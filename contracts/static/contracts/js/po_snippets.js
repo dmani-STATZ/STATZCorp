@@ -251,7 +251,6 @@ const POSnippets = (() => {
     }
 
     function openEditor(id) {
-        _initQuill();
         const modal = bootstrap.Modal.getOrCreateInstance(
             document.getElementById('snippetEditorModal')
         );
@@ -264,13 +263,19 @@ const POSnippets = (() => {
             document.getElementById('snippetEditorTitle').value = s.title;
             document.getElementById('snippetEditorCategory').value = s.category || '';
             document.getElementById('snippetEditorSortOrder').value = s.sort_order;
-            _quill.clipboard.dangerouslyPasteHTML(s.body || '');
+            // Load into Quill only if already initialized (first open defers
+            // to the shown.bs.modal handler below)
+            if (_quill) {
+                _quill.clipboard.dangerouslyPasteHTML(s.body || '');
+            }
         } else {
             document.getElementById('snippetEditorLabel').textContent = 'New Snippet';
             document.getElementById('snippetEditorTitle').value = '';
             document.getElementById('snippetEditorCategory').value = '';
             document.getElementById('snippetEditorSortOrder').value = '0';
-            _quill.setContents([]);
+            if (_quill) {
+                _quill.setContents([]);
+            }
         }
         modal.show();
     }
@@ -351,6 +356,29 @@ const POSnippets = (() => {
     } else {
         init();
     }
+
+    // Wire Quill init to modal shown event (modal must be fully visible
+    // before Quill can measure and mount into the container)
+    (function wireQuillModalInit() {
+        const modalEl = document.getElementById('snippetEditorModal');
+        if (!modalEl) return;
+        modalEl.addEventListener('shown.bs.modal', function () {
+            const wasInitialized = !!_quill;
+            _initQuill();
+            // If Quill was just created for the first time, load pending content
+            if (!wasInitialized && _quill) {
+                const id = document.getElementById('snippetEditorId').value;
+                if (id) {
+                    const s = _all.find(x => x.id === parseInt(id, 10));
+                    if (s) {
+                        _quill.clipboard.dangerouslyPasteHTML(s.body || '');
+                    }
+                } else {
+                    _quill.setContents([]);
+                }
+            }
+        });
+    })();
 
     return {
         load,

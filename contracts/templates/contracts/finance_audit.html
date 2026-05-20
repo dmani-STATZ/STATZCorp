@@ -400,9 +400,9 @@
                                     ${{ clin.paid_amount|floatformat:2|intcomma }}
                                 </span>
                                 {% if clin.has_shipments %}
-                                <div class="text-body-secondary" style="font-size:0.65rem; margin-top:1px;">
+                                <!-- <div class="text-body-secondary" style="font-size:0.65rem; margin-top:1px;">
                                     log via shipment
-                                </div>
+                                </div> -->
                                 {% endif %}
                             </td>
                             <td class="text-end">
@@ -435,9 +435,9 @@
                                     ${{ clin.wawf_payment|floatformat:2|intcomma }}
                                 </span>
                                 {% if clin.has_shipments %}
-                                <div class="text-body-secondary" style="font-size:0.65rem; margin-top:1px;">
+                                <!-- <div class="text-body-secondary" style="font-size:0.65rem; margin-top:1px;">
                                     log via shipment
-                                </div>
+                                </div> -->
                                 {% endif %}
                             </td>
                             <td class="text-end fw-semibold {% if clin.adjusted_gross > 0 %}text-success{% elif clin.adjusted_gross < 0 %}text-danger{% endif %}"

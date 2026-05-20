@@ -120,6 +120,16 @@ class Contact(models.Model):
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True, related_name='contacts')
     address = models.ForeignKey('contracts.Address', on_delete=models.CASCADE, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
+    is_primary = models.BooleanField(
+        default=False,
+        null=True,
+        blank=True,
+        help_text=(
+            "Designates this as a primary contact for the supplier. "
+            "Multiple contacts per supplier may be marked primary — "
+            "no uniqueness constraint is enforced."
+        ),
+    )
 
     class Meta:
         db_table = 'contracts_contact'

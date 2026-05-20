@@ -205,6 +205,8 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 10. **`transactions` signals depend on `Supplier`** — renaming or removing `Supplier` fields without checking `transactions/signals.py` can silently break transaction processing.
 11. **`Supplier.prime` is an IntegerField storing a `SalesClass.id`** — it is rendered in `SupplierForm` as a `ModelChoiceField` with a `clean_prime` override that converts the selected instance back to an integer on save. There is no FK constraint at the database level. Do not change this to a real FK without a coordinated migration.
 12. **`SupplierContactGroup.contacts` M2M only validates that contacts belong to the same supplier at the view layer** — the DB has no constraint preventing a contact from a different supplier being added via ORM directly. Always use the view endpoints or validate supplier ownership before calling `.set()` or `.add()` in any new code path.
+13. **`Contact.is_primary`** — BooleanField (nullable, default False). Multiple contacts per supplier may have `is_primary=True`; this is intentional, do not add a unique constraint. Populated via SQL migration from `COMMONCORE.dbo.STATZ_SUPPLIER_CONTACT_TBL.isPrime` through the `migrate_contact` and `migrate_supplier` mapping tables. 19 contacts were excluded from automated migration due to supplier ID mismatches — see Barbara's manual review list.
+14. **`Supplier.contact` FK is deprecated** — do not use it in any new code. Use `Contact.objects.filter(supplier=supplier, is_primary=True).first()` instead. Removal is scheduled for Stage 2.
 
 ---
 
