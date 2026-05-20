@@ -42,6 +42,8 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 
 `SupplierContactGroup` maps to `contracts_suppliercontactgroup` and represents a named group of `Contact` records for a single supplier. Groups are supplier-specific (no cross-supplier sharing). Each group carries full `AuditModel` timestamps. The M2M junction table `contracts_suppliercontactgroup_contacts` is auto-managed by Django; removing a `Contact` record automatically removes it from all groups via the junction table. Group CRUD is handled by four dedicated AJAX endpoints (`supplier_group_create`, `supplier_group_edit`, `supplier_group_delete`, `supplier_group_name_suggestions`) mounted under `suppliers/urls.py`.
 
+**"Primary Contacts"** is an auto-managed group present on any supplier with at least one `is_primary` contact. It is created/updated/deleted automatically via `sync_primary_group()`. Users cannot rename or delete it manually.
+
 `SupplierDocument` extends `AuditModel` to store uploaded files (upload path `supplier-docs/`), document `doc_type` (CERT/CLASS/GENERAL), optional links to the associated certification/classification, and a `description`; `SupplierDetailView` selects the latest 25 docs and matches them to certifications/classifications.
 
 `OpenRouterModelSetting` keeps the shared AI model metadata (`key`, `model_name`, `needs_update`, timestamps, `updated_by`). `openrouter_config.get_default()` always returns the `key="default"` row, `get_model_for_request` chooses stored vs. fallback vs. hard-coded default (`mistralai/mistral-small:free`), and `save_openrouter_model_config` tracks who made the change.

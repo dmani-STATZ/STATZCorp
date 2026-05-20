@@ -1383,6 +1383,8 @@ def finalize_and_email_contract(request, process_contract_id):
                 modified_by=request.user,
             )
 
+        process_clins = process_contract.clins.all()
+
         # Create CLINs and payment history with all relevant fields
         for process_clin in process_clins:
             clin = Clin.objects.create(

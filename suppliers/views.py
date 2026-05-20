@@ -1176,7 +1176,22 @@ def supplier_group_edit(request, pk, group_id):
         SupplierContactGroup, id=group_id, supplier_id=pk
     )
 
+    from contracts.views.supplier_views import PRIMARY_GROUP_NAME
+
+    if group.name == PRIMARY_GROUP_NAME:
+        return JsonResponse(
+            {
+                "error": "'Primary Contacts' is an auto-managed group and cannot be renamed."
+            },
+            status=400,
+        )
+
     name_in_post = "name" in request.POST
+    if name_in_post and (request.POST.get("name") or "").strip() == PRIMARY_GROUP_NAME:
+        return JsonResponse(
+            {"error": f"'{PRIMARY_GROUP_NAME}' is a reserved group name."},
+            status=400,
+        )
     contact_ids_in_post = "contact_ids" in request.POST
     if not name_in_post and not contact_ids_in_post:
         return JsonResponse(
@@ -1245,6 +1260,20 @@ def supplier_group_delete(request, pk, group_id):
     group = get_object_or_404(
         SupplierContactGroup, id=group_id, supplier_id=pk
     )
+
+    from contracts.views.supplier_views import PRIMARY_GROUP_NAME
+
+    if group.name == PRIMARY_GROUP_NAME:
+        return JsonResponse(
+            {
+                "error": (
+                    "'Primary Contacts' is an auto-managed group and cannot be deleted. "
+                    "Remove the Primary designation from all contacts to remove this group."
+                )
+            },
+            status=400,
+        )
+
     group.delete()
     return JsonResponse({"ok": True, "group_id": group_id})
 

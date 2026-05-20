@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 
 from STATZWeb.decorators import conditional_login_required
 from suppliers.models import Contact, Supplier
+from contracts.views.supplier_views import sync_primary_group, PRIMARY_GROUP_NAME
 from ..models import Address
 from ..forms import ContactForm, AddressForm
 
@@ -117,6 +118,7 @@ class ContactCreateView(CreateView):
                 if Contact.objects.filter(supplier=supplier).count() == 1:
                     self.object.is_primary = True
                     self.object.save(update_fields=['is_primary'])
+                    sync_primary_group(supplier, self.request.user)
                 messages.info(self.request, f'Contact assigned to supplier {supplier.name}.')
             except Supplier.DoesNotExist:
                 pass
@@ -157,13 +159,16 @@ class ContactDeleteView(DeleteView):
     
     def post(self, request, *args, **kwargs):
         contact = self.get_object()
+        supplier = contact.supplier
         if contact.is_primary is True:
             messages.warning(
                 request,
                 "This contact was marked as a primary contact. It has been deleted.",
             )
-        messages.success(request, 'Contact deleted successfully.')
-        return super().post(request, *args, **kwargs)
+        response = super().post(request, *args, **kwargs)
+        if supplier:
+            sync_primary_group(supplier, request.user)
+        return response
 
 # Address Views
 @method_decorator(conditional_login_required, name='dispatch')

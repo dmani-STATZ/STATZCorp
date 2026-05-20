@@ -14,6 +14,7 @@ from STATZWeb.decorators import conditional_login_required
 from suppliers.models import (
     Supplier,
     Contact,
+    SupplierContactGroup,
     SupplierCertification,
     SupplierClassification,
     CertificationType,
@@ -21,6 +22,40 @@ from suppliers.models import (
     SupplierType,
     SupplierDocument,
 )
+
+PRIMARY_GROUP_NAME = "Primary Contacts"
+
+
+def sync_primary_group(supplier, user=None):
+    """
+    Keep the auto-managed 'Primary Contacts' SupplierContactGroup in sync
+    with Contact.is_primary for the given supplier.
+    - If primary contacts exist: get_or_create the group, set its members.
+    - If no primary contacts exist: delete the group if it exists.
+    Called after any is_primary change (toggle, first-contact save, delete).
+    """
+    primary_contacts = list(
+        Contact.objects.filter(supplier=supplier, is_primary=True)
+    )
+    if primary_contacts:
+        group = SupplierContactGroup.objects.filter(
+            supplier=supplier,
+            name=PRIMARY_GROUP_NAME,
+        ).first()
+        if not group:
+            group = SupplierContactGroup(
+                supplier=supplier,
+                name=PRIMARY_GROUP_NAME,
+                created_by=user,
+                modified_by=user,
+            )
+            group.save()
+        group.contacts.set(primary_contacts)
+    else:
+        SupplierContactGroup.objects.filter(
+            supplier=supplier,
+            name=PRIMARY_GROUP_NAME,
+        ).delete()
 from ..models import (
     Address,
     Contract,
@@ -634,6 +669,7 @@ def save_supplier_contact(request, pk):
     if Contact.objects.filter(supplier=supplier).count() == 1:
         contact.is_primary = True
         contact.save(update_fields=['is_primary'])
+        sync_primary_group(supplier, request.user)
 
     payload = SupplierListView.build_detail_payload(supplier)
     return JsonResponse(payload, safe=False)
@@ -647,6 +683,7 @@ def delete_supplier_contact(request, pk, contact_id):
     contact = get_object_or_404(Contact, pk=contact_id, supplier=supplier)
 
     contact.delete()
+    sync_primary_group(supplier, request.user)
     payload = SupplierListView.build_detail_payload(supplier)
     return JsonResponse(payload, safe=False)
 
@@ -660,6 +697,7 @@ def toggle_contact_primary(request, pk, contact_id):
     contact = get_object_or_404(Contact, pk=contact_id, supplier=supplier)
     contact.is_primary = not bool(contact.is_primary)
     contact.save(update_fields=['is_primary'])
+    sync_primary_group(supplier, request.user)
     payload = SupplierListView.build_detail_payload(supplier)
     return JsonResponse(payload, safe=False)
 
