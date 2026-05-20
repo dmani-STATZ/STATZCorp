@@ -53,6 +53,7 @@ from .supplier_views import (
     update_supplier_files,
     save_supplier_contact,
     delete_supplier_contact,
+    toggle_contact_primary,
     addresses_lookup,
     supplier_autocomplete,
     update_supplier_header,

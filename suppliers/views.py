@@ -748,7 +748,9 @@ class SupplierDetailView(DetailView):
             (supplier.business_email or supplier.primary_email)
             or any(c.email for c in context['contacts'])
         )
-        context['has_primary_contact'] = supplier.contact_id is not None
+        context['has_primary_contact'] = Contact.objects.filter(
+            supplier=supplier, is_primary=True
+        ).exists()
 
         clin_contract_ids = Clin.objects.filter(
             supplier=supplier,

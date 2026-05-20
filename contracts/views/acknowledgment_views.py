@@ -9,6 +9,7 @@ import os
 from docx import Document
 from ..models import AcknowledgementLetter, Clin, Contract
 from ..forms import AcknowledgementLetterForm
+from suppliers.models import Contact
 from users.user_settings import UserSettings
 import logging
 
@@ -30,8 +31,8 @@ def get_acknowledgment_letter(request, clin_id):
             letter.supplier = supplier.name
             
             # Get contact info
-            if supplier.contact:
-                contact = supplier.contact
+            contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
+            if contact:
                 letter.salutation = contact.salutation
                 if contact.name:
                     # Split name into first and last

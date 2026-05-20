@@ -179,7 +179,7 @@ def rfq_mailto(request, match_id):
     Resolves supplier email using priority:
       1. match.supplier.primary_email
       2. match.supplier.business_email
-      3. match.supplier.contact.email
+      3. primary Contact email (is_primary=True)
 
     Renders the default EmailTemplate (or first available) with solicitation variables.
     If no email is found, returns { missing_email: true, mailto_url: null }.
@@ -1028,7 +1028,7 @@ def rfq_supplier_search(request):
     # Match suppliers dashboard / supplier search: search all suppliers (do not exclude archived)
     qs = Supplier.objects.filter(
         Q(name__icontains=q) | Q(cage_code__icontains=q),
-    ).select_related('contact').order_by('name')[:15]
+    ).order_by('name')[:15]
 
     existing_match_supplier_ids = set()
     if line_id:
@@ -1075,7 +1075,7 @@ def rfq_send_to_existing(request):
         return JsonResponse({'success': False, 'error': 'supplier_id and line_id are required.'}, status=400)
 
     try:
-        supplier = Supplier.objects.select_related('contact').get(pk=supplier_id)
+        supplier = Supplier.objects.get(pk=supplier_id)
     except Supplier.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Supplier not found.'}, status=404)
 

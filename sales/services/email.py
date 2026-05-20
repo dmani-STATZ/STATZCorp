@@ -171,10 +171,11 @@ def resolve_supplier_email(supplier):
         if email:
             return email
 
-    if getattr(supplier, "contact_id", None) and supplier.contact:
-        email = getattr(supplier.contact, "email", None)
-        if email and email.strip():
-            return email.strip()
+    from suppliers.models import Contact
+
+    primary_contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
+    if primary_contact and primary_contact.email and primary_contact.email.strip():
+        return primary_contact.email.strip()
 
     return None
 

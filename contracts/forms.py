@@ -161,7 +161,7 @@ class SupplierForm(BaseModelForm):
             'name', 'cage_code', 'supplier_type', 'billing_address', 'shipping_address',
             'physical_address', 'business_phone', 'business_fax', 'business_email',
             'primary_phone', 'primary_email', 'website_url', 'logo_url',
-            'contact', 'probation', 'conditional', 'special_terms', 'prime', 'ppi',
+            'probation', 'conditional', 'special_terms', 'prime', 'ppi',
             'iso', 'notes', 'allows_gsi', 'is_packhouse', 'packhouse', 'archived'
         ]
         widgets = {
@@ -198,8 +198,6 @@ class SupplierForm(BaseModelForm):
         # Sort select field choices
         if 'packhouse' in self.fields:
             self.fields['packhouse'].queryset = self.fields['packhouse'].queryset.order_by('name')
-        if 'contact' in self.fields:
-            self.fields['contact'].queryset = self.fields['contact'].queryset.order_by('name')
         
         # Handle null boolean fields - treat None as False for display
         if self.instance and self.instance.pk:

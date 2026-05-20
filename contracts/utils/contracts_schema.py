@@ -152,7 +152,7 @@ def generate_contracts_schema_description():
     schema_description += "- contracts_supplier.billing_address_id (FK) refers to contracts_address.id\n"
     schema_description += "- contracts_supplier.shipping_address_id (FK) refers to contracts_address.id\n"
     schema_description += "- contracts_supplier.physical_address_id (FK) refers to contracts_address.id\n"
-    schema_description += "- contracts_supplier.contact_id (FK) refers to contracts_contact.id\n"
+    schema_description += "- contracts_contact.is_primary marks primary contact(s) per supplier (via contracts_contact.supplier_id)\n"
     schema_description += "- contracts_supplier.probation_by_id (FK) refers to auth_user.id\n"
     schema_description += "- contracts_supplier.conditional_by_id (FK) refers to auth_user.id\n"
     schema_description += "- contracts_supplier.special_terms_id (FK) refers to contracts_specialpaymentterms.id\n"

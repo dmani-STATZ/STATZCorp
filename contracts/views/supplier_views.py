@@ -153,8 +153,7 @@ class SupplierListView(ListView):
         contracts_qs = Contract.objects.filter(clin__supplier=supplier).select_related('idiq_contract', 'status').distinct().order_by('-created_on')
         contracts = contracts_qs[:10]
         contacts = list(Contact.objects.filter(supplier=supplier))
-        if supplier.contact and supplier.contact not in contacts:
-            contacts.append(supplier.contact)
+        primary_contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
         certifications = SupplierCertification.objects.filter(supplier=supplier)
         classifications = SupplierClassification.objects.filter(supplier=supplier)
         try:
@@ -241,9 +240,12 @@ class SupplierListView(ListView):
             'billing_address_obj': as_dict(supplier.billing_address),
             'shipping_address_obj': as_dict(supplier.shipping_address),
             'physical_address_obj': as_dict(supplier.physical_address),
-            'contact_name': supplier.contact.name if supplier.contact else None,
-            'contact_email': supplier.contact.email if supplier.contact else None,
-            'contact_phone': supplier.contact.phone if supplier.contact else None,
+            'contact_name': primary_contact.name if primary_contact else None,
+            'contact_email': primary_contact.email if primary_contact else None,
+            'contact_phone': primary_contact.phone if primary_contact else None,
+            'primary_contact_id': Contact.objects.filter(
+                supplier=supplier, is_primary=True
+            ).values_list('id', flat=True).first(),
             'special_terms': supplier.special_terms.terms if supplier.special_terms else None,
             'special_terms_id': supplier.special_terms.id if supplier.special_terms else None,
             'special_terms_on': fmt_dt(supplier.special_terms_on),
@@ -286,12 +288,14 @@ class SupplierListView(ListView):
             ],
             'contacts': [
                 {
-                    'id': ct.id,
-                    'name': ct.name,
-                    'title': ct.title,
-                    'email': ct.email,
-                    'phone': ct.phone
-                } for ct in contacts
+                    'id': c.id,
+                    'name': c.name or '',
+                    'title': c.title or '',
+                    'phone': c.phone or '',
+                    'email': c.email or '',
+                    'is_primary': bool(c.is_primary),
+                }
+                for c in contacts
             ],
             'stats': contract_stats,
             'documents': [
@@ -627,9 +631,9 @@ def save_supplier_contact(request, pk):
     contact.title = title or None
     contact.save()
 
-    if not supplier.contact:
-        supplier.contact = contact
-        supplier.save(update_fields=['contact'])
+    if Contact.objects.filter(supplier=supplier).count() == 1:
+        contact.is_primary = True
+        contact.save(update_fields=['is_primary'])
 
     payload = SupplierListView.build_detail_payload(supplier)
     return JsonResponse(payload, safe=False)
@@ -642,11 +646,20 @@ def delete_supplier_contact(request, pk, contact_id):
     supplier = get_object_or_404(Supplier, pk=pk)
     contact = get_object_or_404(Contact, pk=contact_id, supplier=supplier)
 
-    if supplier.contact_id == contact.id:
-        supplier.contact = None
-        supplier.save(update_fields=['contact'])
-
     contact.delete()
+    payload = SupplierListView.build_detail_payload(supplier)
+    return JsonResponse(payload, safe=False)
+
+
+@conditional_login_required
+def toggle_contact_primary(request, pk, contact_id):
+    """Toggle is_primary on a contact. POST only."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    supplier = get_object_or_404(Supplier, pk=pk)
+    contact = get_object_or_404(Contact, pk=contact_id, supplier=supplier)
+    contact.is_primary = not bool(contact.is_primary)
+    contact.save(update_fields=['is_primary'])
     payload = SupplierListView.build_detail_payload(supplier)
     return JsonResponse(payload, safe=False)
 
@@ -802,7 +815,6 @@ class SupplierUpdateView(UpdateView):
             'primary_email': getattr(obj, 'primary_email', None),
             'website_url': getattr(obj, 'website_url', None),
             'logo_url': getattr(obj, 'logo_url', None),
-            'contact': obj.contact,
             'probation': obj.probation,
             'conditional': obj.conditional,
             'special_terms': obj.special_terms,
@@ -836,7 +848,6 @@ class SupplierUpdateView(UpdateView):
             'primary_email': supplier.primary_email,
             'website_url': supplier.website_url,
             'logo_url': supplier.logo_url,
-            'contact': supplier.contact.id if supplier.contact else None,
             'probation': supplier.probation,
             'conditional': supplier.conditional,
             'special_terms': supplier.special_terms.id if supplier.special_terms else None,

@@ -50,7 +50,6 @@ class Supplier(AuditModel):
     )
     logo_url = models.URLField(null=True, blank=True)
     last_enriched_at = models.DateTimeField(null=True, blank=True)
-    contact = models.ForeignKey('Contact', on_delete=models.CASCADE, null=True, blank=True, related_name='primary_for_supplier')
     probation = models.BooleanField(null=True, blank=True)
     probation_on = models.DateField(null=True, blank=True)
     probation_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='suppliers_supplier_probation')

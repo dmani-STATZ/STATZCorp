@@ -6,7 +6,7 @@ from django.views.decorators.http import require_http_methods
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, GovAction, Contract
 from ..forms import GovActionForm
-from suppliers.models import Supplier
+from suppliers.models import Supplier, Contact
 
 
 @conditional_login_required
@@ -88,10 +88,10 @@ def get_supplier_info(request, supplier_id):
     """Return supplier details for Supplier Info modal (AJAX)."""
     try:
         supplier = get_object_or_404(
-            Supplier.objects.select_related('contact', 'physical_address', 'billing_address', 'shipping_address'),
+            Supplier.objects.select_related('physical_address', 'billing_address', 'shipping_address'),
             id=supplier_id
         )
-        contact = supplier.contact
+        contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
         return JsonResponse({
             'success': True,
             'name': supplier.name or '—',

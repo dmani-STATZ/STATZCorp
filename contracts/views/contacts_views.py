@@ -55,13 +55,9 @@ class ContactListView(ListView):
         context = super().get_context_data(**kwargs)
         context['search_query'] = self.request.GET.get('q', '')
         context['sort_by'] = self.request.GET.get('sort', 'name')
-        # Count related suppliers for each contact
-        supplier_counts = Supplier.objects.filter(contact__in=context['contacts']).values('contact').annotate(count=Count('id'))
-        supplier_counts_dict = {item['contact']: item['count'] for item in supplier_counts}
-        
-        # Add supplier count to each contact
+        # Add supplier count to each contact (via Contact.supplier FK)
         for contact in context['contacts']:
-            contact.supplier_count = supplier_counts_dict.get(contact.id, 0)
+            contact.supplier_count = 1 if contact.supplier_id else 0
             
         return context
 
@@ -73,7 +69,7 @@ class ContactDetailView(DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['related_suppliers'] = Supplier.objects.filter(contact=self.object).select_related('supplier_type')
+        context['related_suppliers'] = Supplier.objects.filter(contacts=self.object).select_related('supplier_type')
         return context
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -118,8 +114,9 @@ class ContactCreateView(CreateView):
         if supplier_id:
             try:
                 supplier = Supplier.objects.get(id=supplier_id)
-                supplier.contact = self.object
-                supplier.save()
+                if Contact.objects.filter(supplier=supplier).count() == 1:
+                    self.object.is_primary = True
+                    self.object.save(update_fields=['is_primary'])
                 messages.info(self.request, f'Contact assigned to supplier {supplier.name}.')
             except Supplier.DoesNotExist:
                 pass
@@ -158,18 +155,13 @@ class ContactDeleteView(DeleteView):
     template_name = 'contracts/contacts/contact_confirm_delete.html'
     success_url = reverse_lazy('contracts:contact_list')
     
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Check if contact is used by any suppliers
-        context['suppliers_using_contact'] = Supplier.objects.filter(contact=self.object)
-        return context
-    
     def post(self, request, *args, **kwargs):
-        suppliers_using_contact = Supplier.objects.filter(contact=self.get_object())
-        if suppliers_using_contact.exists():
-            messages.error(request, "Cannot delete this contact because it is used by one or more suppliers. Please remove the contact from those suppliers first.")
-            return redirect('contracts:contact_detail', pk=self.get_object().pk)
-        
+        contact = self.get_object()
+        if contact.is_primary is True:
+            messages.warning(
+                request,
+                "This contact was marked as a primary contact. It has been deleted.",
+            )
         messages.success(request, 'Contact deleted successfully.')
         return super().post(request, *args, **kwargs)
 
