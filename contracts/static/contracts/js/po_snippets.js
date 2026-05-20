@@ -252,7 +252,7 @@ const POSnippets = (() => {
 
     function openEditor(id) {
         _initQuill();
-        const modal = bootstrap.Modal.getOrCreate(
+        const modal = bootstrap.Modal.getOrCreateInstance(
             document.getElementById('snippetEditorModal')
         );
         document.getElementById('snippetEditorId').value = id || '';
