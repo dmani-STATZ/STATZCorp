@@ -1,7 +1,7 @@
 ---
 id: 2026-05-20-supplier-primary-contacts
 title: Supplier primary contacts on contact records
-published: false
+published: true
 publish_date: 2026-05-20
 tags: [improved, contracts]
 critical: false

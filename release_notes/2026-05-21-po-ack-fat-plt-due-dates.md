@@ -1,7 +1,7 @@
 ---
 id: 2026-05-21-po-ack-fat-plt-due-dates
 title: PO Acknowledgment Letter — separate FAT and PLT due dates
-published: false
+published: true
 publish_date: 2026-05-21
 tags: [improved, contracts]
 critical: false

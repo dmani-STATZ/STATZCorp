@@ -1,7 +1,7 @@
 ---
 id: 2026-05-21-po-ack-pdf-download-send
 title: PO Acknowledgment Letter — PDF download and contract folder upload
-published: false
+published: true
 publish_date: 2026-05-21
 tags: [improved, contracts]
 critical: false

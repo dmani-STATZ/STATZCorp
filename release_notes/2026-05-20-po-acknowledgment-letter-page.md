@@ -1,7 +1,7 @@
 ---
 id: 2026-05-20-po-acknowledgment-letter-page
 title: PO Acknowledgment Letter — full page editor
-published: false
+published: true
 publish_date: 2026-05-20
 tags: [improved, contracts]
 critical: false

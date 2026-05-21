@@ -1,7 +1,7 @@
 ---
 id: 2026-05-21-po-ack-pdf-preview
 title: PO Acknowledgment Letter — PDF preview from Word template
-published: false
+published: true
 publish_date: 2026-05-21
 tags: [improved, contracts]
 critical: false
