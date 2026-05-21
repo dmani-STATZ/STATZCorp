@@ -99,12 +99,16 @@
             {{ form.statz_contact_email }}
         </div>
 
-        {# supplier_due_date and fat_plt_due_date render explicitly below (not via form.as_p). #}
+        {# supplier_due_date, fat_due_date, and plt_due_date render explicitly below (not via form.as_p). #}
         <!-- Due Dates and DPAS -->
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-4 gap-3">
             <div>
-                <label class="block text-sm font-medium text-red-600">FAT/PLT Due Date</label>
-                {{ form.fat_plt_due_date }}
+                <label class="block text-sm font-medium text-red-600">FAT Due Date</label>
+                {{ form.fat_due_date }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-red-600">PLT Due Date</label>
+                {{ form.plt_due_date }}
             </div>
             <div>
                 <label class="block text-sm font-medium text-red-600">Target Ship Date (Supplier Due)</label>

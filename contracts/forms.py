@@ -666,6 +666,15 @@ class ClinAcknowledgmentForm(BaseModelForm):
         }
 
 class AcknowledgementLetterForm(BaseModelForm):
+    fat_due_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+    )
+    plt_due_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+    )
+
     class Meta:
         model = AcknowledgementLetter
         fields = [
@@ -685,15 +694,13 @@ class AcknowledgementLetterForm(BaseModelForm):
             'statz_contact_title',
             'statz_contact_phone',
             'statz_contact_email',
-            'fat_plt_due_date',
+            'fat_due_date',
+            'plt_due_date',
             'supplier_due_date',
             'dpas_priority',
         ]
         widgets = {
             'letter_date': forms.DateInput(attrs={
-                'type': 'date'
-            }),
-            'fat_plt_due_date': forms.DateInput(attrs={
                 'type': 'date'
             }),
             'supplier_due_date': forms.DateInput(attrs={

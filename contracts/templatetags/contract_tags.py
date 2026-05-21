@@ -23,3 +23,12 @@ def abs_value(value):
         return abs(value)
     except (TypeError, ValueError):
         return value
+
+
+@register.filter
+def add_field_classes(bound_field, css_class):
+    """Set CSS classes on a bound form field widget (replaces widget class)."""
+    widget = bound_field.field.widget
+    attrs = dict(widget.attrs)
+    attrs['class'] = css_class
+    return bound_field.as_widget(attrs=attrs)

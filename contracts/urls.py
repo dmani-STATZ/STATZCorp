@@ -154,6 +154,9 @@ from .views.idiq_views import (
 
 from .views.acknowledgment_views import (
     get_acknowledgment_letter,
+    acknowledgment_letter_page,
+    preview_acknowledgment_letter,
+    upload_acknowledgment_template,
     update_acknowledgment_letter,
     generate_acknowledgment_letter_doc,
 )
@@ -690,6 +693,21 @@ urlpatterns = [
         name="update_clin_field",
     ),
     # Acknowledgment Letter URLs
+    path(
+        "clin/<int:clin_id>/acknowledgment-letter/",
+        acknowledgment_letter_page,
+        name="acknowledgment-letter-page",
+    ),
+    path(
+        "acknowledgment-letter/<int:letter_id>/preview/",
+        preview_acknowledgment_letter,
+        name="acknowledgment-letter-preview",
+    ),
+    path(
+        "acknowledgment-letter/template/upload/",
+        upload_acknowledgment_template,
+        name="acknowledgment-template-upload",
+    ),
     path(
         "acknowledgment-letter/<int:clin_id>/",
         get_acknowledgment_letter,

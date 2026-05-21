@@ -426,9 +426,22 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 10. **Changing URL pattern names without searching templates.** There are ~90 named URLs. `{% url 'contracts:...' %}` is used throughout `contracts/templates/contracts/` and possibly in `sales`, `processing`, and `suppliers` templates.
 
-11. **PO Acknowledgement Letter views live in `acknowledgment_views.py` only** (single-e spelling). `acknowledgement_letter_views.py` (double-e) and its full-page URL routes were removed. Do not recreate the old `generate_acknowledgement_letter` / `view_acknowledgement_letter` / `edit_acknowledgement_letter` endpoints.
+11. **PO Acknowledgement Letter** — views live in `acknowledgment_views.py` only (single-e spelling). Do not recreate `acknowledgement_letter_views.py` (double-e) or legacy full-page routes.
 
-**Contract-level acknowledgment:** The acknowledgment section on `contract_management.html` is now contract-level. `toggleAcknowledgment(field)` POSTs to `toggle_contract_acknowledgment` using `contract.id`. Do not revert to CLIN-level routing. The acknowledgment letter button still uses `selected_clin.id` — this is intentional.
+**`AcknowledgmentLetterTemplate` (`contracts/models.py`):** DB-backed `.docx` templates for letter generation. Fields: `file`, `rev_number`, `uploaded_by`, `uploaded_at`, `is_active`. **`activate()`** deactivates all other rows and sets `is_active=True` on this instance. **`get_active()`** returns the single active template or `None`. Staff upload on the letter page (`upload_acknowledgment_template`); each upload auto-activates.
+
+**`AcknowledgementLetter` due dates:** `fat_due_date` and `plt_due_date` replaced the legacy `fat_plt_due_date` field (migration `0070`). Word template placeholders: `{{FAT_DUE_DATE}}` and `{{PLT_DUE_DATE}}` (not `{{FAT_PLT_DUE_DATE}}`). Preview and `generate_acknowledgment_letter_doc` must substitute both tokens from POST / saved letter fields.
+
+**Acknowledgment letter URL names:**
+| Name | View | Notes |
+|------|------|-------|
+| `acknowledgment-letter-page` | `acknowledgment_letter_page` | `clin/<clin_id>/acknowledgment-letter/` |
+| `acknowledgment-letter-preview` | `preview_acknowledgment_letter` | POST AJAX; no DB write |
+| `acknowledgment-template-upload` | `upload_acknowledgment_template` | Staff only |
+| `generate_acknowledgment_letter_doc` | `generate_acknowledgment_letter_doc` | POST download; JSON error if no active template (do not raise unhandled exceptions) |
+| `update_acknowledgment_letter` | `update_acknowledgment_letter` | AJAX save from letter page |
+
+**Contract-level acknowledgment:** The acknowledgment section on `contract_management.html` is contract-level. `toggleAcknowledgment(field)` POSTs to `toggle_contract_acknowledgment` using `contract.id`. The PO Acknowledge Letter link navigates to `acknowledgment-letter-page` for `selected_clin.id`.
 
 12. **Deprecated `api_add_note`** reads `request.content_type` (which is not set in AJAX requests). Any legacy call must pass `content_type_id` and `object_id` explicitly. No active in-app callers; the route remains for old bookmarks.
 

@@ -21,13 +21,14 @@
                 <div class="row-between py-1 border-b">
                     <span class="text-sm text-gray-700 w-1/3">PO Acknowledge Letter</span>
                     <div class="text-center w-1/3">
-                        <button
-                            onclick="openAcknowledgmentLetter('{{ selected_clin.id }}')"
-                            class="w-24 px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm
-                                {% if not selected_clin %}btn-secondary{% else %}btn-primary{% endif %}"
-                            {% if not selected_clin %}disabled{% endif %}>
+                        {% if selected_clin %}
+                        <a href="{% url 'contracts:acknowledgment-letter-page' selected_clin.id %}"
+                           class="w-24 inline-block px-3 py-1 text-sm font-medium rounded-md transition-colors duration-150 btn btn-sm btn-primary text-decoration-none">
                             {% if acknowledgment_letter %}Edit{% else %}Create{% endif %}
-                        </button>
+                        </a>
+                        {% else %}
+                        <span class="w-24 inline-block px-3 py-1 text-sm font-medium rounded-md btn btn-sm btn-secondary disabled">Create</span>
+                        {% endif %}
                     </div>
                     <span class="text-xs text-gray-500 w-1/3 text-right">
                         {% if acknowledgment_letter %}
@@ -860,23 +861,6 @@
     </div>
 </div>
 
-<!-- Acknowledgment Letter Modal -->
-<div id="acknowledgmentLetterModal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 99999;">
-    <div class="relative top-20 mx-auto p-5 border shadow-lg rounded-md bg-white" style="width: 550px !important; max-width: 550px !important;">
-        <div class="flex justify-between items-center pb-3">
-            <h3 class="text-xl font-semibold">Purchase Order Acknowledge Letter</h3>
-            <button onclick="closeAcknowledgmentLetter()" class="text-gray-400 hover:text-gray-500">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
-        </div>
-        <div id="acknowledgmentLetterContent" class="mt-4">
-            <!-- Form will be loaded here -->
-        </div>
-    </div>
-</div>
-
 <style>
     /* Custom styling for note containers */
     .note-content {
@@ -897,29 +881,6 @@
 
     .clin-note {
         border-left-color: #3B82F6 !important; /* Blue */
-    }
-
-    /* Ensure modal appears above everything */
-    #acknowledgmentLetterModal {
-        z-index: 99999 !important;
-    }
-
-    /* Ensure form inputs in modal appear above CLIN highlight */
-    #acknowledgmentLetterModal input,
-    #acknowledgmentLetterModal select,
-    #acknowledgmentLetterModal button {
-        position: relative;
-        z-index: 1;
-    }
-
-    /* Modal content styling */
-    #acknowledgmentLetterContent input,
-    #acknowledgmentLetterContent select {
-        width: 100%;
-        padding: 0.375rem 0.75rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 0.375rem;
-        font-size: 0.875rem;
     }
 </style>
 
@@ -1239,62 +1200,6 @@ function showSystemMessage(title, content) {
 function closeSystemMessage() {
     const modal = document.getElementById('system-message');
     modal.classList.add('hidden');
-}
-
-// Define generateLetter function globally
-function generateLetter() {
-    const form = document.getElementById('acknowledgmentLetterForm');
-    const letterId = form.dataset.letterId;
-    if (!letterId) {
-        alert('Please save the letter before generating.');
-        return;
-    }
-
-    // Save the form first via AJAX, then trigger the download
-    const formData = new FormData(form);
-    const generateButton = document.querySelector('button[onclick="generateLetter()"]');
-    const originalText = generateButton ? generateButton.innerHTML : '';
-
-    if (generateButton) {
-        generateButton.disabled = true;
-        generateButton.textContent = 'Generating...';
-    }
-
-    // Step 1: Save current form data
-    fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
-        method: 'POST',
-        body: formData,
-        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to save letter before generating.');
-        }
-        // Step 2: Trigger download via hidden form POST
-        const downloadForm = document.createElement('form');
-        downloadForm.method = 'POST';
-        downloadForm.action = `/contracts/acknowledgment-letter/${letterId}/generate/`;
-
-        const csrf = document.createElement('input');
-        csrf.type = 'hidden';
-        csrf.name = 'csrfmiddlewaretoken';
-        csrf.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        downloadForm.appendChild(csrf);
-
-        document.body.appendChild(downloadForm);
-        downloadForm.submit();
-        document.body.removeChild(downloadForm);
-    })
-    .catch(err => {
-        alert(err.message || 'Error generating letter.');
-    })
-    .finally(() => {
-        if (generateButton) {
-            generateButton.disabled = false;
-            generateButton.innerHTML = originalText;
-        }
-    });
 }
 
 // Legacy function kept for reference
@@ -2532,99 +2437,6 @@ document.addEventListener('click', function(event) {
         menu.classList.add('hidden');
     }
 });
-
-function openAcknowledgmentLetter(clinId) {
-    console.log('Opening acknowledgment letter for CLIN:', clinId);
-
-    // Get the modal and content elements
-    const modal = document.getElementById('acknowledgmentLetterModal');
-    const modalContent = document.getElementById('acknowledgmentLetterContent');
-
-    // Show loading state
-    modalContent.innerHTML = '<div class="flex justify-center items-center h-64"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>';
-
-    // Show the modal
-    modal.classList.remove('hidden');
-
-    // Fetch the form
-    const url = `/contracts/acknowledgment-letter/${clinId}/`;
-    console.log('Fetching from URL:', url);
-
-    fetch(url)
-        .then(response => {
-            console.log('Response status:', response.status);
-            return response.json();
-        })
-        .then(data => {
-            console.log('Received data:', data);
-            if (data.success) {
-                modalContent.innerHTML = data.html;
-
-                // Initialize form after content is loaded
-                const form = modalContent.querySelector('form');
-                if (form) {
-                    // Style all form inputs
-                    form.querySelectorAll('input, select').forEach(input => {
-                        input.classList.add('w-full', 'rounded-md', 'border-gray-300', 'shadow-sm', 'focus:border-blue-500', 'focus:ring-blue-500', 'text-sm');
-                    });
-
-                    // Set up form submission
-                    form.addEventListener('submit', function(e) {
-                        e.preventDefault();
-
-                        const formData = new FormData(form);
-                        const letterId = form.dataset.letterId;
-
-                        fetch(`/contracts/acknowledgment-letter/${letterId}/update/`, {
-                            method: 'POST',
-                            body: formData,
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken')
-                            }
-                        })
-                        .then(response => response.json())
-                        .then(result => {
-                            if (result.success) {
-                                // Close modal and refresh page
-                                closeAcknowledgmentLetter();
-                                location.reload();
-                            } else {
-                                // Show errors
-                                const errors = result.errors;
-                                Object.keys(errors).forEach(field => {
-                                    const input = form.querySelector(`[name="${field}"]`);
-                                    if (input) {
-                                        input.classList.add('border-red-500');
-                                        const errorDiv = document.createElement('div');
-                                        errorDiv.className = 'text-red-500 text-sm mt-1';
-                                        errorDiv.textContent = errors[field].join(' ');
-                                        input.parentNode.appendChild(errorDiv);
-                                    }
-                                });
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                            alert('An error occurred while saving the form');
-                        });
-                    });
-                }
-            } else {
-                modalContent.innerHTML = '<div class="p-4 text-red-500">Error loading form</div>';
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            modalContent.innerHTML = '<div class="p-4 text-red-500">Error loading form</div>';
-        });
-}
-
-function closeAcknowledgmentLetter() {
-    const modal = document.getElementById('acknowledgmentLetterModal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
 
 // Helper function to get CSRF token
 function getCookie(name) {

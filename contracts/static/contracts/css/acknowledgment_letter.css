@@ -1,0 +1,182 @@
+/* === PO Acknowledgment Letter Page === */
+.ack-letter-page main > div.mx-auto {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.ack-template-dropzone {
+    border: 2px dashed var(--bs-border-color);
+    border-radius: 0.375rem;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.ack-template-dropzone:hover,
+.ack-template-dropzone:focus {
+    border-color: var(--bs-primary);
+    outline: none;
+}
+
+.ack-template-dropzone-active {
+    border-color: var(--bs-primary);
+    background-color: var(--bs-tertiary-bg);
+}
+
+[data-bs-theme="dark"] .ack-template-dropzone:hover,
+[data-bs-theme="dark"] .ack-template-dropzone:focus,
+[data-bs-theme="dark"] .ack-template-dropzone-active {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.ack-template-rev-dialog {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    padding: 0;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+.ack-template-rev-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+/* ── Acknowledgment Letter — Two-Panel Layout ─────────────────── */
+
+.ack-letter-page .ack-letter-layout {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 1.25rem;
+    height: calc(100vh - 215px);
+    overflow: hidden;
+    align-items: flex-start;
+}
+
+.ack-letter-page .ack-letter-panel-left {
+    flex: 0 0 42%;
+    height: 100%;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+.ack-letter-page .ack-letter-panel-right {
+    flex: 1 1 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+}
+
+.ack-letter-page .ack-letter-panel-right > .accordion {
+    flex-shrink: 0;
+}
+
+.ack-letter-page .ack-letter-panel-right > .card {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.ack-letter-page #ack-template-accordion .accordion-button {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.ack-letter-page .ack-letter-panel-left::-webkit-scrollbar,
+.ack-letter-page .ack-letter-panel-right .card-body::-webkit-scrollbar {
+    width: 5px;
+}
+
+.ack-letter-page .ack-letter-panel-left::-webkit-scrollbar-thumb,
+.ack-letter-page .ack-letter-panel-right .card-body::-webkit-scrollbar-thumb {
+    background: var(--bs-border-color);
+    border-radius: 3px;
+}
+
+.ack-letter-page .form-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.15rem;
+    color: var(--bs-secondary-color);
+}
+
+.ack-letter-page #ackLetterForm h6 {
+    font-size: 0.68rem;
+    letter-spacing: 0.07em;
+    margin-top: 0.75rem;
+    margin-bottom: 0.4rem;
+}
+
+.ack-letter-page #ackLetterForm .mb-2 {
+    margin-bottom: 0.35rem !important;
+}
+
+.ack-letter-page #ackLetterForm .mb-3 {
+    margin-bottom: 0.6rem !important;
+}
+
+.ack-letter-page .card-body {
+    padding: 1rem;
+}
+
+/* ── Preview pane — Word document style normalization ─────────── */
+
+.ack-preview-pane {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #000;
+    padding: 0.5rem;
+}
+
+.ack-preview-pane .docx-h1-center {
+  font-weight: bold;
+  font-size: 0.9rem;
+  text-align: center;
+  margin-top: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.ack-preview-pane .docx-h1 {
+  font-weight: bold;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.ack-preview-pane .docx-normal {
+  margin-top: 0;
+  margin-bottom: 0.1rem;
+}
+
+.ack-preview-pane .docx-empty {
+  display: block;
+  min-height: 0.7em;
+  margin: 0;
+}
+
+.ack-preview-pane .docx-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+}
+
+.ack-preview-pane .docx-table td {
+  border: 1px solid #888;
+  padding: 3px 6px;
+  vertical-align: top;
+}
+
+.ack-tmpl-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.1rem;
+}
+
+.ack-tmpl-value {
+    font-size: 0.82rem;
+}

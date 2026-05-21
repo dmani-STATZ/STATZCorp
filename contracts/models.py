@@ -1232,7 +1232,8 @@ class AcknowledgementLetter(models.Model):
     statz_contact_title = models.CharField(max_length=50, null=True, blank=True)
     statz_contact_phone = models.CharField(max_length=20, null=True, blank=True)
     statz_contact_email = models.EmailField(null=True, blank=True)
-    fat_plt_due_date = models.DateField(null=True, blank=True)
+    fat_due_date = models.DateField(null=True, blank=True)
+    plt_due_date = models.DateField(null=True, blank=True)
     supplier_due_date = models.DateField(null=True, blank=True)
     dpas_priority = models.CharField(max_length=10, null=True, blank=True)
     created_on = models.DateTimeField(auto_now_add=True)
@@ -1247,6 +1248,35 @@ class AcknowledgementLetter(models.Model):
 
     def __str__(self):
         return f'Acknowledgement Letter for CLIN {self.clin.id} - {self.letter_date}'
+
+
+class AcknowledgmentLetterTemplate(models.Model):
+    file = models.FileField(upload_to='acknowledgment_templates/')
+    rev_number = models.CharField(max_length=50)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, on_delete=models.SET_NULL,
+        related_name='uploaded_ack_templates'
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"Rev {self.rev_number} — {self.uploaded_at.date()}"
+
+    def activate(self):
+        """Deactivate all others and set this one active."""
+        AcknowledgmentLetterTemplate.objects.exclude(pk=self.pk).update(is_active=False)
+        self.is_active = True
+        self.save(update_fields=['is_active'])
+
+    @classmethod
+    def get_active(cls):
+        return cls.objects.filter(is_active=True).first()
+
 
 class ClinAcknowledgment(AuditModel):
     clin = models.ForeignKey(Clin, on_delete=models.CASCADE)

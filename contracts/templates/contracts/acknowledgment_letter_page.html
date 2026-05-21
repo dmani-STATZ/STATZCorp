@@ -1,0 +1,457 @@
+{% extends "contracts/contract_base.html" %}
+{% load contract_tags %}
+{% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'contracts/css/acknowledgment_letter.css' %}?v={{ cache_version }}">
+{% endblock %}
+
+{% block title %}PO Acknowledgment Letter — {{ letter.po|default:"" }}{% endblock %}
+
+{% block body_class %}ack-letter-page{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+    <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-outline-secondary">Back to Contract</a>
+    <h1 class="h4 mb-0">PO Acknowledgment Letter — {{ letter.po|default:"—" }}</h1>
+  </div>
+
+  <div class="ack-letter-layout">
+    <div class="ack-letter-panel-left">
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <form id="ackLetterForm" method="post" novalidate>
+            {% csrf_token %}
+
+            <h6 class="text-body-secondary text-uppercase small fw-semibold mb-2">Letter Info</h6>
+            <div class="mb-2">
+              <label for="{{ form.letter_date.id_for_label }}" class="form-label">Letter Date</label>
+              {{ form.letter_date|add_field_classes:"form-control form-control-sm" }}
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-8">
+                <label for="{{ form.po.id_for_label }}" class="form-label">PO Number</label>
+                {{ form.po|add_field_classes:"form-control form-control-sm" }}
+              </div>
+              <div class="col-4">
+                <label for="{{ form.po_ext.id_for_label }}" class="form-label">PO Extension</label>
+                {{ form.po_ext|add_field_classes:"form-control form-control-sm" }}
+              </div>
+            </div>
+            <div class="mb-2">
+              <label for="{{ form.contract_num.id_for_label }}" class="form-label">Contract Number</label>
+              {{ form.contract_num|add_field_classes:"form-control form-control-sm" }}
+            </div>
+            <div class="mb-3">
+              <label for="{{ form.dpas_priority.id_for_label }}" class="form-label">DPAS Priority</label>
+              {{ form.dpas_priority|add_field_classes:"form-control form-control-sm" }}
+            </div>
+
+            <h6 class="text-body-secondary text-uppercase small fw-semibold mb-2">Recipient</h6>
+            <div class="row g-2 mb-2">
+              <div class="col-3">
+                <label for="{{ form.salutation.id_for_label }}" class="form-label">Salutation</label>
+                {{ form.salutation|add_field_classes:"form-select form-select-sm" }}
+              </div>
+              <div class="col">
+                <label for="{{ form.addr_fname.id_for_label }}" class="form-label">First Name</label>
+                {{ form.addr_fname|add_field_classes:"form-control form-control-sm" }}
+              </div>
+              <div class="col">
+                <label for="{{ form.addr_lname.id_for_label }}" class="form-label">Last Name</label>
+                {{ form.addr_lname|add_field_classes:"form-control form-control-sm" }}
+              </div>
+            </div>
+            <div class="mb-2">
+              <label for="{{ form.supplier.id_for_label }}" class="form-label">Supplier Name</label>
+              {{ form.supplier|add_field_classes:"form-control form-control-sm" }}
+            </div>
+            <div class="mb-2">
+              <label for="{{ form.st_address.id_for_label }}" class="form-label">Street Address</label>
+              {{ form.st_address|add_field_classes:"form-control form-control-sm" }}
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-5">
+                <label for="{{ form.city.id_for_label }}" class="form-label">City</label>
+                {{ form.city|add_field_classes:"form-control form-control-sm" }}
+              </div>
+              <div class="col-3">
+                <label for="{{ form.state.id_for_label }}" class="form-label">State</label>
+                {{ form.state|add_field_classes:"form-control form-control-sm" }}
+              </div>
+              <div class="col-4">
+                <label for="{{ form.zip.id_for_label }}" class="form-label">Zip</label>
+                {{ form.zip|add_field_classes:"form-control form-control-sm" }}
+              </div>
+            </div>
+
+            <h6 class="text-body-secondary text-uppercase small fw-semibold mb-2">Dates</h6>
+            <div class="row g-2 mb-3">
+              <div class="col-4">
+                <label for="{{ form.supplier_due_date.id_for_label }}" class="form-label">Supplier Due Date</label>
+                {{ form.supplier_due_date|add_field_classes:"form-control form-control-sm" }}
+              </div>
+              <div class="col-4">
+                <label for="id_fat_due_date" class="form-label">FAT Due Date</label>
+                <input type="date" name="fat_due_date" class="form-control form-control-sm" id="id_fat_due_date"
+                       value="{{ form.fat_due_date.value|default:'' }}">
+              </div>
+              <div class="col-4">
+                <label for="id_plt_due_date" class="form-label">PLT Due Date</label>
+                <input type="date" name="plt_due_date" class="form-control form-control-sm" id="id_plt_due_date"
+                       value="{{ form.plt_due_date.value|default:'' }}">
+              </div>
+            </div>
+
+            <h6 class="text-body-secondary text-uppercase small fw-semibold mb-2">STATZ Contact</h6>
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label for="{{ form.statz_contact.id_for_label }}" class="form-label">Contact Name</label>
+                {{ form.statz_contact|add_field_classes:"form-control form-control-sm" }}
+              </div>
+              <div class="col-6">
+                <label for="{{ form.statz_contact_title.id_for_label }}" class="form-label">Title</label>
+                {{ form.statz_contact_title|add_field_classes:"form-control form-control-sm" }}
+              </div>
+            </div>
+            <div class="mb-2">
+              <label for="{{ form.statz_contact_phone.id_for_label }}" class="form-label">Phone</label>
+              {{ form.statz_contact_phone|add_field_classes:"form-control form-control-sm" }}
+            </div>
+            <div class="mb-3">
+              <label for="{{ form.statz_contact_email.id_for_label }}" class="form-label">Email</label>
+              {{ form.statz_contact_email|add_field_classes:"form-control form-control-sm" }}
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" id="btn-save-letter" class="btn btn-primary">Save</button>
+              <button type="button" id="btn-generate-docx" class="btn btn-outline-brand">Generate .docx</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="ack-letter-panel-right">
+      {% if user_is_staff %}
+      <div class="accordion accordion-flush mb-2" id="ack-template-accordion">
+        <div class="accordion-item" id="ack-template-card">
+          <h2 class="accordion-header" id="ack-template-heading">
+            <button class="accordion-button collapsed py-2 small" type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#ack-template-collapse"
+                    aria-expanded="false"
+                    aria-controls="ack-template-collapse">
+              Letter Template
+            </button>
+          </h2>
+          <div id="ack-template-collapse"
+               class="accordion-collapse collapse"
+               aria-labelledby="ack-template-heading"
+               data-bs-parent="#ack-template-accordion">
+            <div class="accordion-body py-2 px-3">
+              <div id="ack-template-info">
+                {% if active_template %}
+                  <div class="d-flex align-items-center gap-4 flex-wrap py-1">
+                    <div>
+                      <div class="ack-tmpl-label">Rev</div>
+                      <div class="ack-tmpl-value" id="ack-template-rev">{{ active_template.rev_number }}</div>
+                    </div>
+                    <div>
+                      <div class="ack-tmpl-label">Uploaded by</div>
+                      <div class="ack-tmpl-value" id="ack-template-by">{{ active_template.uploaded_by.get_full_name|default:active_template.uploaded_by.username }}</div>
+                    </div>
+                    <div>
+                      <div class="ack-tmpl-label">Date</div>
+                      <div class="ack-tmpl-value" id="ack-template-date">{{ active_template.uploaded_at|date:"N j, Y" }}</div>
+                    </div>
+                    <div class="ms-auto">
+                      <a href="{{ active_template.file.url }}" id="ack-template-download"
+                         target="_blank" rel="noopener"
+                         class="btn btn-outline-secondary btn-sm">Download Current</a>
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="alert alert-warning mb-0 py-2 small" id="ack-template-empty">
+                    No active template. Upload one below.
+                  </div>
+                {% endif %}
+              </div>
+
+              <div class="ack-template-dropzone mt-3" id="ack-template-dropzone" role="button" tabindex="0" aria-label="Upload letter template">
+                <span class="text-body-secondary">Drag &amp; Drop a .docx file here, or click to browse</span>
+                <input type="file" id="ack-template-file-input" accept=".docx" class="d-none">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <dialog id="ack-template-rev-dialog" class="ack-template-rev-dialog">
+        <form method="dialog" class="p-3" style="min-width: 280px;">
+          <p class="mb-2 fw-semibold">Enter revision number for this template:</p>
+          <input type="text" id="ack-template-rev-input" class="form-control mb-3" maxlength="50" required>
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" id="ack-template-rev-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="ack-template-rev-confirm">Confirm</button>
+          </div>
+        </form>
+      </dialog>
+      {% endif %}
+
+      <div class="card shadow-sm" style="flex:1 1 0; display:flex; flex-direction:column; overflow:hidden;">
+        <div class="card-header d-flex align-items-center justify-content-between gap-2">
+          <h2 class="h6 mb-0">Preview</h2>
+          <button type="button" id="btn-refresh-preview" class="btn btn-outline-secondary btn-sm">Refresh Preview</button>
+        </div>
+        <div class="card-body" style="flex:1 1 0; overflow-y:auto;">
+          <div id="preview-pane" class="ack-preview-pane">
+            <p class="text-body-secondary small mb-0">Loading preview…</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  const form = document.getElementById('ackLetterForm');
+  const letterId = {{ letter.id }};
+  const previewUrl = "{% url 'contracts:acknowledgment-letter-preview' letter.id %}";
+  const saveUrl = "{% url 'contracts:update_acknowledgment_letter' letter.id %}";
+  const generateUrl = "{% url 'contracts:generate_acknowledgment_letter_doc' letter.id %}";
+  {% if user_is_staff %}
+  const templateUploadUrl = "{% url 'contracts:acknowledgment-template-upload' %}";
+  {% endif %}
+
+  const btnRefresh = document.getElementById('btn-refresh-preview');
+  const previewPane = document.getElementById('preview-pane');
+  let previewIsClean = true;
+
+  function getCsrfToken() {
+    const el = form.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  function toast(type, message) {
+    if (typeof window.notify === 'function') {
+      window.notify(type, message);
+    } else {
+      alert(message);
+    }
+  }
+
+  function setPreviewDirty() {
+    if (previewIsClean) {
+      previewIsClean = false;
+      btnRefresh.classList.remove('btn-outline-secondary');
+      btnRefresh.classList.add('btn-warning');
+      btnRefresh.textContent = '\u26A0 Refresh Preview';
+    }
+  }
+
+  function setPreviewClean() {
+    previewIsClean = true;
+    btnRefresh.classList.remove('btn-warning');
+    btnRefresh.classList.add('btn-outline-secondary');
+    btnRefresh.textContent = 'Refresh Preview';
+  }
+
+  function refreshPreview() {
+    const formData = new FormData(form);
+    btnRefresh.disabled = true;
+    fetch(previewUrl, {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          previewPane.innerHTML = data.html;
+          setPreviewClean();
+        } else {
+          toast('error', data.error || 'Preview failed.');
+        }
+      })
+      .catch(() => toast('error', 'Preview request failed.'))
+      .finally(() => { btnRefresh.disabled = false; });
+  }
+
+  form.querySelectorAll('input, select, textarea').forEach(el => {
+    el.addEventListener('input', setPreviewDirty);
+    el.addEventListener('change', setPreviewDirty);
+  });
+
+  btnRefresh.addEventListener('click', refreshPreview);
+
+  document.getElementById('btn-save-letter').addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    fetch(saveUrl, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          toast('success', 'Letter saved.');
+        } else if (data.errors) {
+          toast('error', 'Please correct the highlighted fields.');
+        } else {
+          toast('error', data.error || 'Save failed.');
+        }
+      })
+      .catch(() => toast('error', 'Save request failed.'))
+      .finally(() => { btn.disabled = false; });
+  });
+
+  document.getElementById('btn-generate-docx').addEventListener('click', function() {
+    const btn = this;
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+
+    fetch(saveUrl, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) {
+          throw new Error(data.error || 'Save failed before generate.');
+        }
+        const dl = document.createElement('form');
+        dl.method = 'POST';
+        dl.action = generateUrl;
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrfmiddlewaretoken';
+        csrf.value = getCsrfToken();
+        dl.appendChild(csrf);
+        document.body.appendChild(dl);
+        dl.submit();
+        document.body.removeChild(dl);
+      })
+      .catch(err => toast('error', err.message || 'Generate failed.'))
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = original;
+      });
+  });
+
+  {% if user_is_staff %}
+  const dropzone = document.getElementById('ack-template-dropzone');
+  const fileInput = document.getElementById('ack-template-file-input');
+  const revDialog = document.getElementById('ack-template-rev-dialog');
+  const revInput = document.getElementById('ack-template-rev-input');
+  let pendingTemplateFile = null;
+
+  function updateTemplateInfo(data) {
+    const info = document.getElementById('ack-template-info');
+    info.innerHTML = `
+      <div class="d-flex align-items-center gap-4 flex-wrap py-1">
+        <div>
+          <div class="ack-tmpl-label">Rev</div>
+          <div class="ack-tmpl-value" id="ack-template-rev">${data.rev_number}</div>
+        </div>
+        <div>
+          <div class="ack-tmpl-label">Uploaded by</div>
+          <div class="ack-tmpl-value" id="ack-template-by">${data.uploaded_by}</div>
+        </div>
+        <div>
+          <div class="ack-tmpl-label">Date</div>
+          <div class="ack-tmpl-value" id="ack-template-date">${data.uploaded_at}</div>
+        </div>
+        <div class="ms-auto">
+          <a href="${data.download_url}" id="ack-template-download"
+             target="_blank" rel="noopener"
+             class="btn btn-outline-secondary btn-sm">Download Current</a>
+        </div>
+      </div>`;
+  }
+
+  function uploadTemplate(file, revNumber) {
+    const fd = new FormData();
+    fd.append('template_file', file);
+    fd.append('rev_number', revNumber);
+    fetch(templateUploadUrl, {
+      method: 'POST',
+      body: fd,
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    })
+      .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+      .then(({ ok, body }) => {
+        if (ok && body.success) {
+          updateTemplateInfo(body);
+          toast('success', 'Template uploaded and activated.');
+        } else {
+          toast('error', body.error || 'Upload failed.');
+        }
+      })
+      .catch(() => toast('error', 'Upload request failed.'));
+  }
+
+  function promptRevAndUpload(file) {
+    pendingTemplateFile = file;
+    revInput.value = '';
+    revDialog.showModal();
+  }
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files[0]) {
+      promptRevAndUpload(fileInput.files[0]);
+      fileInput.value = '';
+    }
+  });
+  dropzone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropzone.classList.add('ack-template-dropzone-active');
+  });
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.classList.remove('ack-template-dropzone-active');
+  });
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('ack-template-dropzone-active');
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) {
+      promptRevAndUpload(file);
+    }
+  });
+
+  document.getElementById('ack-template-rev-cancel').addEventListener('click', () => {
+    pendingTemplateFile = null;
+    revDialog.close();
+  });
+  revDialog.querySelector('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const rev = revInput.value.trim();
+    if (!rev || !pendingTemplateFile) {
+      return;
+    }
+    const file = pendingTemplateFile;
+    pendingTemplateFile = null;
+    revDialog.close();
+    uploadTemplate(file, rev);
+  });
+  {% endif %}
+
+  refreshPreview();
+})();
+</script>
+{% endblock %}
