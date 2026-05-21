@@ -40,6 +40,10 @@ window.onTransactionSaved = function(data) {
            class="nav-link">
             ← Back to Contract
         </a>
+        <a href="{% url 'contracts:finance_audit_detail' clin.contract.id %}"
+           class="nav-link">
+            Finance Audit
+        </a>
         <br><br>
         <p class="clin-sidebar-label">Quick Jump</p>
         <div class="nav flex-column nav-pills">
@@ -320,7 +324,6 @@ window.onTransactionSaved = function(data) {
             <div class="card clin-section-card clin-card-splits">
                 <div class="card-header clin-section-header d-flex justify-content-between align-items-center">
                     <span>CLIN Splits</span>
-                    <button type="button" id="clin-splits-add" class="btn btn-sm btn-outline-secondary">Add Split</button>
                 </div>
                 <div class="card-body p-0">
                     {% csrf_token %}
@@ -330,6 +333,10 @@ window.onTransactionSaved = function(data) {
                          data-add-url="{% url 'contracts:add_clin_split' clin.id %}"
                          data-update-template="{% url 'contracts:update_clin_split' 12345 %}"
                          data-delete-template="{% url 'contracts:delete_clin_split' 12345 %}">
+                        <div class="d-flex justify-content-end mb-2 px-2 pt-2">
+                            <button type="button" id="clin-splits-add"
+                                    class="btn btn-sm btn-outline-secondary">Add Split</button>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-sm table-striped mb-0">
                                 <thead>

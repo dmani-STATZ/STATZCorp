@@ -210,3 +210,124 @@ def recalc_splits(request, contract_pk):
         'updated_splits': updated_count,
         'skipped_clins': skipped_clins,
     })
+
+
+@conditional_login_required
+@require_http_methods(['POST'])
+def log_split_paid(request, contract_pk):
+    """
+    Accepts a total paid amount for one company and distributes it
+    proportionally across that company's ClinSplit rows on this contract,
+    using split_value as the weight. NULL/zero split_value rows get $0.
+    If ALL rows have NULL/zero split_value, distributes equally.
+
+    Request body (JSON):
+        {
+            "company_name": "STATZ",
+            "total_paid": "1250.00"
+        }
+
+    Returns:
+        {
+            "success": true,
+            "company_name": "STATZ",
+            "total_paid": "1250.00",
+            "company_total_paid": "1250.00",
+            "splits": [
+                {"split_id": 7, "item_number": "0001", "split_value": "500.00", "split_paid": "500.00"},
+                ...
+            ],
+            "discrepancy": false,
+            "discrepancy_amount": "0.00"
+        }
+    """
+    from ..models import Contract
+
+    company = getattr(request, 'active_company', None)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
+
+    contract = get_object_or_404(
+        Contract.objects.filter(company=company), pk=contract_pk
+    )
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    company_name = (data.get('company_name') or '').strip()
+    if not company_name:
+        return JsonResponse({'success': False, 'error': 'company_name is required'}, status=400)
+
+    total_paid = _parse_decimal(data.get('total_paid'))
+    if total_paid is None:
+        return JsonResponse({'success': False, 'error': 'total_paid is required'}, status=400)
+
+    splits = list(
+        ClinSplit.objects.filter(
+            clin__contract=contract,
+            company_name__iexact=company_name,
+        ).select_related('clin').order_by('clin__item_number')
+    )
+
+    if not splits:
+        return JsonResponse(
+            {'success': False, 'error': f'No splits found for company "{company_name}"'},
+            status=404,
+        )
+
+    weights = [
+        Decimal(str(s.split_value)) if s.split_value else Decimal('0')
+        for s in splits
+    ]
+    total_weight = sum(weights)
+
+    if total_weight == 0:
+        n = len(splits)
+        base = (total_paid / Decimal(n)).quantize(Decimal('0.01'))
+        allocated = [base] * n
+        allocated[0] += total_paid - sum(allocated)
+    else:
+        allocated = []
+        running = Decimal('0')
+        for i, weight in enumerate(weights):
+            if i == len(weights) - 1:
+                allocated.append(total_paid - running)
+            else:
+                share = (weight / total_weight * total_paid).quantize(Decimal('0.01'))
+                allocated.append(share)
+                running += share
+
+    for split, paid_amount in zip(splits, allocated):
+        split.split_paid = paid_amount
+        split.save(update_fields=['split_paid', 'modified_at'])
+
+    total_split_value = sum(
+        Decimal(str(s.split_value)) if s.split_value else Decimal('0')
+        for s in splits
+    )
+    discrepancy_amount = total_paid - total_split_value
+    has_discrepancy = abs(discrepancy_amount) > Decimal('0.01')
+
+    result_splits = [
+        {
+            'split_id': s.id,
+            'item_number': s.clin.item_number,
+            'split_value': str(s.split_value) if s.split_value is not None else None,
+            'split_paid': str(paid),
+        }
+        for s, paid in zip(splits, allocated)
+    ]
+
+    company_total_paid = sum(allocated)
+
+    return JsonResponse({
+        'success': True,
+        'company_name': company_name,
+        'total_paid': str(total_paid),
+        'company_total_paid': str(company_total_paid),
+        'splits': result_splits,
+        'discrepancy': has_discrepancy,
+        'discrepancy_amount': str(discrepancy_amount),
+    })

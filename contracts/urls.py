@@ -201,7 +201,7 @@ from .views.documents_views import (
     set_file_path_api,
     sharepoint_files_api,
 )
-from .views.split_views import recalc_splits
+from .views.split_views import log_split_paid, recalc_splits
 from .views.packaging_views import (
     get_packaging_modal,
     update_packaging_details,
@@ -729,6 +729,11 @@ urlpatterns = [
     path("clin/splits/<int:split_pk>/delete/", delete_clin_split, name="delete_clin_split"),
     path("clin/<int:clin_pk>/splits/", get_clin_splits, name="get_clin_splits"),
     path("contracts/<int:contract_pk>/splits/recalc/", recalc_splits, name="recalc_splits"),
+    path(
+        "contracts/<int:contract_pk>/splits/log-paid/",
+        log_split_paid,
+        name="log_split_paid",
+    ),
     # Contract Packaging
     path(
         "api/packaging/<int:pk>/update/",

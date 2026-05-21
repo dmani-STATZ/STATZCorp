@@ -10,6 +10,7 @@ from django.utils.decorators import method_decorator
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.http import JsonResponse
+from django.urls import reverse
 from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, ContractPackaging, PaymentHistory
 from .mixins import ActiveCompanyQuerysetMixin
 import logging
@@ -93,12 +94,17 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                     if cname not in clin_splits_by_company:
                         clin_splits_by_company[cname] = []
                     clin_splits_by_company[cname].append({
+                        'split_id': split.id,
                         'item_number': split.clin.item_number,
                         'split_value': split.split_value,
                         'split_paid': split.split_paid,
                         'percentage': split.percentage,
                     })
                 context['clin_splits_by_company'] = clin_splits_by_company
+                context['log_split_paid_url'] = reverse(
+                    'contracts:log_split_paid',
+                    kwargs={'contract_pk': self.object.pk},
+                )
 
                 # Use the first non-null percentage found per company for summary display.
                 company_percentages = {}
