@@ -429,17 +429,18 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 11. **PO Acknowledgement Letter** — views live in `acknowledgment_views.py` only (single-e spelling). Do not recreate `acknowledgement_letter_views.py` (double-e) or legacy full-page routes.
 
-**`AcknowledgmentLetterTemplate` (`contracts/models.py`):** DB-backed `.docx` templates for letter generation. Fields: `file`, `rev_number`, `uploaded_by`, `uploaded_at`, `is_active`. **`activate()`** deactivates all other rows and sets `is_active=True` on this instance. **`get_active()`** returns the single active template or `None`. Staff upload on the letter page (`upload_acknowledgment_template`); each upload auto-activates.
+**`AcknowledgmentLetterTemplate` (`contracts/models.py`):** DB-backed `.docx` templates for letter generation. Fields: `sharepoint_file_id`, `sharepoint_file_name`, `rev_number`, `uploaded_by`, `uploaded_at`, `is_active`. Template bytes live in SharePoint at `Statz-Public/data/V87/aFed-DOD/z-temp/templates/` (not Django media). **`activate()`** deactivates all other rows and sets `is_active=True` on this instance. **`get_active()`** returns the single active template or `None`. Staff upload on the letter page (`upload_acknowledgment_template`); each upload auto-activates. **Substitution helpers** (`acknowledgment_views.py`): `_build_letter_substitutions(letter)`, `_apply_substitutions_to_doc(doc, substitutions)`, shared pipeline `_generate_letter_pdf_bytes(letter)`, `_acknowledgment_pdf_filename(letter)` (shared by send + existing-PDF lookup). **`get_existing_acknowledgment_pdf`:** GET on page load; looks up `{po_slug}-purchase-order-acknowledge-letter.pdf` in contract folder via `resolve_contract_folder_path` + `_get_drive_item`; returns base64 PDF or `exists: false`; SharePoint errors are silent (no user toast). **Preview** (`preview_acknowledgment_letter`): same PDF pipeline; **Refresh Preview** after **Save**; stale badge hidden after fresh preview. **Download PDF** / **Send to Contract Folder** enabled when preview or existing PDF loads; reset when form goes dirty. **`send_acknowledgment_to_contract_folder`:** POST; saves via `_acknowledgment_pdf_filename` + `send_pdf_bytes_to_folder` (overwrites). **`generate_acknowledgment_letter_doc` removed** — PDF only, no `.docx` export. SharePoint service: `upload_bytes_to_folder`, `convert_file_to_pdf_bytes`, `delete_file_by_id`, `download_file_bytes_by_id`, `send_pdf_bytes_to_folder`.
 
-**`AcknowledgementLetter` due dates:** `fat_due_date` and `plt_due_date` replaced the legacy `fat_plt_due_date` field (migration `0070`). Word template placeholders: `{{FAT_DUE_DATE}}` and `{{PLT_DUE_DATE}}` (not `{{FAT_PLT_DUE_DATE}}`). Preview and `generate_acknowledgment_letter_doc` must substitute both tokens from POST / saved letter fields.
+**`AcknowledgementLetter` due dates:** `fat_due_date` and `plt_due_date` replaced the legacy `fat_plt_due_date` field (migration `0070`). Word template placeholders: `{{FAT_DUE_DATE}}` and `{{PLT_DUE_DATE}}` (not `{{FAT_PLT_DUE_DATE}}`). Preview and send-to-folder must substitute both tokens from the saved letter row.
 
 **Acknowledgment letter URL names:**
 | Name | View | Notes |
 |------|------|-------|
 | `acknowledgment-letter-page` | `acknowledgment_letter_page` | `clin/<clin_id>/acknowledgment-letter/` |
-| `acknowledgment-letter-preview` | `preview_acknowledgment_letter` | POST AJAX; no DB write |
+| `acknowledgment-letter-preview` | `preview_acknowledgment_letter` | POST AJAX; PDF via SharePoint Graph; no DB write; requires prior Save |
+| `acknowledgment-letter-send-to-contract` | `send_acknowledgment_to_contract_folder` | POST AJAX; PDF to contract SharePoint folder; overwrites |
+| `acknowledgment-letter-existing-pdf` | `get_existing_acknowledgment_pdf` | GET AJAX; load saved PDF from contract folder on page open; silent if missing |
 | `acknowledgment-template-upload` | `upload_acknowledgment_template` | Staff only |
-| `generate_acknowledgment_letter_doc` | `generate_acknowledgment_letter_doc` | POST download; JSON error if no active template (do not raise unhandled exceptions) |
 | `update_acknowledgment_letter` | `update_acknowledgment_letter` | AJAX save from letter page |
 
 **Contract-level acknowledgment:** The acknowledgment section on `contract_management.html` is contract-level. `toggleAcknowledgment(field)` POSTs to `toggle_contract_acknowledgment` using `contract.id`. The PO Acknowledge Letter link navigates to `acknowledgment-letter-page` for `selected_clin.id`.

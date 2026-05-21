@@ -94,14 +94,12 @@
                 {{ form.supplier_due_date|add_field_classes:"form-control form-control-sm" }}
               </div>
               <div class="col-4">
-                <label for="id_fat_due_date" class="form-label">FAT Due Date</label>
-                <input type="date" name="fat_due_date" class="form-control form-control-sm" id="id_fat_due_date"
-                       value="{{ form.fat_due_date.value|default:'' }}">
+                <label for="{{ form.fat_due_date.id_for_label }}" class="form-label">FAT Due Date</label>
+                {{ form.fat_due_date|add_field_classes:"form-control form-control-sm" }}
               </div>
               <div class="col-4">
-                <label for="id_plt_due_date" class="form-label">PLT Due Date</label>
-                <input type="date" name="plt_due_date" class="form-control form-control-sm" id="id_plt_due_date"
-                       value="{{ form.plt_due_date.value|default:'' }}">
+                <label for="{{ form.plt_due_date.id_for_label }}" class="form-label">PLT Due Date</label>
+                {{ form.plt_due_date|add_field_classes:"form-control form-control-sm" }}
               </div>
             </div>
 
@@ -126,8 +124,14 @@
             </div>
 
             <div class="d-flex flex-wrap gap-2">
-              <button type="button" id="btn-save-letter" class="btn btn-primary">Save</button>
-              <button type="button" id="btn-generate-docx" class="btn btn-outline-brand">Generate .docx</button>
+              <button type="button" id="btn-save-letter"
+                      class="btn btn-primary btn-sm">Save</button>
+              <button type="button" id="btn-download-pdf"
+                      class="btn btn-outline-secondary btn-sm"
+                      disabled>Download PDF</button>
+              <button type="button" id="btn-send-to-contract"
+                      class="btn btn-outline-brand btn-sm"
+                      disabled>Send to Contract Folder</button>
             </div>
           </form>
         </div>
@@ -168,9 +172,11 @@
                       <div class="ack-tmpl-value" id="ack-template-date">{{ active_template.uploaded_at|date:"N j, Y" }}</div>
                     </div>
                     <div class="ms-auto">
-                      <a href="{{ active_template.file.url }}" id="ack-template-download"
+                      {% if template_download_url %}
+                      <a href="{{ template_download_url }}" id="ack-template-download"
                          target="_blank" rel="noopener"
                          class="btn btn-outline-secondary btn-sm">Download Current</a>
+                      {% endif %}
                     </div>
                   </div>
                 {% else %}
@@ -203,12 +209,19 @@
 
       <div class="card shadow-sm" style="flex:1 1 0; display:flex; flex-direction:column; overflow:hidden;">
         <div class="card-header d-flex align-items-center justify-content-between gap-2">
-          <h2 class="h6 mb-0">Preview</h2>
+          <div class="d-flex align-items-center gap-2">
+            <h2 class="h6 mb-0">Preview</h2>
+            <span id="preview-stale-badge"
+                  class="badge text-bg-secondary fw-normal d-none"
+                  style="font-size:0.7rem;">
+              Previously saved · Refresh to update
+            </span>
+          </div>
           <button type="button" id="btn-refresh-preview" class="btn btn-outline-secondary btn-sm">Refresh Preview</button>
         </div>
         <div class="card-body" style="flex:1 1 0; overflow-y:auto;">
           <div id="preview-pane" class="ack-preview-pane">
-            <p class="text-body-secondary small mb-0">Loading preview…</p>
+            <p class="text-body-secondary small mb-0">Save the letter to enable preview.</p>
           </div>
         </div>
       </div>
@@ -224,14 +237,20 @@
   const letterId = {{ letter.id }};
   const previewUrl = "{% url 'contracts:acknowledgment-letter-preview' letter.id %}";
   const saveUrl = "{% url 'contracts:update_acknowledgment_letter' letter.id %}";
-  const generateUrl = "{% url 'contracts:generate_acknowledgment_letter_doc' letter.id %}";
+  const sendUrl = "{% url 'contracts:acknowledgment-letter-send-to-contract' letter.id %}";
+  const btnDownload = document.getElementById('btn-download-pdf');
+  const btnSend = document.getElementById('btn-send-to-contract');
+  let currentPdfBlob = null;
   {% if user_is_staff %}
   const templateUploadUrl = "{% url 'contracts:acknowledgment-template-upload' %}";
   {% endif %}
 
   const btnRefresh = document.getElementById('btn-refresh-preview');
   const previewPane = document.getElementById('preview-pane');
-  let previewIsClean = true;
+  const existingPdfUrl = "{% url 'contracts:acknowledgment-letter-existing-pdf' letter.id %}";
+  const staleBadge = document.getElementById('preview-stale-badge');
+  let hasBeenSaved = false;
+  let previewIsClean = false;
 
   function getCsrfToken() {
     const el = form.querySelector('[name=csrfmiddlewaretoken]');
@@ -247,12 +266,15 @@
   }
 
   function setPreviewDirty() {
-    if (previewIsClean) {
-      previewIsClean = false;
-      btnRefresh.classList.remove('btn-outline-secondary');
-      btnRefresh.classList.add('btn-warning');
-      btnRefresh.textContent = '\u26A0 Refresh Preview';
-    }
+    if (!hasBeenSaved) return;
+    previewIsClean = false;
+    btnRefresh.classList.remove('btn-outline-secondary');
+    btnRefresh.classList.add('btn-warning');
+    btnRefresh.textContent = '\u26A0 Refresh Preview';
+    btnRefresh.disabled = false;
+    btnDownload.disabled = true;
+    btnSend.disabled = true;
+    currentPdfBlob = null;
   }
 
   function setPreviewClean() {
@@ -260,35 +282,102 @@
     btnRefresh.classList.remove('btn-warning');
     btnRefresh.classList.add('btn-outline-secondary');
     btnRefresh.textContent = 'Refresh Preview';
+    btnRefresh.disabled = false;
   }
 
-  function refreshPreview() {
-    const formData = new FormData(form);
+  function setPreviewDisabled() {
     btnRefresh.disabled = true;
+    btnRefresh.classList.remove('btn-warning');
+    btnRefresh.classList.add('btn-outline-secondary');
+    btnRefresh.textContent = 'Save first to preview';
+  }
+
+  setPreviewDisabled();
+
+  function loadExistingPdf() {
+    fetch(existingPdfUrl, {
+      method: 'GET',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success || !data.exists) return;
+
+        const binary = atob(data.pdf_base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        currentPdfBlob = new Blob([bytes], { type: 'application/pdf' });
+
+        const blobUrl = URL.createObjectURL(currentPdfBlob);
+        previewPane.innerHTML =
+          `<iframe src="${blobUrl}"
+                   style="width:100%;height:100%;min-height:600px;border:none;"
+                   title="Letter Preview">
+           </iframe>`;
+
+        btnDownload.disabled = false;
+        btnSend.disabled = false;
+        staleBadge.classList.remove('d-none');
+        hasBeenSaved = true;
+        setPreviewClean();
+      })
+      .catch(() => {
+        // Silent failure — user just won't see a pre-loaded preview
+      });
+  }
+
+  function triggerPreview() {
+    btnRefresh.disabled = true;
+    btnRefresh.textContent = 'Generating preview…';
+    previewPane.innerHTML =
+      '<p class="text-body-secondary small">Generating PDF preview…</p>';
+
     fetch(previewUrl, {
       method: 'POST',
-      body: formData,
       headers: { 'X-CSRFToken': getCsrfToken() },
     })
       .then(r => r.json())
       .then(data => {
         if (data.success) {
-          previewPane.innerHTML = data.html;
+          previewPane.innerHTML =
+            `<iframe
+               src="data:application/pdf;base64,${data.pdf_base64}"
+               style="width:100%;height:100%;min-height:600px;border:none;"
+               title="Letter Preview">
+             </iframe>`;
+          const binary = atob(data.pdf_base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          currentPdfBlob = new Blob([bytes], { type: 'application/pdf' });
+          btnDownload.disabled = false;
+          btnSend.disabled = false;
           setPreviewClean();
+          staleBadge.classList.add('d-none');
         } else {
-          toast('error', data.error || 'Preview failed.');
+          previewPane.innerHTML =
+            `<p class="text-danger small">${data.error || 'Preview failed.'}</p>`;
+          setPreviewClean();
         }
       })
-      .catch(() => toast('error', 'Preview request failed.'))
-      .finally(() => { btnRefresh.disabled = false; });
+      .catch(() => {
+        previewPane.innerHTML =
+          '<p class="text-danger small">Preview request failed.</p>';
+        setPreviewClean();
+      });
   }
+
+  btnRefresh.addEventListener('click', triggerPreview);
+
+  loadExistingPdf();
 
   form.querySelectorAll('input, select, textarea').forEach(el => {
     el.addEventListener('input', setPreviewDirty);
     el.addEventListener('change', setPreviewDirty);
   });
-
-  btnRefresh.addEventListener('click', refreshPreview);
 
   document.getElementById('btn-save-letter').addEventListener('click', function() {
     const btn = this;
@@ -302,6 +391,8 @@
       .then(data => {
         if (data.success) {
           toast('success', 'Letter saved.');
+          hasBeenSaved = true;
+          triggerPreview();
         } else if (data.errors) {
           toast('error', 'Please correct the highlighted fields.');
         } else {
@@ -312,38 +403,44 @@
       .finally(() => { btn.disabled = false; });
   });
 
-  document.getElementById('btn-generate-docx').addEventListener('click', function() {
-    const btn = this;
-    const original = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Generating…';
+  btnDownload.addEventListener('click', function() {
+    if (!currentPdfBlob) return;
+    const po = document.getElementById('id_po').value.trim() || 'unknown';
+    const filename = po.toLowerCase().replace(/\s+/g, '-')
+      + '-purchase-order-acknowledge-letter.pdf';
+    const url = URL.createObjectURL(currentPdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  });
 
-    fetch(saveUrl, {
+  btnSend.addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    fetch(sendUrl, {
       method: 'POST',
-      body: new FormData(form),
       headers: { 'X-CSRFToken': getCsrfToken() },
     })
       .then(r => r.json())
       .then(data => {
-        if (!data.success) {
-          throw new Error(data.error || 'Save failed before generate.');
+        if (data.success) {
+          toast('success', data.message);
+          btn.textContent = 'Sent ✓';
+        } else {
+          toast('error', data.error || 'Failed to send.');
+          btn.disabled = false;
+          btn.textContent = 'Send to Contract Folder';
         }
-        const dl = document.createElement('form');
-        dl.method = 'POST';
-        dl.action = generateUrl;
-        const csrf = document.createElement('input');
-        csrf.type = 'hidden';
-        csrf.name = 'csrfmiddlewaretoken';
-        csrf.value = getCsrfToken();
-        dl.appendChild(csrf);
-        document.body.appendChild(dl);
-        dl.submit();
-        document.body.removeChild(dl);
       })
-      .catch(err => toast('error', err.message || 'Generate failed.'))
-      .finally(() => {
+      .catch(() => {
+        toast('error', 'Request failed.');
         btn.disabled = false;
-        btn.textContent = original;
+        btn.textContent = 'Send to Contract Folder';
       });
   });
 
@@ -370,11 +467,12 @@
           <div class="ack-tmpl-label">Date</div>
           <div class="ack-tmpl-value" id="ack-template-date">${data.uploaded_at}</div>
         </div>
+        ${data.download_url ? `
         <div class="ms-auto">
           <a href="${data.download_url}" id="ack-template-download"
              target="_blank" rel="noopener"
              class="btn btn-outline-secondary btn-sm">Download Current</a>
-        </div>
+        </div>` : ''}
       </div>`;
   }
 
@@ -450,8 +548,6 @@
     uploadTemplate(file, rev);
   });
   {% endif %}
-
-  refreshPreview();
 })();
 </script>
 {% endblock %}

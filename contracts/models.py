@@ -1251,7 +1251,8 @@ class AcknowledgementLetter(models.Model):
 
 
 class AcknowledgmentLetterTemplate(models.Model):
-    file = models.FileField(upload_to='acknowledgment_templates/')
+    sharepoint_file_id = models.CharField(max_length=500, default='')
+    sharepoint_file_name = models.CharField(max_length=255, default='')
     rev_number = models.CharField(max_length=50)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

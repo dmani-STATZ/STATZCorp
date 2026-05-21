@@ -155,10 +155,11 @@ from .views.idiq_views import (
 from .views.acknowledgment_views import (
     get_acknowledgment_letter,
     acknowledgment_letter_page,
+    get_existing_acknowledgment_pdf,
     preview_acknowledgment_letter,
+    send_acknowledgment_to_contract_folder,
     upload_acknowledgment_template,
     update_acknowledgment_letter,
-    generate_acknowledgment_letter_doc,
 )
 
 from .views import payment_history_views
@@ -719,9 +720,14 @@ urlpatterns = [
         name="update_acknowledgment_letter",
     ),
     path(
-        "acknowledgment-letter/<int:letter_id>/generate/",
-        generate_acknowledgment_letter_doc,
-        name="generate_acknowledgment_letter_doc",
+        'acknowledgment-letter/<int:letter_id>/send-to-contract/',
+        send_acknowledgment_to_contract_folder,
+        name='acknowledgment-letter-send-to-contract',
+    ),
+    path(
+        'acknowledgment-letter/<int:letter_id>/existing-pdf/',
+        get_existing_acknowledgment_pdf,
+        name='acknowledgment-letter-existing-pdf',
     ),
     # CLIN Splits
     path("clin/<int:clin_pk>/splits/add/", add_clin_split, name="add_clin_split"),

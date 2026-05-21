@@ -316,6 +316,100 @@ def upload_file_to_folder(folder_path: str, uploaded_file) -> Dict[str, Any]:
     return _file_payload(response.json())
 
 
+def upload_bytes_to_folder(
+    folder_path: str,
+    filename: str,
+    file_bytes: bytes,
+    content_type: str = "application/octet-stream",
+) -> Dict[str, Any]:
+    """
+    Upload raw bytes to a SharePoint folder. Returns the file payload dict
+    including the 'id' field needed for subsequent operations.
+    Used for in-memory files (e.g. substituted .docx templates).
+    """
+    path = normalize_folder_path(f"{folder_path}/{_safe_filename(filename)}")
+    token = get_graph_access_token()
+    response = requests.put(
+        _content_url(path),
+        headers={**_auth_headers(token), "Content-Type": content_type},
+        data=file_bytes,
+        timeout=120,
+    )
+    _raise_for_graph_error(response, "Could not upload file to SharePoint.")
+    return _file_payload(response.json())
+
+
+def send_pdf_bytes_to_folder(
+    folder_path: str,
+    filename: str,
+    pdf_bytes: bytes,
+) -> Dict[str, Any]:
+    """
+    Upload PDF bytes to a SharePoint folder, overwriting if the file
+    already exists. Uses @microsoft.graph.conflictBehavior: replace.
+    Returns the file payload dict.
+    """
+    path = normalize_folder_path(f"{folder_path}/{filename}")
+    token = get_graph_access_token()
+    url = _content_url(path)
+    response = requests.put(
+        url,
+        headers={
+            **_auth_headers(token),
+            "Content-Type": "application/pdf",
+        },
+        data=pdf_bytes,
+        timeout=120,
+    )
+    _raise_for_graph_error(response, "Could not save PDF to SharePoint.")
+    return _file_payload(response.json())
+
+
+def convert_file_to_pdf_bytes(file_id: str) -> bytes:
+    """
+    Convert a SharePoint file to PDF via Graph and return raw PDF bytes.
+    Uses the /content?format=pdf endpoint.
+    """
+    drive_id = quote(_get_drive_id(), safe="!_")
+    url = (
+        f"{GRAPH_BASE}/drives/{drive_id}/items/"
+        f"{quote(file_id, safe='')}/content?format=pdf"
+    )
+    token = get_graph_access_token()
+    response = requests.get(url, headers=_auth_headers(token), timeout=120)
+    _raise_for_graph_error(response, "Could not convert file to PDF.")
+    return response.content
+
+
+def delete_file_by_id(file_id: str) -> None:
+    """
+    Permanently delete a SharePoint file by drive item ID.
+    Used to clean up temp files after PDF conversion.
+    """
+    drive_id = quote(_get_drive_id(), safe="!_")
+    url = f"{GRAPH_BASE}/drives/{drive_id}/items/{quote(file_id, safe='')}"
+    token = get_graph_access_token()
+    response = requests.delete(url, headers=_auth_headers(token), timeout=60)
+    if response.status_code not in (200, 204):
+        logger.warning(
+            "delete_file_by_id: unexpected status %s for file_id=%s",
+            response.status_code, file_id
+        )
+
+
+def download_file_bytes_by_id(file_id: str) -> bytes:
+    """Download raw file bytes for a SharePoint drive item by ID."""
+    drive_id = quote(_get_drive_id(), safe="!_")
+    url = (
+        f"{GRAPH_BASE}/drives/{drive_id}/items/"
+        f"{quote(file_id, safe='')}/content"
+    )
+    token = get_graph_access_token()
+    response = requests.get(url, headers=_auth_headers(token), timeout=120)
+    _raise_for_graph_error(response, "Could not download file from SharePoint.")
+    return response.content
+
+
 def _path_and_parents(folder_path: str) -> Iterable[str]:
     path = normalize_folder_path(folder_path)
     while path:

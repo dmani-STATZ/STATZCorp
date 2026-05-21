@@ -382,11 +382,100 @@ document.head.appendChild(style);
             '-splits-new-' +
             n +
             '-split_paid" value="0.00"></td>' +
-            '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger delete-clin-split" data-clin-id="' +
+            '<td class="text-center">' +
+            '<span class="badge bg-warning text-dark clin-split-unsaved-badge me-1">Unsaved</span>' +
+            '<button type="button" class="btn btn-sm btn-outline-danger delete-clin-split" data-clin-id="' +
             clinId +
             '">Delete</button></td>';
         tbody.appendChild(tr);
         updateClinSplitTotals(table);
+    }
+
+    async function _persistNewSplitRow(tr, clinId) {
+        if (!tr || tr.getAttribute('data-new') !== '1') {
+            return;
+        }
+        const companyInput = tr.querySelector('input[name$="-company_name"]');
+        const company_name = companyInput
+            ? String(companyInput.value || '').trim()
+            : '';
+        if (!company_name) {
+            return;
+        }
+        const valueInput = tr.querySelector('.clin-split-value-input');
+        const paidInput = tr.querySelector('.clin-split-paid-input');
+        const split_value =
+            valueInput && String(valueInput.value || '').trim()
+                ? String(valueInput.value).trim()
+                : '0.00';
+        const split_paid =
+            paidInput && String(paidInput.value || '').trim()
+                ? String(paidInput.value).trim()
+                : '0.00';
+        try {
+            const resp = await fetch(
+                '/processing/clin/' + clinId + '/splits/add/',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrf(),
+                    },
+                    body: JSON.stringify({
+                        company_name,
+                        split_value,
+                        split_paid,
+                    }),
+                }
+            );
+            const data = await resp.json();
+            if (!resp.ok || !data || data.success !== true) {
+                throw new Error((data && data.error) || 'Split persist failed');
+            }
+            const split_id = data.split_id;
+            tr.querySelectorAll('input[name$="-company_name"], .clin-split-value-input, .clin-split-paid-input').forEach((inp) => {
+                const m = inp.name && inp.name.match(
+                    /^clin-(\d+)-splits-new-\d+-(company_name|split_value|split_paid)$/
+                );
+                if (m) {
+                    inp.name =
+                        'clin-' +
+                        clinId +
+                        '-splits-' +
+                        split_id +
+                        '-' +
+                        m[2];
+                }
+            });
+            tr.setAttribute('data-split-id', String(split_id));
+            tr.removeAttribute('data-new');
+            const delBtn = tr.querySelector('.delete-clin-split');
+            if (delBtn) {
+                delBtn.setAttribute('data-split-id', String(split_id));
+            }
+            const actionsTd = tr.querySelector('td.text-center');
+            if (actionsTd) {
+                const badge = actionsTd.querySelector('.clin-split-unsaved-badge');
+                if (badge) {
+                    badge.remove();
+                }
+            }
+        } catch (err) {
+            console.error('Split persist failed:', err);
+            if (typeof showMessage === 'function') {
+                showMessage(
+                    'Failed to save split row. Please use Save CLIN to retry.',
+                    'error'
+                );
+            }
+        }
+    }
+
+    function clearClinSplitUnsavedBadges(clinId) {
+        const splitTable = document.getElementById('clin-splits-table-' + clinId);
+        if (splitTable) {
+            splitTable.querySelectorAll('.clin-split-unsaved-badge').forEach((b) => b.remove());
+        }
     }
 
     function findStatzRow(table) {
@@ -588,16 +677,80 @@ document.head.appendChild(style);
         }
     });
 
+    document.addEventListener('focusout', (e) => {
+        const input = e.target;
+        if (!input.matches('input[name$="-company_name"]')) {
+            return;
+        }
+        const tr = input.closest('tr.clin-split-row');
+        if (!tr || tr.getAttribute('data-new') !== '1') {
+            return;
+        }
+        const clinId = tr.getAttribute('data-clin-id');
+        if (!clinId) {
+            return;
+        }
+        _persistNewSplitRow(tr, clinId);
+    });
+
     document.addEventListener('input', (e) => {
         if (
             e.target.classList &&
             (e.target.classList.contains('clin-split-value-input') ||
                 e.target.classList.contains('clin-split-paid-input'))
         ) {
+            const tr = e.target.closest('tr.clin-split-row');
+            if (tr && tr.getAttribute('data-new') !== '1') {
+                const actionsTd = tr.querySelector('td.text-center');
+                if (
+                    actionsTd &&
+                    !actionsTd.querySelector('.clin-split-unsaved-badge')
+                ) {
+                    const badge = document.createElement('span');
+                    badge.className =
+                        'badge bg-warning text-dark clin-split-unsaved-badge me-1';
+                    badge.textContent = 'Unsaved';
+                    actionsTd.insertBefore(
+                        badge,
+                        actionsTd.firstChild
+                    );
+                }
+            }
             const table = e.target.closest('table');
             updateClinSplitTotals(table);
         }
     });
+
+    if (!window.__clinSplitSaveClinHook) {
+        window.__clinSplitSaveClinHook = true;
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = async function (input, init) {
+            const resp = await nativeFetch(input, init);
+            try {
+                const url =
+                    typeof input === 'string'
+                        ? input
+                        : input && typeof input.url === 'string'
+                          ? input.url
+                          : '';
+                const method = (
+                    (init && init.method) ||
+                    (input && input.method) ||
+                    'GET'
+                ).toUpperCase();
+                const m = url.match(/\/processing\/save-clin\/(\d+)\//);
+                if (m && method === 'POST' && resp.ok) {
+                    const data = await resp.clone().json();
+                    if (data && data.success) {
+                        clearClinSplitUnsavedBadges(m[1]);
+                    }
+                }
+            } catch (_) {
+                /* ignore hook errors */
+            }
+            return resp;
+        };
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[id^="clin-splits-table-"]').forEach((t) => {
