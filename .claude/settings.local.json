@@ -39,7 +39,10 @@
       "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2)",
       "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb)",
       "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake.tests.EditorViewTests.test_edit_requires_lock -v 2 --keepdb)",
-      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake.tests.MatcherEndpointTests -v 2 --keepdb)"
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake.tests.MatcherEndpointTests -v 2 --keepdb)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb 2>&1 | Select-Object -Last 80)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb 2>&1 | Select-Object -Last 25)",
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb 2>&1 | Select-Object -Last 20)"
     ]
   }
 }

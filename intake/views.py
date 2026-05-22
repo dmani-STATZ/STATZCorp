@@ -25,7 +25,14 @@ from .finalize import FinalizationError, finalize_draft
 from .forms_parse import parse_post
 from .ingest import DuplicateContractNumber, IngestionError, ingest_pdf
 from .locks import LockError, acquire, assert_holds, is_expired, release
-from .matchers import MatcherError, apply_match, clear_match, search as matcher_search
+from .matchers import (
+    CREATABLE_TYPES,
+    MatcherError,
+    apply_match,
+    clear_match,
+    create_record,
+    search as matcher_search,
+)
 from .models import DraftContract
 from .schemas import DraftDataValidationError
 
@@ -133,14 +140,24 @@ def delete_draft(request, pk: int):
 
 def _editor_context(draft: DraftContract, user) -> dict:
     """Shared context for the editor — bound to current draft state."""
+    from contracts.models import SalesClass, SpecialPaymentTerms
+
     data = draft.data or {}
+    pkg_data = data.get('packaging') or {}
     return {
         'draft': draft,
         'data': data,
         # Pre-extracted lists keep the template loop-friendly without filters.
         'clins': data.get('clins') or [],
         'finance_lines': data.get('finance_lines') or [],
-        'packaging': data.get('packaging') or {},
+        'packaging': pkg_data,
+        'pkg_has_data': any([
+            pkg_data.get('packhouse_supplier_text'),
+            pkg_data.get('packhouse_supplier_id'),
+            pkg_data.get('quote_amount'),
+            pkg_data.get('notes'),
+        ]),
+        'sales_classes': SalesClass.objects.all().order_by('sales_team'),
         'approved_nsns': data.get('approved_nsns') or [],
         'approved_suppliers': data.get('approved_suppliers') or [],
         'lock_held_by_user': (
@@ -149,6 +166,14 @@ def _editor_context(draft: DraftContract, user) -> dict:
         'lock_expires_at': draft.lock_expires_at,
         'status_choices': DraftContract.Status.choices,
         'type_choices': DraftContract.Type.choices,
+        'special_payment_terms_choices': list(
+            SpecialPaymentTerms.objects.order_by('terms').values('id', 'terms')
+        ),
+        'item_type_choices': [
+            ('P', 'Production'), ('G', 'GFAT'), ('C', 'CFAT'),
+            ('L', 'PLT'), ('M', 'Miscellaneous'), ('Q', 'QN'), ('D', 'PQDR'),
+        ],
+        'ia_fob_choices': [('O', 'Origin'), ('D', 'Destination')],
     }
 
 
@@ -233,17 +258,22 @@ def mark_ready(request, pk: int):
 @login_required
 @require_POST
 def match_endpoint(request, pk: int):
-    """Unified matcher: search + apply + clear.
+    """Unified matcher: search + apply + clear + create.
 
     POST body is JSON:
         {"action": "search", "match_type": "buyer", "q": "smith"}
         {"action": "apply", "match_type": "nsn",
          "target_path": "clin:0:nsn", "record_id": 42}
         {"action": "clear", "target_path": "clin:0:nsn"}
+        {"action": "create", "match_type": "buyer",
+         "target_path": "buyer", "payload": {"description": "Acme"}}
 
-    Search is read-only and doesn't require the lock — the user might be
-    deciding whether to take the draft. Apply and Clear mutate the draft, so
-    they require `assert_holds`.
+    Search is read-only and doesn't require the lock. Apply / Clear /
+    Create mutate the draft, so they require `assert_holds`.
+
+    Create runs inside the same atomic block as the apply, so a draft
+    that loses its lock after row creation but before write will roll
+    back the new canonical row.
     """
     try:
         payload = json.loads(request.body.decode('utf-8') or '{}')
@@ -260,7 +290,12 @@ def match_endpoint(request, pk: int):
             return JsonResponse({'error': str(exc)}, status=400)
         return JsonResponse({'results': results})
 
-    if action not in ('apply', 'clear'):
+    if action == 'creatable_types':
+        # Convenience for the modal: lets the JS show or hide the Add New
+        # panel based on what the server actually supports.
+        return JsonResponse({'creatable_types': sorted(CREATABLE_TYPES)})
+
+    if action not in ('apply', 'clear', 'create'):
         return JsonResponse({'error': f'unknown action: {action!r}'}, status=400)
 
     with transaction.atomic():
@@ -284,6 +319,13 @@ def match_endpoint(request, pk: int):
                     return JsonResponse(
                         {'error': 'record_id required (int)'}, status=400
                     )
+                apply_match(new_data, target_path, match_type, record_id)
+            elif action == 'create':
+                # Create canonical row, then immediately apply the new
+                # record to the draft. Both happen inside this atomic
+                # block — if validate_data rejects the apply, the new
+                # canonical row rolls back too.
+                record_id = create_record(match_type, payload.get('payload') or {})
                 apply_match(new_data, target_path, match_type, record_id)
             else:  # clear
                 clear_match(new_data, target_path)

@@ -57,16 +57,21 @@ def _date(value) -> Optional[str]:
 
 
 def _clin_to_dict(c: ClinParseResult) -> dict:
-    return {
+    row = {
         'item_number': c.item_number,
         'nsn_text': c.nsn,
         'nsn_description': c.nsn_description,
         'order_qty': float(c.order_qty) if c.order_qty is not None else None,
         'uom': c.uom,
-        'unit_price': _d(c.unit_price),
+        # 1155 unit price is the government contract price (item_value), not
+        # the supplier quote (unit_price) — analysts enter quote price manually.
+        'item_value': _d(c.unit_price),
         'due_date': _date(c.due_date),
         'fob': c.fob,
     }
+    if not (row.get('item_type') or '').strip():
+        row['item_type'] = 'P'
+    return row
 
 
 def _result_to_data(result: AwardParseResult) -> dict:

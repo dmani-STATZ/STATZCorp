@@ -15,6 +15,7 @@ AWD / PO
   data.pr_number             → Contract.pr_number
   data.solicitation_type     → Contract.solicitation_type
   data.buyer_id              → Contract.buyer (REQUIRED — must be matched)
+  data.sales_class_id        → Contract.sales_class (optional; validated)
   data.award_date            → Contract.award_date
   data.due_date              → Contract.due_date
   data.contract_value        → Contract.contract_value
@@ -44,9 +45,12 @@ from typing import Union
 
 from django.contrib.auth.models import User
 
+from decimal import Decimal
+
 from contracts.models import (
     Buyer,
     Clin,
+    ClinSplit,
     Contract,
     ContractFinanceLine,
     ContractPackaging,
@@ -54,6 +58,8 @@ from contracts.models import (
     IdiqContract,
     IdiqContractDetails,
     Note,
+    SalesClass,
+    SpecialPaymentTerms,
 )
 from products.models import Nsn
 from suppliers.models import Supplier
@@ -125,6 +131,20 @@ def finalize_draft(draft: DraftContract, user: User) -> CanonicalTarget:
 # ---------------------------------------------------------------------------
 
 
+def _resolve_sales_class(data: dict):
+    """Return SalesClass for data['sales_class_id'] or None."""
+    sales_class_id = data.get('sales_class_id')
+    if not sales_class_id:
+        return None
+    try:
+        return SalesClass.objects.get(pk=sales_class_id)
+    except SalesClass.DoesNotExist as exc:
+        raise FinalizationError(
+            f'Sales Class #{sales_class_id} no longer exists. '
+            f'Clear or re-select Sales Class in the editor.'
+        ) from exc
+
+
 def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
     data = draft.data or {}
 
@@ -181,6 +201,7 @@ def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
         pr_number=data.get('pr_number'),
         solicitation_type=data.get('solicitation_type') or 'SDVOSB',
         buyer=buyer,
+        sales_class=_resolve_sales_class(data),
         award_date=data.get('award_date') or None,
         due_date=data.get('due_date') or None,
         contract_value=data.get('contract_value') or 0,
@@ -190,25 +211,7 @@ def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
         modified_by=user,
     )
 
-    created_clins = []
-    for row in clin_rows:
-        clin = Clin.objects.create(
-            contract=contract,
-            item_number=row.get('item_number'),
-            item_type=row.get('item_type'),
-            nsn=nsns[row['nsn_id']],
-            supplier=suppliers[row['supplier_id']],
-            order_qty=row.get('order_qty'),
-            uom=row.get('uom'),
-            unit_price=row.get('unit_price'),
-            item_value=row.get('item_value'),
-            due_date=row.get('due_date') or None,
-            ia=row.get('ia'),
-            fob=row.get('fob'),
-            created_by=user,
-            modified_by=user,
-        )
-        created_clins.append(clin)
+    created_clins = _create_clins(contract, clin_rows, nsns, suppliers, user)
 
     packaging = data.get('packaging') or {}
     pack_supplier_id = packaging.get('packhouse_supplier_id')
@@ -228,28 +231,130 @@ def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
             modified_by=user,
         )
 
-    _shred_finance_lines(data.get('finance_lines') or [], created_clins, user)
+    _apply_legacy_root_finance_lines(draft, data, created_clins, user)
 
     return contract
 
 
-def _shred_finance_lines(rows, created_clins, user):
-    """Attach root-level intake finance_lines to the FIRST canonical CLIN.
+def _resolve_special_payment_terms(value):
+    """Look up SpecialPaymentTerms by PK string, or None for blank."""
+    if not value:
+        return None
+    try:
+        return SpecialPaymentTerms.objects.get(pk=int(value))
+    except (SpecialPaymentTerms.DoesNotExist, ValueError, TypeError) as exc:
+        raise FinalizationError(
+            f'Special payment terms #{value!r} not found.'
+        ) from exc
 
-    The canonical ContractFinanceLine is keyed to Clin, not Contract — but
-    intake JSON stores finance_lines at the root because the parser can't
-    yet attribute them per-CLIN. We attach all of them to the first CLIN
-    as a pragmatic placeholder. Analysts can re-bucket later via the
-    Finance Audit page. Documented in AGENTS.md.
+
+def _compute_planned_gp(row: dict) -> Decimal:
+    """planned_gp = item_value − (unit_price × order_qty + sum of finance_lines)."""
+    def _dec(v):
+        if v is None or v == '':
+            return Decimal('0')
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return Decimal('0')
+
+    item_value = _dec(row.get('item_value'))
+    unit_price = _dec(row.get('unit_price'))
+    order_qty = _dec(row.get('order_qty'))
+    finance_total = sum(
+        (_dec(fl.get('amount')) for fl in (row.get('finance_lines') or [])),
+        Decimal('0'),
+    )
+    return item_value - (unit_price * order_qty + finance_total)
+
+
+def _create_clins(contract, clin_rows, nsns, suppliers, user):
+    """Shared CLIN creation loop for AWD/PO/DO/INTERNAL.
+
+    Creates Clin rows, then per-CLIN ContractFinanceLine and ClinSplit
+    rows from the nested intake data. Returns the list of Clin objects
+    in input order so callers (eg the legacy root finance-line path) can
+    target the first CLIN.
     """
-    if not rows or not created_clins:
+    created = []
+    for row in clin_rows:
+        clin = Clin.objects.create(
+            contract=contract,
+            item_number=row.get('item_number'),
+            item_type=row.get('item_type'),
+            nsn=nsns[row['nsn_id']],
+            supplier=suppliers[row['supplier_id']],
+            order_qty=row.get('order_qty'),
+            uom=row.get('uom'),
+            unit_price=row.get('unit_price'),
+            item_value=row.get('item_value'),
+            due_date=row.get('due_date') or None,
+            supplier_due_date=row.get('supplier_due_date') or None,
+            special_payment_terms=_resolve_special_payment_terms(
+                row.get('special_payment_terms')
+            ),
+            ia=row.get('ia'),
+            fob=row.get('fob'),
+            created_by=user,
+            modified_by=user,
+        )
+        created.append(clin)
+
+        # Per-CLIN finance lines.
+        for fl in row.get('finance_lines') or []:
+            if not fl.get('line_type') or fl.get('amount') is None:
+                continue
+            ContractFinanceLine.objects.create(
+                clin=clin,
+                line_type=fl['line_type'],
+                description=fl.get('notes') or None,
+                amount_billed=fl['amount'],
+                created_by=user,
+                modified_by=user,
+            )
+
+        # Per-CLIN GP splits. split_value is computed from planned_gp; the
+        # editor shows it live but doesn't POST it.
+        planned_gp = _compute_planned_gp(row)
+        for sp in row.get('splits') or []:
+            company = (sp.get('company_name') or '').strip()
+            if not company:
+                continue
+            try:
+                percentage = Decimal(str(sp.get('percentage') or 0))
+            except Exception:
+                percentage = Decimal('0')
+            split_value = (planned_gp * percentage / Decimal('100')).quantize(
+                Decimal('0.01')
+            )
+            ClinSplit.objects.create(
+                clin=clin,
+                company_name=company,
+                percentage=percentage,
+                split_value=split_value,
+            )
+    return created
+
+
+def _apply_legacy_root_finance_lines(draft, data, created_clins, user):
+    """Backward-compat: pre-redesign drafts stored finance_lines at the
+    root. Attach them to the first CLIN with a warning. Remove this path
+    once the queue is confirmed clear of legacy drafts.
+    """
+    legacy = data.get('finance_lines') or []
+    if not legacy or not created_clins:
         return
-    target_clin = created_clins[0]
-    for row in rows:
-        if not (row.get('line_type') and row.get('amount') is not None):
+    logger.warning(
+        'Draft %s has root-level finance_lines (legacy). Attaching to first '
+        'CLIN — re-enter via CLIN editor for proper per-CLIN attribution.',
+        draft.pk,
+    )
+    target = created_clins[0]
+    for row in legacy:
+        if not row.get('line_type') or row.get('amount') is None:
             continue
         ContractFinanceLine.objects.create(
-            clin=target_clin,
+            clin=target,
             line_type=row['line_type'],
             description=row.get('notes') or None,
             amount_billed=row['amount'],
@@ -318,6 +423,7 @@ def _finalize_internal(draft: DraftContract, user: User) -> Contract:
         pr_number=data.get('pr_number'),
         solicitation_type=data.get('solicitation_type') or 'SDVOSB',
         buyer=buyer,
+        sales_class=_resolve_sales_class(data),
         award_date=data.get('award_date') or None,
         due_date=data.get('due_date') or None,
         contract_value=data.get('contract_value') or 0,
@@ -330,10 +436,6 @@ def _finalize_internal(draft: DraftContract, user: User) -> Contract:
     clin_rows = data.get('clins') or []
     created_clins = []
     if clin_rows:
-        nsn_ids = {r['nsn_id'] for r in clin_rows if r.get('nsn_id')}
-        supplier_ids = {r['supplier_id'] for r in clin_rows if r.get('supplier_id')}
-        nsns = {n.id: n for n in Nsn.objects.filter(pk__in=nsn_ids)}
-        suppliers = {s.id: s for s in Supplier.objects.filter(pk__in=supplier_ids)}
         for i, row in enumerate(clin_rows):
             if not row.get('nsn_id') or not row.get('supplier_id'):
                 # Internal CLIN with unmatched FK rows is meaningless —
@@ -343,25 +445,13 @@ def _finalize_internal(draft: DraftContract, user: User) -> Contract:
                     f'INTERNAL CLIN {label}: NSN and Supplier must be matched, '
                     f'or remove the CLIN entirely.'
                 )
-            clin = Clin.objects.create(
-                contract=contract,
-                item_number=row.get('item_number'),
-                item_type=row.get('item_type'),
-                nsn=nsns[row['nsn_id']],
-                supplier=suppliers[row['supplier_id']],
-                order_qty=row.get('order_qty'),
-                uom=row.get('uom'),
-                unit_price=row.get('unit_price'),
-                item_value=row.get('item_value'),
-                due_date=row.get('due_date') or None,
-                ia=row.get('ia'),
-                fob=row.get('fob'),
-                created_by=user,
-                modified_by=user,
-            )
-            created_clins.append(clin)
+        nsn_ids = {r['nsn_id'] for r in clin_rows}
+        supplier_ids = {r['supplier_id'] for r in clin_rows}
+        nsns = {n.id: n for n in Nsn.objects.filter(pk__in=nsn_ids)}
+        suppliers = {s.id: s for s in Supplier.objects.filter(pk__in=supplier_ids)}
+        created_clins = _create_clins(contract, clin_rows, nsns, suppliers, user)
 
-    _shred_finance_lines(data.get('finance_lines') or [], created_clins, user)
+    _apply_legacy_root_finance_lines(draft, data, created_clins, user)
 
     if data.get('notes'):
         from django.contrib.contenttypes.models import ContentType
