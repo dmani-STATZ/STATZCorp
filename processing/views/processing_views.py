@@ -34,6 +34,12 @@ from contracts.models import (
     PaymentHistory,
     ContractStatus,
 )
+from contracts.services import (
+    ContractCreationError,
+    create_contract_from_payload,
+    create_idiq_from_payload,
+    get_default_contract_status as _services_get_default_contract_status,
+)
 from products.models import Nsn
 from suppliers.models import Supplier
 import csv
@@ -66,10 +72,96 @@ logger = logging.getLogger(__name__)
 def get_default_contract_status():
     """
     Retrieve or create the default 'Open' contract status.
-    Ensures finalised contracts don't fail because the status table is empty.
+
+    Thin re-export of `contracts.services.get_default_contract_status`
+    kept for backward-compatibility with any in-tree callers; new code
+    should import from `contracts.services` directly.
     """
-    status, _ = ContractStatus.objects.get_or_create(description='Open')
-    return status
+    return _services_get_default_contract_status()
+
+
+def _process_contract_to_payload(process_contract, *, seed_payment_history: bool) -> dict:
+    """Translate a ProcessContract + its ProcessClins + splits into the
+    `contracts.services.contract_create` payload shape.
+
+    The CLIN list preserves `item_number` ordering. Splits use
+    Processing's explicit-value style (split_value verbatim, split_paid
+    defaulted to 0 when None) — the service supports that mode.
+    """
+    clins = []
+    for pc in process_contract.clins.prefetch_related('splits').order_by('item_number'):
+        clins.append({
+            'item_number': pc.item_number,
+            'item_type': pc.item_type,
+            'nsn_id': pc.nsn_id,
+            'supplier_id': pc.supplier_id,
+            'order_qty': pc.order_qty,
+            'uom': pc.uom,
+            'unit_price': pc.unit_price,
+            'item_value': pc.item_value,
+            'price_per_unit': pc.price_per_unit,
+            'quote_value': pc.quote_value,
+            'po_num_ext': pc.po_num_ext,
+            'tab_num': pc.tab_num,
+            'clin_po_num': pc.clin_po_num,
+            'po_number': pc.po_number,
+            'clin_type_id': pc.clin_type_id,
+            'ia': pc.ia,
+            'fob': pc.fob,
+            'due_date': pc.due_date,
+            'supplier_due_date': pc.supplier_due_date,
+            'special_payment_terms_id': pc.special_payment_terms_id,
+            'splits': [
+                {
+                    'company_name': sp.company_name,
+                    'split_value': sp.split_value,
+                    'split_paid': (
+                        sp.split_paid if sp.split_paid is not None
+                        else Decimal('0.00')
+                    ),
+                }
+                for sp in pc.splits.all()
+            ],
+        })
+    payload = {
+        'contract_type_kind': 'AWD',
+        'contract_number': process_contract.contract_number,
+        'idiq_contract_id': process_contract.idiq_contract_id,
+        'pr_number': process_contract.pr_number,
+        'solicitation_type': process_contract.solicitation_type,
+        'po_number': process_contract.po_number,
+        'tab_num': process_contract.tab_num,
+        'buyer_id': process_contract.buyer_id,
+        'contract_type_id': process_contract.contract_type_id,
+        'award_date': process_contract.award_date,
+        'due_date': process_contract.due_date,
+        'sales_class_id': process_contract.sales_class_id,
+        'nist': process_contract.nist,
+        'files_url': process_contract.files_url,
+        'contract_value': process_contract.contract_value,
+        'planned_split': process_contract.planned_split,
+        'plan_gross': process_contract.plan_gross,
+        'clins': clins,
+        'seed_payment_history': seed_payment_history,
+    }
+    if process_contract.packhouse_id:
+        payload['packaging'] = {
+            'packhouse_supplier_id': process_contract.packhouse_id,
+            'quote_amount': process_contract.packhouse_quote_amount,
+            'notes': process_contract.packhouse_notes,
+        }
+    return payload
+
+
+def _wire_final_clin_refs(process_contract, clins_by_item_number) -> None:
+    """Point each ProcessClin.final_clin at the canonical Clin the service
+    just created. Used so any post-finalize bookkeeping that reads
+    `ProcessClin.final_clin` keeps working."""
+    for pc in process_contract.clins.all():
+        clin = clins_by_item_number.get(pc.item_number)
+        if clin is not None:
+            pc.final_clin = clin
+            pc.save(update_fields=['final_clin'])
 
 
 def _get_default_sales_class():
@@ -643,73 +735,15 @@ def finalize_contract(request, process_contract_id):
     """Create a final Contract from a ProcessContract"""
     try:
         process_contract = ProcessContract.objects.get(id=process_contract_id)
-        
-        # Verify all required fields are set
+
+        # Validate before delegating so the user-facing error messages
+        # match the existing wording.
         if not process_contract.buyer:
             return JsonResponse({
                 'success': False,
                 'error': 'Buyer must be matched before finalizing'
             })
-        
-        # Create the Contract
-        contract = Contract.objects.create(
-            contract_number=process_contract.contract_number,
-            idiq_contract=process_contract.idiq_contract,
-            solicitation_type=process_contract.solicitation_type,
-            pr_number=process_contract.pr_number,
-            po_number=process_contract.po_number,
-            tab_num=process_contract.tab_num,
-            buyer=process_contract.buyer,
-            contract_type=process_contract.contract_type,
-            award_date=process_contract.award_date,
-            due_date=process_contract.due_date,
-            sales_class=process_contract.sales_class,
-            nist=process_contract.nist,
-            files_url=process_contract.files_url,
-            contract_value=process_contract.contract_value,
-            planned_split=process_contract.planned_split,
-            created_by=request.user,
-            modified_by=request.user,
-            status=get_default_contract_status()
-        )
-
-        # Copy packhouse data captured during processing to ContractPackaging.
-        if process_contract.packhouse_id:
-            from contracts.models import ContractPackaging
-
-            ContractPackaging.objects.create(
-                contract=contract,
-                packhouse=process_contract.packhouse,
-                quote_amount=process_contract.packhouse_quote_amount,
-                notes=process_contract.packhouse_notes,
-                created_by=request.user,
-                modified_by=request.user,
-            )
-
-        # Update sequence numbers if necessary
-        po_number_current = SequenceNumber.get_po_number()
-        tab_number_current = SequenceNumber.get_tab_number()
-
-        # For PO number: Ensure sequence is at least one more than the contract's number
-        target_po_number = process_contract.po_number + 1
-        if po_number_current <= process_contract.po_number:
-            # Need to advance sequence to be one more than contract's number
-            sequence = SequenceNumber.objects.first()
-            if sequence:
-                sequence.po_number = target_po_number
-                sequence.save()
-
-        # For Tab number: Ensure sequence is at least one more than the contract's number
-        target_tab_number = process_contract.tab_num + 1
-        if tab_number_current <= process_contract.tab_num:
-            # Need to advance sequence to be one more than contract's number
-            sequence = SequenceNumber.objects.first()
-            if sequence:
-                sequence.tab_number = target_tab_number
-                sequence.save()
-
-        # Create CLINs
-        for process_clin in process_contract.clins.prefetch_related('splits'):
+        for process_clin in process_contract.clins.all():
             if not process_clin.nsn:
                 return JsonResponse({
                     'success': False,
@@ -720,54 +754,50 @@ def finalize_contract(request, process_contract_id):
                     'success': False,
                     'error': f'Supplier must be matched for CLIN {process_clin.item_number}'
                 })
-            
-            clin = Clin.objects.create(
-                contract=contract,
-                item_number=process_clin.item_number,
-                item_type=process_clin.item_type,
-                nsn=process_clin.nsn,
-                supplier=process_clin.supplier,
-                order_qty=process_clin.order_qty,
-                unit_price=process_clin.unit_price,
-                item_value=process_clin.item_value,
-                po_num_ext=process_clin.po_num_ext,
-                tab_num=process_clin.tab_num,
-                clin_po_num=process_clin.clin_po_num,
-                po_number=process_clin.po_number,
-                clin_type=process_clin.clin_type,
-                ia=process_clin.ia,
-                fob=process_clin.fob,
-                due_date=process_clin.due_date,
-                supplier_due_date=process_clin.supplier_due_date,
-                price_per_unit=process_clin.price_per_unit,
-                quote_value=process_clin.quote_value,
-                special_payment_terms=process_clin.special_payment_terms,
-                created_by=request.user,
-                modified_by=request.user
+
+        try:
+            result = create_contract_from_payload(
+                _process_contract_to_payload(
+                    process_contract, seed_payment_history=False
+                ),
+                request.user,
             )
-            process_clin.final_clin = clin
-            process_clin.save(update_fields=['final_clin'])
-            for proc_split in process_clin.splits.all():
-                ClinSplit.objects.create(
-                    clin=clin,
-                    company_name=proc_split.company_name,
-                    split_value=proc_split.split_value,
-                    split_paid=(
-                        proc_split.split_paid
-                        if proc_split.split_paid is not None
-                        else Decimal('0.00')
-                    ),
-                )
-        
-        # Update queue item status
-        queue_contract = process_contract.queue_contract
+        except ContractCreationError as exc:
+            return JsonResponse({'success': False, 'error': str(exc)}, status=400)
+
+        contract = result.contract
+        _wire_final_clin_refs(process_contract, result.clins_by_item_number)
+
+        # Sequence-number housekeeping: ensure the shared counter sits
+        # one past the values just consumed by this contract. Processing-
+        # specific, kept in the view.
+        po_number_current = SequenceNumber.get_po_number()
+        tab_number_current = SequenceNumber.get_tab_number()
+        if process_contract.po_number is not None:
+            target_po_number = process_contract.po_number + 1
+            if po_number_current <= process_contract.po_number:
+                sequence = SequenceNumber.objects.first()
+                if sequence:
+                    sequence.po_number = target_po_number
+                    sequence.save()
+        if process_contract.tab_num is not None:
+            target_tab_number = process_contract.tab_num + 1
+            if tab_number_current <= process_contract.tab_num:
+                sequence = SequenceNumber.objects.first()
+                if sequence:
+                    sequence.tab_number = target_tab_number
+                    sequence.save()
+
+        # Update queue item status.
+        queue_contract = QueueContract.objects.filter(
+            id=process_contract.queue_id
+        ).first()
         if queue_contract:
             queue_contract.status = 'processed'
             queue_contract.save()
-        
-        # Delete the process contract
+
         process_contract.delete()
-        
+
         return JsonResponse({
             'success': True,
             'contract_id': contract.id,
@@ -1261,18 +1291,10 @@ def mark_ready_for_review(request, process_contract_id):
 def finalize_and_email_contract(request, process_contract_id):
     try:
         process_contract = get_object_or_404(ProcessContract, id=process_contract_id)
-        # Normalize award_date to a plain date regardless of whether it's a date or datetime
-        from datetime import date as _date, datetime as _datetime
-        award_date_for_payment = (
-            process_contract.award_date.date()
-            if isinstance(process_contract.award_date, _datetime)
-            else process_contract.award_date
-        )
-        process_clins = process_contract.clins.prefetch_related('splits')
-        
-        # Validate all CLINs before processing
+
+        # Validate all CLINs before processing.
         validation_errors = []
-        for process_clin in process_clins:
+        for process_clin in process_contract.clins.all():
             if not process_clin.nsn:
                 validation_errors.append(f"CLIN {process_clin.item_number} is missing NSN")
             if not process_clin.supplier:
@@ -1281,32 +1303,31 @@ def finalize_and_email_contract(request, process_contract_id):
                 validation_errors.append(f"CLIN {process_clin.item_number} has no item value")
             if not process_clin.quote_value and process_clin.quote_value != 0:
                 validation_errors.append(f"CLIN {process_clin.item_number} has no quote value")
-                
+
         if validation_errors:
             return JsonResponse({
                 'success': False,
                 'error': "Validation failed:\n" + "\n".join(validation_errors)
             }, status=400)
 
-        # Validate contract level data
+        # Validate contract level data.
         if not process_contract.contract_value:
             return JsonResponse({
                 'success': False,
                 'error': "Contract has no total value"
             }, status=400)
-            
+
         if not process_contract.plan_gross and process_contract.plan_gross != 0:
             return JsonResponse({
                 'success': False,
                 'error': "Contract has no plan gross value"
             }, status=400)
-            
+
         if not process_contract.award_date:
             return JsonResponse({
                 'success': False,
                 'error': "Contract has no award date"
             }, status=400)
-
 
         # Mint the PO number at finalization — this is the only place a PO number
         # is ever assigned. ProcessContract.po_number is null during staging by design.
@@ -1321,140 +1342,19 @@ def finalize_and_email_contract(request, process_contract_id):
             po_number=finalized_po_number,
         )
 
-        # Create the final contract with all relevant fields
-        contract = Contract.objects.create(
-            contract_number=process_contract.contract_number,
-            idiq_contract=process_contract.idiq_contract,
-            solicitation_type=process_contract.solicitation_type,
-            pr_number=process_contract.pr_number,
-            po_number=process_contract.po_number,
-            tab_num=process_contract.tab_num,
-            buyer=process_contract.buyer,
-            contract_type=process_contract.contract_type,
-            award_date=process_contract.award_date,
-            due_date=process_contract.due_date,
-            sales_class=process_contract.sales_class,
-            nist=process_contract.nist,
-            files_url=process_contract.files_url,
-            contract_value=process_contract.contract_value,
-            planned_split=process_contract.planned_split,
-            plan_gross=process_contract.plan_gross,
-            created_by=request.user,
-            modified_by=request.user,
-            status=get_default_contract_status()
-        )
-
-        # Create contract_value payment history
-        contract_content_type = ContentType.objects.get_for_model(Contract)
-        PaymentHistory.objects.create(
-            content_type=contract_content_type,
-            object_id=contract.id,
-            payment_type='contract_value',
-            payment_amount=process_contract.contract_value,
-            payment_date=award_date_for_payment,
-            payment_info='Initial contract value',
-            created_by=request.user,
-            modified_by=request.user
-        )
-        # Create plan_gross payment history
-        PaymentHistory.objects.create(
-            content_type=contract_content_type,
-            object_id=contract.id,
-            payment_type='plan_gross',
-            payment_amount=process_contract.plan_gross,
-            payment_date=award_date_for_payment,
-            payment_info='Initial plan gross',
-            created_by=request.user,
-            modified_by=request.user
-        )
-
-        # Copy packhouse data captured during processing to ContractPackaging.
-        # Only create a ContractPackaging row when a packhouse was assigned —
-        # packhouse is optional and most contracts have none.
-        if process_contract.packhouse_id:
-            from contracts.models import ContractPackaging
-
-            ContractPackaging.objects.create(
-                contract=contract,
-                packhouse=process_contract.packhouse,
-                quote_amount=process_contract.packhouse_quote_amount,
-                notes=process_contract.packhouse_notes,
-                created_by=request.user,
-                modified_by=request.user,
+        try:
+            result = create_contract_from_payload(
+                _process_contract_to_payload(
+                    process_contract, seed_payment_history=True
+                ),
+                request.user,
             )
+        except ContractCreationError as exc:
+            return JsonResponse({'success': False, 'error': str(exc)}, status=400)
 
-        process_clins = process_contract.clins.all()
+        contract = result.contract
+        _wire_final_clin_refs(process_contract, result.clins_by_item_number)
 
-        # Create CLINs and payment history with all relevant fields
-        for process_clin in process_clins:
-            clin = Clin.objects.create(
-                contract=contract,
-                item_number=process_clin.item_number,
-                item_type=process_clin.item_type,
-                nsn=process_clin.nsn,
-                supplier=process_clin.supplier,
-                order_qty=process_clin.order_qty,
-                unit_price=process_clin.unit_price,
-                item_value=process_clin.item_value,
-                po_num_ext=process_clin.po_num_ext,
-                tab_num=process_clin.tab_num,
-                clin_po_num=process_clin.clin_po_num,
-                po_number=process_clin.po_number,
-                clin_type=process_clin.clin_type,
-                ia=process_clin.ia,
-                fob=process_clin.fob,
-                due_date=process_clin.due_date,
-                supplier_due_date=process_clin.supplier_due_date,
-                price_per_unit=process_clin.price_per_unit,
-                quote_value=process_clin.quote_value,
-                uom=process_clin.uom,
-                special_payment_terms=process_clin.special_payment_terms,
-                created_by=request.user,
-                modified_by=request.user
-            )
-
-            process_clin.final_clin = clin
-            process_clin.save(update_fields=['final_clin'])
-
-            for proc_split in process_clin.splits.all():
-                ClinSplit.objects.create(
-                    clin=clin,
-                    company_name=proc_split.company_name,
-                    split_value=proc_split.split_value,
-                    split_paid=(
-                        proc_split.split_paid
-                        if proc_split.split_paid is not None
-                        else Decimal('0.00')
-                    ),
-                )
-            
-            # Create payment history records using ContentType framework
-            clin_content_type = ContentType.objects.get_for_model(Clin)
-            
-            # Create item_value payment history
-            PaymentHistory.objects.create(
-                content_type=clin_content_type,
-                object_id=clin.id,
-                payment_type='item_value',
-                payment_amount=process_clin.item_value,
-                payment_date=award_date_for_payment,
-                payment_info='Initial item value',
-                created_by=request.user,
-                modified_by=request.user
-            )
-            
-            # Create quote_value payment history
-            PaymentHistory.objects.create(
-                content_type=clin_content_type,
-                object_id=clin.id,
-                payment_type='quote_value',
-                payment_amount=process_clin.quote_value,
-                payment_date=award_date_for_payment,
-                payment_info='Initial quote value',
-                created_by=request.user,
-                modified_by=request.user
-            )
-            
         queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
 
         email_subject = f"New Contract: {contract.contract_number}"
@@ -3059,29 +2959,36 @@ def finalize_idiq_contract(request, process_contract_id):
         except (ValueError, TypeError):
             option_months = None
 
-        # Create the canonical IdiqContract record
-        idiq_contract = IdiqContract.objects.create(
-            contract_number=process_contract.contract_number,
-            buyer=process_contract.buyer,
-            award_date=process_contract.award_date,
-            term_length=term_months,
-            option_length=option_months,
-            max_value=max_value,
-            min_guarantee=min_guarantee,
-            closed=False,
-            created_by=request.user,
-            modified_by=request.user,
-        )
-
-        # Create one IdiqContractDetails row per CLIN
-        for pc in clins:
-            min_order_qty = (request.POST.get(f'min_order_qty_{pc.id}') or '').strip() or None
-            IdiqContractDetails.objects.create(
-                idiq_contract=idiq_contract,
-                nsn=pc.nsn,
-                supplier=pc.supplier,
-                min_order_qty=min_order_qty,
+        # Build the explicit (nsn, supplier, min_order_qty) pairs from the
+        # per-CLIN form inputs so the service can create one IdiqContractDetails
+        # row per CLIN (Processing's direct-mapping style — not Intake's
+        # cross-product).
+        idiq_details = [
+            {
+                'nsn_id': pc.nsn_id,
+                'supplier_id': pc.supplier_id,
+                'min_order_qty':
+                    (request.POST.get(f'min_order_qty_{pc.id}') or '').strip()
+                    or None,
+            }
+            for pc in clins
+        ]
+        try:
+            idiq_contract = create_idiq_from_payload(
+                {
+                    'contract_number': process_contract.contract_number,
+                    'buyer_id': process_contract.buyer_id,
+                    'award_date': process_contract.award_date,
+                    'term_length': term_months,
+                    'option_length': option_months,
+                    'max_value': max_value,
+                    'min_guarantee': min_guarantee,
+                    'idiq_details': idiq_details,
+                },
+                request.user,
             )
+        except ContractCreationError as exc:
+            return JsonResponse({'success': False, 'error': str(exc)}, status=400)
 
         # Cleanup: delete processing + queue records
         queue_id = process_contract.queue_id
