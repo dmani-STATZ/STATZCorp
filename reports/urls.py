@@ -15,6 +15,7 @@ urlpatterns = [
     path("change/<uuid:pk>/", views.request_change, name="request_change"),
     path("promote/<uuid:pk>/", views.promote_to_company, name="promote_to_company"),
     path("share/<uuid:pk>/", views.share_report, name="share_report"),
+    path("share/<uuid:share_pk>/revoke/", views.revoke_share, name="revoke_share"),
 
     # Admin queue
     path("admin/", views.admin_queue, name="admin_queue"),
