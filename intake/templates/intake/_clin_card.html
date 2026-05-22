@@ -1,0 +1,227 @@
+{% load intake_extras %}
+{# One CLIN card. Expects `clin` (dict), `idx` (int), and `clins` (list) in context. #}
+<div class="card mb-3 clin-card" data-clin-idx="{{ idx }}">
+    <div class="card-header d-flex justify-content-between align-items-center bg-light">
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-clin-toggle>
+                <span class="clin-toggle-label">{% if clins|length == 1 and not clin|get_item:'item_value' and not clin|get_item:'nsn_text' %}▲ Collapse{% else %}▼ Expand{% endif %}</span>
+            </button>
+            <div class="clin-header-summary">
+                <strong>CLIN <span class="clin-header-item-number">{{ clin|get_item:'item_number'|default:'—' }}</span></strong>
+                <span class="text-muted ms-2 clin-header-item-type">
+                    {% with t=clin|get_item:'item_type' %}
+                        {% if t == 'P' %}Production
+                        {% elif t == 'G' %}GFAT
+                        {% elif t == 'C' %}CFAT
+                        {% elif t == 'L' %}PLT
+                        {% elif t == 'M' %}Miscellaneous
+                        {% elif t == 'Q' %}QN
+                        {% elif t == 'D' %}PQDR
+                        {% else %}—
+                        {% endif %}
+                    {% endwith %}
+                </span>
+                <div class="small text-muted">
+                    <span class="clin-header-nsn">{{ clin|get_item:'nsn_text'|default:'NSN: Not Set' }}</span>
+                    <span class="clin-header-nsn-desc text-muted">
+                        {% with nd=clin|get_item:'nsn_description' %}{% if nd %} — {{ nd }}{% endif %}{% endwith %}
+                    </span>
+                    &nbsp;·&nbsp;
+                    <span class="clin-header-supplier">{{ clin|get_item:'supplier_text'|default:'Supplier: Not Set' }}</span>
+                </div>
+            </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" data-remove-clin>×</button>
+    </div>
+    <div class="card-body clin-card-body{% if clins|length != 1 or clin|get_item:'item_value' or clin|get_item:'nsn_text' %} d-none{% endif %}">
+
+        {# ---- Section 1: Contract Data ---- #}
+        <h6 class="text-uppercase text-muted mb-2">Contract Data</h6>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+            <div>
+                <label class="label block mb-1">Item Number</label>
+                <input type="text" name="clin-{{ idx }}-item_number"
+                       value="{{ clin|get_item:'item_number'|default:'' }}"
+                       class="form-control form-control-sm clin-item-number">
+            </div>
+            <div>
+                <label class="label block mb-1">Item Type</label>
+                <select name="clin-{{ idx }}-item_type"
+                        class="form-select form-select-sm clin-item-type">
+                    {% with t=clin|get_item:'item_type' %}
+                    <option value="">—</option>
+                    {% for code, label in item_type_choices %}
+                    <option value="{{ code }}"
+                        {% if t == code %}selected{% elif not t and code == 'P' %}selected{% endif %}>
+                        {{ label }} ({{ code }})
+                    </option>
+                    {% endfor %}
+                    {% endwith %}
+                </select>
+            </div>
+            <div>
+                <label class="label block mb-1">CLIN Due Date</label>
+                <input type="date" name="clin-{{ idx }}-due_date"
+                       value="{{ clin|get_item:'due_date'|default:'' }}"
+                       class="form-control form-control-sm">
+            </div>
+            <div class="col-span-2">
+                <label class="label block mb-1">NSN</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="clin-{{ idx }}-nsn_text"
+                           value="{{ clin|get_item:'nsn_text'|default:'' }}"
+                           class="form-control form-control-sm">
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                            data-match-open data-match-type="nsn"
+                            data-target-path="clin:{{ idx }}:nsn"
+                            data-match-title="NSN"
+                            data-match-original="{{ clin|get_item:'nsn_text'|default:'' }}">Match</button>
+                </div>
+                <input type="hidden" name="clin-{{ idx }}-nsn_id"
+                       value="{{ clin|get_item:'nsn_id'|default:'' }}">
+                {% with nd=clin|get_item:'nsn_description' %}
+                    {% if nd %}<div class="small text-muted mt-1">{{ nd }}</div>{% endif %}
+                {% endwith %}
+            </div>
+            <div>
+                <label class="label block mb-1">Quantity</label>
+                <input type="number" step="0.0001" name="clin-{{ idx }}-order_qty"
+                       value="{{ clin|get_item:'order_qty'|default:'' }}"
+                       class="form-control form-control-sm clin-order-qty">
+            </div>
+            <div>
+                <label class="label block mb-1">UOM</label>
+                <input type="text" name="clin-{{ idx }}-uom"
+                       value="{{ clin|get_item:'uom'|default:'' }}"
+                       class="form-control form-control-sm">
+            </div>
+            <div>
+                <label class="label block mb-1">Item Value</label>
+                <input type="number" step="0.01" name="clin-{{ idx }}-item_value"
+                       value="{{ clin|get_item:'item_value'|default:'' }}"
+                       class="form-control form-control-sm clin-item-value">
+            </div>
+            <div>
+                <label class="label block mb-1">IA</label>
+                <select name="clin-{{ idx }}-ia" class="form-select form-select-sm">
+                    {% with t=clin|get_item:'ia' %}
+                    <option value="" {% if not t %}selected{% endif %}>—</option>
+                    {% for code, label in ia_fob_choices %}
+                    <option value="{{ code }}" {% if t == code %}selected{% endif %}>{{ label }} ({{ code }})</option>
+                    {% endfor %}
+                    {% endwith %}
+                </select>
+            </div>
+            <div>
+                <label class="label block mb-1">FOB</label>
+                <select name="clin-{{ idx }}-fob" class="form-select form-select-sm">
+                    {% with t=clin|get_item:'fob' %}
+                    <option value="" {% if not t %}selected{% endif %}>—</option>
+                    {% for code, label in ia_fob_choices %}
+                    <option value="{{ code }}" {% if t == code %}selected{% endif %}>{{ label }} ({{ code }})</option>
+                    {% endfor %}
+                    {% endwith %}
+                </select>
+            </div>
+        </div>
+        <hr>
+
+        {# ---- Section 2: Supplier / Quote Data ---- #}
+        <h6 class="text-uppercase text-muted mb-2">Supplier / Quote</h6>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+            <div class="col-span-2">
+                <label class="label block mb-1">Supplier</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="clin-{{ idx }}-supplier_text"
+                           value="{{ clin|get_item:'supplier_text'|default:'' }}"
+                           class="form-control form-control-sm">
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                            data-match-open data-match-type="supplier"
+                            data-target-path="clin:{{ idx }}:supplier"
+                            data-match-title="Supplier"
+                            data-match-original="{{ clin|get_item:'supplier_text'|default:'' }}">Match</button>
+                </div>
+                <input type="hidden" name="clin-{{ idx }}-supplier_id"
+                       value="{{ clin|get_item:'supplier_id'|default:'' }}">
+            </div>
+            <div>
+                <label class="label block mb-1">Supplier Due Date</label>
+                <input type="date" name="clin-{{ idx }}-supplier_due_date"
+                       value="{{ clin|get_item:'supplier_due_date'|default:'' }}"
+                       class="form-control form-control-sm">
+            </div>
+            <div>
+                <label class="label block mb-1">Special Payment Terms</label>
+                <select name="clin-{{ idx }}-special_payment_terms"
+                        class="form-select form-select-sm">
+                    {% with t=clin|get_item:'special_payment_terms' %}
+                    <option value="" {% if not t %}selected{% endif %}>—</option>
+                    {% for spt in special_payment_terms_choices %}
+                    <option value="{{ spt.id }}" {% if t == spt.id|stringformat:'s' %}selected{% endif %}>{{ spt.terms }}</option>
+                    {% endfor %}
+                    {% endwith %}
+                </select>
+            </div>
+            <div>
+                <label class="label block mb-1">Quote Price (unit)</label>
+                <input type="number" step="0.0001" name="clin-{{ idx }}-unit_price"
+                       value="{{ clin|get_item:'unit_price'|default:'' }}"
+                       class="form-control form-control-sm clin-unit-price">
+            </div>
+            <div>
+                <label class="label block mb-1">Quote Total</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" readonly class="form-control form-control-sm clin-quote-total" value="$0.00">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-recalc-clin>ReCalc</button>
+                </div>
+            </div>
+        </div>
+        <hr>
+
+        {# ---- Section 3: Finance Lines ---- #}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="text-uppercase text-muted mb-0">Finance Lines</h6>
+            <button type="button" class="btn btn-sm btn-outline-success" data-add-clin-fin>+ Add Finance Line</button>
+        </div>
+        <table class="table table-sm mb-2 clin-fin-table">
+            <thead><tr>
+                <th>Line Type</th><th>Amount</th><th>Notes</th><th></th>
+            </tr></thead>
+            <tbody class="clin-fin-tbody">
+            {% for fl in clin|get_item:'finance_lines'|default_if_none:'' %}
+                <tr data-fin-idx="{{ forloop.counter0 }}">
+                    <td><input type="text" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-line_type" value="{{ fl|get_item:'line_type'|default:'' }}" class="form-control form-control-sm"></td>
+                    <td><input type="number" step="0.01" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-amount" value="{{ fl|get_item:'amount'|default:'' }}" class="form-control form-control-sm clin-fin-amount"></td>
+                    <td><input type="text" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-notes" value="{{ fl|get_item:'notes'|default:'' }}" class="form-control form-control-sm"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>×</button></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <hr>
+
+        {# ---- Section 4: GP Split ---- #}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="text-uppercase text-muted mb-0">GP Split</h6>
+            <button type="button" class="btn btn-sm btn-outline-success" data-add-clin-split>+ Add Split</button>
+        </div>
+        <div class="mb-2">
+            Planned GP: <strong class="clin-planned-gp">$0.00</strong>
+        </div>
+        <table class="table table-sm mb-0 clin-split-table">
+            <thead><tr>
+                <th>Company</th><th>Percentage</th><th>Split Value</th><th></th>
+            </tr></thead>
+            <tbody class="clin-split-tbody">
+            {% for sp in clin|get_item:'splits'|default_if_none:'' %}
+                <tr data-split-idx="{{ forloop.counter0 }}">
+                    <td><input type="text" name="clin-{{ idx }}-split-{{ forloop.counter0 }}-company_name" value="{{ sp|get_item:'company_name'|default:'' }}" class="form-control form-control-sm"></td>
+                    <td><input type="number" step="0.01" max="100" name="clin-{{ idx }}-split-{{ forloop.counter0 }}-percentage" value="{{ sp|get_item:'percentage'|default:'' }}" class="form-control form-control-sm clin-split-pct"></td>
+                    <td><input type="text" readonly class="form-control form-control-sm clin-split-value" value="$0.00"></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>×</button></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -193,6 +193,52 @@ class FormParseTests(TestCase):
         out = parse_post(post)
         self.assertNotIn('clins', out)
 
+    def test_nested_per_clin_finance_and_splits_parse(self):
+        """clin-i-fin-j-* and clin-i-split-j-* land under the right CLIN."""
+        post = {
+            'csrfmiddlewaretoken': 'x',
+            'clin-0-item_number': '0001',
+            'clin-0-fin-0-line_type': 'progress',
+            'clin-0-fin-0-amount': '500.00',
+            'clin-0-fin-0-notes': 'milestone 1',
+            'clin-0-split-0-company_name': 'STATZ',
+            'clin-0-split-0-percentage': '60',
+            'clin-0-split-1-company_name': 'PARTNER',
+            'clin-0-split-1-percentage': '40',
+            'clin-1-item_number': '0002',
+            'clin-1-fin-0-line_type': 'progress',
+            'clin-1-fin-0-amount': '100.00',
+        }
+        out = parse_post(post)
+        self.assertEqual(len(out['clins']), 2)
+        self.assertEqual(out['clins'][0]['item_number'], '0001')
+        self.assertEqual(len(out['clins'][0]['finance_lines']), 1)
+        self.assertEqual(out['clins'][0]['finance_lines'][0]['line_type'], 'progress')
+        self.assertEqual(len(out['clins'][0]['splits']), 2)
+        self.assertEqual(out['clins'][0]['splits'][1]['company_name'], 'PARTNER')
+        self.assertEqual(len(out['clins'][1]['finance_lines']), 1)
+        # New POST keys never produce root-level finance_lines.
+        self.assertNotIn('finance_lines', out)
+
+    def test_nested_orphan_rows_dropped_when_clin_blank(self):
+        """Sub-rows under a blank top-level CLIN are dropped with the CLIN."""
+        post = {
+            'clin-0-fin-0-line_type': 'progress',
+            'clin-0-fin-0-amount': '500.00',
+        }
+        out = parse_post(post)
+        self.assertNotIn('clins', out)
+
+    def test_new_clin_scalar_fields_accepted(self):
+        post = {
+            'clin-0-item_number': '0001',
+            'clin-0-supplier_due_date': '2026-08-01',
+            'clin-0-special_payment_terms': '7',
+        }
+        out = parse_post(post)
+        self.assertEqual(out['clins'][0]['supplier_due_date'], '2026-08-01')
+        self.assertEqual(out['clins'][0]['special_payment_terms'], '7')
+
 
 class EditorViewTests(TestCase):
     @classmethod
@@ -764,7 +810,11 @@ class IngestUnitTests(TestCase):
         self.assertEqual(draft.data['buyer_text'], 'Acme Buying')
         self.assertEqual(draft.data['contract_value'], '12345.67')
         self.assertEqual(len(draft.data['clins']), 1)
-        self.assertEqual(draft.data['clins'][0]['nsn_text'], '1234-12-345-6789')
+        clin0 = draft.data['clins'][0]
+        self.assertEqual(clin0['nsn_text'], '1234-12-345-6789')
+        self.assertEqual(clin0['item_value'], '5.00')
+        self.assertIsNone(clin0.get('unit_price'))
+        self.assertEqual(clin0['item_type'], 'P')
 
     def test_missing_contract_number_rejected(self):
         result = _stub_parse_result(contract_number=None)
@@ -973,7 +1023,52 @@ class FinanceLineShredTests(TestCase):
         cls.nsn = Nsn.objects.create(nsn_code='5555', description='X')
         cls.supplier = Supplier.objects.create(name='S', cage_code='99')
 
-    def test_finance_lines_attach_to_first_clin(self):
+    def test_per_clin_finance_and_splits_land_inline(self):
+        """Each CLIN's nested finance_lines and splits create the matching
+        ContractFinanceLine + ClinSplit rows on that CLIN."""
+        from contracts.models import ClinSplit, ContractFinanceLine
+        from decimal import Decimal
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-C-INLINE',
+            contract_type='AWD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'buyer_id': self.buyer.id,
+                'clins': [
+                    {
+                        'item_number': '0001',
+                        'nsn_id': self.nsn.id,
+                        'supplier_id': self.supplier.id,
+                        'item_value': '1000.00',
+                        'unit_price': '5.00',
+                        'order_qty': 100,
+                        'finance_lines': [
+                            {'line_type': 'progress', 'amount': '200.00',
+                             'notes': 'milestone'},
+                        ],
+                        'splits': [
+                            {'company_name': 'STATZ', 'percentage': '60'},
+                            {'company_name': 'PARTNER', 'percentage': '40'},
+                        ],
+                    },
+                ],
+            },
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        clin = target.clin_set.get(item_number='0001')
+        # 1 finance line on this CLIN — not on a non-existent first CLIN
+        # via legacy path.
+        self.assertEqual(ContractFinanceLine.objects.filter(clin=clin).count(), 1)
+        # planned_gp = 1000 - (5*100 + 200) = 300
+        # split_value at 60% = 180.00, at 40% = 120.00
+        splits = list(ClinSplit.objects.filter(clin=clin).order_by('company_name'))
+        self.assertEqual(len(splits), 2)
+        by_name = {s.company_name: s for s in splits}
+        self.assertEqual(by_name['STATZ'].split_value, Decimal('180.00'))
+        self.assertEqual(by_name['PARTNER'].split_value, Decimal('120.00'))
+
+    def test_legacy_root_finance_lines_still_attach_to_first_clin(self):
         draft = DraftContract.objects.create(
             contract_number='SPE7L1-26-C-FINLN',
             contract_type='AWD',
@@ -1117,3 +1212,158 @@ class FinalizeEmailRedirectTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         # MOD returns parent — no email compose, just queue.
         self.assertNotIn('/processing/email-compose/', resp.url)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2c — inline create (buyer / NSN / supplier) via matcher modal
+# ---------------------------------------------------------------------------
+
+
+class MatcherCreateUnitTests(TestCase):
+    """Pure-function create_record behavior."""
+
+    def test_buyer_create_returns_pk(self):
+        from intake.matchers import create_record
+        pk = create_record('buyer', {'description': 'Acme Buying Office'})
+        self.assertTrue(Buyer.objects.filter(pk=pk).exists())
+
+    def test_buyer_create_requires_description(self):
+        from intake.matchers import create_record
+        with self.assertRaises(MatcherError):
+            create_record('buyer', {'description': ''})
+
+    def test_buyer_create_rejects_duplicate_description(self):
+        from intake.matchers import create_record
+        Buyer.objects.create(description='Acme Buying Office')
+        with self.assertRaises(MatcherError):
+            create_record('buyer', {'description': 'acme buying office'})
+
+    def test_nsn_create_with_optional_description(self):
+        from intake.matchers import create_record
+        pk = create_record('nsn', {'nsn_code': '8888-88-888-8888'})
+        nsn = Nsn.objects.get(pk=pk)
+        self.assertEqual(nsn.nsn_code, '8888-88-888-8888')
+        self.assertIsNone(nsn.description)
+
+    def test_nsn_create_requires_code(self):
+        from intake.matchers import create_record
+        with self.assertRaises(MatcherError):
+            create_record('nsn', {'description': 'orphan'})
+
+    def test_supplier_create_requires_cage(self):
+        from intake.matchers import create_record
+        with self.assertRaises(MatcherError):
+            create_record('supplier', {'name': 'NoCage'})
+
+    def test_supplier_dedup_on_cage(self):
+        from intake.matchers import create_record
+        Supplier.objects.create(name='Existing', cage_code='ABCDE')
+        with self.assertRaises(MatcherError):
+            create_record('supplier', {'name': 'Other', 'cage_code': 'abcde'})
+
+    def test_unsupported_match_type_rejected(self):
+        from intake.matchers import create_record
+        with self.assertRaises(MatcherError):
+            create_record('idiq', {'contract_number': 'X'})
+
+
+class MatcherCreateEndpointTests(TestCase):
+    """End-to-end create-and-apply via the /match/ endpoint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.bob = User.objects.create_user('bob', 'b@x.com', 'pw')
+
+    def _draft(self, **kw):
+        defaults = dict(
+            contract_number='SPE7L1-26-P-CREATE',
+            contract_type='AWD',
+            status=DraftContract.Status.IN_PROGRESS,
+        )
+        defaults.update(kw)
+        return DraftContract.objects.create(**defaults)
+
+    def _post(self, draft, body):
+        return self.client.post(
+            reverse('intake:match', args=[draft.pk]),
+            data=json.dumps(body),
+            content_type='application/json',
+        )
+
+    def test_create_buyer_applies_to_draft_under_lock(self):
+        draft = self._draft()
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {
+            'action': 'create', 'match_type': 'buyer',
+            'target_path': 'buyer',
+            'payload': {'description': 'Fresh Buyer'},
+        })
+        self.assertEqual(resp.status_code, 200)
+        draft.refresh_from_db()
+        new_buyer = Buyer.objects.get(description='Fresh Buyer')
+        self.assertEqual(draft.data['buyer_id'], new_buyer.id)
+        self.assertEqual(draft.data['buyer_text'], 'Fresh Buyer')
+
+    def test_create_requires_lock(self):
+        draft = self._draft()
+        # No lock acquired.
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {
+            'action': 'create', 'match_type': 'buyer',
+            'target_path': 'buyer',
+            'payload': {'description': 'Should Not Land'},
+        })
+        self.assertEqual(resp.status_code, 409)
+        # The transaction rolled back — no buyer created.
+        self.assertFalse(Buyer.objects.filter(description='Should Not Land').exists())
+
+    def test_create_validation_error_rolls_back_new_row(self):
+        draft = self._draft()
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        # Blank description — creator raises MatcherError BEFORE any
+        # canonical row is created. Still expect no Buyer to land.
+        resp = self._post(draft, {
+            'action': 'create', 'match_type': 'buyer',
+            'target_path': 'buyer', 'payload': {'description': ''},
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_create_unsupported_type_rejected(self):
+        draft = self._draft()
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {
+            'action': 'create', 'match_type': 'idiq',
+            'target_path': 'parent_idiq',
+            'payload': {'contract_number': 'X'},
+        })
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('Inline create', resp.json().get('error', ''))
+
+    def test_creatable_types_endpoint(self):
+        draft = self._draft()
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {'action': 'creatable_types'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            sorted(resp.json()['creatable_types']),
+            ['buyer', 'nsn', 'supplier'],
+        )
+
+    def test_create_nsn_applies_to_clin_path(self):
+        draft = self._draft(data={'clins': [{'item_number': '0001'}]})
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self._post(draft, {
+            'action': 'create', 'match_type': 'nsn',
+            'target_path': 'clin:0:nsn',
+            'payload': {'nsn_code': '7777-77-777-7777', 'description': 'New Widget'},
+        })
+        self.assertEqual(resp.status_code, 200)
+        draft.refresh_from_db()
+        nsn = Nsn.objects.get(nsn_code='7777-77-777-7777')
+        self.assertEqual(draft.data['clins'][0]['nsn_id'], nsn.id)
+        self.assertEqual(draft.data['clins'][0]['nsn_description'], 'New Widget')

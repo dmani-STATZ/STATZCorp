@@ -64,11 +64,22 @@ class Packaging(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ClinSplitDraft(BaseModel):
+    """GP split entry for one CLIN. Finalization computes split_value
+    from planned GP × percentage; only company_name + percentage are
+    user-entered."""
+
+    model_config = ConfigDict(extra='forbid')
+
+    company_name: Optional[str] = None
+    percentage: Optional[Decimal] = None
+
+
 class DraftClin(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     item_number: Optional[str] = None
-    item_type: Optional[str] = None  # P / G / C / L / M
+    item_type: Optional[str] = None  # P / G / C / L / M / Q / D
     nsn_text: Optional[str] = None
     nsn_id: Optional[int] = None
     nsn_description: Optional[str] = None
@@ -79,8 +90,14 @@ class DraftClin(BaseModel):
     unit_price: Optional[Decimal] = None
     item_value: Optional[Decimal] = None
     due_date: Optional[date] = None
+    supplier_due_date: Optional[date] = None
+    # Stored as a stringified PK; finalization resolves to SpecialPaymentTerms.
+    special_payment_terms: Optional[str] = None
     ia: Optional[Literal['O', 'D']] = None
     fob: Optional[Literal['O', 'D']] = None
+    # Nested per-CLIN finance lines and GP splits (Phase 3.5 redesign).
+    finance_lines: List[FinanceLine] = Field(default_factory=list)
+    splits: List[ClinSplitDraft] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +139,7 @@ class _CommonContractFields(BaseModel):
     pr_number: Optional[str] = None
     buyer_text: Optional[str] = None
     buyer_id: Optional[int] = None
+    sales_class_id: Optional[int] = None
     contractor_name: Optional[str] = None
     contractor_cage: Optional[str] = None
     files_url: Optional[str] = None

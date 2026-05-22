@@ -142,6 +142,82 @@
         close();
     }
 
+    // ---- Inline create (Phase 2c) ----------------------------------------
+
+    // Types the server supports inline. We could ask the server via
+    // {action:'creatable_types'}; hard-coding the list here is simpler and
+    // matches the static modal field-set markup. If the matchers module
+    // grows a new type, add it both here and in the modal HTML.
+    const CREATABLE = ['buyer', 'nsn', 'supplier'];
+
+    function setCreateStatus(msg, isError) {
+        const s = $('#intake-match-create-status');
+        if (!s) return;
+        s.textContent = msg || '';
+        s.classList.toggle('text-danger', !!isError);
+        s.classList.toggle('text-muted', !isError);
+    }
+
+    function toggleCreatePanel(matchType) {
+        const wrap = $('#intake-match-create-wrap');
+        const panel = $('#intake-match-create-panel');
+        if (!wrap || !panel) return;
+        const supported = CREATABLE.indexOf(matchType) !== -1;
+        wrap.classList.toggle('d-none', !supported);
+        panel.classList.add('d-none');  // collapsed by default each open
+        const label = wrap.querySelector('.intake-match-create-type');
+        if (label) label.textContent = matchType;
+        // Show only the matching field set.
+        wrap.querySelectorAll('[data-create-fields]').forEach(group => {
+            group.classList.toggle('d-none',
+                group.dataset.createFields !== matchType);
+        });
+        // Pre-fill the obvious field from the parsed original text so the
+        // analyst doesn't retype it.
+        const orig = $('#intake-match-original').textContent || '';
+        const fields = wrap.querySelector('[data-create-fields="' + matchType + '"]');
+        if (fields && orig && orig !== '(none)') {
+            const first = fields.querySelector('[data-create-field]');
+            if (first && !first.value) first.value = orig;
+        }
+        setCreateStatus('');
+    }
+
+    async function submitCreate() {
+        const wrap = $('#intake-match-create-wrap');
+        const fields = wrap.querySelector(
+            '[data-create-fields="' + state.matchType + '"]'
+        );
+        if (!fields) {
+            setCreateStatus('Unsupported type.', true);
+            return;
+        }
+        const payload = {};
+        fields.querySelectorAll('[data-create-field]').forEach(el => {
+            payload[el.dataset.createField] = el.value;
+        });
+        setCreateStatus('Creating...');
+        const { ok, json } = await postJSON({
+            action: 'create',
+            match_type: state.matchType,
+            target_path: state.targetPath,
+            payload: payload,
+        });
+        if (!ok) {
+            setCreateStatus(json.error || 'Create failed.', true);
+            return;
+        }
+        document.dispatchEvent(new CustomEvent('intake:match-applied', {
+            detail: {
+                targetPath: state.targetPath,
+                matchType: state.matchType,
+                action: 'create',
+                data: json.data,
+            },
+        }));
+        close();
+    }
+
     function open(opts) {
         state.matchType = opts.matchType;
         state.targetPath = opts.targetPath;
@@ -150,6 +226,8 @@
         $('#intake-match-q').value = opts.originalText || '';
         $('#intake-match-results').innerHTML = '';
         setStatus('');
+        // Reset and re-target the inline-create panel for this match_type.
+        toggleCreatePanel(opts.matchType);
         el().classList.remove('d-none');
         setTimeout(function () { $('#intake-match-q').focus(); }, 50);
         if ((opts.originalText || '').length >= 3) {
@@ -172,6 +250,17 @@
             if (searcher && el().contains(searcher)) { runSearch(); return; }
             const clearer = ev.target.closest('[data-match-clear]');
             if (clearer && el().contains(clearer)) { clearMatch(); return; }
+            const createToggle = ev.target.closest('[data-match-create-toggle]');
+            if (createToggle && el().contains(createToggle)) {
+                const panel = $('#intake-match-create-panel');
+                if (panel) panel.classList.toggle('d-none');
+                return;
+            }
+            const createSubmit = ev.target.closest('[data-match-create-submit]');
+            if (createSubmit && el().contains(createSubmit)) {
+                submitCreate();
+                return;
+            }
             const opener = ev.target.closest('[data-match-open]');
             if (opener) {
                 ev.preventDefault();

@@ -178,6 +178,87 @@ LOOKUPS: dict[str, Callable[[int], dict]] = {
 
 
 # ---------------------------------------------------------------------------
+# Create: inline canonical-record creation from the matcher modal
+# ---------------------------------------------------------------------------
+#
+# Phase 2c. Each creator validates minimum fields, dedups against the
+# obvious unique-ish column, and creates the row. Returns the new record's
+# PK so the calling endpoint can chain into `apply_match`.
+#
+# Deliberately narrow scope: buyer / NSN / supplier only. IDIQ and Contract
+# creation is out of scope for the matcher modal — those have richer
+# requirements (award date, term length, FKs of their own) and live in the
+# contracts app's full forms. The modal will not surface an Add New panel
+# for those match_types; the JS checks `CREATABLE_TYPES`.
+
+
+CREATABLE_TYPES = {'buyer', 'nsn', 'supplier'}
+
+
+def _clean(value, *, required_field: str = '') -> str:
+    """Trim a user-supplied string. Raise on blank-when-required."""
+    s = (value or '').strip() if isinstance(value, str) else ''
+    if required_field and not s:
+        raise MatcherError(f'{required_field} is required.')
+    return s
+
+
+def _create_buyer(payload: dict) -> int:
+    description = _clean(payload.get('description'), required_field='Description')
+    if Buyer.objects.filter(description__iexact=description).exists():
+        raise MatcherError(
+            f'A buyer named {description!r} already exists — search for it instead.'
+        )
+    buyer = Buyer.objects.create(description=description)
+    return buyer.id
+
+
+def _create_nsn(payload: dict) -> int:
+    nsn_code = _clean(payload.get('nsn_code'), required_field='NSN code')
+    description = _clean(payload.get('description'))
+    if Nsn.objects.filter(nsn_code__iexact=nsn_code).exists():
+        raise MatcherError(
+            f'NSN {nsn_code!r} already exists — search for it instead.'
+        )
+    nsn = Nsn.objects.create(nsn_code=nsn_code, description=description or None)
+    return nsn.id
+
+
+def _create_supplier(payload: dict) -> int:
+    name = _clean(payload.get('name'), required_field='Supplier name')
+    cage = _clean(payload.get('cage_code'), required_field='CAGE code')
+    # CAGE codes are the canonical dedup key for suppliers.
+    if Supplier.objects.filter(cage_code__iexact=cage).exists():
+        raise MatcherError(
+            f'A supplier with CAGE {cage!r} already exists — search by CAGE instead.'
+        )
+    supplier = Supplier.objects.create(name=name, cage_code=cage)
+    return supplier.id
+
+
+CREATORS: dict[str, Callable[[dict], int]] = {
+    'buyer': _create_buyer,
+    'nsn': _create_nsn,
+    'supplier': _create_supplier,
+}
+
+
+def create_record(match_type: str, payload: dict) -> int:
+    """Create a canonical record from modal payload. Returns the new PK.
+
+    The caller is responsible for then `apply_match`-ing the returned PK
+    into the draft's target_path (so the new record is linked to the
+    draft in one user action). See `match_endpoint.action == 'create'`.
+    """
+    if match_type not in CREATORS:
+        raise MatcherError(
+            f'Inline create is not supported for match_type {match_type!r}. '
+            f'Use the {match_type} app to create new records.'
+        )
+    return CREATORS[match_type](payload or {})
+
+
+# ---------------------------------------------------------------------------
 # Apply: write match into draft.data at the given target_path
 # ---------------------------------------------------------------------------
 

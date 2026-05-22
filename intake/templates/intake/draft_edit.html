@@ -69,6 +69,26 @@
                            class="form-control">
                 </div>
                 <div>
+                    <label class="label block mb-1">PO Number</label>
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           value="Assigned when submitted"
+                           disabled
+                           style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;">
+                </div>
+                <div>
+                    <label class="label block mb-1">Sales Class</label>
+                    <select name="f_sales_class_id" class="form-select form-select-sm">
+                        <option value="">——</option>
+                        {% for sc in sales_classes %}
+                        <option value="{{ sc.pk }}"
+                            {% if data|get_item:'sales_class_id' == sc.pk %}selected{% endif %}>
+                            {{ sc.sales_team }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
                     <label class="label block mb-1">Contract Value</label>
                     <input type="number" step="0.01" name="f_contract_value"
                            value="{{ data|get_item:'contract_value'|default:'' }}"
@@ -106,18 +126,6 @@
                     {% with bid=data|get_item:'buyer_id' %}
                         {% if bid %}<span class="badge bg-success mt-1">matched #{{ bid }}</span>{% endif %}
                     {% endwith %}
-                </div>
-                <div>
-                    <label class="label block mb-1">Contractor Name</label>
-                    <input type="text" name="f_contractor_name"
-                           value="{{ data|get_item:'contractor_name'|default:'' }}"
-                           class="form-control">
-                </div>
-                <div>
-                    <label class="label block mb-1">Contractor CAGE</label>
-                    <input type="text" name="f_contractor_cage"
-                           value="{{ data|get_item:'contractor_cage'|default:'' }}"
-                           class="form-control">
                 </div>
                 <div class="col-span-3">
                     <label class="label block mb-1">Files URL</label>
@@ -306,121 +314,21 @@
 
         {# ---- CLINs (AWD / PO / DO / INTERNAL) ---- #}
         {% if draft.contract_type == 'AWD' or draft.contract_type == 'PO' or draft.contract_type == 'DO' or draft.contract_type == 'INTERNAL' %}
-        <div class="card card-padded shadow-sm mb-4">
-            <div class="row-between mb-2">
-                <h2 class="text-xl font-semibold">CLINs</h2>
-                <button type="button" class="btn btn-sm btn-success" data-add-row="clin">+ Add CLIN</button>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full" id="clin-table">
-                    <thead><tr>
-                        <th class="text-left p-2">Item #</th>
-                        <th class="text-left p-2">Type</th>
-                        <th class="text-left p-2">NSN</th>
-                        <th class="text-left p-2">Supplier</th>
-                        <th class="text-left p-2">Qty</th>
-                        <th class="text-left p-2">UOM</th>
-                        <th class="text-left p-2">Unit Price</th>
-                        <th class="text-left p-2">Item Value</th>
-                        <th class="text-left p-2">Due Date</th>
-                        <th class="text-left p-2">IA</th>
-                        <th class="text-left p-2">FOB</th>
-                        <th></th>
-                    </tr></thead>
-                    <tbody>
-                    {% for clin in clins %}
-                        <tr data-row="clin" data-idx="{{ forloop.counter0 }}">
-                            <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-item_number" value="{{ clin|get_item:'item_number'|default:'' }}" class="form-control form-control-sm" style="width:6rem"></td>
-                            <td class="p-1">
-                                <select name="clin-{{ forloop.counter0 }}-item_type" class="form-select form-select-sm">
-                                    {% with t=clin|get_item:'item_type' %}
-                                    <option value="" {% if not t %}selected{% endif %}>—</option>
-                                    {% for v in 'PGCLM' %}
-                                    <option value="{{ v }}" {% if t == v %}selected{% endif %}>{{ v }}</option>
-                                    {% endfor %}
-                                    {% endwith %}
-                                </select>
-                            </td>
-                            <td class="p-1">
-                                <div class="input-group input-group-sm">
-                                    <input type="text" name="clin-{{ forloop.counter0 }}-nsn_text" value="{{ clin|get_item:'nsn_text'|default:'' }}" class="form-control form-control-sm">
-                                    <button type="button" class="btn btn-outline-primary btn-sm"
-                                            data-match-open data-match-type="nsn"
-                                            data-target-path="clin:{{ forloop.counter0 }}:nsn"
-                                            data-match-title="NSN (CLIN {{ clin|get_item:'item_number'|default:forloop.counter0 }})"
-                                            data-match-original="{{ clin|get_item:'nsn_text'|default:'' }}">M</button>
-                                </div>
-                                <input type="hidden" name="clin-{{ forloop.counter0 }}-nsn_id" value="{{ clin|get_item:'nsn_id'|default:'' }}">
-                            </td>
-                            <td class="p-1">
-                                <div class="input-group input-group-sm">
-                                    <input type="text" name="clin-{{ forloop.counter0 }}-supplier_text" value="{{ clin|get_item:'supplier_text'|default:'' }}" class="form-control form-control-sm">
-                                    <button type="button" class="btn btn-outline-primary btn-sm"
-                                            data-match-open data-match-type="supplier"
-                                            data-target-path="clin:{{ forloop.counter0 }}:supplier"
-                                            data-match-title="Supplier (CLIN {{ clin|get_item:'item_number'|default:forloop.counter0 }})"
-                                            data-match-original="{{ clin|get_item:'supplier_text'|default:'' }}">M</button>
-                                </div>
-                                <input type="hidden" name="clin-{{ forloop.counter0 }}-supplier_id" value="{{ clin|get_item:'supplier_id'|default:'' }}">
-                            </td>
-                            <td class="p-1"><input type="number" step="0.01" name="clin-{{ forloop.counter0 }}-order_qty" value="{{ clin|get_item:'order_qty'|default:'' }}" class="form-control form-control-sm" style="width:5rem"></td>
-                            <td class="p-1"><input type="text" name="clin-{{ forloop.counter0 }}-uom" value="{{ clin|get_item:'uom'|default:'' }}" class="form-control form-control-sm" style="width:4rem"></td>
-                            <td class="p-1"><input type="number" step="0.01" name="clin-{{ forloop.counter0 }}-unit_price" value="{{ clin|get_item:'unit_price'|default:'' }}" class="form-control form-control-sm" style="width:6rem"></td>
-                            <td class="p-1"><input type="number" step="0.01" name="clin-{{ forloop.counter0 }}-item_value" value="{{ clin|get_item:'item_value'|default:'' }}" class="form-control form-control-sm" style="width:6rem"></td>
-                            <td class="p-1"><input type="date" name="clin-{{ forloop.counter0 }}-due_date" value="{{ clin|get_item:'due_date'|default:'' }}" class="form-control form-control-sm"></td>
-                            <td class="p-1">
-                                <select name="clin-{{ forloop.counter0 }}-ia" class="form-select form-select-sm">
-                                    {% with t=clin|get_item:'ia' %}
-                                    <option value="" {% if not t %}selected{% endif %}>—</option>
-                                    <option value="O" {% if t == 'O' %}selected{% endif %}>O</option>
-                                    <option value="D" {% if t == 'D' %}selected{% endif %}>D</option>
-                                    {% endwith %}
-                                </select>
-                            </td>
-                            <td class="p-1">
-                                <select name="clin-{{ forloop.counter0 }}-fob" class="form-select form-select-sm">
-                                    {% with t=clin|get_item:'fob' %}
-                                    <option value="" {% if not t %}selected{% endif %}>—</option>
-                                    <option value="O" {% if t == 'O' %}selected{% endif %}>O</option>
-                                    <option value="D" {% if t == 'D' %}selected{% endif %}>D</option>
-                                    {% endwith %}
-                                </select>
-                            </td>
-                            <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        {% if not pkg_has_data %}
+        <div class="mb-4" id="pkg-add-wrap">
+            <button type="button" class="btn btn-sm btn-outline-success" id="btn-add-packaging">
+                + Add Packaging
+            </button>
         </div>
-
-        <div class="card card-padded shadow-sm mb-4">
-            <div class="row-between mb-2">
-                <h2 class="text-xl font-semibold">Finance Lines</h2>
-                <button type="button" class="btn btn-sm btn-success" data-add-row="fin">+ Add Finance Line</button>
+        {% endif %}
+        <div class="card card-padded shadow-sm mb-4" id="packaging-card"
+             {% if not pkg_has_data %}style="display:none"{% endif %}>
+            <div class="row-between mb-3">
+                <h2 class="text-xl font-semibold mb-0">Packaging</h2>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="btn-remove-packaging">
+                    Remove Packaging
+                </button>
             </div>
-            <table class="min-w-full" id="fin-table">
-                <thead><tr>
-                    <th class="text-left p-2">Line Type</th>
-                    <th class="text-left p-2">Amount</th>
-                    <th class="text-left p-2">Notes</th>
-                    <th></th>
-                </tr></thead>
-                <tbody>
-                {% for row in finance_lines %}
-                    <tr data-row="fin" data-idx="{{ forloop.counter0 }}">
-                        <td class="p-1"><input type="text" name="fin-{{ forloop.counter0 }}-line_type" value="{{ row|get_item:'line_type'|default:'' }}" class="form-control form-control-sm"></td>
-                        <td class="p-1"><input type="number" step="0.01" name="fin-{{ forloop.counter0 }}-amount" value="{{ row|get_item:'amount'|default:'' }}" class="form-control form-control-sm"></td>
-                        <td class="p-1"><input type="text" name="fin-{{ forloop.counter0 }}-notes" value="{{ row|get_item:'notes'|default:'' }}" class="form-control form-control-sm"></td>
-                        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="card card-padded shadow-sm mb-4">
-            <h2 class="text-xl font-semibold mb-3">Packaging</h2>
             <div class="grid grid-cols-3 gap-4">
                 <div>
                     <label class="label block mb-1">Packhouse CAGE</label>
@@ -461,6 +369,36 @@
                            class="form-control">
                 </div>
             </div>
+        </div>
+
+        <div class="card card-padded shadow-sm mb-4">
+            <div class="row-between mb-3">
+                <h2 class="text-xl font-semibold">CLINs</h2>
+                <button type="button" class="btn btn-sm btn-success" data-add-clin>+ Add New CLIN</button>
+            </div>
+            <div id="clin-stack">
+                {% for clin in clins %}
+                    {% include 'intake/_clin_card.html' with clin=clin idx=forloop.counter0 clins=clins %}
+                {% endfor %}
+            </div>
+        </div>
+
+        {# ---- GP Summary (read-only, calculated live) ---- #}
+        <div class="card card-padded shadow-sm mb-4 border-info">
+            <h2 class="text-xl font-semibold mb-2">GP Summary</h2>
+            <table class="table table-sm mb-0" id="gp-summary-table">
+                <tbody id="gp-summary-rows">
+                    {# Rows populated by JS — initial server-side render below as fallback #}
+                </tbody>
+                <tfoot>
+                    <tr><td><strong>Sum of CLIN GPs</strong></td><td class="text-end" id="gp-sum">$0.00</td></tr>
+                    <tr><td>Packaging Quote</td><td class="text-end text-danger" id="gp-packaging">−$0.00</td></tr>
+                    <tr class="border-top">
+                        <td><strong>Net Contract GP</strong></td>
+                        <td class="text-end fw-bold" id="gp-net">$0.00</td>
+                    </tr>
+                </tfoot>
+            </table>
         </div>
         {% endif %}
 
@@ -536,53 +474,130 @@
     {% include 'intake/_match_modal.html' %}
 </div>
 
-{# Row templates kept off-DOM so the indexes don't collide with rendered rows. #}
-<template id="tpl-clin">
-    <tr data-row="clin">
-        <td class="p-1"><input type="text" data-name="clin-__IDX__-item_number" class="form-control form-control-sm" style="width:6rem"></td>
-        <td class="p-1">
-            <select data-name="clin-__IDX__-item_type" class="form-select form-select-sm">
-                <option value="">—</option><option>P</option><option>G</option><option>C</option><option>L</option><option>M</option>
-            </select>
-        </td>
-        <td class="p-1">
-            <div class="input-group input-group-sm">
-                <input type="text" data-name="clin-__IDX__-nsn_text" class="form-control form-control-sm">
-                <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="nsn" data-target-path="clin:__IDX__:nsn" data-match-title="NSN (new CLIN)">M</button>
+{# Off-DOM templates. JS substitutes __CLINIDX__, __FINIDX__, __SPLITIDX__ as needed. #}
+<template id="tpl-clin-card">
+    <div class="card mb-3 clin-card" data-clin-idx="__CLINIDX__">
+        <div class="card-header d-flex justify-content-between align-items-center bg-light">
+            <div class="d-flex align-items-center gap-2 flex-grow-1">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-clin-toggle>
+                    <span class="clin-toggle-label">▼ Expand</span>
+                </button>
+                <div class="clin-header-summary">
+                    <strong>CLIN <span class="clin-header-item-number">—</span></strong>
+                    <span class="text-muted ms-2 clin-header-item-type">—</span>
+                    <div class="small text-muted">
+                        <span class="clin-header-nsn">NSN: Not Set</span>
+                        <span class="clin-header-nsn-desc text-muted"></span>
+                        &nbsp;·&nbsp;
+                        <span class="clin-header-supplier">Supplier: Not Set</span>
+                    </div>
+                </div>
             </div>
-            <input type="hidden" data-name="clin-__IDX__-nsn_id">
-        </td>
-        <td class="p-1">
-            <div class="input-group input-group-sm">
-                <input type="text" data-name="clin-__IDX__-supplier_text" class="form-control form-control-sm">
-                <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="supplier" data-target-path="clin:__IDX__:supplier" data-match-title="Supplier (new CLIN)">M</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-remove-clin>×</button>
+        </div>
+        <div class="card-body clin-card-body d-none">
+            <h6 class="text-uppercase text-muted mb-2">Contract Data</h6>
+            <div class="grid grid-cols-3 gap-3 mb-3">
+                <div><label class="label block mb-1">Item Number</label>
+                    <input type="text" data-name="clin-__CLINIDX__-item_number" class="form-control form-control-sm clin-item-number"></div>
+                <div><label class="label block mb-1">Item Type</label>
+                    <select data-name="clin-__CLINIDX__-item_type" class="form-select form-select-sm clin-item-type">
+                        <option value="">—</option>
+                        <option value="P" selected>Production (P)</option>
+                        <option value="G">GFAT (G)</option>
+                        <option value="C">CFAT (C)</option>
+                        <option value="L">PLT (L)</option>
+                        <option value="M">Miscellaneous (M)</option>
+                        <option value="Q">QN (Q)</option>
+                        <option value="D">PQDR (D)</option>
+                    </select></div>
+                <div><label class="label block mb-1">CLIN Due Date</label>
+                    <input type="date" data-name="clin-__CLINIDX__-due_date" class="form-control form-control-sm"></div>
+                <div class="col-span-2"><label class="label block mb-1">NSN</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" data-name="clin-__CLINIDX__-nsn_text" class="form-control form-control-sm">
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="nsn" data-target-path="clin:__CLINIDX__:nsn" data-match-title="NSN">Match</button>
+                    </div>
+                    <input type="hidden" data-name="clin-__CLINIDX__-nsn_id"></div>
+                <div><label class="label block mb-1">Quantity</label>
+                    <input type="number" step="0.0001" data-name="clin-__CLINIDX__-order_qty" class="form-control form-control-sm clin-order-qty"></div>
+                <div><label class="label block mb-1">UOM</label>
+                    <input type="text" data-name="clin-__CLINIDX__-uom" class="form-control form-control-sm"></div>
+                <div><label class="label block mb-1">Item Value</label>
+                    <input type="number" step="0.01" data-name="clin-__CLINIDX__-item_value" class="form-control form-control-sm clin-item-value"></div>
+                <div><label class="label block mb-1">IA</label>
+                    <select data-name="clin-__CLINIDX__-ia" class="form-select form-select-sm">
+                        <option value="">—</option><option value="O">Origin (O)</option><option value="D">Destination (D)</option>
+                    </select></div>
+                <div><label class="label block mb-1">FOB</label>
+                    <select data-name="clin-__CLINIDX__-fob" class="form-select form-select-sm">
+                        <option value="">—</option><option value="O">Origin (O)</option><option value="D">Destination (D)</option>
+                    </select></div>
             </div>
-            <input type="hidden" data-name="clin-__IDX__-supplier_id">
-        </td>
-        <td class="p-1"><input type="number" step="0.01" data-name="clin-__IDX__-order_qty" class="form-control form-control-sm" style="width:5rem"></td>
-        <td class="p-1"><input type="text" data-name="clin-__IDX__-uom" class="form-control form-control-sm" style="width:4rem"></td>
-        <td class="p-1"><input type="number" step="0.01" data-name="clin-__IDX__-unit_price" class="form-control form-control-sm" style="width:6rem"></td>
-        <td class="p-1"><input type="number" step="0.01" data-name="clin-__IDX__-item_value" class="form-control form-control-sm" style="width:6rem"></td>
-        <td class="p-1"><input type="date" data-name="clin-__IDX__-due_date" class="form-control form-control-sm"></td>
-        <td class="p-1">
-            <select data-name="clin-__IDX__-ia" class="form-select form-select-sm">
-                <option value="">—</option><option>O</option><option>D</option>
-            </select>
-        </td>
-        <td class="p-1">
-            <select data-name="clin-__IDX__-fob" class="form-select form-select-sm">
-                <option value="">—</option><option>O</option><option>D</option>
-            </select>
-        </td>
-        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+            <hr>
+            <h6 class="text-uppercase text-muted mb-2">Supplier / Quote</h6>
+            <div class="grid grid-cols-3 gap-3 mb-3">
+                <div class="col-span-2"><label class="label block mb-1">Supplier</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" data-name="clin-__CLINIDX__-supplier_text" class="form-control form-control-sm">
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="supplier" data-target-path="clin:__CLINIDX__:supplier" data-match-title="Supplier">Match</button>
+                    </div>
+                    <input type="hidden" data-name="clin-__CLINIDX__-supplier_id"></div>
+                <div><label class="label block mb-1">Supplier Due Date</label>
+                    <input type="date" data-name="clin-__CLINIDX__-supplier_due_date" class="form-control form-control-sm"></div>
+                <div><label class="label block mb-1">Special Payment Terms</label>
+                    <select data-name="clin-__CLINIDX__-special_payment_terms" class="form-select form-select-sm">
+                        <option value="">—</option>
+                        {% for spt in special_payment_terms_choices %}
+                        <option value="{{ spt.id }}">{{ spt.terms }}</option>
+                        {% endfor %}
+                    </select></div>
+                <div><label class="label block mb-1">Quote Price (unit)</label>
+                    <input type="number" step="0.0001" data-name="clin-__CLINIDX__-unit_price" class="form-control form-control-sm clin-unit-price"></div>
+                <div><label class="label block mb-1">Quote Total</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" readonly class="form-control form-control-sm clin-quote-total" value="$0.00">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-recalc-clin>ReCalc</button>
+                    </div></div>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-uppercase text-muted mb-0">Finance Lines</h6>
+                <button type="button" class="btn btn-sm btn-outline-success" data-add-clin-fin>+ Add Finance Line</button>
+            </div>
+            <table class="table table-sm mb-2 clin-fin-table">
+                <thead><tr><th>Line Type</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
+                <tbody class="clin-fin-tbody"></tbody>
+            </table>
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-uppercase text-muted mb-0">GP Split</h6>
+                <button type="button" class="btn btn-sm btn-outline-success" data-add-clin-split>+ Add Split</button>
+            </div>
+            <div class="mb-2">Planned GP: <strong class="clin-planned-gp">$0.00</strong></div>
+            <table class="table table-sm mb-0 clin-split-table">
+                <thead><tr><th>Company</th><th>Percentage</th><th>Split Value</th><th></th></tr></thead>
+                <tbody class="clin-split-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-clin-fin">
+    <tr data-fin-idx="__FINIDX__">
+        <td><input type="text" data-name="clin-__CLINIDX__-fin-__FINIDX__-line_type" class="form-control form-control-sm"></td>
+        <td><input type="number" step="0.01" data-name="clin-__CLINIDX__-fin-__FINIDX__-amount" class="form-control form-control-sm clin-fin-amount"></td>
+        <td><input type="text" data-name="clin-__CLINIDX__-fin-__FINIDX__-notes" class="form-control form-control-sm"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>×</button></td>
     </tr>
 </template>
-<template id="tpl-fin">
-    <tr data-row="fin">
-        <td class="p-1"><input type="text" data-name="fin-__IDX__-line_type" class="form-control form-control-sm"></td>
-        <td class="p-1"><input type="number" step="0.01" data-name="fin-__IDX__-amount" class="form-control form-control-sm"></td>
-        <td class="p-1"><input type="text" data-name="fin-__IDX__-notes" class="form-control form-control-sm"></td>
-        <td class="p-1"><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>×</button></td>
+
+<template id="tpl-clin-split">
+    <tr data-split-idx="__SPLITIDX__">
+        <td><input type="text" data-name="clin-__CLINIDX__-split-__SPLITIDX__-company_name" class="form-control form-control-sm"></td>
+        <td><input type="number" step="0.01" max="100" data-name="clin-__CLINIDX__-split-__SPLITIDX__-percentage" class="form-control form-control-sm clin-split-pct"></td>
+        <td><input type="text" readonly class="form-control form-control-sm clin-split-value" value="$0.00"></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>×</button></td>
     </tr>
 </template>
 <template id="tpl-nsn">
@@ -615,45 +630,259 @@
 
 <script>
 (function() {
-    // Per-table row counter — keeps newly added rows from colliding with
-    // server-rendered indexes. We don't care about gaps; the backend just
-    // sorts and reindexes on save.
-    const counters = {clin: 1000, fin: 1000, nsn: 1000, supp: 1000};
+    // Counters keep newly added rows from colliding with server-rendered
+    // indexes. We don't care about gaps; the backend reindexes on save.
+    const counters = {clin: 1000, nsn: 1000, supp: 1000};
+    // Per-CLIN sub-counters for finance lines and splits, keyed by CLIN idx.
+    const subCounters = {};
 
-    function addRow(prefix) {
-        const tpl = document.getElementById('tpl-' + prefix);
-        const table = document.getElementById(prefix + '-table');
-        if (!tpl || !table) return;
-        const idx = counters[prefix]++;
-        const frag = tpl.content.cloneNode(true);
-        frag.querySelectorAll('*').forEach(el => {
-            // Substitute __IDX__ in data-name → name, and in any data-* attr
-            // that legitimately needs the row index (e.g. data-target-path).
-            if (el.dataset.name) {
-                el.name = el.dataset.name.replace('__IDX__', idx);
-                el.removeAttribute('data-name');
-            }
-            if (el.dataset.targetPath && el.dataset.targetPath.indexOf('__IDX__') !== -1) {
-                el.dataset.targetPath = el.dataset.targetPath.replace('__IDX__', idx);
-            }
-        });
-        const tr = frag.querySelector('tr');
-        tr.dataset.idx = idx;
-        table.querySelector('tbody').appendChild(frag);
+    function nextSub(clinIdx, kind) {
+        const key = clinIdx + ':' + kind;
+        subCounters[key] = (subCounters[key] || 1000) + 1;
+        return subCounters[key];
     }
 
+    function applyTemplate(frag, subs) {
+        // Substitute placeholder tokens in data-name → name and in
+        // data-target-path. `subs` is an object like {__CLINIDX__: 5, __FINIDX__: 7}.
+        frag.querySelectorAll('*').forEach(el => {
+            const apply = s => {
+                let out = s;
+                for (const k in subs) out = out.split(k).join(subs[k]);
+                return out;
+            };
+            if (el.dataset.name) {
+                el.name = apply(el.dataset.name);
+                el.removeAttribute('data-name');
+            }
+            if (el.dataset.targetPath) {
+                el.dataset.targetPath = apply(el.dataset.targetPath);
+            }
+        });
+    }
+
+    function addClinCard() {
+        const tpl = document.getElementById('tpl-clin-card');
+        const stack = document.getElementById('clin-stack');
+        if (!tpl || !stack) return;
+        const idx = counters.clin++;
+        const frag = tpl.content.cloneNode(true);
+        applyTemplate(frag, {'__CLINIDX__': idx});
+        const card = frag.querySelector('.clin-card');
+        card.dataset.clinIdx = idx;
+        const body = card.querySelector('.clin-card-body');
+        const label = card.querySelector('.clin-toggle-label');
+        if (body) body.classList.add('d-none');
+        if (label) label.textContent = '▼ Expand';
+        stack.appendChild(frag);
+        recalcAll();
+    }
+
+    function initPackagingToggle() {
+        const addWrap = document.getElementById('pkg-add-wrap');
+        const card = document.getElementById('packaging-card');
+        const btnAdd = document.getElementById('btn-add-packaging');
+        const btnRemove = document.getElementById('btn-remove-packaging');
+        if (!card) return;
+
+        function showPackaging() {
+            card.style.display = '';
+            if (addWrap) addWrap.style.display = 'none';
+        }
+        function hidePackaging() {
+            card.style.display = 'none';
+            card.querySelectorAll('[name^="pkg-"]').forEach(el => { el.value = ''; });
+            if (addWrap) addWrap.style.display = '';
+        }
+
+        if (btnAdd) btnAdd.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            showPackaging();
+        });
+        if (btnRemove) btnRemove.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            hidePackaging();
+            recalcGpSummary();
+        });
+    }
+
+    function addClinSubRow(card, kind) {
+        const tplId = 'tpl-clin-' + kind;
+        const tpl = document.getElementById(tplId);
+        const tbodyClass = '.clin-' + kind + '-tbody';
+        const tbody = card.querySelector(tbodyClass);
+        if (!tpl || !tbody) return;
+        const clinIdx = card.dataset.clinIdx;
+        const subIdx = nextSub(clinIdx, kind);
+        const subs = {'__CLINIDX__': clinIdx};
+        subs[kind === 'fin' ? '__FINIDX__' : '__SPLITIDX__'] = subIdx;
+        const frag = tpl.content.cloneNode(true);
+        applyTemplate(frag, subs);
+        tbody.appendChild(frag);
+    }
+
+    // ---- live calculation engine ----
+    function parseNum(s) {
+        if (s == null) return 0;
+        const n = parseFloat(String(s).replace(/[^0-9.\-]/g, ''));
+        return isNaN(n) ? 0 : n;
+    }
+    function money(n, signed) {
+        const abs = Math.abs(n).toFixed(2);
+        const formatted = '$' + abs.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        if (signed && n < 0) return '−' + formatted;
+        return (n < 0 ? '−' : '') + formatted;
+    }
+
+    function recalcClin(card) {
+        const itemValue = parseNum(card.querySelector('.clin-item-value')?.value);
+        const unitPrice = parseNum(card.querySelector('.clin-unit-price')?.value);
+        const orderQty = parseNum(card.querySelector('.clin-order-qty')?.value);
+        let financeTotal = 0;
+        card.querySelectorAll('.clin-fin-amount').forEach(el => {
+            financeTotal += parseNum(el.value);
+        });
+        const quoteTotal = unitPrice * orderQty;
+        const plannedGp = itemValue - (quoteTotal + financeTotal);
+
+        const qt = card.querySelector('.clin-quote-total');
+        if (qt) qt.value = money(quoteTotal);
+        const gp = card.querySelector('.clin-planned-gp');
+        if (gp) {
+            gp.textContent = money(plannedGp);
+            gp.classList.toggle('text-success', plannedGp >= 0);
+            gp.classList.toggle('text-danger', plannedGp < 0);
+        }
+        // Per-split value = plannedGp × pct / 100
+        card.querySelectorAll('.clin-split-table tbody tr').forEach(tr => {
+            const pct = parseNum(tr.querySelector('.clin-split-pct')?.value);
+            const sv = tr.querySelector('.clin-split-value');
+            if (sv) sv.value = money(plannedGp * pct / 100);
+        });
+        // Update header summary text from current inputs.
+        const itemNum = card.querySelector('.clin-item-number')?.value || '—';
+        card.querySelector('.clin-header-item-number').textContent = itemNum;
+        const sel = card.querySelector('.clin-item-type');
+        const itemTypeLabel = sel?.selectedOptions[0]?.textContent || '—';
+        card.querySelector('.clin-header-item-type').textContent = itemTypeLabel;
+        return plannedGp;
+    }
+
+    function recalcGpSummary() {
+        const rows = document.getElementById('gp-summary-rows');
+        if (!rows) return;
+        rows.innerHTML = '';
+        let total = 0;
+        document.querySelectorAll('#clin-stack .clin-card').forEach(card => {
+            const gp = recalcClin(card);
+            total += gp;
+            const itemNum = card.querySelector('.clin-item-number')?.value || '—';
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>CLIN ' + (itemNum || '—') + '</td>' +
+                '<td class="text-end ' + (gp < 0 ? 'text-danger' : 'text-success') + '">' + money(gp) + '</td>';
+            rows.appendChild(tr);
+        });
+        const sumEl = document.getElementById('gp-sum');
+        if (sumEl) sumEl.textContent = money(total);
+        const pkgInput = document.querySelector('[name="pkg-quote_amount"]');
+        const pkgAmt = pkgInput ? parseNum(pkgInput.value) : 0;
+        const pkgEl = document.getElementById('gp-packaging');
+        if (pkgEl) pkgEl.textContent = '−' + money(pkgAmt);
+        const net = total - pkgAmt;
+        const netEl = document.getElementById('gp-net');
+        if (netEl) {
+            netEl.textContent = money(net);
+            netEl.classList.toggle('text-success', net >= 0);
+            netEl.classList.toggle('text-danger', net < 0);
+        }
+    }
+
+    function recalcAll() { recalcGpSummary(); }
+
     document.addEventListener('click', function(ev) {
+        const addClinBtn = ev.target.closest('[data-add-clin]');
+        if (addClinBtn) { ev.preventDefault(); addClinCard(); return; }
+        const rmClinBtn = ev.target.closest('[data-remove-clin]');
+        if (rmClinBtn) {
+            ev.preventDefault();
+            const card = rmClinBtn.closest('.clin-card');
+            if (card) { card.remove(); recalcAll(); }
+            return;
+        }
+        const toggleBtn = ev.target.closest('[data-clin-toggle]');
+        if (toggleBtn) {
+            ev.preventDefault();
+            const card = toggleBtn.closest('.clin-card');
+            if (!card) return;
+            const body = card.querySelector('.clin-card-body');
+            const label = toggleBtn.querySelector('.clin-toggle-label');
+            const collapsed = body.classList.toggle('d-none');
+            if (label) label.textContent = collapsed ? '▼ Expand' : '▲ Collapse';
+            return;
+        }
+        const addFinBtn = ev.target.closest('[data-add-clin-fin]');
+        if (addFinBtn) {
+            ev.preventDefault();
+            const card = addFinBtn.closest('.clin-card');
+            if (card) { addClinSubRow(card, 'fin'); recalcClin(card); recalcGpSummary(); }
+            return;
+        }
+        const addSplitBtn = ev.target.closest('[data-add-clin-split]');
+        if (addSplitBtn) {
+            ev.preventDefault();
+            const card = addSplitBtn.closest('.clin-card');
+            if (card) { addClinSubRow(card, 'split'); recalcClin(card); }
+            return;
+        }
+        const rmSubBtn = ev.target.closest('[data-remove-sub-row]');
+        if (rmSubBtn) {
+            ev.preventDefault();
+            const tr = rmSubBtn.closest('tr');
+            const card = rmSubBtn.closest('.clin-card');
+            if (tr) tr.remove();
+            if (card) recalcClin(card);
+            recalcGpSummary();
+            return;
+        }
+        const recalcBtn = ev.target.closest('[data-recalc-clin]');
+        if (recalcBtn) {
+            ev.preventDefault();
+            const card = recalcBtn.closest('.clin-card');
+            if (card) { recalcClin(card); recalcGpSummary(); }
+            return;
+        }
+        // Legacy: still support adding rows for IDIQ approved_nsns / suppliers.
         const addBtn = ev.target.closest('[data-add-row]');
         if (addBtn) {
             ev.preventDefault();
-            addRow(addBtn.dataset.addRow);
+            const prefix = addBtn.dataset.addRow;
+            const tpl = document.getElementById('tpl-' + prefix);
+            const table = document.getElementById(prefix + '-table');
+            if (!tpl || !table) return;
+            const idx = counters[prefix] = (counters[prefix] || 1000) + 1;
+            const frag = tpl.content.cloneNode(true);
+            applyTemplate(frag, {'__IDX__': idx});
+            table.querySelector('tbody').appendChild(frag);
             return;
         }
-        const rmBtn = ev.target.closest('[data-remove-row]');
-        if (rmBtn) {
+        const rmRowBtn = ev.target.closest('[data-remove-row]');
+        if (rmRowBtn) {
             ev.preventDefault();
-            const tr = rmBtn.closest('tr');
+            const tr = rmRowBtn.closest('tr');
             if (tr) tr.remove();
+        }
+    });
+
+    // Live recalc on any input within a CLIN card OR the packaging quote field.
+    document.addEventListener('input', function(ev) {
+        const card = ev.target.closest('.clin-card');
+        if (card) {
+            recalcClin(card);
+            recalcGpSummary();
+            return;
+        }
+        if (ev.target.name === 'pkg-quote_amount') {
+            recalcGpSummary();
         }
     });
 
@@ -701,10 +930,22 @@
         });
     }
 
+    function bootRecalc() {
+        // Initial pass so server-rendered CLINs show Quote Total / Planned GP
+        // immediately, and the GP Summary table is populated on page load.
+        if (typeof recalcAll === 'function') recalcAll();
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+            initPackagingToggle();
+            bootRecalc();
+        });
     } else {
         init();
+        initPackagingToggle();
+        bootRecalc();
     }
 })();
 </script>

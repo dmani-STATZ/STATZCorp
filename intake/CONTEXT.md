@@ -72,22 +72,57 @@ incompatible with new code. Validation is a hard requirement.
 - `intake:cancel_draft` — `POST /intake/drafts/<pk>/cancel/` — transition to
   `cancelled` + release lock
 
-## Editor (Phase 2a)
-The editor (`intake/templates/intake/draft_edit.html`) is a flat HTML form
-whose field names follow a strict prefix convention; `intake/forms_parse.py`
-reshapes the POST back into the per-type JSON schema:
+## Editor
+The editor (`intake/templates/intake/draft_edit.html`) is a CLIN-card
+form whose field names follow a strict prefix convention;
+`intake/forms_parse.py` reshapes the POST back into the per-type JSON
+schema:
 
-| Prefix             | Maps to                        |
-|--------------------|--------------------------------|
-| `f_<scalar>`       | top-level scalar               |
-| `clin-<i>-<field>` | `clins[i]`                     |
-| `fin-<i>-<field>`  | `finance_lines[i]`             |
-| `pkg-<field>`      | `packaging` (singleton)        |
-| `nsn-<i>-<field>`  | `approved_nsns[i]` (IDIQ)      |
-| `supp-<i>-<field>` | `approved_suppliers[i]` (IDIQ) |
+| Prefix                              | Maps to                         |
+|-------------------------------------|---------------------------------|
+| `f_<scalar>`                        | top-level scalar (incl. `f_sales_class_id`) |
+| `clin-<i>-<field>`                  | `clins[i]`                      |
+| `clin-<i>-fin-<j>-<field>`          | `clins[i].finance_lines[j]`     |
+| `clin-<i>-split-<j>-<field>`        | `clins[i].splits[j]`            |
+| `pkg-<field>`                       | `packaging` (singleton)         |
+| `nsn-<i>-<field>`                   | `approved_nsns[i]` (IDIQ)       |
+| `supp-<i>-<field>`                  | `approved_suppliers[i]` (IDIQ)  |
 
 Unknown keys are dropped at parse time. All-blank rows are dropped. Date /
 Decimal coercion is deferred to the Pydantic schema on `DraftContract.save()`.
+
+Contract-level scalars in `_CommonContractFields` include `award_date`,
+`due_date`, `buyer_text` / `buyer_id`, `sales_class_id`, `contractor_name`,
+`contractor_cage`, and related fields. `contractor_name` and
+`contractor_cage` are parser provenance only — they round-trip in JSON but
+are not shown in the editor UI.
+
+CLIN data shape (per-CLIN JSON keys, see `DraftClin` in `schemas.py`):
+
+- Contract data: `item_number`, `item_type` (P/G/C/L/M/Q/D; defaults to
+  `P` when not parsed), `nsn_text` + `nsn_id` + `nsn_description`,
+  `order_qty`, `uom`, `item_value` (government contract unit price from
+  the 1155 parser via `ingest._clin_to_dict`), `due_date`, `ia` (O/D),
+  `fob` (O/D)
+- Supplier data: `supplier_text` + `supplier_id`, `supplier_due_date`,
+  `special_payment_terms` (stringified PK), `unit_price` (supplier quote
+  price — manual entry only, never populated from PDF ingest)
+- Nested children: `finance_lines: [{line_type, amount, notes}]`,
+  `splits: [{company_name, percentage}]`
+
+Packaging: hidden in the editor until the analyst clicks **+ Add Packaging**,
+or auto-shown on load when any of `packhouse_supplier_text`,
+`packhouse_supplier_id`, `quote_amount`, or `notes` is pre-filled. The
+section sits above the CLIN stack. **Remove Packaging** clears all `pkg-*`
+inputs so the next save drops the packaging block from JSON.
+
+PO Number is display-only in the editor (`Assigned when submitted`). It is
+assigned post-finalization by the processing app — not a draft field.
+
+GP calculation per CLIN:
+`planned_gp = item_value − (unit_price × order_qty + Σ finance_lines.amount)`
+Split rows derive `split_value = planned_gp × percentage / 100` at
+finalization (the editor shows it live; the value is not POSTed).
 
 ## Matcher (Phase 2b)
 A single endpoint `intake:match` (`POST /intake/drafts/<pk>/match/`) handles
@@ -101,6 +136,13 @@ Actions:
   `*_cage` where relevant) under the chosen path, saves through schema
   validation.
 - `clear` — strips `*_id` only (leaves `*_text` for the user to edit).
+- `create` (Phase 2c) — inline-creates a canonical Buyer / NSN / Supplier
+  from a minimal payload (`description`, `nsn_code`+`description`, or
+  `name`+`cage_code`) and immediately applies it under the same atomic
+  block. Dedup is enforced. IDIQ / Contract creation is intentionally
+  not supported — use the contracts app forms.
+- `creatable_types` — read-only convenience that returns the list of
+  match_types supporting inline create.
 
 Target paths:
 - `buyer`, `parent_idiq`, `parent_contract`, `packaging` (top-level)
@@ -126,9 +168,10 @@ Supported types: **AWD, PO, DO, IDIQ, INTERNAL, MOD, AMD**.
 | INTERNAL | If any CLIN provided, each must be fully matched   | new Contract; CLINs optional; notes append as Note |
 | MOD/AMD  | `parent_contract_id` matched                       | appends a tagged Note on the parent Contract; returns parent (no new row) |
 
-`finance_lines` (root-level on the intake JSON) attach to the FIRST canonical
-CLIN. `ContractFinanceLine` is keyed to Clin, not Contract, so this is a
-pragmatic placement; analysts can re-bucket via the Finance Audit page.
+Per-CLIN `finance_lines` and `splits` are created inline on the matching
+canonical `Clin`. Legacy root-level `finance_lines` are still accepted for
+in-flight drafts and attach to the first canonical CLIN with a warning
+(removed once the queue is clear of pre-redesign drafts).
 
 URL: `intake:finalize_draft` → `POST /intake/drafts/<pk>/finalize/`
 (requires lock + status=`ready_for_review`). On success for AWD/PO/DO/INTERNAL,

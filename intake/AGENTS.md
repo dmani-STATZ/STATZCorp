@@ -47,12 +47,16 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   The view code uses `draft_type` (captured pre-delete) to skip the
   email-compose redirect for these. If you add a new "modify existing"
   type, route it the same way.
-- **finance_lines** attach to the FIRST canonical CLIN, because
-  `ContractFinanceLine` is keyed to Clin. This is a pragmatic placement
-  and analysts re-bucket via the Finance Audit page later. If the
-  parser learns to attribute finance lines per-CLIN, change the schema
-  to nest them under each CLIN and update `_shred_finance_lines`
-  accordingly.
+- **finance_lines** are now nested per-CLIN in the draft JSON and
+  finalized inline (`_create_clins` handles them). Root-level
+  `finance_lines` is **legacy** — the backward-compat path in
+  `_apply_legacy_root_finance_lines` accepts them with a warning and
+  attaches to the first CLIN. Remove that path once the queue is
+  confirmed clear of pre-redesign drafts.
+- **ClinSplit** rows are created from per-CLIN `splits` (company_name +
+  percentage). `split_value` is computed in finalize as
+  `planned_gp × percentage / 100` (quantized to cents), not pulled from
+  the draft. The editor renders the live value for analyst feedback.
 
 ### Template changes
 - Templates intentionally mirror `processing/` visually so analysts learning
@@ -73,19 +77,25 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   intentionally simple). When company scoping is added it should mirror the
   pattern in `contracts.views.mixins.ActiveCompanyQuerysetMixin`.
 
-### Editor changes (Phase 2a)
+### Editor changes
 - Field name convention in `draft_edit.html` is the load-bearing contract
   with `forms_parse.parse_post`. Adding a key to a schema is **not enough** —
-  the template must POST it under the right prefix (`f_*`, `clin-i-*`,
-  `pkg-*`, `nsn-i-*`, `supp-i-*`, `fin-i-*`) AND the field name must be in
-  the matching allowlist set in `forms_parse.py`. Skip either step and the
-  field is silently dropped at POST time, not flagged at validate time.
+  the template must POST it under the right prefix and the field name must
+  be in the matching allowlist set in `forms_parse.py`. Valid prefixes:
+  `f_*` (scalar), `clin-i-*`, `clin-i-fin-j-*`, `clin-i-split-j-*`,
+  `pkg-*`, `nsn-i-*`, `supp-i-*`. Skip either step and the field is
+  silently dropped at POST time, not flagged at validate time.
+- Nested keys (`clin-i-fin-j-*`, `clin-i-split-j-*`) require entries in
+  `_NESTED_ROW_KEY` (regex) and `_NESTED_BUCKET` (allowlist map). The CLIN
+  card template uses `__CLINIDX__` and the sub-templates use
+  `__CLINIDX__` + `__FINIDX__` / `__SPLITIDX__`; the JS engine in
+  `draft_edit.html` substitutes them on row add.
 - All write endpoints (`save_draft`, `mark_ready`, `cancel_draft`) MUST hold
   the soft lock and MUST call `assert_holds` before writing. The
   `test_save_rejects_when_user_lost_lock` test exists specifically to catch
   regressions here — don't disable it without thinking.
 
-### Matcher changes (Phase 2b)
+### Matcher changes (Phase 2b/2c)
 - `intake/matchers.py` is the single source of truth for what target_paths
   are valid and which match_type each one accepts. Don't widen path
   grammar without also expanding the test in `MatcherUnitTests` — the
@@ -99,6 +109,32 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   Don't add lock requirements there — users browse before claiming.
 - The editor reloads on `intake:match-applied`. If you add async behavior
   that should not trigger a reload, dispatch a different event.
+- **Inline create (Phase 2c)** — `CREATABLE_TYPES = {'buyer','nsn','supplier'}`.
+  Adding a new creatable type requires three coordinated edits:
+  (1) a `_create_<type>` function in `matchers.py` with explicit dedup,
+  (2) adding the type to `CREATABLE_TYPES` and `CREATORS`,
+  (3) a `<div data-create-fields="<type>">` field group in
+  `templates/intake/_match_modal.html` AND adding the type to `CREATABLE`
+  in `static/intake/js/match_modal.js`. Skip step 3 and the modal will
+  silently lack a UI surface even though the endpoint accepts the
+  request. **Do not expose IDIQ or Contract creation here** — they
+  require fields (award_date, term_length, FK chains) that don't fit
+  the modal's flat form; route analysts to the contracts app instead.
+- Create runs inside the same atomic block as the immediate apply. If
+  the apply or save fails, the new canonical row rolls back too. Don't
+  split create and apply across requests — that re-introduces the
+  "orphan row exists but isn't linked to a draft" failure mode.
+
+### Editor field semantics (do not regress)
+- **`contractor_name` / `contractor_cage`:** parser provenance fields in
+  JSON only. Do **not** add them back to `draft_edit.html`. If someone
+  asks to show them in the form, read this note first.
+- **`item_value` vs `unit_price`:** `item_value` is the government contract
+  unit price from the 1155 parser (`ingest._clin_to_dict` maps parser
+  `unit_price` → `item_value`). `unit_price` is the supplier quote and is
+  manual in the editor. Do not swap these in ingest.
+- **PO Number:** display-only placeholder in intake. Assigned after
+  finalization by processing — never add a POST field or schema key for it.
 
 ### PDF Ingestion (Phase 3c)
 - `intake/ingest.py::_result_to_data` is the single mapping from
