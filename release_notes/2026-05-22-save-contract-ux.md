@@ -1,8 +1,10 @@
 ---
+id: 2026-05-22-save-contract-ux
 title: Save Contract Button — Visibility and Dirty State Indicator
-date: 2026-05-22
-app: processing
-type: improvement
+published: true
+publish_date: 2026-05-22
+tags: [improved]
+critical: false
 ---
 
 **Save Contract button now shows label and unsaved changes indicator.**

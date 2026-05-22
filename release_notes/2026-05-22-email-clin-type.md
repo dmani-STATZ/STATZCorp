@@ -1,9 +1,12 @@
 ---
+id: 2026-05-22-email-clin-type
 title: CLIN Type Added to Contract Notification Email
-date: 2026-05-22
-app: processing
-type: improvement
+published: true
+publish_date: 2026-05-22
+tags: [improved]
+critical: false
 ---
+
 
 **Contract notification emails now include CLIN item type.**
 

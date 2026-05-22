@@ -19,6 +19,7 @@ from contracts.models import (
     ContractPackaging,
     IdiqContract,
     IdiqContractDetails,
+    SalesClass,
 )
 from products.models import Nsn
 from suppliers.models import Supplier
@@ -837,6 +838,60 @@ class IngestUnitTests(TestCase):
             with self.assertRaises(DuplicateContractNumber):
                 ingest_pdf(b'fake', original_filename='4.pdf')
 
+    def test_clin_ia_mapped_from_parser(self):
+        """IA field is extracted from the parser result and stored on the CLIN."""
+        result = _stub_parse_result()
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='ia_test.pdf')
+        clin0 = draft.data['clins'][0]
+        # _stub_parse_result sets inspection_point='O' (acceptance_point='D' ignored for IA).
+        self.assertEqual(clin0.get('ia'), 'O')
+
+    def test_contract_due_date_derived_from_earliest_clin(self):
+        """Contract due_date is set to the earliest CLIN due_date after parse."""
+        result = _stub_parse_result(clins=[
+            ClinParseResult(
+                item_number='0001', nsn='1111-11-111-1111', nsn_description='A',
+                order_qty=Decimal('1'), uom='EA', unit_price=Decimal('1.00'),
+                due_date=date(2027, 6, 1),
+                inspection_point='O', acceptance_point='D', fob='D',
+                cage='12345', clin_parse_note=None, min_order_qty_text=None,
+            ),
+            ClinParseResult(
+                item_number='0002', nsn='2222-22-222-2222', nsn_description='B',
+                order_qty=Decimal('2'), uom='EA', unit_price=Decimal('2.00'),
+                due_date=date(2026, 12, 1),
+                inspection_point='O', acceptance_point='D', fob='D',
+                cage='12345', clin_parse_note=None, min_order_qty_text=None,
+            ),
+        ])
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='due_date_test.pdf')
+        self.assertEqual(draft.data.get('due_date'), '2026-12-01')
+
+    def test_contract_due_date_none_when_no_clins(self):
+        """Contract due_date is not set when there are no CLINs."""
+        result = _stub_parse_result(clins=[])
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='no_clins_test.pdf')
+        self.assertIsNone(draft.data.get('due_date'))
+
+    def test_sales_class_defaults_to_statz(self):
+        """Sales class defaults to the STATZ SalesClass PK when it exists."""
+        sc, _ = SalesClass.objects.get_or_create(sales_team='STATZ')
+        result = _stub_parse_result()
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='sc_test.pdf')
+        self.assertEqual(draft.data.get('sales_class_id'), sc.pk)
+
+    def test_sales_class_none_when_statz_missing(self):
+        """Sales class is None when no STATZ SalesClass record exists."""
+        SalesClass.objects.filter(sales_team='STATZ').delete()
+        result = _stub_parse_result()
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='sc_none_test.pdf')
+        self.assertIsNone(draft.data.get('sales_class_id'))
+
 
 class UploadViewTests(TestCase):
     @classmethod
@@ -1039,7 +1094,7 @@ class FinanceLineShredTests(TestCase):
                         'item_number': '0001',
                         'nsn_id': self.nsn.id,
                         'supplier_id': self.supplier.id,
-                        'item_value': '1000.00',
+                        'item_value': '10.00',
                         'unit_price': '5.00',
                         'order_qty': 100,
                         'finance_lines': [
@@ -1060,7 +1115,7 @@ class FinanceLineShredTests(TestCase):
         # 1 finance line on this CLIN — not on a non-existent first CLIN
         # via legacy path.
         self.assertEqual(ContractFinanceLine.objects.filter(clin=clin).count(), 1)
-        # planned_gp = 1000 - (5*100 + 200) = 300
+        # planned_gp = (10*100) - (5*100 + 200) = 300
         # split_value at 60% = 180.00, at 40% = 120.00
         splits = list(ClinSplit.objects.filter(clin=clin).order_by('company_name'))
         self.assertEqual(len(splits), 2)

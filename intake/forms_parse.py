@@ -33,6 +33,7 @@ from typing import Any
 SCALAR_FIELDS = {
     'award_date', 'due_date', 'contract_value', 'solicitation_type',
     'pr_number', 'buyer_text', 'buyer_id', 'sales_class_id',
+    'canonical_contract_type_id', 'plan_gross', 'planned_split', 'nist',
     'contractor_name',
     'contractor_cage', 'files_url',
     # AwdPoData / DoData
@@ -84,6 +85,18 @@ def _coerce(value: str) -> Any:
         return None
     v = value.strip()
     return v if v else None
+
+
+def _coerce_nist(value: str) -> bool | None:
+    """Map editor Yes/No select to bool for Contract.nist."""
+    v = _coerce(value)
+    if v is None:
+        return None
+    if v.lower() in ('yes', 'true', '1'):
+        return True
+    if v.lower() in ('no', 'false', '0'):
+        return False
+    return None
 
 
 def parse_post(post) -> dict:
@@ -141,7 +154,10 @@ def parse_post(post) -> dict:
         if m:
             field = m.group(1)
             if field in SCALAR_FIELDS:
-                out[field] = _coerce(raw)
+                if field == 'nist':
+                    out[field] = _coerce_nist(raw)
+                else:
+                    out[field] = _coerce(raw)
             continue
         # everything else: ignored
 

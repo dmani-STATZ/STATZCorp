@@ -140,7 +140,7 @@ def delete_draft(request, pk: int):
 
 def _editor_context(draft: DraftContract, user) -> dict:
     """Shared context for the editor — bound to current draft state."""
-    from contracts.models import SalesClass, SpecialPaymentTerms
+    from contracts.models import ContractType, SalesClass, SpecialPaymentTerms
 
     data = draft.data or {}
     pkg_data = data.get('packaging') or {}
@@ -158,6 +158,7 @@ def _editor_context(draft: DraftContract, user) -> dict:
             pkg_data.get('notes'),
         ]),
         'sales_classes': SalesClass.objects.all().order_by('sales_team'),
+        'contract_types': ContractType.objects.all().order_by('description'),
         'approved_nsns': data.get('approved_nsns') or [],
         'approved_suppliers': data.get('approved_suppliers') or [],
         'lock_held_by_user': (

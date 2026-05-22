@@ -92,17 +92,33 @@ Unknown keys are dropped at parse time. All-blank rows are dropped. Date /
 Decimal coercion is deferred to the Pydantic schema on `DraftContract.save()`.
 
 Contract-level scalars in `_CommonContractFields` include `award_date`,
-`due_date`, `buyer_text` / `buyer_id`, `sales_class_id`, `contractor_name`,
+`due_date` (contract-level `due_date` is derived at ingest as the earliest
+CLIN `due_date`; analysts can override in the editor), `buyer_text` /
+`buyer_id`, `sales_class_id` (defaults to the 'STATZ' SalesClass PK at
+ingest if that record exists; analyst can change in editor),
+`canonical_contract_type_id` (FK PK to `contracts.ContractType`; the
+Bilateral/Delivery Order/etc. value written on the canonical Contract at
+finalization — analyst-selected, optional), `plan_gross` (optional decimal;
+planned gross value), `planned_split` (optional string; planned split
+assignment), `nist` (optional bool; NIST flag on Contract), `contractor_name`,
 `contractor_cage`, and related fields. `contractor_name` and
 `contractor_cage` are parser provenance only — they round-trip in JSON but
 are not shown in the editor UI.
+
+INTAKE TYPE (`draft.contract_type`) is display-only in the editor. It is
+set by the parser and drives schema routing. CONTRACT TYPE
+(`data.canonical_contract_type_id`) is the analyst-selected FK to
+`contracts.ContractType` and is written to `Contract.contract_type` at
+finalization.
 
 CLIN data shape (per-CLIN JSON keys, see `DraftClin` in `schemas.py`):
 
 - Contract data: `item_number`, `item_type` (P/G/C/L/M/Q/D; defaults to
   `P` when not parsed), `nsn_text` + `nsn_id` + `nsn_description`,
   `order_qty`, `uom`, `item_value` (government contract unit price from
-  the 1155 parser via `ingest._clin_to_dict`), `due_date`, `ia` (O/D),
+  the 1155 parser via `ingest._clin_to_dict`), `due_date`, `ia` (O/D;
+  mapped from `ClinParseResult.inspection_point` at ingest — previously
+  missing from `_clin_to_dict`; value is `'O'` or `'D'`),
   `fob` (O/D)
 - Supplier data: `supplier_text` + `supplier_id`, `supplier_due_date`,
   `special_payment_terms` (stringified PK), `unit_price` (supplier quote
@@ -120,7 +136,14 @@ PO Number is display-only in the editor (`Assigned when submitted`). It is
 assigned post-finalization by the processing app — not a draft field.
 
 GP calculation per CLIN:
-`planned_gp = item_value − (unit_price × order_qty + Σ finance_lines.amount)`
+`contract_total = item_value × order_qty`
+`quote_total = unit_price × order_qty`
+`planned_gp = contract_total − (quote_total + Σ finance_lines.amount)`
+
+Note: `item_value` is the government contract UNIT price (from the 1155
+parser). It must be multiplied by `order_qty` to get the contract total
+before computing GP.
+
 Split rows derive `split_value = planned_gp × percentage / 100` at
 finalization (the editor shows it live; the value is not POSTed).
 
@@ -157,6 +180,11 @@ client reloads on `intake:match-applied`. The dirty-form guard in
 `intake/finalize.py` shreds a Ready-for-Review draft into canonical
 `contracts.*` tables and deletes the draft on success. The whole flow runs
 inside `transaction.atomic()` so any failure rolls back cleanly.
+
+For AWD/PO/DO/INTERNAL contract creation, among other fields:
+`data.canonical_contract_type_id` → `Contract.contract_type` (FK);
+`data.plan_gross` → `Contract.plan_gross`; `data.planned_split` →
+`Contract.planned_split`; `data.nist` → `Contract.nist`.
 
 Supported types: **AWD, PO, DO, IDIQ, INTERNAL, MOD, AMD**.
 

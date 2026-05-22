@@ -15,7 +15,7 @@ from dataclasses import asdict
 from decimal import Decimal
 from typing import Optional
 
-from contracts.models import Contract
+from contracts.models import Contract, SalesClass
 from processing.services.pdf_parser import (
     AwardParseResult,
     ClinParseResult,
@@ -56,6 +56,38 @@ def _date(value) -> Optional[str]:
     return value.isoformat() if hasattr(value, 'isoformat') else str(value)
 
 
+def _default_sales_class_id() -> Optional[int]:
+    """Return the PK of the 'STATZ' SalesClass, or None if it doesn't exist.
+
+    Called once per ingest. Fails silently — a missing SalesClass record
+    is not a reason to reject a valid PDF.
+    """
+    try:
+        return SalesClass.objects.get(sales_team='STATZ').pk
+    except SalesClass.DoesNotExist:
+        return None
+
+
+def _ia_from_clin_parse(c: ClinParseResult) -> Optional[str]:
+    """Map ClinParseResult → draft CLIN ``ia`` ('O' or 'D').
+
+    Matches ``processing.services.pdf_parser.ingest_parsed_award``: canonical
+    ``Clin.ia`` is derived from ``inspection_point`` only (not acceptance).
+    Parser text uses ORIGIN/DESTINATION; choice values may already be O/D.
+    """
+    insp = c.inspection_point
+    if not insp:
+        return None
+    u = insp.strip().upper()
+    if u in ('O', 'D'):
+        return u
+    if 'ORIGIN' in u:
+        return 'O'
+    if 'DESTINATION' in u:
+        return 'D'
+    return None
+
+
 def _clin_to_dict(c: ClinParseResult) -> dict:
     row = {
         'item_number': c.item_number,
@@ -68,6 +100,7 @@ def _clin_to_dict(c: ClinParseResult) -> dict:
         'item_value': _d(c.unit_price),
         'due_date': _date(c.due_date),
         'fob': c.fob,
+        'ia': _ia_from_clin_parse(c),
     }
     if not (row.get('item_type') or '').strip():
         row['item_type'] = 'P'
@@ -86,6 +119,7 @@ def _result_to_data(result: AwardParseResult) -> dict:
         'contract_value': _d(result.contract_value),
         'solicitation_type': result.solicitation_type,
         'pr_number': result.pr_number,
+        'sales_class_id': _default_sales_class_id(),
         'buyer_text': result.buyer_text,
         'contractor_name': result.contractor_name,
         'contractor_cage': result.contractor_cage,
@@ -99,6 +133,13 @@ def _result_to_data(result: AwardParseResult) -> dict:
     # AWD/PO/DO: CLINs + packaging
     if result.clins:
         data['clins'] = [_clin_to_dict(c) for c in result.clins]
+        # Derive contract due_date as the earliest CLIN due_date.
+        clin_dates = [
+            c.due_date for c in result.clins
+            if c.due_date is not None
+        ]
+        if clin_dates:
+            data['due_date'] = _date(min(clin_dates))
     if result.packhouse_cage:
         data['packaging'] = {'packhouse_cage': result.packhouse_cage}
     # DO: parent IDIQ reference

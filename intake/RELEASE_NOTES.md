@@ -1,5 +1,51 @@
 # intake — Release Notes
 
+## [Unreleased]
+
+### Changed
+
+Contract Details form reordered to a 2-column layout matching the
+desired field groupings: Contract Number / IDIQ Contract, PO / PR Number,
+Buyer / Sales Class, Contract Type / Solicitation Type, Award Date / Due Date,
+Contract Value, Plan Gross / Planned Split, Files URL / NIST.
+CLIN card Contract Data section reordered: Item Number, Item Type, CLIN PO
+Number (display-only), IA on top row; FOB full-width; NSN + Due Date;
+Quantity / UOM / Unit Price / Total Value.
+"INTAKE TYPE" (parser-set, read-only) and "CONTRACT TYPE" (analyst-selected
+canonical ContractType FK) are now both visible in the Contract Details
+section.
+
+### Added
+
+`canonical_contract_type_id` field added to intake draft data schema
+(`_CommonContractFields`). Analyst selects the canonical ContractType
+(Bilateral / Delivery Order / IDIQ / etc.) during intake; value is passed
+through to `Contract.contract_type` at finalization.
+`plan_gross`, `planned_split`, `nist` fields added to draft data schema
+and editor form.
+
+### Fixed
+
+GP calculation corrected: item_value (government contract unit price)
+is now multiplied by order_qty before subtracting the supplier quote
+total. Previously the formula used item_value as if it were already
+a total, producing a wildly incorrect (always negative) planned GP
+when item_value was a unit price and order_qty > 1.
+Correct formula: planned_gp = (item_value × order_qty) − (unit_price × order_qty + Σ finance_lines.amount).
+
+CLIN ia (Inspection/Acceptance) field now correctly mapped from the
+1155 parser result in _clin_to_dict. Previously absent, causing IA
+to always be blank after PDF ingest.
+Contract-level due_date now derived at ingest as the earliest CLIN
+due date. Previously blank on all PDF-ingested drafts.
+Sales Class now defaults to 'STATZ' on PDF ingest when that SalesClass
+record exists. Previously blank on all ingested drafts.
+
+Removed rendered template comment text that appeared as selectable content
+in the Match IDIQ modal results area.
+Parent IDIQ match field moved into the Contract Details grid (was a
+separate card below Contract Details).
+
 ## Inline Create from Match Modal (2026-05-22)
 **User-visible changes:**
 - The Match modal now has an **+ Add new** panel for Buyer, NSN, and

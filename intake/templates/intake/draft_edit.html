@@ -50,26 +50,39 @@
         {# ---- Common header fields ---- #}
         <div class="card card-padded shadow-sm mb-4">
             <h2 class="text-xl font-semibold mb-3">Contract Details</h2>
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="label block mb-1">Contract Number</label>
+                    <label class="label block mb-1">CONTRACT NUMBER</label>
                     <input type="text" value="{{ draft.contract_number }}"
                            class="form-control bg-gray-50" readonly>
                 </div>
                 <div>
-                    <label class="label block mb-1">Award Date</label>
-                    <input type="date" name="f_award_date"
-                           value="{{ data|get_item:'award_date'|default:'' }}"
-                           class="form-control">
+                    {% if draft.contract_type == 'DO' %}
+                    <label class="label block mb-1">IDIQ CONTRACT</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="f_parent_idiq_contract_number"
+                               value="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}"
+                               class="form-control">
+                        <button type="button" class="btn btn-outline-primary"
+                                data-match-open
+                                data-match-type="idiq"
+                                data-target-path="parent_idiq"
+                                data-match-title="IDIQ Contract"
+                                data-match-original="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}">
+                            Match
+                        </button>
+                    </div>
+                    <input type="hidden" name="f_parent_idiq_id"
+                           value="{{ data|get_item:'parent_idiq_id'|default:'' }}">
+                    {% with pid=data|get_item:'parent_idiq_id' %}
+                        {% if pid %}<span class="badge bg-success mt-1">matched #{{ pid }}</span>{% endif %}
+                    {% endwith %}
+                    {% else %}
+                    <div></div>
+                    {% endif %}
                 </div>
                 <div>
-                    <label class="label block mb-1">Due Date</label>
-                    <input type="date" name="f_due_date"
-                           value="{{ data|get_item:'due_date'|default:'' }}"
-                           class="form-control">
-                </div>
-                <div>
-                    <label class="label block mb-1">PO Number</label>
+                    <label class="label block mb-1">PO NUMBER</label>
                     <input type="text"
                            class="form-control form-control-sm"
                            value="Assigned when submitted"
@@ -77,37 +90,13 @@
                            style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;">
                 </div>
                 <div>
-                    <label class="label block mb-1">Sales Class</label>
-                    <select name="f_sales_class_id" class="form-select form-select-sm">
-                        <option value="">——</option>
-                        {% for sc in sales_classes %}
-                        <option value="{{ sc.pk }}"
-                            {% if data|get_item:'sales_class_id' == sc.pk %}selected{% endif %}>
-                            {{ sc.sales_team }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label class="label block mb-1">Contract Value</label>
-                    <input type="number" step="0.01" name="f_contract_value"
-                           value="{{ data|get_item:'contract_value'|default:'' }}"
-                           class="form-control">
-                </div>
-                <div>
-                    <label class="label block mb-1">Solicitation Type</label>
-                    <input type="text" name="f_solicitation_type"
-                           value="{{ data|get_item:'solicitation_type'|default:'' }}"
-                           class="form-control">
-                </div>
-                <div>
-                    <label class="label block mb-1">PR Number</label>
+                    <label class="label block mb-1">PR NUMBER</label>
                     <input type="text" name="f_pr_number"
                            value="{{ data|get_item:'pr_number'|default:'' }}"
                            class="form-control">
                 </div>
                 <div>
-                    <label class="label block mb-1">Buyer</label>
+                    <label class="label block mb-1">BUYER</label>
                     <div class="input-group input-group-sm">
                         <input type="text" name="f_buyer_text"
                                value="{{ data|get_item:'buyer_text'|default:'' }}"
@@ -127,43 +116,91 @@
                         {% if bid %}<span class="badge bg-success mt-1">matched #{{ bid }}</span>{% endif %}
                     {% endwith %}
                 </div>
-                <div class="col-span-3">
-                    <label class="label block mb-1">Files URL</label>
+                <div>
+                    <label class="label block mb-1">SALES CLASS</label>
+                    <select name="f_sales_class_id" class="form-select form-select-sm">
+                        <option value="">——</option>
+                        {% for sc in sales_classes %}
+                        <option value="{{ sc.pk }}"
+                            {% if data|get_item:'sales_class_id' == sc.pk %}selected{% endif %}>
+                            {{ sc.sales_team }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label block mb-1">INTAKE TYPE</label>
+                    <input type="text"
+                           class="form-control form-control-sm bg-gray-50"
+                           value="{{ draft.get_contract_type_display }}"
+                           disabled
+                           style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;">
+                    <label class="label block mb-1 mt-2">CONTRACT TYPE</label>
+                    <select name="f_canonical_contract_type_id" class="form-select form-select-sm">
+                        <option value="">——</option>
+                        {% for ct in contract_types %}
+                        <option value="{{ ct.pk }}"
+                            {% if data|get_item:'canonical_contract_type_id' == ct.pk %}selected{% endif %}>
+                            {{ ct.description }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label block mb-1">SOLICITATION TYPE</label>
+                    <input type="text" name="f_solicitation_type"
+                           value="{{ data|get_item:'solicitation_type'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">AWARD DATE</label>
+                    <input type="date" name="f_award_date"
+                           value="{{ data|get_item:'award_date'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">DUE DATE</label>
+                    <input type="date" name="f_due_date"
+                           value="{{ data|get_item:'due_date'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">CONTRACT VALUE</label>
+                    <input type="number" step="0.01" name="f_contract_value"
+                           value="{{ data|get_item:'contract_value'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div></div>
+                <div>
+                    <label class="label block mb-1">PLAN GROSS</label>
+                    <input type="number" step="0.01" name="f_plan_gross"
+                           value="{{ data|get_item:'plan_gross'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">PLANNED SPLIT</label>
+                    <input type="text" name="f_planned_split"
+                           value="{{ data|get_item:'planned_split'|default:'' }}"
+                           class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">FILES URL</label>
                     <input type="text" name="f_files_url"
                            value="{{ data|get_item:'files_url'|default:'' }}"
                            class="form-control">
+                </div>
+                <div>
+                    <label class="label block mb-1">NIST</label>
+                    <select name="f_nist" class="form-select form-select-sm">
+                        <option value="">——</option>
+                        <option value="Yes" {% if data|get_item:'nist' == True %}selected{% endif %}>Yes</option>
+                        <option value="No" {% if data|get_item:'nist' == False %}selected{% endif %}>No</option>
+                    </select>
                 </div>
             </div>
         </div>
 
         {# ---- Type-specific blocks ---- #}
-        {% if draft.contract_type == 'DO' %}
-        <div class="card card-padded shadow-sm mb-4">
-            <h2 class="text-xl font-semibold mb-3">Parent IDIQ</h2>
-            <div>
-                <label class="label block mb-1">Parent IDIQ Contract Number</label>
-                <div class="input-group input-group-sm">
-                    <input type="text" name="f_parent_idiq_contract_number"
-                           value="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}"
-                           class="form-control">
-                    <button type="button" class="btn btn-outline-primary"
-                            data-match-open
-                            data-match-type="idiq"
-                            data-target-path="parent_idiq"
-                            data-match-title="Parent IDIQ"
-                            data-match-original="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}">
-                        Match
-                    </button>
-                </div>
-                <input type="hidden" name="f_parent_idiq_id"
-                       value="{{ data|get_item:'parent_idiq_id'|default:'' }}">
-                {% with pid=data|get_item:'parent_idiq_id' %}
-                    {% if pid %}<span class="badge bg-success mt-1">matched #{{ pid }}</span>{% endif %}
-                {% endwith %}
-            </div>
-        </div>
-        {% endif %}
-
         {% if draft.contract_type == 'IDIQ' %}
         <div class="card card-padded shadow-sm mb-4">
             <h2 class="text-xl font-semibold mb-3">IDIQ Terms</h2>
@@ -497,7 +534,7 @@
         </div>
         <div class="card-body clin-card-body d-none">
             <h6 class="text-uppercase text-muted mb-2">Contract Data</h6>
-            <div class="grid grid-cols-3 gap-3 mb-3">
+            <div class="grid grid-cols-4 gap-3 mb-3">
                 <div><label class="label block mb-1">Item Number</label>
                     <input type="text" data-name="clin-__CLINIDX__-item_number" class="form-control form-control-sm clin-item-number"></div>
                 <div><label class="label block mb-1">Item Type</label>
@@ -511,28 +548,36 @@
                         <option value="Q">QN (Q)</option>
                         <option value="D">PQDR (D)</option>
                     </select></div>
-                <div><label class="label block mb-1">CLIN Due Date</label>
-                    <input type="date" data-name="clin-__CLINIDX__-due_date" class="form-control form-control-sm"></div>
-                <div class="col-span-2"><label class="label block mb-1">NSN</label>
+                <div><label class="label block mb-1">CLIN PO Number</label>
+                    <input type="text" class="form-control form-control-sm" value="Assigned when submitted" disabled
+                           style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;"></div>
+                <div><label class="label block mb-1">IA</label>
+                    <select data-name="clin-__CLINIDX__-ia" class="form-select form-select-sm">
+                        <option value="">—</option><option value="O">Origin (O)</option><option value="D">Destination (D)</option>
+                    </select></div>
+                <div class="col-span-4"><label class="label block mb-1">FOB</label>
+                    <select data-name="clin-__CLINIDX__-fob" class="form-select form-select-sm">
+                        <option value="">—</option><option value="O">Origin (O)</option><option value="D">Destination (D)</option>
+                    </select></div>
+                <div class="col-span-2"><label class="label block mb-1">NSN*</label>
                     <div class="input-group input-group-sm">
                         <input type="text" data-name="clin-__CLINIDX__-nsn_text" class="form-control form-control-sm">
                         <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="nsn" data-target-path="clin:__CLINIDX__:nsn" data-match-title="NSN">Match</button>
                     </div>
                     <input type="hidden" data-name="clin-__CLINIDX__-nsn_id"></div>
+                <div><label class="label block mb-1">CLIN Due Date</label>
+                    <input type="date" data-name="clin-__CLINIDX__-due_date" class="form-control form-control-sm"></div>
                 <div><label class="label block mb-1">Quantity</label>
                     <input type="number" step="0.0001" data-name="clin-__CLINIDX__-order_qty" class="form-control form-control-sm clin-order-qty"></div>
                 <div><label class="label block mb-1">UOM</label>
                     <input type="text" data-name="clin-__CLINIDX__-uom" class="form-control form-control-sm"></div>
-                <div><label class="label block mb-1">Item Value</label>
+                <div><label class="label block mb-1">Unit Price</label>
                     <input type="number" step="0.01" data-name="clin-__CLINIDX__-item_value" class="form-control form-control-sm clin-item-value"></div>
-                <div><label class="label block mb-1">IA</label>
-                    <select data-name="clin-__CLINIDX__-ia" class="form-select form-select-sm">
-                        <option value="">—</option><option value="O">Origin (O)</option><option value="D">Destination (D)</option>
-                    </select></div>
-                <div><label class="label block mb-1">FOB</label>
-                    <select data-name="clin-__CLINIDX__-fob" class="form-select form-select-sm">
-                        <option value="">—</option><option value="O">Origin (O)</option><option value="D">Destination (D)</option>
-                    </select></div>
+                <div><label class="label block mb-1">Total Value</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" readonly class="form-control form-control-sm clin-total-value" value="$0.00">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-recalc-clin>ReCalc</button>
+                    </div></div>
             </div>
             <hr>
             <h6 class="text-uppercase text-muted mb-2">Supplier / Quote</h6>
@@ -742,9 +787,12 @@
         card.querySelectorAll('.clin-fin-amount').forEach(el => {
             financeTotal += parseNum(el.value);
         });
+        const contractTotal = itemValue * orderQty;
         const quoteTotal = unitPrice * orderQty;
-        const plannedGp = itemValue - (quoteTotal + financeTotal);
+        const plannedGp = contractTotal - (quoteTotal + financeTotal);
 
+        const tv = card.querySelector('.clin-total-value');
+        if (tv) tv.value = money(contractTotal);
         const qt = card.querySelector('.clin-quote-total');
         if (qt) qt.value = money(quoteTotal);
         const gp = card.querySelector('.clin-planned-gp');

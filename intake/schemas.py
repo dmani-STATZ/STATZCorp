@@ -140,6 +140,10 @@ class _CommonContractFields(BaseModel):
     buyer_text: Optional[str] = None
     buyer_id: Optional[int] = None
     sales_class_id: Optional[int] = None
+    canonical_contract_type_id: Optional[int] = None
+    plan_gross: Optional[Decimal] = None
+    planned_split: Optional[str] = None
+    nist: Optional[bool] = None
     contractor_name: Optional[str] = None
     contractor_cage: Optional[str] = None
     files_url: Optional[str] = None

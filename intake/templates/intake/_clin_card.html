@@ -37,7 +37,7 @@
 
         {# ---- Section 1: Contract Data ---- #}
         <h6 class="text-uppercase text-muted mb-2">Contract Data</h6>
-        <div class="grid grid-cols-3 gap-3 mb-3">
+        <div class="grid grid-cols-4 gap-3 mb-3">
             <div>
                 <label class="label block mb-1">Item Number</label>
                 <input type="text" name="clin-{{ idx }}-item_number"
@@ -60,13 +60,44 @@
                 </select>
             </div>
             <div>
-                <label class="label block mb-1">CLIN Due Date</label>
-                <input type="date" name="clin-{{ idx }}-due_date"
-                       value="{{ clin|get_item:'due_date'|default:'' }}"
-                       class="form-control form-control-sm">
+                <label class="label block mb-1">CLIN PO Number</label>
+                <input type="text"
+                       class="form-control form-control-sm"
+                       value="Assigned when submitted"
+                       disabled
+                       style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;">
+            </div>
+            <div>
+                
             </div>
             <div class="col-span-2">
-                <label class="label block mb-1">NSN</label>
+                <label class="label block mb-1">IA</label>
+                <select name="clin-{{ idx }}-ia" class="form-select form-select-sm">
+                    {% with t=clin|get_item:'ia' %}
+                    <option value="" {% if not t %}selected{% endif %}>—</option>
+                    {% for code, label in ia_fob_choices %}
+                    <option value="{{ code }}" {% if t == code %}selected{% endif %}>{{ label }} ({{ code }})</option>
+                    {% endfor %}
+                    {% endwith %}
+                </select>
+            </div>
+            <div class="col-span-2">
+                <label class="label block mb-1">FOB</label>
+                <select name="clin-{{ idx }}-fob" class="form-select form-select-sm">
+                    {% with t=clin|get_item:'fob' %}
+                    <option value="" {% if not t %}selected{% endif %}>—</option>
+                    {% for code, label in ia_fob_choices %}
+                    <option value="{{ code }}" {% if t == code %}selected{% endif %}>{{ label }} ({{ code }})</option>
+                    {% endfor %}
+                    {% endwith %}
+                </select>
+            </div>
+        </div>
+        <hr>
+
+        <div class="grid grid-cols-6 gap-3 mb-3">
+            <div class="col-span-4">
+                <label class="label block mb-1">NSN*</label>
                 <div class="input-group input-group-sm">
                     <input type="text" name="clin-{{ idx }}-nsn_text"
                            value="{{ clin|get_item:'nsn_text'|default:'' }}"
@@ -83,6 +114,12 @@
                     {% if nd %}<div class="small text-muted mt-1">{{ nd }}</div>{% endif %}
                 {% endwith %}
             </div>
+            <div class="col-span-2">
+                <label class="label block mb-1">CLIN Due Date</label>
+                <input type="date" name="clin-{{ idx }}-due_date"
+                       value="{{ clin|get_item:'due_date'|default:'' }}"
+                       class="form-control form-control-sm">
+            </div>
             <div>
                 <label class="label block mb-1">Quantity</label>
                 <input type="number" step="0.0001" name="clin-{{ idx }}-order_qty"
@@ -95,33 +132,18 @@
                        value="{{ clin|get_item:'uom'|default:'' }}"
                        class="form-control form-control-sm">
             </div>
-            <div>
-                <label class="label block mb-1">Item Value</label>
+            <div class="col-span-2">
+                <label class="label block mb-1">Unit Price</label>
                 <input type="number" step="0.01" name="clin-{{ idx }}-item_value"
                        value="{{ clin|get_item:'item_value'|default:'' }}"
                        class="form-control form-control-sm clin-item-value">
             </div>
-            <div>
-                <label class="label block mb-1">IA</label>
-                <select name="clin-{{ idx }}-ia" class="form-select form-select-sm">
-                    {% with t=clin|get_item:'ia' %}
-                    <option value="" {% if not t %}selected{% endif %}>—</option>
-                    {% for code, label in ia_fob_choices %}
-                    <option value="{{ code }}" {% if t == code %}selected{% endif %}>{{ label }} ({{ code }})</option>
-                    {% endfor %}
-                    {% endwith %}
-                </select>
-            </div>
-            <div>
-                <label class="label block mb-1">FOB</label>
-                <select name="clin-{{ idx }}-fob" class="form-select form-select-sm">
-                    {% with t=clin|get_item:'fob' %}
-                    <option value="" {% if not t %}selected{% endif %}>—</option>
-                    {% for code, label in ia_fob_choices %}
-                    <option value="{{ code }}" {% if t == code %}selected{% endif %}>{{ label }} ({{ code }})</option>
-                    {% endfor %}
-                    {% endwith %}
-                </select>
+            <div class="col-span-2">
+                <label class="label block mb-1">Total Value</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" readonly class="form-control form-control-sm clin-total-value" value="$0.00">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-recalc-clin>ReCalc</button>
+                </div>
             </div>
         </div>
         <hr>

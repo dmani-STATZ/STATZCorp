@@ -371,7 +371,7 @@ def _create_splits(clin, clin_row: dict) -> None:
     If a split row supplies `split_value`, use it verbatim (Processing
     style). Otherwise, if `percentage` is provided, derive
     split_value = planned_gp × percentage / 100 (Intake style), where
-    planned_gp = item_value − (unit_price × order_qty + Σ finance_lines).
+    planned_gp = (item_value × order_qty) − (unit_price × order_qty + Σ finance_lines).
     """
     splits = clin_row.get('splits') or []
     if not splits:
@@ -550,7 +550,7 @@ def _to_decimal(value) -> Optional[Decimal]:
 
 
 def _compute_planned_gp(row: dict) -> Decimal:
-    """planned_gp = item_value − (unit_price × order_qty + Σ finance_lines)."""
+    """planned_gp = (item_value × order_qty) − (unit_price × order_qty + Σ finance_lines)."""
     def _dec(v):
         d = _to_decimal(v)
         return d if d is not None else Decimal('0')
@@ -564,4 +564,6 @@ def _compute_planned_gp(row: dict) -> Decimal:
         if amt is None:
             amt = fl.get('amount')
         finance_total += _dec(amt)
-    return item_value - (unit_price * order_qty + finance_total)
+    contract_total = item_value * order_qty
+    quote_total = unit_price * order_qty
+    return contract_total - (quote_total + finance_total)

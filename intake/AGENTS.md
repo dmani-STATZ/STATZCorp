@@ -126,6 +126,11 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   "orphan row exists but isn't linked to a draft" failure mode.
 
 ### Editor field semantics (do not regress)
+- **`canonical_contract_type_id` vs `contract_type`:** `contract_type` on
+  `DraftContract` is the intake routing type (AWD/PO/DO/etc.) set by the
+  parser — never shown as an editable field. `canonical_contract_type_id`
+  in `data` is the analyst-selected ContractType FK (Bilateral/etc.) that
+  lands on `Contract.contract_type` at finalization. Do not conflate them.
 - **`contractor_name` / `contractor_cage`:** parser provenance fields in
   JSON only. Do **not** add them back to `draft_edit.html`. If someone
   asks to show them in the form, read this note first.
@@ -141,6 +146,13 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   `AwardParseResult` (parser dataclass) to the intake JSON shape. If you
   add a parser field, update the mapping AND add a test under
   `IngestUnitTests`. Don't sprinkle conversion logic in views.
+- **`ia` mapping:** `ia` is derived from `ClinParseResult` in
+  `_clin_to_dict`. The exact source field(s) are documented in the
+  `_ia_from_clin_parse` docstring. Do not remove this mapping — it was
+  previously absent and caused IA to be blank on all ingested CLINs.
+- **Contract `due_date`:** derived as `min(clin.due_date)` at ingest.
+  Do not remove — without it the contract-level due date is always blank
+  on ingest.
 - The upload view processes files independently. Do NOT wrap the batch in
   a single transaction — one bad PDF must not roll back the good ones.
 - Dedup is enforced against both `DraftContract.contract_number` and

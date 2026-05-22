@@ -22,6 +22,10 @@ AWD / PO / DO / INTERNAL
   data.solicitation_type     → Contract.solicitation_type
   data.buyer_id              → Contract.buyer (REQUIRED for AWD/PO/DO)
   data.sales_class_id        → Contract.sales_class (optional; validated)
+  data.canonical_contract_type_id → Contract.contract_type (FK)
+  data.plan_gross            → Contract.plan_gross
+  data.planned_split         → Contract.planned_split
+  data.nist                  → Contract.nist
   data.award_date            → Contract.award_date
   data.due_date              → Contract.due_date
   data.contract_value        → Contract.contract_value
@@ -147,6 +151,10 @@ def _draft_to_service_payload(draft: DraftContract, kind: str) -> dict:
         'solicitation_type': data.get('solicitation_type'),
         'buyer_id': data.get('buyer_id'),
         'sales_class_id': data.get('sales_class_id'),
+        'contract_type_id': data.get('canonical_contract_type_id'),
+        'plan_gross': data.get('plan_gross'),
+        'planned_split': data.get('planned_split'),
+        'nist': data.get('nist'),
         'idiq_contract_id': data.get('parent_idiq_id'),
         'award_date': data.get('award_date'),
         'due_date': data.get('due_date'),
