@@ -165,17 +165,17 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
 
 ### DIBBS Ingestion
 - `intake/ingest.py::ingest_dibbs_record` is the single converter from a
-  scraped DIBBS row to a `DraftContract`. The scraper itself
-  (`sales/services/dibbs_awards_scraper.py`) is reused as-is — do not
-  fork or rewrite it.
+  scraped DIBBS row to a `DraftContract`. Row data is supplied by
+  `intake/services/queue_we_won_drafts.py`, which maps `DibbsAward` ORM
+  fields to the scraper dict shape — do not fork conversion logic elsewhere.
 - Drafts from DIBBS have `pdf_parse_status='no_pdf'` deliberately —
   analysts must either edit by hand OR delete the skeleton and re-ingest
   the actual award PDF. Don't change this status default; it's how the
   editor flags "incomplete data, parse failed/missing".
-- The management command `intake_dibbs_pull` is the only sanctioned
-  invocation path today. If you add a web button to trigger this, run it
-  out-of-band (Celery / management command) — the scrape uses Playwright
-  and a launched Chromium, which can take minutes per date.
+- DIBBS skeleton drafts are created automatically by the `scrape_awards`
+  WebJob piggyback (`queue_we_won_drafts`), immediately after
+  `queue_we_won_awards`. Do not add a separate scrape path; the daily job
+  already owns Playwright and batch-scoped we-won filtering.
 
 ## Tests
 `intake/tests.py` covers:

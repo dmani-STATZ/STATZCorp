@@ -100,7 +100,10 @@ ingest if that record exists; analyst can change in editor),
 Bilateral/Delivery Order/etc. value written on the canonical Contract at
 finalization — analyst-selected, optional), `plan_gross` (optional decimal;
 planned gross value), `planned_split` (optional string; planned split
-assignment), `nist` (optional bool; NIST flag on Contract), `contractor_name`,
+assignment). Both fields are auto-populated live in the editor: `plan_gross` is
+set to Net Contract GP (sum of CLIN GPs minus packaging quote) and
+`planned_split` is derived from all CLIN split rows as a plain
+summed percentage total (e.g. "100"). Both remain user-editable. `nist` (optional bool; NIST flag on Contract), `contractor_name`,
 `contractor_cage`, and related fields. `contractor_name` and
 `contractor_cage` are parser provenance only — they round-trip in JSON but
 are not shown in the editor UI.
@@ -256,9 +259,11 @@ the upload endpoint and reloads the queue on any success.
 - **Finalization for all seven types** (AWD/PO/DO/IDIQ/INTERNAL/MOD/AMD)
 - **`ContractFinanceLine` shred** — attaches root-level finance_lines to the
   first canonical CLIN
-- **DIBBS ingestion** — `python manage.py intake_dibbs_pull --date YYYY-MM-DD`
-  creates skeleton drafts (status=queued, pdf_parse_status=no_pdf) from the
-  DIBBS Awards table. Reuses `sales.services.dibbs_awards_scraper` as-is.
+- **DIBBS ingestion** — `intake/services/queue_we_won_drafts.py` is called
+  automatically as a piggyback inside `scrape_awards` (the daily WebJob)
+  immediately after Processing queue injection. Creates skeleton DraftContracts
+  (status=queued, pdf_parse_status=no_pdf) for the same STATZ-won awards
+  injected into the Processing queue. No manual command needed.
 - **Finalization email** — redirects to `/processing/email-compose/` with
   prefilled subject + body on Contract-creating finalize paths
 

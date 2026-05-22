@@ -4,6 +4,22 @@
 
 ### Changed
 
+Planned Split auto-populates as a plain percentage total (e.g. "100")
+derived from the sum of all CLIN split row percentages. Plan Gross
+continues to auto-populate from Net Contract GP. Both fields remain
+manually editable.
+
+GP Split smart defaults: clicking "+ Add Split" on a CLIN with no
+splits pre-fills the first entry as STATZ at 100%. Adding a second
+split automatically drops the first to 50%, leaving the new entry
+blank for the analyst to fill in. Adding a third or more splits
+makes no automatic adjustments.
+
+Finance Lines and GP Split entries now render as individual cards
+instead of table rows — each entry shows fields side-by-side in a
+light bordered card with a trash button. No data or field names
+changed.
+
 Contract Details form reordered to a 2-column layout matching the
 desired field groupings: Contract Number / IDIQ Contract, PO / PR Number,
 Buyer / Sales Class, Contract Type / Solicitation Type, Award Date / Due Date,
@@ -25,6 +41,12 @@ through to `Contract.contract_type` at finalization.
 and editor form.
 
 ### Fixed
+
+Packaging Quote line in GP Summary no longer shows "-$0.00" when
+the packaging quote amount is zero — now correctly shows "$0.00".
+
+NSN match now shows a green "matched #N" badge below the NSN field
+on CLIN cards, consistent with the existing Supplier badge.
 
 CLIN cards now stay expanded after matching an NSN or Supplier.
 Previously the page reload caused all CLINs to collapse.

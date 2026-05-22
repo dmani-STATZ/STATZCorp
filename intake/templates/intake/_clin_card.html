@@ -111,6 +111,9 @@
                 </div>
                 <input type="hidden" name="clin-{{ idx }}-nsn_id"
                        value="{{ clin|get_item:'nsn_id'|default:'' }}">
+                {% with nid=clin|get_item:'nsn_id' %}
+                    {% if nid %}<span class="badge bg-success mt-1">matched #{{ nid }}</span>{% endif %}
+                {% endwith %}
                 {% with nd=clin|get_item:'nsn_description' %}
                     {% if nd %}<div class="small text-muted mt-1">{{ nd }}</div>{% endif %}
                 {% endwith %}
@@ -209,21 +212,39 @@
             <h6 class="text-uppercase text-muted mb-0">Finance Lines</h6>
             <button type="button" class="btn btn-sm btn-outline-success" data-add-clin-fin>+ Add Finance Line</button>
         </div>
-        <table class="table table-sm mb-2 clin-fin-table">
-            <thead><tr>
-                <th>Line Type</th><th>Amount</th><th>Notes</th><th></th>
-            </tr></thead>
-            <tbody class="clin-fin-tbody">
-            {% for fl in clin|get_item:'finance_lines'|default_if_none:'' %}
-                <tr data-fin-idx="{{ forloop.counter0 }}">
-                    <td><input type="text" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-line_type" value="{{ fl|get_item:'line_type'|default:'' }}" class="form-control form-control-sm"></td>
-                    <td><input type="number" step="0.01" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-amount" value="{{ fl|get_item:'amount'|default:'' }}" class="form-control form-control-sm clin-fin-amount"></td>
-                    <td><input type="text" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-notes" value="{{ fl|get_item:'notes'|default:'' }}" class="form-control form-control-sm"></td>
-                    <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>×</button></td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <div class="clin-fin-tbody mb-2">
+        {% for fl in clin|get_item:'finance_lines'|default_if_none:'' %}
+            <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-light" data-fin-idx="{{ forloop.counter0 }}">
+                <div style="flex: 2;">
+                    <label class="label small mb-1">Line Type</label>
+                    <input type="text" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-line_type"
+                           value="{{ fl|get_item:'line_type'|default:'' }}"
+                           class="form-control form-control-sm"
+                           placeholder="e.g. Progress Payment">
+                </div>
+                <div style="flex: 1;">
+                    <label class="label small mb-1">Amount</label>
+                    <input type="number" step="0.01"
+                           name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-amount"
+                           value="{{ fl|get_item:'amount'|default:'' }}"
+                           class="form-control form-control-sm clin-fin-amount"
+                           placeholder="0.00">
+                </div>
+                <div style="flex: 3;">
+                    <label class="label small mb-1">Notes</label>
+                    <input type="text" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-notes"
+                           value="{{ fl|get_item:'notes'|default:'' }}"
+                           class="form-control form-control-sm"
+                           placeholder="Optional notes">
+                </div>
+                <div class="pt-3">
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>
+                        🗑
+                    </button>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
         <hr>
 
         {# ---- Section 4: GP Split ---- #}
@@ -234,20 +255,38 @@
         <div class="mb-2">
             Planned GP: <strong class="clin-planned-gp">$0.00</strong>
         </div>
-        <table class="table table-sm mb-0 clin-split-table">
-            <thead><tr>
-                <th>Company</th><th>Percentage</th><th>Split Value</th><th></th>
-            </tr></thead>
-            <tbody class="clin-split-tbody">
-            {% for sp in clin|get_item:'splits'|default_if_none:'' %}
-                <tr data-split-idx="{{ forloop.counter0 }}">
-                    <td><input type="text" name="clin-{{ idx }}-split-{{ forloop.counter0 }}-company_name" value="{{ sp|get_item:'company_name'|default:'' }}" class="form-control form-control-sm"></td>
-                    <td><input type="number" step="0.01" max="100" name="clin-{{ idx }}-split-{{ forloop.counter0 }}-percentage" value="{{ sp|get_item:'percentage'|default:'' }}" class="form-control form-control-sm clin-split-pct"></td>
-                    <td><input type="text" readonly class="form-control form-control-sm clin-split-value" value="$0.00"></td>
-                    <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>×</button></td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <div class="clin-split-tbody mb-0">
+        {% for sp in clin|get_item:'splits'|default_if_none:'' %}
+            <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-light" data-split-idx="{{ forloop.counter0 }}">
+                <div style="flex: 3;">
+                    <label class="label small mb-1">Company</label>
+                    <input type="text"
+                           name="clin-{{ idx }}-split-{{ forloop.counter0 }}-company_name"
+                           value="{{ sp|get_item:'company_name'|default:'' }}"
+                           class="form-control form-control-sm"
+                           placeholder="Company name">
+                </div>
+                <div style="flex: 1;">
+                    <label class="label small mb-1">%</label>
+                    <input type="number" step="0.01" max="100"
+                           name="clin-{{ idx }}-split-{{ forloop.counter0 }}-percentage"
+                           value="{{ sp|get_item:'percentage'|default:'' }}"
+                           class="form-control form-control-sm clin-split-pct"
+                           placeholder="0">
+                </div>
+                <div style="flex: 1;">
+                    <label class="label small mb-1">Split Value</label>
+                    <input type="text" readonly
+                           class="form-control form-control-sm clin-split-value"
+                           value="$0.00">
+                </div>
+                <div class="pt-3">
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>
+                        🗑
+                    </button>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
     </div>
 </div>

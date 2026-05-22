@@ -428,6 +428,22 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             self._activity(f"Award queue injection failed unexpectedly: {exc}")
             self.stderr.write(f"queue_we_won_awards error: {exc}")
 
+        # Piggyback: inject we-won awards into the intake queue.
+        # Runs on SUCCESS and PARTIAL. Never allowed to crash the scrape job.
+        try:
+            from intake.services.queue_we_won_drafts import queue_we_won_drafts
+
+            draft_result = queue_we_won_drafts(batch, activity_log=self._activity)
+            self._activity(
+                f"Intake draft injection: "
+                f"queued={draft_result['queued']} "
+                f"skipped={draft_result['skipped']} "
+                f"errors={draft_result['errors']}."
+            )
+        except Exception as exc:
+            self._activity(f"Intake draft injection failed unexpectedly: {exc}")
+            self.stderr.write(f"queue_we_won_drafts error: {exc}")
+
         return True, None
 
     def _scrape_single_date(self, target_date: date) -> None:

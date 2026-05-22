@@ -64,9 +64,6 @@
                     Lock not held — read only
                 {% endif %}
             </p>
-            <p class="text-xs text-amber-700 mt-1">
-                Phase 2a editor — text-only fields. Matching modals (buyer / IDIQ / NSN / supplier) ship in Phase 2b.
-            </p>
         </div>
         <div>
             <a href="{% url 'intake:queue' %}" class="btn btn-outline-secondary">Back to Queue</a>
@@ -652,40 +649,74 @@
                 <h6 class="text-uppercase text-muted mb-0">Finance Lines</h6>
                 <button type="button" class="btn btn-sm btn-outline-success" data-add-clin-fin>+ Add Finance Line</button>
             </div>
-            <table class="table table-sm mb-2 clin-fin-table">
-                <thead><tr><th>Line Type</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
-                <tbody class="clin-fin-tbody"></tbody>
-            </table>
+            <div class="clin-fin-tbody mb-2"></div>
             <hr>
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="text-uppercase text-muted mb-0">GP Split</h6>
                 <button type="button" class="btn btn-sm btn-outline-success" data-add-clin-split>+ Add Split</button>
             </div>
             <div class="mb-2">Planned GP: <strong class="clin-planned-gp">$0.00</strong></div>
-            <table class="table table-sm mb-0 clin-split-table">
-                <thead><tr><th>Company</th><th>Percentage</th><th>Split Value</th><th></th></tr></thead>
-                <tbody class="clin-split-tbody"></tbody>
-            </table>
+            <div class="clin-split-tbody mb-0"></div>
         </div>
     </div>
 </template>
 
 <template id="tpl-clin-fin">
-    <tr data-fin-idx="__FINIDX__">
-        <td><input type="text" data-name="clin-__CLINIDX__-fin-__FINIDX__-line_type" class="form-control form-control-sm"></td>
-        <td><input type="number" step="0.01" data-name="clin-__CLINIDX__-fin-__FINIDX__-amount" class="form-control form-control-sm clin-fin-amount"></td>
-        <td><input type="text" data-name="clin-__CLINIDX__-fin-__FINIDX__-notes" class="form-control form-control-sm"></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>×</button></td>
-    </tr>
+    <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-light" data-fin-idx="__FINIDX__">
+        <div style="flex: 2;">
+            <label class="label small mb-1">Line Type</label>
+            <input type="text" data-name="clin-__CLINIDX__-fin-__FINIDX__-line_type"
+                   class="form-control form-control-sm"
+                   placeholder="e.g. Progress Payment">
+        </div>
+        <div style="flex: 1;">
+            <label class="label small mb-1">Amount</label>
+            <input type="number" step="0.01"
+                   data-name="clin-__CLINIDX__-fin-__FINIDX__-amount"
+                   class="form-control form-control-sm clin-fin-amount"
+                   placeholder="0.00">
+        </div>
+        <div style="flex: 3;">
+            <label class="label small mb-1">Notes</label>
+            <input type="text" data-name="clin-__CLINIDX__-fin-__FINIDX__-notes"
+                   class="form-control form-control-sm"
+                   placeholder="Optional notes">
+        </div>
+        <div class="pt-3">
+            <button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>
+                🗑
+            </button>
+        </div>
+    </div>
 </template>
 
 <template id="tpl-clin-split">
-    <tr data-split-idx="__SPLITIDX__">
-        <td><input type="text" data-name="clin-__CLINIDX__-split-__SPLITIDX__-company_name" class="form-control form-control-sm"></td>
-        <td><input type="number" step="0.01" max="100" data-name="clin-__CLINIDX__-split-__SPLITIDX__-percentage" class="form-control form-control-sm clin-split-pct"></td>
-        <td><input type="text" readonly class="form-control form-control-sm clin-split-value" value="$0.00"></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>×</button></td>
-    </tr>
+    <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-light" data-split-idx="__SPLITIDX__">
+        <div style="flex: 3;">
+            <label class="label small mb-1">Company</label>
+            <input type="text" data-name="clin-__CLINIDX__-split-__SPLITIDX__-company_name"
+                   class="form-control form-control-sm"
+                   placeholder="Company name">
+        </div>
+        <div style="flex: 1;">
+            <label class="label small mb-1">%</label>
+            <input type="number" step="0.01" max="100"
+                   data-name="clin-__CLINIDX__-split-__SPLITIDX__-percentage"
+                   class="form-control form-control-sm clin-split-pct"
+                   placeholder="0">
+        </div>
+        <div style="flex: 1;">
+            <label class="label small mb-1">Split Value</label>
+            <input type="text" readonly
+                   class="form-control form-control-sm clin-split-value"
+                   value="$0.00">
+        </div>
+        <div class="pt-3">
+            <button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>
+                🗑
+            </button>
+        </div>
+    </div>
 </template>
 <template id="tpl-nsn">
     <tr data-row="nsn">
@@ -793,6 +824,34 @@
         });
     }
 
+    function addClinSplit(card) {
+        const tbody = card.querySelector('.clin-split-tbody');
+        if (!tbody) return;
+
+        const existingRows = tbody.querySelectorAll('[data-split-idx]');
+        const existingCount = existingRows.length;
+
+        // Add the new row via the existing machinery.
+        addClinSubRow(card, 'split');
+
+        if (existingCount === 0) {
+            // First split ever — pre-fill STATZ at 100%.
+            const newRow = tbody.querySelectorAll('[data-split-idx]')[0];
+            if (newRow) {
+                const companyInput = newRow.querySelector('[name$="-company_name"], [data-name$="-company_name"]');
+                const pctInput = newRow.querySelector('.clin-split-pct');
+                if (companyInput) companyInput.value = 'STATZ';
+                if (pctInput) pctInput.value = '100';
+            }
+        } else if (existingCount === 1) {
+            // Second split added — drop first to 50%, leave new blank.
+            const firstRow = existingRows[0];
+            const firstPct = firstRow.querySelector('.clin-split-pct');
+            if (firstPct) firstPct.value = '50';
+        }
+        // 2+ existing splits — no auto-adjustment.
+    }
+
     function addClinSubRow(card, kind) {
         const tplId = 'tpl-clin-' + kind;
         const tpl = document.getElementById(tplId);
@@ -844,9 +903,9 @@
             gp.classList.toggle('text-danger', plannedGp < 0);
         }
         // Per-split value = plannedGp × pct / 100
-        card.querySelectorAll('.clin-split-table tbody tr').forEach(tr => {
-            const pct = parseNum(tr.querySelector('.clin-split-pct')?.value);
-            const sv = tr.querySelector('.clin-split-value');
+        card.querySelectorAll('.clin-split-tbody [data-split-idx]').forEach(row => {
+            const pct = parseNum(row.querySelector('.clin-split-pct')?.value);
+            const sv = row.querySelector('.clin-split-value');
             if (sv) sv.value = money(plannedGp * pct / 100);
         });
         // Update header summary text from current inputs.
@@ -877,13 +936,53 @@
         const pkgInput = document.querySelector('[name="pkg-quote_amount"]');
         const pkgAmt = pkgInput ? parseNum(pkgInput.value) : 0;
         const pkgEl = document.getElementById('gp-packaging');
-        if (pkgEl) pkgEl.textContent = '−' + money(pkgAmt);
+        const pkgDisplay = pkgAmt === 0 ? '$0.00' : money(-pkgAmt);
+        if (pkgEl) pkgEl.textContent = pkgDisplay;
         const net = total - pkgAmt;
         const netEl = document.getElementById('gp-net');
         if (netEl) {
             netEl.textContent = money(net);
             netEl.classList.toggle('text-success', net >= 0);
             netEl.classList.toggle('text-danger', net < 0);
+        }
+
+        // --- Auto-populate Plan Gross from Net Contract GP ---
+        const planGrossInput = document.querySelector('[name="f_plan_gross"]');
+        if (planGrossInput) {
+            // Only auto-fill if the net is non-zero, to avoid wiping a
+            // manually entered value when the page first loads with no CLINs.
+            // Use a raw number (no $ or commas) since it's a number input.
+            if (net !== 0) {
+                planGrossInput.value = net.toFixed(2);
+            }
+        }
+
+        // --- Auto-populate Planned Split from all CLIN split rows ---
+        const plannedSplitInput = document.querySelector('[name="f_planned_split"]');
+        if (plannedSplitInput) {
+            // Collect all split entries across all CLINs, aggregate by
+            // company name, then sum percentages into a plain total.
+            // If no splits exist, leave the field as-is.
+            const splitTotals = {};  // company_name -> total percentage
+            document.querySelectorAll('#clin-stack .clin-card').forEach(function(card) {
+                card.querySelectorAll('.clin-split-tbody [data-split-idx]').forEach(function(row) {
+                    const companyInput = row.querySelector('[name$="-company_name"]');
+                    const pctInput = row.querySelector('.clin-split-pct');
+                    const company = (companyInput?.value || '').trim();
+                    const pct = parseNum(pctInput?.value);
+                    if (company) {
+                        splitTotals[company] = (splitTotals[company] || 0) + pct;
+                    }
+                });
+            });
+
+            const entries = Object.entries(splitTotals);
+            if (entries.length > 0) {
+                const totalPct = entries.reduce(function(sum, e) {
+                    return sum + e[1];
+                }, 0);
+                plannedSplitInput.value = totalPct.toFixed(0);
+            }
         }
     }
 
@@ -921,15 +1020,15 @@
         if (addSplitBtn) {
             ev.preventDefault();
             const card = addSplitBtn.closest('.clin-card');
-            if (card) { addClinSubRow(card, 'split'); recalcClin(card); }
+            if (card) { addClinSplit(card); recalcClin(card); }
             return;
         }
         const rmSubBtn = ev.target.closest('[data-remove-sub-row]');
         if (rmSubBtn) {
             ev.preventDefault();
-            const tr = rmSubBtn.closest('tr');
+            const row = rmSubBtn.closest('[data-fin-idx], [data-split-idx]');
             const card = rmSubBtn.closest('.clin-card');
-            if (tr) tr.remove();
+            if (row) row.remove();
             if (card) recalcClin(card);
             recalcGpSummary();
             return;
