@@ -1369,8 +1369,9 @@ def finalize_and_email_contract(request, process_contract_id):
             nsn_display = (
                 clin.nsn.nsn_code if clin.nsn else clin.nsn_text or 'Unmatched'
             )
+            type_display = clin.item_type or 'N/A'
             clin_lines.append(
-                f"  CLIN: {clin.item_number},  Supplier: {supplier_name},  NSN: {nsn_display}"
+                f"  CLIN: {clin.item_number},  Type: {type_display},  Supplier: {supplier_name},  NSN: {nsn_display}"
             )
 
         packhouse_line = ""

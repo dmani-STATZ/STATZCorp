@@ -1,12 +1,60 @@
-{% extends "contracts/contract_base.html" %}
 {% load static %}
-{% block extra_head %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" crossorigin="anonymous">
-{% endblock %}
+{% load custom_tags %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Contract Notification</title>
+    {% is_development as dev_mode %}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/5.3.8/spacelab/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" crossorigin="anonymous">
+    {% if dev_mode %}
+        <link rel="stylesheet" href="{% static 'css/theme-vars.css' %}?v={{ cache_version }}-{{ request.id|default:'' }}">
+        <link rel="stylesheet" href="{% static 'css/app-core.css' %}?v={{ cache_version }}-{{ request.id|default:'' }}">
+        <link rel="stylesheet" href="{% static 'css/utilities.css' %}?v={{ cache_version }}-{{ request.id|default:'' }}">
+    {% else %}
+        <link rel="stylesheet" href="{% static 'css/theme-vars.css' %}?v={{ cache_version }}">
+        <link rel="stylesheet" href="{% static 'css/app-core.css' %}?v={{ cache_version }}">
+        <link rel="stylesheet" href="{% static 'css/utilities.css' %}?v={{ cache_version }}">
+    {% endif %}
+    {% if active_company %}
+    <style>
+        :root {
+            --company-primary: {{ active_company.get_primary_color }};
+            --company-secondary: {{ active_company.get_secondary_color }};
+        }
+    </style>
+    {% endif %}
+    <style>
+        .email-compose-brand-bar {
+            background-color: var(--company-primary);
+            color: var(--company-secondary, #fff);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            min-height: var(--header-height, 48px);
+        }
+    </style>
+</head>
+<body
+    class="bg-body"
+    {% if active_company %}
+        style="
+            --company-primary: {{ active_company.get_primary_color }};
+            --company-secondary: {{ active_company.get_secondary_color }};
+        "
+    {% endif %}
+>
+    <nav class="email-compose-brand-bar" aria-label="STATZ">
+        {% if active_company and active_company.logo_url %}
+            <img src="{{ active_company.logo_url }}" alt="{{ active_company.name }} Logo" style="height: 30px;">
+        {% else %}
+            <img src="{% static 'images/StatzCorpColorFINAL.png' %}" alt="STATZ Corporation" style="height: 30px;">
+        {% endif %}
+    </nav>
 
-{% block title %}New Contract Notification{% endblock %}
-
-{% block content %}
 <div class="container-fluid py-3">
     <div class="d-flex align-items-center gap-2 mb-3">
         <span class="fs-4" aria-hidden="true">✉</span>
@@ -149,4 +197,6 @@
     });
 })();
 </script>
-{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
