@@ -108,8 +108,10 @@
                   <small class="text-muted">Shared {{ share.created_at|date:"N j, Y" }}</small>
                 </div>
               </div>
-              <!-- TODO: reports:revoke_share view needs to be added before enabling this button -->
-              <button type="button" class="btn btn-outline-danger btn-sm" disabled title="Revoke feature coming soon">Revoke</button>
+              <form method="post" action="{% url 'reports:revoke_share' share_pk=share.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">Revoke</button>
+              </form>
             </div>
           </div>
           {% endfor %}

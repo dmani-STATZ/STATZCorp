@@ -296,6 +296,18 @@ def share_report(request, pk):
 
 
 @login_required
+@require_POST
+def revoke_share(request, share_pk):
+    share = get_object_or_404(ReportShare, pk=share_pk)
+    if share.report.owner != request.user:
+        return HttpResponseForbidden("Not allowed")
+    report_pk = share.report.pk
+    share.delete()
+    messages.success(request, "Share revoked.")
+    return redirect("reports:share_report", pk=report_pk)
+
+
+@login_required
 @user_passes_test(_is_admin)
 def admin_queue(request):
     queue = (
