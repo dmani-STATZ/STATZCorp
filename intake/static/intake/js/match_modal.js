@@ -22,6 +22,7 @@
         csrfToken: null,
         matchType: null,
         targetPath: null,
+        originalDescription: '',
     };
 
     function $(sel, root) {
@@ -180,6 +181,13 @@
             const first = fields.querySelector('[data-create-field]');
             if (first && !first.value) first.value = orig;
         }
+        // For NSN: also pre-fill the description field if we have one.
+        if (matchType === 'nsn' && state.originalDescription) {
+            const descField = fields && fields.querySelector('[data-create-field="description"]');
+            if (descField && !descField.value) {
+                descField.value = state.originalDescription;
+            }
+        }
         setCreateStatus('');
     }
 
@@ -223,6 +231,13 @@
         state.targetPath = opts.targetPath;
         $('#intake-match-title').textContent = opts.title || opts.matchType;
         $('#intake-match-original').textContent = opts.originalText || '(none)';
+        const descEl = document.getElementById('intake-match-original-description');
+        if (descEl) {
+            const desc = opts.originalDescription || '';
+            descEl.textContent = desc;
+            descEl.classList.toggle('d-none', !desc);
+        }
+        state.originalDescription = opts.originalDescription || '';
         $('#intake-match-q').value = opts.originalText || '';
         $('#intake-match-results').innerHTML = '';
         setStatus('');
@@ -269,6 +284,7 @@
                     targetPath: opener.dataset.targetPath,
                     title: opener.dataset.matchTitle || opener.dataset.matchType,
                     originalText: opener.dataset.matchOriginal || '',
+                    originalDescription: opener.dataset.matchOriginalDescription || '',
                 });
             }
         });

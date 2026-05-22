@@ -167,6 +167,14 @@ Actions:
 - `creatable_types` — read-only convenience that returns the list of
   match_types supporting inline create.
 
+The match modal pre-fills the inline-create panel's first field from the
+parsed original text (`data-match-original` on the opener button). For NSN
+matches, if the opener button carries a `data-match-original-description`
+attribute (set by `_clin_card.html` from `nsn_description`), the description
+field in the create panel is also pre-filled. For NSN matches, the "Parsed
+value:" box also displays the stored `nsn_description` as a subtitle line
+beneath the NSN code when one is present.
+
 Target paths:
 - `buyer`, `parent_idiq`, `parent_contract`, `packaging` (top-level)
 - `clin:<i>:nsn`, `clin:<i>:supplier`

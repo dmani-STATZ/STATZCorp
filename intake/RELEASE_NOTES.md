@@ -26,6 +26,14 @@ and editor form.
 
 ### Fixed
 
+Match NSN create panel now pre-fills "Description (optional)" from the
+parsed NSN description already stored on the CLIN draft data. Previously
+the field was always blank even when the description was available.
+Match NSN modal "Parsed value:" box now shows the NSN description
+(e.g. ANCHOR,TORSION BAR) on a second line when available, so analysts
+can confirm they are matching the correct item without scrolling back
+to the CLIN header.
+
 GP calculation corrected: item_value (government contract unit price)
 is now multiplied by order_qty before subtracting the supplier quote
 total. Previously the formula used item_value as if it were already

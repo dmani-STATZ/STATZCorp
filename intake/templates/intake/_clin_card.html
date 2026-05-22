@@ -65,7 +65,7 @@
                        class="form-control form-control-sm"
                        value="Assigned when submitted"
                        disabled
-                       style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;">
+                       style="background:#f8f9fa; color:#4b5563; cursor:not-allowed;">
             </div>
             <div>
                 
@@ -106,7 +106,8 @@
                             data-match-open data-match-type="nsn"
                             data-target-path="clin:{{ idx }}:nsn"
                             data-match-title="NSN"
-                            data-match-original="{{ clin|get_item:'nsn_text'|default:'' }}">Match</button>
+                            data-match-original="{{ clin|get_item:'nsn_text'|default:'' }}"
+                            data-match-original-description="{{ clin|get_item:'nsn_description'|default:'' }}">Match</button>
                 </div>
                 <input type="hidden" name="clin-{{ idx }}-nsn_id"
                        value="{{ clin|get_item:'nsn_id'|default:'' }}">

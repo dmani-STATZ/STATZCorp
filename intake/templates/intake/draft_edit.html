@@ -10,6 +10,35 @@
 {% block title %}Edit Draft {{ draft.contract_number }}{% endblock %}
 
 {% block content %}
+
+<style>
+  /* --- Intake editor text contrast improvements --- */
+
+  /* Field labels */
+  .label {
+    color: #1a1a1a;
+    font-weight: 600;
+  }
+
+  /* Editable input / select / textarea values */
+  .form-control:not(:disabled):not([readonly]),
+  .form-select:not(:disabled) {
+    color: #1a1a1a;
+  }
+
+  /* Section subheadings (e.g. "Contract Data", "Supplier / Quote") */
+  h6.text-uppercase.text-muted {
+    color: #4b5563 !important;
+  }
+
+  /* Disabled / read-only fields — keep visually distinct but not as
+     washed-out as Bootstrap's default #6c757d */
+  .form-control:disabled,
+  .form-control[readonly] {
+    color: #4b5563;
+  }
+</style>
+
 <div class="w-[95%] mx-auto px-4 py-6">
 
     {% if messages %}
@@ -87,7 +116,7 @@
                            class="form-control form-control-sm"
                            value="Assigned when submitted"
                            disabled
-                           style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;">
+                           style="background:#f8f9fa; color:#4b5563; cursor:not-allowed;">
                 </div>
                 <div>
                     <label class="label block mb-1">PR NUMBER</label>
@@ -134,7 +163,7 @@
                            class="form-control form-control-sm bg-gray-50"
                            value="{{ draft.get_contract_type_display }}"
                            disabled
-                           style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;">
+                           style="background:#f8f9fa; color:#4b5563; cursor:not-allowed;">
                     <label class="label block mb-1 mt-2">CONTRACT TYPE</label>
                     <select name="f_canonical_contract_type_id" class="form-select form-select-sm">
                         <option value="">——</option>
@@ -550,7 +579,7 @@
                     </select></div>
                 <div><label class="label block mb-1">CLIN PO Number</label>
                     <input type="text" class="form-control form-control-sm" value="Assigned when submitted" disabled
-                           style="background:#f8f9fa; color:#6c757d; cursor:not-allowed;"></div>
+                           style="background:#f8f9fa; color:#4b5563; cursor:not-allowed;"></div>
                 <div><label class="label block mb-1">IA</label>
                     <select data-name="clin-__CLINIDX__-ia" class="form-select form-select-sm">
                         <option value="">—</option><option value="O">Origin (O)</option><option value="D">Destination (D)</option>
