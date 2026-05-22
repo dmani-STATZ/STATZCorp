@@ -390,7 +390,20 @@
         <div class="card card-padded shadow-sm mb-4" id="packaging-card"
              {% if not pkg_has_data %}style="display:none"{% endif %}>
             <div class="row-between mb-3">
-                <h2 class="text-xl font-semibold mb-0">Packaging</h2>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h2 class="text-xl font-semibold mb-0">Packaging</h2>
+                    {% with pkg_supp=packaging|get_item:'packhouse_supplier_text' %}
+                        {% if pkg_supp %}
+                            {% for clin in clins %}
+                                {% if clin|get_item:'supplier_text' == pkg_supp %}
+                                    <span class="badge bg-secondary">
+                                        Same as supplier — packhouse may not be needed
+                                    </span>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                </div>
                 <button type="button" class="btn btn-sm btn-outline-danger" id="btn-remove-packaging">
                     Remove Packaging
                 </button>
@@ -1001,9 +1014,34 @@
             }
         }, true);  // capture-phase so we run before IntakeMatch's handler
 
-        document.addEventListener('intake:match-applied', function() {
-            // Server is canonical — reload to re-render from the saved JSON.
+        document.addEventListener('intake:match-applied', function(ev) {
+            // Persist which CLINs are currently expanded so we can restore
+            // them after the reload.
+            const openIdxs = [];
+            document.querySelectorAll('.clin-card').forEach(function(card) {
+                const body = card.querySelector('.clin-card-body');
+                if (body && !body.classList.contains('d-none')) {
+                    openIdxs.push(card.dataset.clinIdx);
+                }
+            });
+            sessionStorage.setItem('intake_open_clins', JSON.stringify(openIdxs));
             window.location.reload();
+        });
+    }
+
+    function restoreOpenClins() {
+        const raw = sessionStorage.getItem('intake_open_clins');
+        if (!raw) return;
+        sessionStorage.removeItem('intake_open_clins');
+        let openIdxs;
+        try { openIdxs = JSON.parse(raw); } catch(e) { return; }
+        openIdxs.forEach(function(idx) {
+            const card = document.querySelector('.clin-card[data-clin-idx="' + idx + '"]');
+            if (!card) return;
+            const body = card.querySelector('.clin-card-body');
+            const label = card.querySelector('.clin-toggle-label');
+            if (body) body.classList.remove('d-none');
+            if (label) label.textContent = '▲ Collapse';
         });
     }
 
@@ -1018,11 +1056,13 @@
             init();
             initPackagingToggle();
             bootRecalc();
+            restoreOpenClins();
         });
     } else {
         init();
         initPackagingToggle();
         bootRecalc();
+        restoreOpenClins();
     }
 })();
 </script>

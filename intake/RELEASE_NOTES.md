@@ -26,6 +26,17 @@ and editor form.
 
 ### Fixed
 
+CLIN cards now stay expanded after matching an NSN or Supplier.
+Previously the page reload caused all CLINs to collapse.
+
+Supplier match now shows a green "matched #N" badge below the
+Supplier field on CLIN cards, matching the existing NSN badge
+behaviour.
+
+Packaging card now shows a "Same as supplier — packhouse may not
+be needed" warning badge when the packhouse supplier matches any
+CLIN's supplier.
+
 Match NSN create panel now pre-fills "Description (optional)" from the
 parsed NSN description already stored on the CLIN draft data. Previously
 the field was always blank even when the description was available.

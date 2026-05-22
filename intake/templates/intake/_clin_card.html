@@ -166,6 +166,9 @@
                 </div>
                 <input type="hidden" name="clin-{{ idx }}-supplier_id"
                        value="{{ clin|get_item:'supplier_id'|default:'' }}">
+                {% with sid=clin|get_item:'supplier_id' %}
+                    {% if sid %}<span class="badge bg-success mt-1">matched #{{ sid }}</span>{% endif %}
+                {% endwith %}
             </div>
             <div>
                 <label class="label block mb-1">Supplier Due Date</label>
