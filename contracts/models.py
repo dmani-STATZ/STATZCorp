@@ -186,15 +186,12 @@ class Contract(AuditModel):
         """
         Contract-level realized adjusted gross profit.
 
-        Formula: SUM(Clin.adjusted_gross) - packaging_variance
+        Formula: SUM(Clin.adjusted_gross) - packaging_deduction
 
-        packaging_variance = amount_paid - quote_amount  (only when amount_paid is set and non-zero)
-        packaging_variance = 0                           (when amount_paid is null/zero — quote is
-                                                          already absorbed into plan_gross upstream)
-
-        Contract adj gross uses SUM(Clin.adjusted_gross) − variance: a **positive** variance
-        (paid more than quoted, overage) **reduces** adj_gross; a **negative** variance
-        (savings) **increases** it.
+        packaging_deduction = COALESCE(amount_paid, quote_amount, 0) — the full packaging
+        cost is deducted from adj gross. If paid, use the actual paid amount. If not yet
+        paid, use the quoted amount as the estimate. Zero if no packaging exists.
+        plan_gross is intentionally excluded — it is an independent planning benchmark.
 
         Clin.adjusted_gross already incorporates all finance line costs (CLIN-level
         and partial-scoped), so do NOT subtract finance_costs_total separately here —
@@ -218,8 +215,9 @@ class Contract(AuditModel):
         try:
             pkg = self.packaging
             if pkg.amount_paid is not None and Decimal(str(pkg.amount_paid)) != Decimal('0'):
-                quote = Decimal(str(pkg.quote_amount or 0))
-                packaging_deduction = Decimal(str(pkg.amount_paid)) - quote
+                packaging_deduction = Decimal(str(pkg.amount_paid))
+            elif pkg.quote_amount is not None and Decimal(str(pkg.quote_amount)) != Decimal('0'):
+                packaging_deduction = Decimal(str(pkg.quote_amount))
         except ContractPackaging.DoesNotExist:
             pass
 

@@ -134,18 +134,13 @@
                             ${{ finance_costs_total|floatformat:2|intcomma }}
                         </span>
                     </div>
-                    {% if packaging and packaging_deduction %}
-                    <div class="finance-summary-row flex-fill {% if packaging_deduction > 0 %}finance-summary-row--danger{% endif %}">
-                        <span class="finance-summary-label">
-                            {% if packaging_deduction > 0 %}
-                            <i class="bi bi-arrow-down text-danger me-1"></i>
-                            {% else %}
-                            <i class="bi bi-arrow-up text-success me-1"></i>
-                            {% endif %}
-                            Packaging Variance
+                    {% if packaging_deduction %}
+                    <div class="finance-summary-row">
+                        <span class="finance-summary-label text-danger">
+                            Packaging
                         </span>
-                        <span class="fw-semibold finance-summary-value {% if packaging_deduction > 0 %}text-danger{% else %}text-success{% endif %}" id="packaging-cost-display">
-                            {% if packaging_deduction > 0 %}-${{ packaging_deduction|abs_value|floatformat:2|intcomma }}{% else %}+${{ packaging_deduction|abs_value|floatformat:2|intcomma }}{% endif %}
+                        <span class="fw-semibold finance-summary-value text-danger" id="packaging-cost-display">
+                            -${{ packaging_deduction|abs_value|floatformat:2|intcomma }}
                         </span>
                     </div>
                     {% endif %}

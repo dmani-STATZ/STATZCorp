@@ -166,14 +166,15 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 try:
                     pkg = self.object.packaging
                     if pkg.amount_paid is not None and Decimal(str(pkg.amount_paid)) != Decimal('0'):
-                        quote = Decimal(str(pkg.quote_amount or 0))
-                        packaging_deduction = Decimal(str(pkg.amount_paid)) - quote
+                        packaging_deduction = Decimal(str(pkg.amount_paid))
+                    elif pkg.quote_amount is not None and Decimal(str(pkg.quote_amount)) != Decimal('0'):
+                        packaging_deduction = Decimal(str(pkg.quote_amount))
                     packaging_context = pkg
                 except ContractPackaging.DoesNotExist:
                     pass
 
                 context['packaging'] = packaging_context
-                context['packaging_deduction'] = packaging_deduction  # can be negative, positive, or zero
+                context['packaging_deduction'] = packaging_deduction
 
                 ct_contract = ContentType.objects.get_for_model(Contract)
                 ct_clin = ContentType.objects.get_for_model(Clin)
@@ -309,8 +310,9 @@ def finance_audit_summary_api(request, contract_id):
         try:
             pkg = contract.packaging
             if pkg.amount_paid is not None and Decimal(str(pkg.amount_paid)) != Decimal('0'):
-                quote = Decimal(str(pkg.quote_amount or 0))
-                packaging_deduction = Decimal(str(pkg.amount_paid)) - quote
+                packaging_deduction = Decimal(str(pkg.amount_paid))
+            elif pkg.quote_amount is not None and Decimal(str(pkg.quote_amount)) != Decimal('0'):
+                packaging_deduction = Decimal(str(pkg.quote_amount))
         except ContractPackaging.DoesNotExist:
             pass
 
