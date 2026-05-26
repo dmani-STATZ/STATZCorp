@@ -9,6 +9,12 @@
     max-width: 100% !important;
 }
 
+/* Contract Log page — full-width layout override (contract_base 75% container) */
+.contract-log-page main > div.mx-auto {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
 .finance-audit-header-bar {
     /* base — open contract (green) */
     background-color: rgba(25, 135, 84, 0.12);
