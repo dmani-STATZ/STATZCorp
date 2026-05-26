@@ -87,4 +87,5 @@ django_dev.log
 staticfiles/
 
 #Stuff
-install_requirements.batantenv/
+install_requirements.bat
+antenv/
