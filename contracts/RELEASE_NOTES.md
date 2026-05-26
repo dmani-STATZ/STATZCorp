@@ -12,6 +12,10 @@
 
 ### Changed
 
+- **[2026-05-26] Finance Audit — Plan Gross is now direct-edit.** Plan Gross on the Finance Audit page is now edited by clicking the value and typing the number directly, instead of logging a payment-history entry — matching how Item Value and Quote Value now work. Every change is fully recorded in the field's history.
+
+- **[2026-05-26] Finance Audit — Item Value & Quote Value are now direct-edit.** Item Value and Quote Value on the Finance Audit page (and CLIN detail) are now edited by clicking the value and typing the number directly, instead of logging a payment-history entry. Type what the CLIN is worth and the system fills in the per-unit price behind the scenes. Every change is still fully recorded in the field's history. (Paid and Customer Pay are unchanged for now.)
+
 - **[2026-05-21] CLIN Detail — Added "Finance Audit" link to the sidebar** — Direct navigation back to the Finance Audit page for the parent contract, removing the need to go through the contract management page.
 
 - **[2026-05-21] Finance Audit — CLIN Item # links to detail page** — CLIN Item # in the Finance Audit CLINs table is now a link to the CLIN detail page, giving users direct access to edit split values and other CLIN-level data without leaving the finance workflow.

@@ -100,6 +100,31 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
         if model_class.__name__ == 'ClinShipment' and field_name == 'pod_date':
             from contracts.views.shipment_views import _sync_clin_ship_fields
             _sync_clin_ship_fields(instance.clin, request.user)
+        # Reverse-derive the per-unit price when a CLIN contract value is edited.
+        # The value the user typed is the source of truth; the per-unit price is
+        # derived underneath and saved as its OWN save() so it gets its own
+        # Transaction row (unit_price / price_per_unit are TRACKED). If order_qty
+        # is missing or zero, the value stands alone and the per-unit is untouched.
+        # NEVER recompute item_value/quote_value back from the rounded per-unit price.
+        if model_class.__name__ == 'Clin' and field_name in ('item_value', 'quote_value'):
+            from decimal import Decimal, InvalidOperation
+            derive_map = {
+                'item_value': 'unit_price',
+                'quote_value': 'price_per_unit',
+            }
+            target_price_field = derive_map[field_name]
+            qty = instance.order_qty
+            value = getattr(instance, field_name, None)
+            try:
+                if qty is not None and Decimal(str(qty)) != Decimal('0') and value is not None:
+                    derived = Decimal(str(value)) / Decimal(str(qty))
+                    setattr(instance, target_price_field, derived)
+                    instance.modified_by = request.user
+                    # Separate save so the signal records a clean unit-price transaction.
+                    instance.save(update_fields=[target_price_field, 'modified_by', 'modified_on'])
+            except (InvalidOperation, ZeroDivisionError, TypeError):
+                # Bad/zero qty -> leave value standing alone, do not crash the edit.
+                pass
         new_display = get_display_value(instance, field_name)
         return JsonResponse({
             "success": True,

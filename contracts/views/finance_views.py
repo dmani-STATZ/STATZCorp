@@ -60,6 +60,8 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context['payment_activity_page'] = None
         context['payment_activity_total'] = 0
         context['clins'] = []
+        context['contract_content_type_id'] = ContentType.objects.get_for_model(Contract).id
+        context['clin_content_type_id'] = ContentType.objects.get_for_model(Clin).id
         zero = Decimal('0.00')
         context['clin_totals'] = {
             'quote_value': zero,

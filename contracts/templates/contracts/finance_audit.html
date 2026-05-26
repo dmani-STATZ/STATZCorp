@@ -16,7 +16,11 @@
 <div class="container-fluid px-4 py-3">
     {% if contract %}
     {% csrf_token %}
+    {% include "transactions/transaction_modal.html" %}
     <script>
+    window.contractContentTypeId = {{ contract_content_type_id }};
+    window.contractId = {{ contract.id }};
+    window.clinContentTypeId = {{ clin_content_type_id }};
     window.recalcSplitsUrl = "{% url 'contracts:recalc_splits' contract.id %}";
     window.logSplitPaidUrl = "{{ log_split_paid_url }}";
 
@@ -77,7 +81,14 @@
             <div class="card-body px-3 py-2 d-flex flex-column gap-2">
                 <div class="finance-summary-row">
                     <span class="finance-summary-label">
-                        <i class="bi bi-arrow-up-right text-info me-1"></i>Contract Value
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             width="14" height="14"
+                             fill="currentColor"
+                             viewBox="0 0 16 16"
+                             class="text-info me-1"
+                             aria-hidden="true">
+                            <path d="M6.5 3.5a.5.5 0 0 1 .5-.5h5.5a.5.5 0 0 1 .5.5V9a.5.5 0 0 1-1 0V4.707l-8.146 8.147a.5.5 0 0 1-.708-.708L11.293 4H7a.5.5 0 0 1-.5-.5z"/>
+                        </svg>Contract Value
                     </span>
                     <div class="d-flex align-items-center gap-1">
                         <button type="button" class="btn btn-link p-0 fw-semibold finance-summary-value text-info"
@@ -116,19 +127,33 @@
                 <div class="d-flex gap-2">
                     <div class="finance-summary-row flex-fill">
                         <span class="finance-summary-label">
-                            <i class="bi bi-arrow-up text-success me-1"></i>Plan Gross
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 width="14" height="14"
+                                 fill="currentColor"
+                                 viewBox="0 0 16 16"
+                                 class="text-success me-1"
+                                 aria-hidden="true">
+                                <path fill-rule="evenodd" d="M8 12a.5.5 0 0 0 .5-.5V5.707l2.146 2.147a.5.5 0 0 0 .708-.708l-3-3a.5.5 0 0 0-.708 0l-3 3a.5.5 0 1 0 .708.708L7.5 5.707V11.5a.5.5 0 0 0 .5.5z"/>
+                            </svg>Plan Gross
                         </span>
                         <button type="button" class="btn btn-link p-0 fw-semibold finance-summary-value text-success"
                                 id="plan_gross_display"
                                 data-current-value="{{ contract.plan_gross|default:'0.00' }}"
-                                onclick="openPaymentHistoryPopup('contract', '{{ contract.id }}', 'plan_gross', 'finance_audit', document.getElementById('id_plan_gross').value)">
+                                onclick="openTransactionsEditModal(window.contractContentTypeId, {{ contract.id }}, 'plan_gross')">
                             ${{ contract.plan_gross|floatformat:2|intcomma|default:'0.00' }}
                         </button>
                         <input type="hidden" name="plan_gross" id="id_plan_gross" value="{{ contract.plan_gross|default:'0.00' }}">
                     </div>
                     <div class="finance-summary-row finance-summary-row--danger flex-fill">
                         <span class="finance-summary-label">
-                            <i class="bi bi-arrow-down text-danger me-1"></i>Finance Costs
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 width="14" height="14"
+                                 fill="currentColor"
+                                 viewBox="0 0 16 16"
+                                 class="text-danger me-1"
+                                 aria-hidden="true">
+                                <path fill-rule="evenodd" d="M8 4a.5.5 0 0 1 .5.5v5.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 10.293V4.5A.5.5 0 0 1 8 4z"/>
+                            </svg>Finance Costs
                         </span>
                         <span class="fw-semibold finance-summary-value text-danger" id="finance-costs-display">
                             ${{ finance_costs_total|floatformat:2|intcomma }}
@@ -148,7 +173,14 @@
 
                 <div class="finance-summary-row finance-summary-row--success">
                     <span class="finance-summary-label">
-                        <i class="bi bi-currency-dollar text-success me-1"></i>Adj Gross
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             width="14" height="14"
+                             fill="currentColor"
+                             viewBox="0 0 16 16"
+                             class="text-success me-1"
+                             aria-hidden="true">
+                            <path d="M4 10.781c.148 1.667 1.513 2.85 3.591 3.003V15h1.043v-1.216c2.27-.179 3.678-1.438 3.678-3.3 0-1.59-.947-2.51-2.956-3.028l-.722-.187V3.467c1.122.11 1.879.714 2.07 1.616h1.47c-.166-1.6-1.54-2.748-3.54-2.875V1H7.591v1.233c-1.939.23-3.27 1.472-3.27 3.156 0 1.454.966 2.483 2.661 2.917l.61.162v4.031c-1.149-.17-1.94-.8-2.131-1.718H4zm3.391-3.836c-1.043-.263-1.6-.825-1.6-1.616 0-.944.704-1.641 1.8-1.828v3.495l-.2-.05zm1.591 1.872c1.287.323 1.852.859 1.852 1.769 0 1.097-.826 1.828-2.2 1.939V8.73l.348.086z"/>
+                        </svg>Adj Gross
                     </span>
                     <span class="fw-bold finance-summary-value text-success fs-6" id="adj-gross-display">
                         ${{ adj_gross_contract|floatformat:2|intcomma }}
@@ -436,11 +468,13 @@
                             <td class="text-end">
                                 <span class="value-cell {% if clin.has_shipments %}has-shipments{% endif %}"
                                       role="button" tabindex="0"
+                                      data-clin="{{ clin.id }}"
+                                      data-type="item_value"
+                                      data-value="{{ clin.item_value|floatformat:2 }}"
                                       data-entity-type="clin"
                                       data-entity-id="{{ clin.id }}"
                                       data-field-type="item_value"
-                                      data-current-value="{{ clin.item_value|default:'0' }}"
-                                      onclick="openPaymentHistoryPopup('clin', '{{ clin.id }}', 'item_value', 'finance_audit', {{ clin.item_value|default:'0' }})">
+                                      data-current-value="{{ clin.item_value|default:'0' }}">
                                     ${{ clin.item_value|floatformat:2|intcomma|default:"0.00" }}
                                 </span>
                                 {% if clin.has_shipments %}
@@ -451,7 +485,13 @@
                                     </div>
                                     {% else %}
                                     <div class="small text-success mt-1">
-                                        <i class="bi bi-check-circle-fill"></i>
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                             width="14" height="14"
+                                             fill="currentColor"
+                                             viewBox="0 0 16 16"
+                                             aria-hidden="true">
+                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                                        </svg>
                                     </div>
                                     {% endif %}
                                 {% endif %}
@@ -1499,16 +1539,61 @@ window.financeShipmentsByClin = {
         return financeAuditUpdateCellValue(arg0, arg1, arg2, arg3);
     };
 
+    window.onTransactionSaved = function(data) {
+        if (!data || !data.success) return;
+
+        // CLIN-level edits (Slice 1): refresh the affected CLIN row and summary.
+        if (data.content_type_id === window.clinContentTypeId && data.object_id) {
+            if (typeof refreshClinRow === 'function') {
+                refreshClinRow(data.object_id);
+            }
+            if (typeof refreshContractSummary === 'function') {
+                refreshContractSummary();
+            }
+            return;
+        }
+
+        // Contract-level edits (Slice 1b): plan_gross direct edit.
+        if (data.content_type_id === window.contractContentTypeId &&
+            data.object_id == window.contractId &&
+            data.field_name === 'plan_gross') {
+            var raw = (data.display_value || '0').toString().replace(/[^0-9.\-]/g, '');
+            var num = parseFloat(raw);
+            if (isNaN(num)) num = 0;
+            var display = '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            var btn = document.getElementById('plan_gross_display');
+            if (btn) {
+                btn.textContent = display;
+                btn.dataset.currentValue = num.toFixed(2);
+            }
+            var hidden = document.getElementById('id_plan_gross');
+            if (hidden) hidden.value = num.toFixed(2);
+            return;
+        }
+    };
+
     document.querySelectorAll('[data-clin][data-type]').forEach(function(cell) {
         cell.addEventListener('click', function() {
             const clinId = this.dataset.clin;
             const fieldType = this.dataset.type;
+
+            // Set-once contract facts -> direct edit via the Transactions modal.
+            if (fieldType === 'item_value' || fieldType === 'quote_value') {
+                if (typeof openTransactionsEditModal === 'function' && window.clinContentTypeId) {
+                    openTransactionsEditModal(window.clinContentTypeId, clinId, fieldType);
+                }
+                return;
+            }
+
+            // Accumulating money -> keep the existing log-payment flow (unchanged).
             if (fieldType === 'paid_amount' || fieldType === 'wawf_payment') {
                 if (typeof window.openLogPaymentModal === 'function') {
                     window.openLogPaymentModal(clinId);
                 }
                 return;
             }
+
+            // Any other clin-level field type retains the payment-history popup.
             const currentValue = this.dataset.value || '0.00';
             if (typeof openPaymentHistoryPopup === 'function') {
                 openPaymentHistoryPopup('clin', clinId, fieldType, 'finance_audit', currentValue);

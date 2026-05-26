@@ -22,6 +22,7 @@ TRACKED = [
     (Contract, "award_date"),
     (Contract, "sales_class"),
     (Contract, "solicitation_type"),
+    (Contract, "plan_gross"),
     (Clin, "item_type"),
     (Clin, "clin_po_num"),
     (Clin, "supplier"),
@@ -35,6 +36,9 @@ TRACKED = [
     (Clin, "ship_qty"),
     (Clin, "ship_date"),
     (Clin, "item_value"),
+    (Clin, "quote_value"),
+    (Clin, "unit_price"),
+    (Clin, "price_per_unit"),
     (Clin, "uom"),
     (ClinShipment, "pod_date"),
     (ClinSplit, "split_paid"),
@@ -99,7 +103,8 @@ def store_old_state(sender, instance, **kwargs):
         try:
             row = Contract.objects.filter(pk=instance.pk).values(
                 "contract_number", "po_number", "tab_num", "buyer_id",
-                "due_date", "award_date", "sales_class_id", "solicitation_type"
+                "due_date", "award_date", "sales_class_id", "solicitation_type",
+                "plan_gross",
             ).first()
             if row is not None:
                 old_state[key] = {
@@ -111,6 +116,7 @@ def store_old_state(sender, instance, **kwargs):
                     "award_date": _serialize(row.get("award_date")),
                     "sales_class": _serialize(row.get("sales_class_id")),
                     "solicitation_type": _serialize(row.get("solicitation_type")),
+                    "plan_gross": _serialize(row.get("plan_gross")),
                 }
         except Exception:
             pass
@@ -119,7 +125,8 @@ def store_old_state(sender, instance, **kwargs):
             row = Clin.objects.filter(pk=instance.pk).values(
                 "item_type", "clin_po_num", "supplier_id", "nsn_id", "ia", "fob",
                 "special_payment_terms_id", "supplier_due_date", "due_date",
-                "order_qty", "ship_qty", "ship_date", "item_value", "uom",
+                "order_qty", "ship_qty", "ship_date", "item_value", "quote_value",
+                "unit_price", "price_per_unit", "uom",
             ).first()
             if row is not None:
                 old_state[key] = {
@@ -136,6 +143,9 @@ def store_old_state(sender, instance, **kwargs):
                     "ship_qty": _serialize(row.get("ship_qty")),
                     "ship_date": _serialize(row.get("ship_date")),
                     "item_value": _serialize(row.get("item_value")),
+                    "quote_value": _serialize(row.get("quote_value")),
+                    "unit_price": _serialize(row.get("unit_price")),
+                    "price_per_unit": _serialize(row.get("price_per_unit")),
                     "uom": _serialize(row.get("uom")),
                 }
         except Exception:
