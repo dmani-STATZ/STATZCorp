@@ -9,4 +9,4 @@ critical: false
 
 STATZ-won awards are now automatically added to the Intake queue each morning 
 when the DIBBS awards WebJob runs — the same awards that appear in the 
-Processing queue. No manual steps required.
+Processing queue. No manual steps required.  
