@@ -132,8 +132,10 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   in `data` is the analyst-selected ContractType FK (Bilateral/etc.) that
   lands on `Contract.contract_type` at finalization. Do not conflate them.
 - **`contractor_name` / `contractor_cage`:** parser provenance fields in
-  JSON only. Do **not** add them back to `draft_edit.html`. If someone
-  asks to show them in the form, read this note first.
+  JSON only. Do **not** add them back to `draft_edit.html`. Supplier text
+  on each CLIN is pre-populated from the inspection block at ingest; analyst
+  can override via the Match button. If someone asks to show contractor
+  fields in the form, read this note first.
 - **`item_value` vs `unit_price`:** `item_value` is the government contract
   unit price from the 1155 parser (`ingest._clin_to_dict` maps parser
   `unit_price` → `item_value`). `unit_price` is the supplier quote and is
@@ -142,26 +144,43 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   finalization by processing — never add a POST field or schema key for it.
 
 ### PDF Ingestion (Phase 3c)
-- `intake/ingest.py::_result_to_data` is the single mapping from
-  `AwardParseResult` (parser dataclass) to the intake JSON shape. If you
-  add a parser field, update the mapping AND add a test under
-  `IngestUnitTests`. Don't sprinkle conversion logic in views.
-- **`ia` mapping:** `ia` is derived from `ClinParseResult` in
-  `_clin_to_dict`. The exact source field(s) are documented in the
-  `_ia_from_clin_parse` docstring. Do not remove this mapping — it was
-  previously absent and caused IA to be blank on all ingested CLINs.
-- **Contract `due_date`:** derived as `min(clin.due_date)` at ingest.
-  Do not remove — without it the contract-level due date is always blank
-  on ingest.
-- The upload view processes files independently. Do NOT wrap the batch in
-  a single transaction — one bad PDF must not roll back the good ones.
-- Dedup is enforced against both `DraftContract.contract_number` and
-  canonical `Contract.contract_number`. Don't bypass either check, even
-  for "re-import" workflows — analysts should explicitly delete a draft
-  before re-ingesting its source PDF.
-- The parser lives in the `processing` app and is shared. Don't fork it.
-  If you need parsing behavior intake-specific, push the change upstream
-  to `processing.services.pdf_parser` so processing stays consistent.
+
+The intake app owns its own PDF parser at `intake/pdf_parser.py`. It has
+NO dependency on `processing.services.pdf_parser`. Do NOT re-introduce
+that import. The intake parser is ported from the original processing
+parser and extended with intake-specific extraction logic.
+
+`intake/ingest.py::_result_to_data` is the single mapping from
+`AwardParseResult` (intake parser dataclass) to the intake JSON shape. If
+the parser grows new fields, update the mapping there AND add a test under
+`IngestUnitTests`. Don't sprinkle conversion logic in views.
+
+**Supplier drill-down:** The parser extracts supplier CAGE + name using a
+two-level drill-down. Contract-level "PLACE OF INSPECTION FOR SUPPLIES"
+establishes the default. CLIN-level occurrence overrides per CLIN. If
+neither level has the block, supplier fields are None and the analyst fills
+manually. Do NOT use contractor_cage / contractor_name (Block 9 prime
+contractor) as supplier fallback — they are different entities.
+
+**Packhouse drill-down:** Same pattern. Contract-level "PLACE OF INSPECTION
+FOR PACKAGING" is the default. CLIN-level overrides per CLIN.
+
+**`ia` mapping:** `ia` is derived from `ClinParseResult.inspection_point`
+only (not acceptance). ORIGIN → 'O', DESTINATION → 'D'.
+
+**`item_value` vs `unit_price`:** `item_value` is the government contract
+unit price. `unit_price` is the supplier quote — manual entry only, never
+parsed from PDF.
+
+**Contract `due_date`:** derived as `min(clin.due_date)` at ingest. Do not
+remove.
+
+The upload view processes files independently. Do NOT wrap the batch in a
+single transaction.
+
+Dedup is enforced against both `DraftContract.contract_number` and
+canonical `Contract.contract_number`.
+
 
 ### DIBBS Ingestion
 - `intake/ingest.py::ingest_dibbs_record` is the single converter from a

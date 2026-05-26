@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
+### Added
+
+Supplier name now auto-populated on each CLIN at PDF ingest. The parser
+reads "PLACE OF INSPECTION FOR SUPPLIES" from the DLA 1155 — first at the
+contract level as a default, then per-CLIN as an override. When found, the
+company name pre-fills the Supplier field so analysts can match without
+typing. If the block is absent, the field stays blank for manual entry.
+
+Packhouse name now auto-populated in the Packaging section at PDF ingest
+from "PLACE OF INSPECTION FOR PACKAGING" using the same drill-down logic.
+
 ### Changed
+
+Intake PDF parser is now fully independent of the `processing` app.
+`intake/pdf_parser.py` is the intake-owned parser. The
+`processing.services.pdf_parser` import has been removed from
+`intake/ingest.py`. Intake no longer has a hard dependency on the
+processing app for PDF parsing.
 
 Planned Split auto-populates as a plain percentage total (e.g. "100")
 derived from the sum of all CLIN split row percentages. Plan Gross

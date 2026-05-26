@@ -1,5 +1,6 @@
 """Tests: model dedup, schema validation, lock semantics, editor flow, matcher."""
 import json
+from dataclasses import replace
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -9,8 +10,6 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-
-from processing.services.pdf_parser import AwardParseResult, ClinParseResult
 
 from contracts.models import (
     Buyer,
@@ -24,6 +23,7 @@ from contracts.models import (
 from products.models import Nsn
 from suppliers.models import Supplier
 
+from intake.pdf_parser import AwardParseResult, ClinParseResult
 from intake.finalize import FinalizationError, finalize_draft
 from intake.forms_parse import parse_post
 from intake.ingest import DuplicateContractNumber, IngestionError, ingest_pdf
@@ -784,6 +784,7 @@ def _stub_parse_result(**overrides) -> AwardParseResult:
                 acceptance_point='D',
                 fob='D',
                 cage='12345',
+                supplier_name=None,
                 clin_parse_note=None,
                 min_order_qty_text=None,
             ),
@@ -792,7 +793,10 @@ def _stub_parse_result(**overrides) -> AwardParseResult:
         idiq_min_guarantee=None,
         idiq_term_months=None,
         idiq_option_months=None,
+        contract_supplier_cage=None,
+        contract_supplier_name=None,
         packhouse_cage=None,
+        contract_packhouse_name=None,
     )
     base.update(overrides)
     return AwardParseResult(**base)
@@ -810,12 +814,63 @@ class IngestUnitTests(TestCase):
         self.assertEqual(draft.status, DraftContract.Status.QUEUED)
         self.assertEqual(draft.data['buyer_text'], 'Acme Buying')
         self.assertEqual(draft.data['contract_value'], '12345.67')
+        self.assertEqual(draft.data['parser']['parser_version'], 'intake.pdf_parser')
         self.assertEqual(len(draft.data['clins']), 1)
         clin0 = draft.data['clins'][0]
         self.assertEqual(clin0['nsn_text'], '1234-12-345-6789')
         self.assertEqual(clin0['item_value'], '5.00')
         self.assertIsNone(clin0.get('unit_price'))
         self.assertEqual(clin0['item_type'], 'P')
+
+    def test_contract_level_supplier_populates_clin(self):
+        base_clin = _stub_parse_result().clins[0]
+        result = _stub_parse_result(
+            contract_supplier_cage='4M107',
+            contract_supplier_name='GREENE METAL PRODUCTS, INC.',
+            clins=[replace(base_clin, cage=None, supplier_name=None)],
+        )
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='supplier_default.pdf')
+        self.assertEqual(
+            draft.data['clins'][0]['supplier_text'],
+            'GREENE METAL PRODUCTS, INC.',
+        )
+
+    def test_clin_level_supplier_overrides_contract_level(self):
+        base_clin = _stub_parse_result().clins[0]
+        result = _stub_parse_result(
+            contract_supplier_name='DEFAULT SUPPLIER',
+            clins=[replace(base_clin, supplier_name='CLIN SPECIFIC SUPPLIER')],
+        )
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='supplier_override.pdf')
+        self.assertEqual(
+            draft.data['clins'][0]['supplier_text'],
+            'CLIN SPECIFIC SUPPLIER',
+        )
+
+    def test_missing_supplier_levels_keep_supplier_text_none(self):
+        base_clin = _stub_parse_result().clins[0]
+        result = _stub_parse_result(
+            contract_supplier_name=None,
+            clins=[replace(base_clin, supplier_name=None)],
+        )
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='supplier_none.pdf')
+        self.assertIsNone(draft.data['clins'][0]['supplier_text'])
+
+    def test_packhouse_name_populates_packaging_block(self):
+        result = _stub_parse_result(
+            packhouse_cage='4M107',
+            contract_packhouse_name='GREENE METAL PRODUCTS, INC.',
+        )
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='packhouse.pdf')
+        self.assertEqual(draft.data['packaging']['packhouse_cage'], '4M107')
+        self.assertEqual(
+            draft.data['packaging']['packhouse_supplier_text'],
+            'GREENE METAL PRODUCTS, INC.',
+        )
 
     def test_missing_contract_number_rejected(self):
         result = _stub_parse_result(contract_number=None)
@@ -855,14 +910,16 @@ class IngestUnitTests(TestCase):
                 order_qty=Decimal('1'), uom='EA', unit_price=Decimal('1.00'),
                 due_date=date(2027, 6, 1),
                 inspection_point='O', acceptance_point='D', fob='D',
-                cage='12345', clin_parse_note=None, min_order_qty_text=None,
+                cage='12345', supplier_name=None,
+                clin_parse_note=None, min_order_qty_text=None,
             ),
             ClinParseResult(
                 item_number='0002', nsn='2222-22-222-2222', nsn_description='B',
                 order_qty=Decimal('2'), uom='EA', unit_price=Decimal('2.00'),
                 due_date=date(2026, 12, 1),
                 inspection_point='O', acceptance_point='D', fob='D',
-                cage='12345', clin_parse_note=None, min_order_qty_text=None,
+                cage='12345', supplier_name=None,
+                clin_parse_note=None, min_order_qty_text=None,
             ),
         ])
         with patch('intake.ingest.parse_award_pdf', return_value=result):

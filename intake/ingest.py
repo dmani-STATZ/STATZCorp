@@ -1,7 +1,6 @@
-"""PDF → DraftContract ingestion.
+"""PDF -> DraftContract ingestion.
 
-Wraps the existing `processing.services.pdf_parser.parse_award_pdf` (which
-already handles DLA 1155-style award PDFs) and converts the resulting
+Wraps the intake-owned DLA 1155 PDF parser and converts the resulting
 `AwardParseResult` dataclass into the intake JSON shape so a `DraftContract`
 can be created.
 
@@ -16,7 +15,8 @@ from decimal import Decimal
 from typing import Optional
 
 from contracts.models import Contract, SalesClass
-from processing.services.pdf_parser import (
+
+from .pdf_parser import (
     AwardParseResult,
     ClinParseResult,
     parse_award_pdf,
@@ -71,9 +71,9 @@ def _default_sales_class_id() -> Optional[int]:
 def _ia_from_clin_parse(c: ClinParseResult) -> Optional[str]:
     """Map ClinParseResult → draft CLIN ``ia`` ('O' or 'D').
 
-    Matches ``processing.services.pdf_parser.ingest_parsed_award``: canonical
-    ``Clin.ia`` is derived from ``inspection_point`` only (not acceptance).
-    Parser text uses ORIGIN/DESTINATION; choice values may already be O/D.
+    Canonical ``Clin.ia`` is derived from ``inspection_point`` only (not
+    acceptance). Parser text uses ORIGIN/DESTINATION; choice values may
+    already be O/D.
     """
     insp = c.inspection_point
     if not insp:
@@ -88,9 +88,13 @@ def _ia_from_clin_parse(c: ClinParseResult) -> Optional[str]:
     return None
 
 
-def _clin_to_dict(c: ClinParseResult) -> dict:
+def _clin_to_dict(
+    c: ClinParseResult,
+    contract_supplier_name: Optional[str] = None,
+) -> dict:
     row = {
         'item_number': c.item_number,
+        'item_type': 'P',
         'nsn_text': c.nsn,
         'nsn_description': c.nsn_description,
         'order_qty': float(c.order_qty) if c.order_qty is not None else None,
@@ -101,6 +105,7 @@ def _clin_to_dict(c: ClinParseResult) -> dict:
         'due_date': _date(c.due_date),
         'fob': c.fob,
         'ia': _ia_from_clin_parse(c),
+        'supplier_text': c.supplier_name or contract_supplier_name or None,
     }
     if not (row.get('item_type') or '').strip():
         row['item_type'] = 'P'
@@ -125,14 +130,17 @@ def _result_to_data(result: AwardParseResult) -> dict:
         'contractor_cage': result.contractor_cage,
         'parser': {
             'source': 'pdf',
-            'parser_version': 'processing.pdf_parser',
+            'parser_version': 'intake.pdf_parser',
             # Stash the parse notes so the editor can surface them.
             'raw_extraction': result.pdf_parse_notes or None,
         },
     }
     # AWD/PO/DO: CLINs + packaging
     if result.clins:
-        data['clins'] = [_clin_to_dict(c) for c in result.clins]
+        data['clins'] = [
+            _clin_to_dict(c, result.contract_supplier_name)
+            for c in result.clins
+        ]
         # Derive contract due_date as the earliest CLIN due_date.
         clin_dates = [
             c.due_date for c in result.clins
@@ -140,8 +148,11 @@ def _result_to_data(result: AwardParseResult) -> dict:
         ]
         if clin_dates:
             data['due_date'] = _date(min(clin_dates))
-    if result.packhouse_cage:
-        data['packaging'] = {'packhouse_cage': result.packhouse_cage}
+    if result.packhouse_cage or result.contract_packhouse_name:
+        data['packaging'] = {
+            'packhouse_cage': result.packhouse_cage or None,
+            'packhouse_supplier_text': result.contract_packhouse_name or None,
+        }
     # DO: parent IDIQ reference
     if result.idiq_contract_number:
         data['parent_idiq_contract_number'] = result.idiq_contract_number
@@ -305,7 +316,7 @@ def ingest_dibbs_record(record: dict) -> DraftContract:
     DuplicateContractNumber if the row collides with an existing draft
     or canonical Contract.
     """
-    from processing.services.contract_utils import detect_contract_type
+    from .pdf_parser import detect_contract_type
 
     contract_number = _dibbs_contract_number(record)
     if not contract_number:

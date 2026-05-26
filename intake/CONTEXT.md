@@ -125,7 +125,10 @@ CLIN data shape (per-CLIN JSON keys, see `DraftClin` in `schemas.py`):
   `fob` (O/D)
 - Supplier data: `supplier_text` + `supplier_id`, `supplier_due_date`,
   `special_payment_terms` (stringified PK), `unit_price` (supplier quote
-  price — manual entry only, never populated from PDF ingest)
+  price — manual entry only, never populated from PDF ingest).
+  `supplier_text` is pre-populated at ingest from the "PLACE OF INSPECTION
+  FOR SUPPLIES" block using a two-level drill-down (contract-level default,
+  CLIN-level override). Analyst can override via Match button.
 - Nested children: `finance_lines: [{line_type, amount, notes}]`,
   `splits: [{company_name, percentage}]`
 
@@ -219,8 +222,8 @@ redirects to `/processing/email-compose/` with subject + body pre-populated
 email step.
 
 ## PDF Ingestion (Phase 3c)
-`intake/ingest.py` wraps `processing.services.pdf_parser.parse_award_pdf`
-(the existing DLA 1155 parser) and converts the resulting
+`intake/ingest.py` wraps `intake/pdf_parser.py` (the intake-owned DLA 1155
+parser — no dependency on processing) and converts the resulting
 `AwardParseResult` dataclass into the intake `data` JSON shape. The mapping
 lives ONLY in `_result_to_data` — when the parser grows new fields, update
 the mapping there.
@@ -255,7 +258,7 @@ the upload endpoint and reloads the queue on any success.
 - **Finalization** for AWD / PO / IDIQ (`intake/finalize.py` +
   `intake:finalize_draft` endpoint + Finalize button on the editor)
 - **PDF ingestion** via drag-and-drop on the queue (`intake/ingest.py` +
-  `intake:upload_pdfs` endpoint, reuses `processing.services.pdf_parser`)
+  `intake/pdf_parser.py` + `intake:upload_pdfs` endpoint)
 - **Finalization for all seven types** (AWD/PO/DO/IDIQ/INTERNAL/MOD/AMD)
 - **`ContractFinanceLine` shred** — attaches root-level finance_lines to the
   first canonical CLIN
