@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from datetime import date, timedelta
 
 from django.conf import settings
@@ -270,7 +271,7 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             return
 
         failed_dates: list[tuple[date, str]] = []
-        for batch in queue:
+        for idx, batch in enumerate(queue):
             ok, fail_reason = self._scrape_single_date_from_batch(batch)
             if not ok:
                 failed_dates.append(
@@ -279,6 +280,9 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                         fail_reason or "Scrape marked FAILED (see logs).",
                     )
                 )
+            if idx < len(queue) - 1:
+                self._activity("Sleeping 15s before next scrape to avoid DIBBS rate limiting.")
+                time.sleep(15)
 
         self._check_and_notify_expiring_dates()
 
