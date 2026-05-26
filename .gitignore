@@ -38,6 +38,7 @@ ENV/
 .venv
 env.bak/
 venv.bak/
+antenv/
 
 
 # IDE
@@ -88,4 +89,5 @@ staticfiles/
 
 #Stuff
 install_requirements.bat
-antenv/
+
+
