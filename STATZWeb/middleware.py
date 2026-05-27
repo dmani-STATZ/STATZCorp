@@ -26,6 +26,9 @@ class LoginRequiredMiddleware:
             '/users/custom-password-reset/',
             '/system-test/',  # System test page for troubleshooting
             '/api/system-test/',  # System test API endpoint
+            '/health/',
+            '/api/azure-health/',
+            '/api/health-check/',
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 

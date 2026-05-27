@@ -27,6 +27,7 @@ from . import views
 from STATZWeb.version_utils import get_version_info
 from users import views as user_views
 from users.ms_views import MicrosoftAuthView, MicrosoftCallbackView
+from core import views as core_views
 
 # --- Add these lines ---
 admin.site.site_header = (
@@ -37,11 +38,6 @@ admin.site.index_title = (
     "Welcome to STATZ Corporation Administration"  # Title on the main admin index page
 )
 # --- End of added lines ---
-
-
-def health_check(request):
-    """Simple health check endpoint to test if the server is functioning correctly."""
-    return HttpResponse("OK", content_type="text/plain")
 
 
 def manifest_json(request):
@@ -136,7 +132,9 @@ urlpatterns = [
     path("processing/", include("processing.urls")),
     path("intake/", include("intake.urls")),
     path("training/", include("training.urls")),
-    path("health/", health_check, name="health_check"),
+    path("health/", core_views.health_plain, name="health_check"),
+    # Azure App Service: set Health check path to /api/azure-health/
+    path("api/azure-health/", core_views.azure_health, name="azure_health"),
     path("reports/", include("reports.urls")),
     path("transactions/", include("transactions.urls")),
     # Announcement URLs
@@ -159,7 +157,7 @@ urlpatterns = [
     path(
         "api/health-check/",
         lambda request: JsonResponse({"status": "ok"}),
-        name="health_check",
+        name="api_health_check",
     ),
     path(
         "api/calendar/sharepoint-sync/",
