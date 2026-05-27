@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-05-27] Document Browser Improvements** — Files and folders can now be selected using checkboxes. A new **Actions** dropdown menu replaces the Save Path button — all document browser actions live in one place. **Save Path** — same behavior as before. **Open in SharePoint** — opens the current folder in SharePoint; if a folder row is selected, opens that folder instead. **Download** — appears when files are selected; downloads files directly to your computer. **Delete** — appears for staff users when files are selected; permanently removes files from SharePoint after confirmation.
+
 - **[2026-05-21] Finance Audit — Log Split Paid** — Jenny can now record split paid amounts directly from the Finance Audit page. Click the "Split Paid" header in the Split Summary card to open the Log Split Paid modal. Enter the total paid for each company and save — the system distributes the amount proportionally across CLINs automatically. A warning highlights any discrepancy between what was paid and the expected split value.
 
 ### Fixed

@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 from django.core.exceptions import PermissionDenied
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
@@ -373,3 +373,99 @@ def set_idiq_file_path_api(request):
     idiq.modified_by = request.user
     idiq.save()
     return JsonResponse({"success": True, "message": "Path saved successfully"})
+
+
+@conditional_login_required
+@require_POST
+def download_file_api(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid request body."}, status=400)
+
+    contract_id = payload.get("contract_id")
+    file_id = (payload.get("file_id") or "").strip()
+    filename = payload.get("filename") or ""
+
+    contract_pk = _parse_contract_id(contract_id)
+    if contract_pk is None or not file_id:
+        return JsonResponse(
+            {"success": False, "error": "contract_id and file_id are required."},
+            status=400,
+        )
+
+    _contract_for_request(request, contract_pk)
+    try:
+        file_bytes = sharepoint_service.download_file_bytes_by_id(file_id)
+    except SharePointError as error:
+        return JsonResponse(
+            {"success": False, "error": error.message},
+            status=error.status_code,
+        )
+
+    safe_name = sharepoint_service._safe_filename(filename)
+    response = HttpResponse(file_bytes, content_type="application/octet-stream")
+    response["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+    return response
+
+
+@conditional_login_required
+@require_POST
+def delete_file_api(request):
+    if not request.user.is_staff:
+        return JsonResponse(
+            {"success": False, "error": "Permission denied."},
+            status=403,
+        )
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid request body."}, status=400)
+
+    contract_id = payload.get("contract_id")
+    file_id = (payload.get("file_id") or "").strip()
+    filename = payload.get("filename") or ""
+
+    contract_pk = _parse_contract_id(contract_id)
+    if contract_pk is None or not file_id:
+        return JsonResponse(
+            {"success": False, "error": "contract_id and file_id are required."},
+            status=400,
+        )
+
+    _contract_for_request(request, contract_pk)
+    try:
+        sharepoint_service.delete_item_by_id(file_id)
+    except SharePointError as error:
+        return JsonResponse(
+            {"success": False, "error": error.message},
+            status=error.status_code,
+        )
+
+    return JsonResponse({"success": True, "message": "File deleted."})
+
+
+@conditional_login_required
+@require_GET
+def folder_weburl_api(request):
+    contract_id = request.GET.get("contract_id")
+    folder_path = (request.GET.get("folder_path") or "").strip()
+
+    contract_pk = _parse_contract_id(contract_id)
+    if contract_pk is None or not folder_path:
+        return JsonResponse(
+            {"success": False, "error": "contract_id and folder_path are required."},
+            status=400,
+        )
+
+    _contract_for_request(request, contract_pk)
+    try:
+        web_url = sharepoint_service.get_folder_weburl(folder_path)
+    except SharePointError as error:
+        return _error_response(error)
+
+    if not web_url:
+        return JsonResponse({"success": False, "error": "Folder not found."}, status=404)
+
+    return JsonResponse({"success": True, "webUrl": web_url})

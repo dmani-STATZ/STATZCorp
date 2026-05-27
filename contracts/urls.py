@@ -196,7 +196,10 @@ from .views.company_views import (
 from .views.documents_views import (
     contract_details_api,
     create_folder_api,
+    delete_file_api,
     documents_browser_view,
+    download_file_api,
+    folder_weburl_api,
     idiq_contract_details_api,
     idiq_documents_browser_view,
     set_idiq_file_path_api,
@@ -297,6 +300,9 @@ urlpatterns = [
         name="contract_details_api",
     ),
     path("api/sharepoint-files/", sharepoint_files_api, name="sharepoint_files_api"),
+    path("api/download-file/", download_file_api, name="download_file_api"),
+    path("api/delete-file/", delete_file_api, name="delete_file_api"),
+    path("api/folder-weburl/", folder_weburl_api, name="folder_weburl_api"),
     path("api/create-folder/", create_folder_api, name="create_folder_api"),
     path("api/set-file-path/", set_file_path_api, name="set_file_path_api"),
     # Contract management

@@ -381,6 +381,28 @@ def convert_file_to_pdf_bytes(file_id: str) -> bytes:
     return response.content
 
 
+def delete_item_by_id(item_id: str) -> None:
+    """Permanently delete a SharePoint drive item by ID.
+
+    Raises SharePointError if deletion fails. Use for user-facing deletes.
+    Do NOT replace delete_file_by_id — that function is for internal temp cleanup.
+    """
+    drive_id = quote(_get_drive_id(), safe="!_")
+    url = f"{GRAPH_BASE}/drives/{drive_id}/items/{quote(item_id, safe='')}"
+    token = get_graph_access_token()
+    response = requests.delete(url, headers=_auth_headers(token), timeout=60)
+    if response.status_code not in (200, 204):
+        _raise_for_graph_error(response, "Could not delete the file from SharePoint.")
+
+
+def get_folder_weburl(folder_path: str) -> str:
+    """Return the SharePoint webUrl for a folder path, or empty string if not found."""
+    item = _get_drive_item(normalize_folder_path(folder_path))
+    if item is None:
+        return ""
+    return item.get("webUrl") or ""
+
+
 def delete_file_by_id(file_id: str) -> None:
     """
     Permanently delete a SharePoint file by drive item ID.
@@ -473,7 +495,12 @@ def _get_drive_item_by_id(file_id: str) -> Dict[str, Any]:
 
 def _folder_payload(item: Dict[str, Any], parent_path: str) -> Dict[str, Any]:
     folder_path = normalize_folder_path(f"{parent_path}/{item.get('name', '')}")
-    return {"name": item.get("name") or "", "path": folder_path}
+    return {
+        "name": item.get("name") or "",
+        "path": folder_path,
+        "id": item.get("id") or "",
+        "webUrl": item.get("webUrl") or "",
+    }
 
 
 def _file_payload(item: Dict[str, Any]) -> Dict[str, Any]:

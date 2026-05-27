@@ -113,7 +113,9 @@
             gap: 8px;
             flex-shrink: 0;
             margin-left: 16px;
+            align-items: center;
         }
+
 
         /* ── Banner ── */
         .docs-banner-container {
@@ -317,7 +319,7 @@
         /* ── Column header (sticky) ── */
         .docs-list-header {
             display: grid;
-            grid-template-columns: 1fr 80px 100px 140px;
+            grid-template-columns: 32px 1fr 80px 100px 140px;
             padding: 6px 16px;
             font-size: 11px;
             text-transform: uppercase;
@@ -347,11 +349,22 @@
 
         .docs-file-list li {
             display: grid;
-            grid-template-columns: 1fr 80px 100px 140px;
+            grid-template-columns: 32px 1fr 80px 100px 140px;
             padding: 8px 16px;
             cursor: pointer;
             border-bottom: 1px solid #f1f3f5;
             align-items: center;
+        }
+
+        .col-checkbox {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .doc-select-checkbox {
+            margin: 0;
+            cursor: pointer;
         }
 
         .docs-file-list li.folder .col-name {
@@ -434,6 +447,7 @@
             from { transform: translateX(400px); opacity: 0; }
             to   { transform: translateX(0);     opacity: 1; }
         }
+
     </style>
 </head>
 <body>
@@ -447,7 +461,18 @@
                 <span class="docs-header-contract" id="contract-name">{{ contract_number|default:"—" }}</span>
             </div>
             <div class="docs-header-actions">
-                <button type="button" class="btn btn-sm btn-success" onclick="setCurrentPath()">Save Path</button>
+                <div class="dropdown" id="doc-actions-dropdown">
+                    <button class="btn btn-sm btn-secondary dropdown-toggle"
+                            type="button"
+                            id="doc-actions-btn"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                        Actions
+                    </button>
+                    <ul class="dropdown-menu" id="doc-actions-menu" aria-labelledby="doc-actions-btn">
+                        <!-- items injected by updateActionsMenu() -->
+                    </ul>
+                </div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.close()">Close Window</button>
             </div>
         </header>
@@ -496,6 +521,9 @@
 
             <!-- Column header (sticky) -->
             <div class="docs-list-header">
+                <div class="col-checkbox">
+                    <input type="checkbox" id="select-all-checkbox" aria-label="Select all">
+                </div>
                 <div class="col-name">Name</div>
                 <div class="col-size">Size</div>
                 <div class="col-modified">Modified</div>
@@ -543,6 +571,33 @@
     </div>
     {% endif %}
 
+    <!-- Delete confirmation modal -->
+    <div class="modal fade" id="delete-confirm-modal" tabindex="-1" aria-labelledby="delete-confirm-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="delete-confirm-modal-label">Delete Files</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">The following files will be permanently deleted from SharePoint and cannot be recovered:</p>
+                    <ul id="delete-confirm-list" class="mb-0"></ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="delete-confirm-btn" onclick="executeDelete()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-2px;margin-right:4px;">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                        </svg>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
     <script>
         const IS_IDIQ = {{ is_idiq|yesno:"true,false" }};
         const ENTITY_ID = {{ contract_id|default:"null" }};
@@ -562,7 +617,13 @@
         const SHAREPOINT_FILES_URL = "{{ sharepoint_files_url|default:''|escapejs }}";
         const SET_FILE_PATH_URL = "{{ set_file_path_url|default:''|escapejs }}";
         const CREATE_FOLDER_URL = {% if not is_idiq %}"{% url 'contracts:create_folder_api' %}"{% else %}null{% endif %};
+        const DOWNLOAD_FILE_URL = "{% url 'contracts:download_file_api' %}";
+        const DELETE_FILE_URL = "{% url 'contracts:delete_file_api' %}";
+        const FOLDER_WEBURL_URL = "{% url 'contracts:folder_weburl_api' %}";
+        const USER_IS_STAFF = {{ request.user.is_staff|yesno:"true,false" }};
         const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+        let selectedItems = new Map();
 
         document.addEventListener('DOMContentLoaded', function() {
             const params = new URLSearchParams(window.location.search);
@@ -598,6 +659,13 @@
                     }
                 });
             }
+
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', handleSelectAllChange);
+            }
+
+            updateActionsMenu();
         });
 
         function loadContractAndFolder() {
@@ -673,6 +741,12 @@
                     currentFolders = data.folders || [];
                     currentFolderPath = data.currentPath || currentFolderPath;
 
+                    selectedItems.clear();
+                    const selectAllOnLoad = document.getElementById('select-all-checkbox');
+                    if (selectAllOnLoad) {
+                        selectAllOnLoad.checked = false;
+                    }
+                    updateActionsMenu();
                     renderFileList();
                     updateBreadcrumb();
                 })
@@ -710,6 +784,22 @@
             li.className = isFolder ? 'folder' : 'file';
             li.dataset.name = (item.name || '').toLowerCase();
 
+            const checkboxCol = document.createElement('div');
+            checkboxCol.className = 'col-checkbox';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'doc-select-checkbox';
+            checkbox.dataset.id = item.id || '';
+            checkbox.dataset.name = item.name || '';
+            checkbox.dataset.type = isFolder ? 'folder' : 'file';
+            checkbox.dataset.weburl = isFolder ? (item.webUrl || '') : (item.downloadUrl || '');
+            checkbox.checked = selectedItems.has(item.id || '');
+            checkbox.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            checkbox.addEventListener('change', onRowCheckboxChange);
+            checkboxCol.appendChild(checkbox);
+
             const nameCol = document.createElement('div');
             nameCol.className = 'col-name';
             nameCol.innerHTML = `<span>${isFolder ? '📁' : '📄'}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.name || '')}</span>`;
@@ -726,12 +816,292 @@
             authorCol.className = 'col-author';
             authorCol.textContent = item.author || 'Unknown';
 
+            li.appendChild(checkboxCol);
             li.appendChild(nameCol);
             li.appendChild(sizeCol);
             li.appendChild(dateCol);
             li.appendChild(authorCol);
 
             return li;
+        }
+
+        function onRowCheckboxChange(event) {
+            const cb = event.target;
+            const item = {
+                id: cb.dataset.id,
+                name: cb.dataset.name,
+                type: cb.dataset.type,
+                webUrl: cb.dataset.weburl || ''
+            };
+            if (cb.checked) {
+                selectedItems.set(item.id, item);
+            } else {
+                selectedItems.delete(item.id);
+                document.getElementById('select-all-checkbox').checked = false;
+            }
+            syncSelectAllCheckbox();
+            updateActionsMenu();
+        }
+
+        function handleSelectAllChange() {
+            const selectAll = document.getElementById('select-all-checkbox');
+            const checkboxes = document.querySelectorAll('#file-list .doc-select-checkbox');
+
+            if (selectAll.checked) {
+                selectedItems.clear();
+                checkboxes.forEach(function(cb) {
+                    const li = cb.closest('li');
+                    if (li && li.style.display === 'none') {
+                        return;
+                    }
+                    cb.checked = true;
+                    selectedItems.set(cb.dataset.id, {
+                        id: cb.dataset.id,
+                        name: cb.dataset.name,
+                        type: cb.dataset.type,
+                        webUrl: cb.dataset.weburl || ''
+                    });
+                });
+            } else {
+                checkboxes.forEach(function(cb) {
+                    cb.checked = false;
+                });
+                selectedItems.clear();
+            }
+
+            updateActionsMenu();
+        }
+
+        function syncSelectAllCheckbox() {
+            const selectAll = document.getElementById('select-all-checkbox');
+            const checkboxes = Array.from(document.querySelectorAll('#file-list .doc-select-checkbox'))
+                .filter(function(cb) {
+                    const li = cb.closest('li');
+                    return li && li.style.display !== 'none';
+                });
+
+            if (checkboxes.length === 0) {
+                selectAll.checked = false;
+                return;
+            }
+
+            const allChecked = checkboxes.every(function(cb) { return cb.checked; });
+            selectAll.checked = allChecked;
+        }
+
+        function getSingleSelectedFolder() {
+            const folders = [...selectedItems.values()].filter(function(i) { return i.type === 'folder'; });
+            return folders.length === 1 ? folders[0] : null;
+        }
+
+        function makeDropdownItem(label, onclick, isDanger) {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.className = 'dropdown-item' + (isDanger ? ' text-danger' : '');
+            a.href = '#';
+            a.setAttribute('onclick', onclick);
+            a.textContent = label;
+            li.appendChild(a);
+            return li;
+        }
+
+        function makeDropdownDivider() {
+            const li = document.createElement('li');
+            li.innerHTML = '<hr class="dropdown-divider">';
+            return li;
+        }
+
+        function updateActionsMenu() {
+            const menu = document.getElementById('doc-actions-menu');
+            if (!menu) {
+                return;
+            }
+            menu.innerHTML = '';
+
+            menu.appendChild(makeDropdownItem('Save Path', 'setCurrentPath(); return false;'));
+
+            const singleFolder = getSingleSelectedFolder();
+            const openLabel = singleFolder
+                ? 'Open Selected Folder in SharePoint'
+                : 'Open Current Folder in SharePoint';
+            const openOnclick = singleFolder
+                ? 'openSelectedFolderInSharePoint(); return false;'
+                : 'openCurrentFolderInSharePoint(); return false;';
+            menu.appendChild(makeDropdownItem(openLabel, openOnclick));
+
+            const files = [...selectedItems.values()].filter(function(i) { return i.type === 'file'; });
+            if (files.length > 0) {
+                menu.appendChild(makeDropdownDivider());
+                const countLi = document.createElement('li');
+                const countSpan = document.createElement('span');
+                countSpan.className = 'dropdown-item disabled';
+                countSpan.textContent = files.length + ' file(s) selected';
+                countLi.appendChild(countSpan);
+                menu.appendChild(countLi);
+                menu.appendChild(makeDropdownItem('Download', 'downloadSelectedFiles(); return false;'));
+                if (USER_IS_STAFF) {
+                    menu.appendChild(makeDropdownItem('Delete', 'confirmDeleteSelectedFiles(); return false;', true));
+                }
+            }
+        }
+
+        function openSelectedFolderInSharePoint() {
+            const folder = getSingleSelectedFolder();
+            if (!folder || !folder.webUrl) {
+                showToast('This folder does not have a SharePoint link.', 'error');
+                return;
+            }
+            window.open(folder.webUrl, '_blank', 'noopener');
+        }
+
+        function openCurrentFolderInSharePoint() {
+            const params = new URLSearchParams({
+                contract_id: currentContractId,
+                folder_path: currentFolderPath
+            });
+
+            fetch(FOLDER_WEBURL_URL + '?' + params.toString(), {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(function(r) {
+                    return r.json().then(function(data) {
+                        return { ok: r.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (!result.ok || !result.data.success || !result.data.webUrl) {
+                        throw new Error((result.data && result.data.error) || 'Could not open folder in SharePoint.');
+                    }
+                    window.open(result.data.webUrl, '_blank', 'noopener');
+                })
+                .catch(function(err) {
+                    showToast(err.message || 'Could not open folder in SharePoint.', 'error');
+                });
+        }
+
+        async function downloadSelectedFiles() {
+            const files = [...selectedItems.values()].filter(function(i) { return i.type === 'file'; });
+            if (!files.length) {
+                return;
+            }
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            let successCount = 0;
+
+            for (const item of files) {
+                try {
+                    const response = await fetch(DOWNLOAD_FILE_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            contract_id: currentContractId,
+                            file_id: item.id,
+                            filename: item.name
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json().catch(function() { return {}; });
+                        showToast(data.error || ('Failed to download ' + item.name), 'error');
+                        continue;
+                    }
+
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = item.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    successCount++;
+                } catch (err) {
+                    showToast('Error downloading ' + item.name, 'error');
+                }
+            }
+
+            if (successCount > 0) {
+                showToast('Downloaded ' + successCount + ' file(s) successfully', 'success');
+            }
+        }
+
+        function confirmDeleteSelectedFiles() {
+            const files = [...selectedItems.values()].filter(function(i) { return i.type === 'file'; });
+            if (!files.length) {
+                return;
+            }
+
+            const listEl = document.getElementById('delete-confirm-list');
+            listEl.innerHTML = '';
+            files.forEach(function(file) {
+                const li = document.createElement('li');
+                li.textContent = file.name;
+                listEl.appendChild(li);
+            });
+
+            bootstrap.Modal.getOrCreateInstance(
+                document.getElementById('delete-confirm-modal')
+            ).show();
+        }
+
+        async function executeDelete() {
+            const files = [...selectedItems.values()].filter(function(i) { return i.type === 'file'; });
+            const modal = bootstrap.Modal.getOrCreateInstance(
+                document.getElementById('delete-confirm-modal')
+            );
+            modal.hide();
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const failed = [];
+            let successCount = 0;
+
+            for (const item of files) {
+                try {
+                    const response = await fetch(DELETE_FILE_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            contract_id: currentContractId,
+                            file_id: item.id,
+                            filename: item.name
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        successCount++;
+                    } else {
+                        failed.push(item.name + ': ' + (data.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    failed.push(item.name + ': Network error');
+                }
+            }
+
+            selectedItems.clear();
+            const selectAll = document.getElementById('select-all-checkbox');
+            if (selectAll) {
+                selectAll.checked = false;
+            }
+            updateActionsMenu();
+            loadFolderContents();
+
+            if (failed.length === 0) {
+                showToast('Deleted ' + successCount + ' file(s) successfully', 'success');
+            } else {
+                showToast(
+                    'Deleted ' + successCount + ' file(s). Failed: ' + failed.join('; '),
+                    'error'
+                );
+            }
         }
 
         function filterFileList() {
@@ -784,12 +1154,16 @@
         function navigateToFolder(path) {
             currentFolderPath = path;
             document.getElementById('search-input').value = '';
+            selectedItems.clear();
+            updateActionsMenu();
             loadFolderContents();
         }
 
         function navigateToBreadcrumb(path) {
             currentFolderPath = path;
             document.getElementById('search-input').value = '';
+            selectedItems.clear();
+            updateActionsMenu();
             loadFolderContents();
         }
 

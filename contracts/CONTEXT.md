@@ -166,6 +166,13 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
   - Contract folder patterns are built by `Contract.get_sharepoint_relative_path()`; `sharepoint_paths.resolve_contract_folder_path` validates `files_url` and delegates to that method. IDIQ-specific helpers remain: `build_idiq_pattern_path`, `resolve_idiq_folder_path`, and `get_idiq_root_fallback_path`.
   - IDIQ path resolution has no company override branch because `IdiqContract` has no company FK; it always uses `get_sharepoint_prefix()` directly.
   - The split summary rollup (`idiq_clin_split_rollup`) remains removed from `IdiqContractDetailView` and `idiq_contract_detail.html`; it was never referenced in user meetings and added no value to the page.
+- **Documents Browser** (`documents_browser.html`, `documents_views.py`, `sharepoint_service.py`):
+  - `_folder_payload` includes `id` and `webUrl` for each folder row (used by multi-select and Open in SharePoint).
+  - `get_folder_weburl(folder_path)` — returns SharePoint `webUrl` for a drive-relative path (empty string if not found).
+  - `delete_item_by_id(item_id)` — user-facing permanent delete; raises `SharePointError` on failure. Distinct from internal `delete_file_by_id` (temp PDF cleanup only).
+  - Views: `download_file_api` (POST, streams file bytes), `delete_file_api` (POST, staff-only), `folder_weburl_api` (GET).
+  - URLs: `api/download-file/`, `api/delete-file/`, `api/folder-weburl/`.
+  - UI: multi-select checkboxes on files and folders, single **Actions** dropdown menu (Save Path, Open in SharePoint, Download, staff-gated Delete with confirmation modal). Selection clears on folder navigation. Breadcrumb position is unchanged.
 - **Superuser admin:** `/contracts/companies/`, `/contracts/code-tables/`, `/contracts/admin-tools/` for bulk supplier SharePoint URLs.
 - **Supporting APIs:** `/contracts/search/`, `/contracts/clin/<id>/notes/`, `/contracts/clin/<id>/details/`, `/contracts/api/options/<field>/`, `/contracts/api/clin/<id>/update-field/`, `/contracts/clin/<clin_pk>/splits/`, `/contracts/api/shipments/*`, `/contracts/api/nsn/create`, `/contracts/api/buyers/create`, `/contracts/api/suppliers/create`, `/contracts/api/day-counts/`, `/contracts/api/payment-history/*`.
   - `contract_search` (`/contracts/search/`) supports dash-free contract-number input by normalizing dashes at query time with a `Replace` annotation on `contract_number`; this is runtime-only behavior and does not require model or migration changes.
