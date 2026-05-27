@@ -12,6 +12,12 @@
 
 ### Changed
 
+- **[2026-05-27] Finance Audit — one workbench on the CLIN table.** The top **Add Shipment**, **Add Finance Line**, and **Log Payment** buttons are gone. Every CLIN has **+ Shipment** and **+ cost** on its row; each shipment has **+ cost** for trucking and other unplanned costs. Supplier and customer payments are logged by clicking **Paid** or **Customer Pay** on the shipment — you can now **edit** a mistyped amount in the ledger instead of deleting and re-entering. CLIN **Paid** and **Customer Pay** are always read-only; add a shipment first, then record money there. The Payment Activity panel is a read-only history.
+
+- **[2026-05-27] Finance Audit — Paid & Customer Pay roll up from shipments.** For CLINs that have shipments (marked with the blue "S"), Paid and Customer Pay are now calculated automatically from the shipments and are no longer edited directly on the CLIN — record those amounts on the shipment instead. CLINs that haven't been converted to shipments yet keep working exactly as before. This removes a behind-the-scenes duplication that could cause totals to drift.
+
+- **[2026-05-27] Finance Audit — shipment values now calculate automatically.** A shipment's Quote Value and Item Value are now calculated from its quantity × the CLIN's unit price, instead of being typed in by hand. To change them, change the shipment's quantity. For older contracts missing a unit price, a small "set unit price" option appears on those CLINs so the values can still be calculated correctly.
+
 - **[2026-05-26] Finance Audit — Plan Gross is now direct-edit.** Plan Gross on the Finance Audit page is now edited by clicking the value and typing the number directly, instead of logging a payment-history entry — matching how Item Value and Quote Value now work. Every change is fully recorded in the field's history.
 
 - **[2026-05-26] Finance Audit — Item Value & Quote Value are now direct-edit.** Item Value and Quote Value on the Finance Audit page (and CLIN detail) are now edited by clicking the value and typing the number directly, instead of logging a payment-history entry. Type what the CLIN is worth and the system fills in the per-unit price behind the scenes. Every change is still fully recorded in the field's history. (Paid and Customer Pay are unchanged for now.)

@@ -405,9 +405,7 @@
 
   btnDownload.addEventListener('click', function() {
     if (!currentPdfBlob) return;
-    const po = document.getElementById('id_po').value.trim() || 'unknown';
-    const filename = po.toLowerCase().replace(/\s+/g, '-')
-      + '-purchase-order-acknowledge-letter.pdf';
+    const filename = 'Purchase Order Acknowledgment Letter.pdf';
     const url = URL.createObjectURL(currentPdfBlob);
     const a = document.createElement('a');
     a.href = url;

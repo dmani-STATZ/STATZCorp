@@ -1,5 +1,5 @@
 /**
- * Add Finance Line Modal — Finance Audit page
+ * Add Finance Line Modal — Finance Audit page (inline triggers) + future reuse
  * Depends on: window.financeClinList, window.financeShipmentsByClin,
  * refreshFinanceLinesForClin, refreshPartialFinanceLines, refreshContractSummary
  */
@@ -58,6 +58,9 @@
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save';
         }
+
+        document.getElementById('aflClinSelectRow').style.display = '';
+        document.getElementById('aflShipmentRow').style.display = '';
     }
 
     function toastSuccess(msg) {
@@ -84,6 +87,8 @@
         if (shipmentId) {
             const acc = document.getElementById('partial-fl-accordion-' + shipmentId);
             if (acc) acc.style.display = 'table-row';
+            const partialsAcc = document.getElementById('partials-accordion-' + clinId);
+            if (partialsAcc) partialsAcc.style.display = '';
         } else {
             const acc = document.getElementById('accordion-' + clinId);
             if (acc) acc.style.display = 'table-row';
@@ -105,42 +110,71 @@
         if (instance) instance.hide();
     }
 
-    function init() {
-        const openBtn = document.getElementById('btnAddFinanceLine');
-        const modalEl = document.getElementById(MODAL_ID);
-        if (!openBtn || !modalEl) return;
+    function populateShipmentOptions(clinId, selectedShipmentId) {
+        const shipSelect = document.getElementById('aflShipmentSelect');
+        shipSelect.innerHTML =
+            '<option value="">— CLIN-level (no shipment) —</option>';
+        if (!clinId) return;
+        const shipments = (window.financeShipmentsByClin || {})[clinId] ||
+            (window.financeShipmentsByClin || {})[String(clinId)] || [];
+        shipments.forEach(function(s) {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            const name = s.name || ('Shipment ' + s.counter);
+            const date = s.ship_date ? (' · ' + s.ship_date) : '';
+            opt.textContent = name + date;
+            if (selectedShipmentId && String(s.id) === String(selectedShipmentId)) {
+                opt.selected = true;
+            }
+            shipSelect.appendChild(opt);
+        });
+    }
 
-        openBtn.addEventListener('click', function() {
-            resetAflModal();
-            const clinSelect = document.getElementById('aflClinSelect');
-            clinSelect.innerHTML = '<option value="">— Select a CLIN —</option>';
-            (window.financeClinList || []).forEach(function(clin) {
-                const opt = document.createElement('option');
-                opt.value = clin.id;
-                opt.textContent = clin.item_number + ' — ' + clin.supplier_name;
-                clinSelect.appendChild(opt);
-            });
-            document.getElementById('aflDate').value =
-                new Date().toISOString().split('T')[0];
-            new bootstrap.Modal(modalEl).show();
+    function openAddFinanceLineModal(clinId, shipmentId) {
+        const modalEl = document.getElementById(MODAL_ID);
+        if (!modalEl) return;
+
+        resetAflModal();
+        document.getElementById('aflDate').value =
+            new Date().toISOString().split('T')[0];
+
+        const clinSelect = document.getElementById('aflClinSelect');
+        clinSelect.innerHTML = '<option value="">— Select a CLIN —</option>';
+        (window.financeClinList || []).forEach(function(clin) {
+            const opt = document.createElement('option');
+            opt.value = clin.id;
+            opt.textContent = clin.item_number + ' — ' + clin.supplier_name;
+            if (clinId && String(clin.id) === String(clinId)) {
+                opt.selected = true;
+            }
+            clinSelect.appendChild(opt);
+        });
+
+        if (clinId) {
+            document.getElementById('aflClinSelectRow').style.display = 'none';
+            populateShipmentOptions(clinId, shipmentId || '');
+            if (shipmentId) {
+                document.getElementById('aflShipmentRow').style.display = 'none';
+            }
+        }
+
+        new bootstrap.Modal(modalEl).show();
+    }
+
+    window.openAddFinanceLineModal = openAddFinanceLineModal;
+
+    function init() {
+        const modalEl = document.getElementById(MODAL_ID);
+        if (!modalEl) return;
+
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.js-open-add-finance-line');
+            if (!btn) return;
+            openAddFinanceLineModal(btn.dataset.clinId, btn.dataset.shipmentId || '');
         });
 
         document.getElementById('aflClinSelect').addEventListener('change', function() {
-            const clinId = this.value;
-            const shipSelect = document.getElementById('aflShipmentSelect');
-            shipSelect.innerHTML =
-                '<option value="">— CLIN-level (no shipment) —</option>';
-            if (!clinId) return;
-            const shipments = (window.financeShipmentsByClin || {})[clinId] ||
-                (window.financeShipmentsByClin || {})[String(clinId)] || [];
-            shipments.forEach(function(s) {
-                const opt = document.createElement('option');
-                opt.value = s.id;
-                const name = s.name || ('Shipment ' + s.counter);
-                const date = s.ship_date ? (' · ' + s.ship_date) : '';
-                opt.textContent = name + date;
-                shipSelect.appendChild(opt);
-            });
+            populateShipmentOptions(this.value, '');
         });
 
         document.getElementById('aflAmountBilled').addEventListener('input', function() {

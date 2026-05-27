@@ -60,29 +60,35 @@
                            id="addPartialShipDate">
                 </div>
 
-                <!-- Quote Value + Paid -->
-                <div class="d-flex gap-3 mb-3">
+                <!-- Derived values (shown on CLIN detail; hidden on Finance Audit) -->
+                <div class="add-partial-derived-fields d-flex gap-3 mb-3">
                     <div style="flex: 1;">
                         <label class="form-label small fw-semibold">Quote Value</label>
-                        <input type="number" class="form-control form-control-sm"
-                               id="addPartialQuoteValue" step="0.01" min="0"
-                               placeholder="Auto-calculated">
+                        <input type="number" class="form-control form-control-sm bg-body-secondary"
+                               id="addPartialQuoteValue" step="0.01" min="0" readonly
+                               placeholder="Auto-calculated from QTY">
+                        <div class="form-text small text-muted">
+                            Derived from QTY × CLIN price per unit
+                        </div>
                     </div>
+                    <div style="flex: 1;">
+                        <label class="form-label small fw-semibold">Item Value</label>
+                        <input type="number" class="form-control form-control-sm bg-body-secondary"
+                               id="addPartialItemValue" step="0.01" min="0" readonly
+                               placeholder="Auto-calculated from QTY">
+                        <div class="form-text small text-muted">
+                            Derived from QTY × CLIN unit price
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Optional money on CLIN detail only (Finance Audit logs payments on shipment ledger) -->
+                <div class="add-partial-money-fields d-flex gap-3 mb-3">
                     <div style="flex: 1;">
                         <label class="form-label small fw-semibold">Paid</label>
                         <input type="number" class="form-control form-control-sm"
                                id="addPartialPaid" step="0.01" min="0"
                                placeholder="0.00">
-                    </div>
-                </div>
-
-                <!-- Item Value + Customer Pay -->
-                <div class="d-flex gap-3 mb-3">
-                    <div style="flex: 1;">
-                        <label class="form-label small fw-semibold">Item Value</label>
-                        <input type="number" class="form-control form-control-sm"
-                               id="addPartialItemValue" step="0.01" min="0"
-                               placeholder="Auto-calculated">
                     </div>
                     <div style="flex: 1;">
                         <label class="form-label small fw-semibold">Customer Pay</label>
@@ -101,8 +107,8 @@
                 </div>
 
                 <div class="small text-muted fst-italic"
-                     id="addPartialAutoCalcNote" style="display:none;">
-                    Quote Value and Item Value auto-calculated from QTY. You may override.
+                     id="addPartialAutoCalcNote">
+                    Quote Value and Item Value are calculated from QTY × the CLIN's unit price.
                 </div>
             </div>
             <div class="modal-footer">

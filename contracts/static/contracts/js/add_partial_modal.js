@@ -6,6 +6,22 @@
 (function() {
     'use strict';
 
+    const isFinanceAuditPage = typeof window.FINANCE_AUDIT_CONTRACT_ID !== 'undefined';
+
+    function applyFinanceAuditModalMode() {
+        if (!isFinanceAuditPage) return;
+        document.querySelectorAll('.add-partial-money-fields').forEach(function(el) {
+            el.style.display = 'none';
+        });
+        document.querySelectorAll('.add-partial-derived-fields').forEach(function(el) {
+            el.style.display = 'none';
+        });
+        const note = document.getElementById('addPartialAutoCalcNote');
+        if (note) {
+            note.textContent = 'Record supplier and customer payments on the shipment row after saving.';
+        }
+    }
+
     function resetModal() {
         document.getElementById('addPartialClinId').value = '';
         document.getElementById('addPartialName').value = '';
@@ -16,7 +32,6 @@
         document.getElementById('addPartialPaid').value = '';
         document.getElementById('addPartialCustomerPay').value = '';
         document.getElementById('addPartialComments').value = '';
-        document.getElementById('addPartialAutoCalcNote').style.display = 'none';
         document.getElementById('addPartialUom').value = '';
 
         const clinSelect = document.getElementById('addPartialClinSelect');
@@ -24,11 +39,6 @@
             clinSelect.value = '';
             clinSelect.classList.remove('is-invalid');
         }
-
-        ['addPartialQuoteValue', 'addPartialItemValue'].forEach(function(id) {
-            const el = document.getElementById(id);
-            if (el) delete el.dataset.manuallyEdited;
-        });
     }
 
     // Open modal — delegated to handle dynamically rendered buttons
@@ -57,10 +67,16 @@
         } else if (btnClinId) {
             clinSelectRow.style.display = 'none';
             document.getElementById('addPartialClinId').value = btnClinId;
-            const section = document.querySelector('.section[data-clin-id="' + btnClinId + '"]');
             const uomInput = document.getElementById('addPartialUom');
-            if (section && section.dataset.uom && uomInput) {
-                uomInput.value = section.dataset.uom;
+            const clinRow = document.querySelector(
+                '.clin-finance-audit-row[data-clin-id="' + btnClinId + '"]'
+            );
+            const section = document.querySelector('.section[data-clin-id="' + btnClinId + '"]');
+            const uomSource = clinRow || section;
+            if (uomSource && uomInput) {
+                uomInput.value = clinRow
+                    ? (clinRow.dataset.clinUom || 'EA')
+                    : (section.dataset.uom || 'EA');
             }
         } else {
             clinSelectRow.style.display = 'none';
@@ -73,6 +89,8 @@
     });
 
     document.addEventListener('DOMContentLoaded', function() {
+        applyFinanceAuditModalMode();
+
         const clinSelect = document.getElementById('addPartialClinSelect');
         if (clinSelect) {
             clinSelect.addEventListener('change', function() {
@@ -83,9 +101,6 @@
                 document.getElementById('addPartialQty').value = '';
                 document.getElementById('addPartialQuoteValue').value = '';
                 document.getElementById('addPartialItemValue').value = '';
-                delete document.getElementById('addPartialQuoteValue').dataset.manuallyEdited;
-                delete document.getElementById('addPartialItemValue').dataset.manuallyEdited;
-                document.getElementById('addPartialAutoCalcNote').style.display = 'none';
 
                 if (window.financeClinList && clinId) {
                     const clin = window.financeClinList.find(function(c) {
@@ -112,35 +127,16 @@
                     if (data.success) {
                         const qv = document.getElementById('addPartialQuoteValue');
                         const iv = document.getElementById('addPartialItemValue');
-                        const note = document.getElementById('addPartialAutoCalcNote');
-                        if (!qv.dataset.manuallyEdited) {
-                            qv.value = data.auto_quote_value.toFixed(2);
-                        }
-                        if (!iv.dataset.manuallyEdited) {
-                            iv.value = data.auto_item_value.toFixed(2);
-                        }
-                        if (note) note.style.display = 'block';
+                        qv.value = data.auto_quote_value.toFixed(2);
+                        iv.value = data.auto_item_value.toFixed(2);
                     }
                 })
                 .catch(err => console.debug('Auto-calc error:', err));
         });
 
-        ['addPartialQuoteValue', 'addPartialItemValue'].forEach(function(id) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.addEventListener('input', function() {
-                    this.dataset.manuallyEdited = '1';
-                });
-            }
-        });
-
         const modalEl = document.getElementById('addPartialModal');
         if (modalEl) {
             modalEl.addEventListener('hidden.bs.modal', function() {
-                ['addPartialQuoteValue', 'addPartialItemValue'].forEach(function(id) {
-                    const el = document.getElementById(id);
-                    if (el) delete el.dataset.manuallyEdited;
-                });
                 const select = document.getElementById('addPartialClinSelect');
                 if (select) select.classList.remove('is-invalid');
             });
@@ -172,12 +168,14 @@
                 ship_qty: parseFloat(qty),
                 uom: document.getElementById('addPartialUom').value || '',
                 ship_date: document.getElementById('addPartialShipDate').value || null,
-                quote_value: document.getElementById('addPartialQuoteValue').value || null,
-                item_value: document.getElementById('addPartialItemValue').value || null,
-                paid_amount: document.getElementById('addPartialPaid').value || null,
-                wawf_payment: document.getElementById('addPartialCustomerPay').value || null,
                 comments: document.getElementById('addPartialComments').value || '',
             };
+            if (!isFinanceAuditPage) {
+                payload.quote_value = document.getElementById('addPartialQuoteValue').value || null;
+                payload.item_value = document.getElementById('addPartialItemValue').value || null;
+                payload.paid_amount = document.getElementById('addPartialPaid').value || null;
+                payload.wawf_payment = document.getElementById('addPartialCustomerPay').value || null;
+            }
 
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';

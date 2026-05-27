@@ -423,20 +423,21 @@ def add_partial_shipment(request):
 
         today = shipment.ship_date or __import__('datetime').date.today()
 
-        clin_content_type = ContentType.objects.get_for_model(Clin)
         shipment_content_type = ContentType.objects.get_for_model(ClinShipment)
 
         ROLLUP_FIELDS = [
-            ('paid_amount', 'partial_paid_amount', 'paid_amount'),
-            ('wawf_payment', 'partial_wawf_payment', 'wawf_payment'),
+            ('paid_amount', 'partial_paid_amount'),
+            ('wawf_payment', 'partial_wawf_payment'),
         ]
 
-        for shipment_field, shipment_payment_type, clin_payment_type in ROLLUP_FIELDS:
+        had_payment_rollup = False
+        for shipment_field, shipment_payment_type in ROLLUP_FIELDS:
             value = getattr(shipment, shipment_field)
             if not value:
                 continue
 
-            shipment_ph = PaymentHistory.objects.create(
+            had_payment_rollup = True
+            PaymentHistory.objects.create(
                 content_type=shipment_content_type,
                 object_id=shipment.id,
                 payment_type=shipment_payment_type,
@@ -449,34 +450,9 @@ def add_partial_shipment(request):
                 company=clin.company,
             )
 
-            PaymentHistory.objects.create(
-                content_type=clin_content_type,
-                object_id=clin.id,
-                payment_type=clin_payment_type,
-                payment_amount=value,
-                payment_date=today,
-                payment_info=f'From Shipment #{shipment.id}',
-                reference_number=f'shipment-ph-{shipment_ph.id}',
-                created_by=request.user,
-                modified_by=request.user,
-                company=clin.company,
-            )
-
-            clin_new_total = PaymentHistory.objects.filter(
-                content_type=clin_content_type,
-                object_id=clin.id,
-                payment_type=clin_payment_type,
-            ).aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
-
-            setattr(clin, clin_payment_type, clin_new_total)
-
-        _fields_to_save = [
-            f for f in ['paid_amount', 'wawf_payment']
-            if getattr(shipment, f)
-        ]
-        if _fields_to_save:
-            clin.modified_by = request.user
-            clin.save(update_fields=_fields_to_save + ['modified_by', 'modified_on'])
+        if had_payment_rollup:
+            from .shipment_views import _recompute_clin_payment_rollup
+            _recompute_clin_payment_rollup(clin, request.user)
         # --- end PaymentHistory rollup ---
 
         return JsonResponse({
@@ -528,3 +504,64 @@ def get_partial_auto_calc(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@conditional_login_required
+@require_http_methods(["POST"])
+def set_clin_unit_prices(request, clin_id):
+    """Set CLIN unit_price and/or price_per_unit (fallback for un-backfillable legacy CLINs)."""
+    company = getattr(request, 'active_company', None)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    clin = get_object_or_404(
+        Clin.objects.filter(contract__company=company),
+        id=clin_id,
+    )
+
+    update_fields = []
+    errors = []
+
+    if 'unit_price' in data and data['unit_price'] is not None and data['unit_price'] != '':
+        try:
+            unit_price = Decimal(str(data['unit_price']))
+            if unit_price <= 0:
+                errors.append('Unit price must be greater than zero')
+            else:
+                clin.unit_price = unit_price
+                update_fields.append('unit_price')
+        except (InvalidOperation, ValueError):
+            errors.append('Invalid unit price')
+
+    if 'price_per_unit' in data and data['price_per_unit'] is not None and data['price_per_unit'] != '':
+        try:
+            price_per_unit = Decimal(str(data['price_per_unit']))
+            if price_per_unit <= 0:
+                errors.append('Price per unit must be greater than zero')
+            else:
+                clin.price_per_unit = price_per_unit
+                update_fields.append('price_per_unit')
+        except (InvalidOperation, ValueError):
+            errors.append('Invalid price per unit')
+
+    if errors:
+        return JsonResponse({'success': False, 'error': '; '.join(errors)}, status=400)
+
+    if not update_fields:
+        return JsonResponse(
+            {'success': False, 'error': 'Provide at least one price to save'},
+            status=400,
+        )
+
+    clin.save(update_fields=update_fields)
+
+    return JsonResponse({
+        'success': True,
+        'unit_price': str(clin.unit_price) if clin.unit_price is not None else None,
+        'price_per_unit': str(clin.price_per_unit) if clin.price_per_unit is not None else None,
+    })

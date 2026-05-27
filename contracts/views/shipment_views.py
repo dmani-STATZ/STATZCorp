@@ -35,6 +35,23 @@ def _sync_clin_ship_fields(clin, user):
         'ship_qty', 'ship_date', 'pod_date', 'modified_by', 'modified_on',
     ])
 
+
+def _recompute_clin_payment_rollup(clin, user):
+    """Set CLIN paid_amount / wawf_payment from the SUM of its shipments' stored
+    columns (Layer A cascade). Only meaningful for CLINs that have shipments;
+    callers invoke this after any shipment paid/customer-pay change. CLINs with
+    no shipments are NOT touched here (their stored columns remain user-managed
+    until conversion)."""
+    agg = clin.shipments.aggregate(
+        paid=Sum('paid_amount'),
+        wawf=Sum('wawf_payment'),
+    )
+    clin.paid_amount = agg['paid'] or Decimal('0.00')
+    clin.wawf_payment = agg['wawf'] or Decimal('0.00')
+    clin.modified_by = user
+    clin.save(update_fields=['paid_amount', 'wawf_payment', 'modified_by', 'modified_on'])
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def create_shipment(request):

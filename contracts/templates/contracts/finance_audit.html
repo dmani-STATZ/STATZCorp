@@ -332,15 +332,8 @@
             <div class="card-body finance-audit-notes-scroll" id="payment-activity-list">
                 {% if payment_activity_rollup %}
                     {% for row in payment_activity_rollup %}
-                    <button type="button"
-                            class="finance-audit-payment-note w-100 text-start border-0 bg-transparent"
-                            onclick="openPaymentHistoryPopup(
-                                '{{ row.entity_type }}',
-                                '{{ row.entity_id }}',
-                                '{{ row.payment_type }}',
-                                'finance_audit',
-                                {{ row.current_value }}
-                            )">
+                    <div class="finance-audit-payment-note finance-audit-payment-note--readonly w-100 py-2 border-bottom"
+                         title="Read-only log — edit payments on the shipment row in the CLIN table">
                         <div class="d-flex align-items-baseline gap-1 flex-wrap">
                             <span class="text-body-secondary">{{ row.entity_label }}</span>
                             <span class="text-body-secondary">·</span>
@@ -358,7 +351,7 @@
                             {{ row.note_text }}
                         </div>
                         {% endif %}
-                    </button>
+                    </div>
                     {% endfor %}
                 {% else %}
                 <p class="text-body-secondary small mb-0">No payment activity recorded.</p>
@@ -388,25 +381,9 @@
 
     {# Section C — CLIN table + Section D accordions #}
     <div class="card shadow-sm mt-4">
-        <div class="card-header py-2 small fw-semibold d-flex justify-content-between align-items-center">
+        <div class="card-header py-2 small fw-semibold">
             <span>CLINs</span>
-            <div>
-                <button type="button"
-                        class="btn btn-sm btn-outline-secondary js-open-add-partial"
-                        data-clin-id="">
-                    + Add Shipment
-                </button>
-                <button type="button"
-                        class="btn btn-sm btn-outline-secondary ms-2"
-                        id="btnAddFinanceLine">
-                    + Add Finance Line
-                </button>
-                <button type="button"
-                        class="btn btn-sm btn-primary ms-2"
-                        id="btnLogPayment">
-                    + Log Payment
-                </button>
-            </div>
+            <span class="text-body-secondary fw-normal ms-2">Add shipments and costs on each row</span>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -439,6 +416,16 @@
                                 <span class="badge bg-primary ms-1 finance-clin-mode-badge"
                                       title="Shipment mode — values tracked via shipments">S</span>
                                 {% endif %}
+                                {% if clin.needs_unit_price %}
+                                <button type="button"
+                                        class="btn btn-sm btn-link p-0 ms-1 js-set-unit-price"
+                                        data-clin-id="{{ clin.id }}"
+                                        data-unit-price="{{ clin.unit_price|default:'' }}"
+                                        data-price-per-unit="{{ clin.price_per_unit|default:'' }}"
+                                        title="Set per-unit prices so shipment values can be calculated">
+                                    set unit price
+                                </button>
+                                {% endif %}
                             </td>
                             <td>{{ clin.get_item_type_display }}</td>
                             <td>{{ clin.supplier.name|default:"—" }}</td>
@@ -454,16 +441,10 @@
                                 </span>
                             </td>
                             <td class="text-end">
-                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
-                                      data-clin="{{ clin.id }}" data-type="paid_amount"
-                                      data-value="{{ clin.paid_amount|floatformat:2 }}">
+                                <span class="text-body-secondary clin-rollup-paid"
+                                      title="{% if clin.has_shipments %}Sum of shipment Paid{% else %}Add a shipment, then log payments on it{% endif %}">
                                     ${{ clin.paid_amount|floatformat:2|intcomma }}
                                 </span>
-                                {% if clin.has_shipments %}
-                                <!-- <div class="text-body-secondary" style="font-size:0.65rem; margin-top:1px;">
-                                    log via shipment
-                                </div> -->
-                                {% endif %}
                             </td>
                             <td class="text-end">
                                 <span class="value-cell {% if clin.has_shipments %}has-shipments{% endif %}"
@@ -497,38 +478,46 @@
                                 {% endif %}
                             </td>
                             <td class="text-end">
-                                <span role="button" tabindex="0" class="text-primary text-decoration-underline"
-                                      data-clin="{{ clin.id }}" data-type="wawf_payment"
-                                      data-value="{{ clin.wawf_payment|floatformat:2 }}">
+                                <span class="text-body-secondary clin-rollup-wawf"
+                                      title="{% if clin.has_shipments %}Sum of shipment Customer Pay{% else %}Add a shipment, then log payments on it{% endif %}">
                                     ${{ clin.wawf_payment|floatformat:2|intcomma }}
                                 </span>
-                                {% if clin.has_shipments %}
-                                <!-- <div class="text-body-secondary" style="font-size:0.65rem; margin-top:1px;">
-                                    log via shipment
-                                </div> -->
-                                {% endif %}
                             </td>
                             <td class="text-end fw-semibold {% if clin.adjusted_gross > 0 %}text-success{% elif clin.adjusted_gross < 0 %}text-danger{% endif %}"
                                 data-adj-gross-clin="{{ clin.id }}">
                                 ${{ clin.adjusted_gross|floatformat:2|intcomma }}
                             </td>
                             <td class="text-center">
-                                {% with slist=shipments_by_clin|get_item:clin.id %}
-                                {% if slist %}
-                                <button type="button" class="pill pill-partials partials-pill me-1"
-                                        data-clin-id="{{ clin.id }}">
-                                    {{ slist|length }} shipment{% if slist|length != 1 %}s{% endif %}
-                                </button>
-                                {% endif %}
-                                {% endwith %}
-                                {% with flist=clin.finance_lines_for_audit %}
-                                {% if flist %}
-                                <button type="button" class="pill pill-finance finance-pill"
-                                        data-clin-id="{{ clin.id }}">
-                                    {{ flist|length }} line{% if flist|length != 1 %}s{% endif %} · ${{ clin.finance_billed_sum|floatformat:2 }}
-                                </button>
-                                {% endif %}
-                                {% endwith %}
+                                <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center finance-workbench-actions">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary js-open-add-partial"
+                                            data-clin-id="{{ clin.id }}"
+                                            title="Add shipment (logistics only)">
+                                        + Shipment
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary js-open-add-finance-line"
+                                            data-clin-id="{{ clin.id }}"
+                                            title="CLIN-level cost (no shipment)">
+                                        + cost
+                                    </button>
+                                    {% with slist=shipments_by_clin|get_item:clin.id %}
+                                    {% if slist %}
+                                    <button type="button" class="pill pill-partials partials-pill"
+                                            data-clin-id="{{ clin.id }}">
+                                        {{ slist|length }} shipment{% if slist|length != 1 %}s{% endif %}
+                                    </button>
+                                    {% endif %}
+                                    {% endwith %}
+                                    {% with flist=clin.finance_lines_for_audit %}
+                                    {% if flist %}
+                                    <button type="button" class="pill pill-finance finance-pill"
+                                            data-clin-id="{{ clin.id }}">
+                                        {{ flist|length }} line{% if flist|length != 1 %}s{% endif %} · ${{ clin.finance_billed_sum|floatformat:2 }}
+                                    </button>
+                                    {% endif %}
+                                    {% endwith %}
+                                </div>
                             </td>
                         </tr>
                         <tr id="accordion-{{ clin.id }}" data-accordion-for="{{ clin.id }}" style="display:none;">
@@ -615,12 +604,9 @@
                                 <td class="text-end">{{ shipment.ship_date|date:"m/d/Y"|default:"—" }}</td>
                                 <td class="text-end">{{ shipment.ship_qty|default:"—" }}</td>
                                 <td class="text-end">
-                                    <span role="button" tabindex="0"
-                                          class="text-primary text-decoration-underline partial-value-cell"
-                                          data-entity-type="clinshipment"
-                                          data-entity-id="{{ shipment.id }}"
-                                          data-payment-type="partial_quote_value"
-                                          data-current-value="{{ shipment.quote_value|floatformat:2|default:'0.00' }}">
+                                    <span data-derived-field="quote_value"
+                                          data-current-value="{{ shipment.quote_value|floatformat:2|default:'0.00' }}"
+                                          title="Derived from QTY">
                                         ${{ shipment.quote_value|floatformat:2|default:"0.00" }}
                                     </span>
                                 </td>
@@ -630,17 +616,15 @@
                                           data-entity-type="clinshipment"
                                           data-entity-id="{{ shipment.id }}"
                                           data-payment-type="partial_paid_amount"
-                                          data-current-value="{{ shipment.paid_amount|floatformat:2|default:'0.00' }}">
+                                          data-current-value="{{ shipment.paid_amount|floatformat:2|default:'0.00' }}"
+                                          title="Supplier payment ledger — add, edit, or delete entries">
                                         ${{ shipment.paid_amount|floatformat:2|default:"0.00" }}
                                     </span>
                                 </td>
                                 <td class="text-end">
-                                    <span role="button" tabindex="0"
-                                          class="text-primary text-decoration-underline partial-value-cell"
-                                          data-entity-type="clinshipment"
-                                          data-entity-id="{{ shipment.id }}"
-                                          data-payment-type="partial_item_value"
-                                          data-current-value="{{ shipment.item_value|floatformat:2|default:'0.00' }}">
+                                    <span data-derived-field="item_value"
+                                          data-current-value="{{ shipment.item_value|floatformat:2|default:'0.00' }}"
+                                          title="Derived from QTY">
                                         ${{ shipment.item_value|floatformat:2|default:"0.00" }}
                                     </span>
                                 </td>
@@ -650,25 +634,31 @@
                                           data-entity-type="clinshipment"
                                           data-entity-id="{{ shipment.id }}"
                                           data-payment-type="partial_wawf_payment"
-                                          data-current-value="{{ shipment.wawf_payment|floatformat:2|default:'0.00' }}">
+                                          data-current-value="{{ shipment.wawf_payment|floatformat:2|default:'0.00' }}"
+                                          title="Customer payment ledger — add, edit, or delete entries">
                                         ${{ shipment.wawf_payment|floatformat:2|default:"0.00" }}
                                     </span>
                                 </td>
                                 <td class="text-end text-muted small">—</td>
                                 <td class="text-center">
-                                    {% with pflist=shipment.finance_lines_for_audit %}
-                                    {% if pflist %}
-                                    <button type="button" class="pill pill-finance partial-finance-pill"
-                                            data-shipment-id="{{ shipment.id }}"
-                                            data-clin-id="{{ clin.id }}">
-                                        {{ pflist|length }} line{% if pflist|length != 1 %}s{% endif %} · ${{ shipment.finance_billed_sum|floatformat:2 }}
-                                    </button>
-                                    {% else %}
-                                    <button type="button" class="pill pill-add partial-finance-pill"
-                                            data-shipment-id="{{ shipment.id }}"
-                                            data-clin-id="{{ clin.id }}">+ add</button>
-                                    {% endif %}
-                                    {% endwith %}
+                                    <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center finance-workbench-actions">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary js-open-add-finance-line"
+                                                data-clin-id="{{ clin.id }}"
+                                                data-shipment-id="{{ shipment.id }}"
+                                                title="Add cost to this shipment">
+                                            + cost
+                                        </button>
+                                        {% with pflist=shipment.finance_lines_for_audit %}
+                                        {% if pflist %}
+                                        <button type="button" class="pill pill-finance partial-finance-pill"
+                                                data-shipment-id="{{ shipment.id }}"
+                                                data-clin-id="{{ clin.id }}">
+                                            {{ pflist|length }} line{% if pflist|length != 1 %}s{% endif %} · ${{ shipment.finance_billed_sum|floatformat:2 }}
+                                        </button>
+                                        {% endif %}
+                                        {% endwith %}
+                                    </div>
                                 </td>
                             </tr>
                             <tr id="partial-fl-accordion-{{ shipment.id }}"
@@ -741,9 +731,9 @@
                                 <td></td>
                             </tr>
                         {% else %}
-                            <tr>
-                                <td colspan="13" class="ps-4 py-2 text-muted small border-0">
-                                    No shipments recorded.
+                            <tr class="partial-empty-hint">
+                                <td colspan="13" class="ps-4 py-2 text-body-secondary small border-0">
+                                    No shipments yet — use <strong>+ Shipment</strong> on the CLIN row, then log Paid / Customer Pay on the shipment.
                                 </td>
                             </tr>
                         {% endif %}
@@ -785,7 +775,6 @@
     {% include 'contracts/includes/payment_history_popup.html' %}
 
     {% include "contracts/includes/add_partial_modal.html" %}
-    {% include "contracts/includes/log_payment_modal.html" %}
     {% include "contracts/includes/add_finance_line_modal.html" %}
 
     {% endif %}
@@ -860,6 +849,51 @@
 </div>
 {% endif %}
 
+{# Set CLIN unit prices (fallback for legacy CLINs missing per-unit prices) #}
+<div class="modal fade" id="setUnitPriceModal" tabindex="-1"
+     aria-labelledby="setUnitPriceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title small" id="setUnitPriceModalLabel">Set Unit Price</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="setUnitPriceClinId">
+                <div class="mb-2">
+                    <label for="setUnitPriceItem" class="form-label small fw-semibold mb-1">
+                        Unit Price
+                    </label>
+                    <input type="number" class="form-control form-control-sm"
+                           id="setUnitPriceItem" step="0.0001" min="0.0001"
+                           placeholder="Item value per unit">
+                    <div class="form-text small text-muted">
+                        Used to derive shipment Item Value (QTY × unit price)
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label for="setUnitPriceQuote" class="form-label small fw-semibold mb-1">
+                        Price Per Unit
+                    </label>
+                    <input type="number" class="form-control form-control-sm"
+                           id="setUnitPriceQuote" step="0.01" min="0.01"
+                           placeholder="Quote value per unit">
+                    <div class="form-text small text-muted">
+                        Used to derive shipment Quote Value (QTY × price per unit)
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary"
+                        id="setUnitPriceSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {# Log Split Paid Modal #}
 <div class="modal fade" id="logSplitPaidModal" tabindex="-1"
      aria-labelledby="logSplitPaidModalLabel" aria-hidden="true">
@@ -887,7 +921,6 @@
 {% block extra_js %}
 {% if contract %}
 <script src="{% static 'contracts/js/add_partial_modal.js' %}?v={% now 'U' %}"></script>
-<script src="{% static 'contracts/js/log_payment_modal.js' %}?v={% now 'U' %}"></script>
 <script src="{% static 'contracts/js/add_finance_line_modal.js' %}?v={% now 'U' %}"></script>
 <script src="{% static 'contracts/js/finance_audit_splits.js' %}?v={% now 'U' %}"></script>
 <script>
@@ -909,29 +942,29 @@ function openFinanceLinePaymentPopup(financeLineId, lineType, amountBilled) {
 
             const historyContent = document.getElementById('historyContent');
             if (data.payments && data.payments.length > 0) {
-                let html = `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200 payment-history-table">
-                    <thead class="bg-gray-50"><tr>
-                        <th class="px-4 py-2 text-left label">Date</th>
-                        <th class="px-4 py-2 text-right label">Amount</th>
-                        <th class="px-4 py-2 text-left label">Note</th>
-                        <th class="px-4 py-2 text-left label">By</th>
+                let html = `<div class="table-responsive"><table class="table table-sm table-hover payment-history-table mb-0">
+                    <thead class="table-light"><tr>
+                        <th class="text-start">Date</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-start">Note</th>
+                        <th class="text-start">By</th>
                     </tr></thead><tbody>`;
                 data.payments.forEach(p => {
                     html += `<tr>
-                        <td class="px-4 py-2 text-sm">${new Date(p.payment_date).toLocaleDateString('en-US')}</td>
-                        <td class="px-4 py-2 text-sm text-right">$${parseFloat(p.amount).toFixed(2)}</td>
-                        <td class="px-4 py-2 text-sm">${p.note || '—'}</td>
-                        <td class="px-4 py-2 text-sm">${p.created_by}</td>
+                        <td class="small">${new Date(p.payment_date).toLocaleDateString('en-US')}</td>
+                        <td class="small text-end">$${parseFloat(p.amount).toFixed(2)}</td>
+                        <td class="small">${p.note || '—'}</td>
+                        <td class="small">${p.created_by}</td>
                     </tr>`;
                 });
-                html += `</tbody><tfoot class="bg-gray-50"><tr>
-                    <td class="px-4 py-2 text-sm font-medium">Total</td>
-                    <td class="px-4 py-2 text-sm text-right font-medium">$${parseFloat(data.total_paid).toFixed(2)}</td>
+                html += `</tbody><tfoot class="table-secondary"><tr>
+                    <td class="small fw-medium">Total</td>
+                    <td class="small text-end fw-medium">$${parseFloat(data.total_paid).toFixed(2)}</td>
                     <td colspan="2"></td>
                 </tr></tfoot></table></div>`;
                 historyContent.innerHTML = html;
             } else {
-                historyContent.innerHTML = '<p class="text-gray-500 text-center py-3">No payments logged yet</p>';
+                historyContent.innerHTML = '<p class="small text-body-secondary text-center py-3">No payments logged yet</p>';
             }
 
             popup.classList.remove('hidden');
@@ -1112,19 +1145,33 @@ function refreshPartialFinanceLines(shipmentId, clinId) {
         .then(data => {
             if (!data.success) return;
 
-            const pill = document.querySelector(`.partial-finance-pill[data-shipment-id="${shipmentId}"]`);
-            if (pill) {
-                const count = data.finance_lines.length;
-                const total = data.totals.total_billed;
-                if (count > 0) {
+            let pill = document.querySelector(`.partial-finance-pill[data-shipment-id="${shipmentId}"]`);
+            const count = data.finance_lines.length;
+            const total = data.totals.total_billed;
+            const partialRow = document.querySelector(
+                `.partial-row[data-shipment-id="${shipmentId}"]`
+            );
+            const actionsCell = partialRow ? partialRow.cells[partialRow.cells.length - 1] : null;
+            const actionsWrap = actionsCell
+                ? actionsCell.querySelector('.finance-workbench-actions')
+                : null;
+
+            if (count > 0) {
+                if (!pill && actionsWrap) {
+                    pill = document.createElement('button');
+                    pill.type = 'button';
+                    pill.className = 'pill pill-finance partial-finance-pill';
+                    pill.dataset.shipmentId = shipmentId;
+                    if (clinId) pill.dataset.clinId = clinId;
+                    actionsWrap.appendChild(pill);
+                }
+                if (pill) {
                     pill.textContent = `${count} line${count > 1 ? 's' : ''} · $${total.toFixed(2)}`;
                     pill.className = 'pill pill-finance partial-finance-pill';
-                } else {
-                    pill.textContent = '+ add';
-                    pill.className = 'pill pill-add partial-finance-pill';
+                    pill.style.display = '';
                 }
-                pill.dataset.shipmentId = shipmentId;
-                if (clinId) pill.dataset.clinId = clinId;
+            } else if (pill) {
+                pill.remove();
             }
 
             const footerCosts = document.querySelector(`.pfl-footer-costs[data-shipment-id="${shipmentId}"]`);
@@ -1179,9 +1226,9 @@ function refreshPartialSubtotals(clinId) {
     let totalWawf = 0;
 
     accordion.querySelectorAll('.partial-row').forEach(row => {
-        const qv = row.querySelector('[data-payment-type="partial_quote_value"]');
+        const qv = row.querySelector('[data-derived-field="quote_value"]');
         const pa = row.querySelector('[data-payment-type="partial_paid_amount"]');
-        const iv = row.querySelector('[data-payment-type="partial_item_value"]');
+        const iv = row.querySelector('[data-derived-field="item_value"]');
         const wp = row.querySelector('[data-payment-type="partial_wawf_payment"]');
 
         totalQuote += qv ? parseFloat(qv.dataset.currentValue || 0) : 0;
@@ -1287,11 +1334,21 @@ function refreshClinRow(clinId) {
                 quoteSpan.dataset.value = parseFloat(data.quote_value).toFixed(2);
             }
 
-            const paidSpan = document.querySelector(`[data-clin="${clinId}"][data-type="paid_amount"]`);
-            if (paidSpan) {
-                paidSpan.textContent = fmt(data.paid_amount);
-                paidSpan.dataset.value = parseFloat(data.paid_amount).toFixed(2);
+            function updateClinPaymentCell(fieldType, amount, hasShipments) {
+                const row = document.querySelector(`.clin-finance-audit-row[data-clin-id="${clinId}"]`);
+                if (!row) return;
+                const colIndex = fieldType === 'paid_amount' ? 8 : 10;
+                const cell = row.cells[colIndex];
+                if (!cell) return;
+                const formatted = fmt(amount);
+                const cls = fieldType === 'paid_amount' ? 'clin-rollup-paid' : 'clin-rollup-wawf';
+                const title = hasShipments
+                    ? (fieldType === 'paid_amount' ? 'Sum of shipment Paid' : 'Sum of shipment Customer Pay')
+                    : 'Add a shipment, then log payments on it';
+                cell.innerHTML = `<span class="text-body-secondary ${cls}" title="${title}">${formatted}</span>`;
             }
+
+            updateClinPaymentCell('paid_amount', data.paid_amount, data.has_shipments);
 
             const itemSpan = document.querySelector(`[data-entity-id="${clinId}"][data-field-type="item_value"]`);
             if (itemSpan) {
@@ -1299,11 +1356,7 @@ function refreshClinRow(clinId) {
                 itemSpan.dataset.currentValue = parseFloat(data.item_value).toFixed(2);
             }
 
-            const wawfSpan = document.querySelector(`[data-clin="${clinId}"][data-type="wawf_payment"]`);
-            if (wawfSpan) {
-                wawfSpan.textContent = fmt(data.wawf_payment);
-                wawfSpan.dataset.value = parseFloat(data.wawf_payment).toFixed(2);
-            }
+            updateClinPaymentCell('wawf_payment', data.wawf_payment, data.has_shipments);
 
             const adjGross = parseFloat(data.adjusted_gross);
             const adjGrossCell = document.querySelector(`td[data-adj-gross-clin="${clinId}"]`);
@@ -1329,6 +1382,13 @@ function refreshClinRow(clinId) {
                         itemCell.appendChild(newBadge);
                     }
                 }
+            }
+
+            if (!data.needs_unit_price) {
+                const setBtn = document.querySelector(
+                    `.js-set-unit-price[data-clin-id="${clinId}"]`
+                );
+                if (setBtn) setBtn.remove();
             }
         })
         .catch(e => console.error('CLIN refresh failed:', e));
@@ -1585,11 +1645,8 @@ window.financeShipmentsByClin = {
                 return;
             }
 
-            // Accumulating money -> keep the existing log-payment flow (unchanged).
+            // Paid / Customer Pay: always via shipment ledger (Slice 2C).
             if (fieldType === 'paid_amount' || fieldType === 'wawf_payment') {
-                if (typeof window.openLogPaymentModal === 'function') {
-                    window.openLogPaymentModal(clinId);
-                }
                 return;
             }
 
@@ -1601,7 +1658,7 @@ window.financeShipmentsByClin = {
         });
     });
 
-    // Delegated click handler for partial shipment value cells
+    // Delegated click handler for partial shipment paid / customer-pay cells only
     document.addEventListener('click', function(e) {
         const cell = e.target.closest('.partial-value-cell');
         if (!cell) return;
@@ -1619,6 +1676,69 @@ window.financeShipmentsByClin = {
             );
         }
     });
+
+    // Set unit price fallback for CLINs missing per-unit prices
+    const setUnitPriceModalEl = document.getElementById('setUnitPriceModal');
+    let setUnitPriceModal = null;
+    if (setUnitPriceModalEl) {
+        setUnitPriceModal = new bootstrap.Modal(setUnitPriceModalEl);
+    }
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.js-set-unit-price');
+        if (!btn) return;
+        document.getElementById('setUnitPriceClinId').value = btn.dataset.clinId;
+        document.getElementById('setUnitPriceItem').value = btn.dataset.unitPrice || '';
+        document.getElementById('setUnitPriceQuote').value = btn.dataset.pricePerUnit || '';
+        if (setUnitPriceModal) setUnitPriceModal.show();
+    });
+
+    const setUnitPriceSaveBtn = document.getElementById('setUnitPriceSaveBtn');
+    if (setUnitPriceSaveBtn) {
+        setUnitPriceSaveBtn.addEventListener('click', function() {
+            const clinId = document.getElementById('setUnitPriceClinId').value;
+            const unitPrice = document.getElementById('setUnitPriceItem').value;
+            const pricePerUnit = document.getElementById('setUnitPriceQuote').value;
+            if (!clinId) return;
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            setUnitPriceSaveBtn.disabled = true;
+
+            fetch('/contracts/api/clin/' + clinId + '/set-unit-prices/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    unit_price: unitPrice || null,
+                    price_per_unit: pricePerUnit || null,
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                setUnitPriceSaveBtn.disabled = false;
+                if (data.success) {
+                    if (setUnitPriceModal) setUnitPriceModal.hide();
+                    if (window.notify) {
+                        window.notify('success', 'Unit prices saved', 3000);
+                    }
+                    if (typeof refreshClinRow === 'function') {
+                        refreshClinRow(clinId);
+                    }
+                } else {
+                    const msg = data.error || 'Failed to save unit prices';
+                    if (window.notify) window.notify('error', msg, 4000);
+                    else alert(msg);
+                }
+            })
+            .catch(err => {
+                console.error('Set unit price error:', err);
+                setUnitPriceSaveBtn.disabled = false;
+                if (window.notify) window.notify('error', 'Network error', 3000);
+            });
+        });
+    }
 
     document.querySelectorAll('.finance-pill').forEach(pill => {
         pill.addEventListener('click', function() {

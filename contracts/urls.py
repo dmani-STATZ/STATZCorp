@@ -13,6 +13,7 @@ from .views.finance_line_views import (
     get_partial_auto_calc,
     get_partial_finance_lines,
     log_finance_line_payment,
+    set_clin_unit_prices,
 )
 
 # Import views from the modular structure
@@ -671,6 +672,11 @@ urlpatterns = [
         get_partial_auto_calc,
         name="partial_auto_calc",
     ),
+    path(
+        "api/clin/<int:clin_id>/set-unit-prices/",
+        set_clin_unit_prices,
+        name="clin_set_unit_prices",
+    ),
     # Payment History API
     path(
         "api/payment-history/<str:entity_type>/<int:entity_id>/details/",
@@ -686,6 +692,11 @@ urlpatterns = [
         "api/payment-history/<int:payment_id>/delete/",
         payment_history_views.delete_payment_history_entry,
         name="payment_history_delete",
+    ),
+    path(
+        "api/payment-history/<int:payment_id>/update/",
+        payment_history_views.update_payment_history_entry,
+        name="payment_history_update",
     ),
     # CLIN Field Update API
     path(

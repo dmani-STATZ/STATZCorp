@@ -14,8 +14,8 @@
                 <p class="small text-body-secondary" id="popupSubtitle"></p>
                 <p class="small fw-medium text-primary mt-2" id="currentValue"></p>
             </div>
-            <button type="button" onclick="closePaymentHistoryPopup()" class="btn btn-link p-0 text-secondary">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button type="button" onclick="closePaymentHistoryPopup()" class="btn btn-link p-0 text-secondary" aria-label="Close">
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
             </button>
@@ -25,6 +25,8 @@
         </div>
         <form id="newHistoryForm">
             {% csrf_token %}
+            <input type="hidden" id="editingPaymentId" value="">
+            <p class="small text-body-secondary mb-2" id="historyFormModeLabel">Add entry</p>
             <div class="d-flex gap-3">
                 <div class="flex-fill">
                     <label for="payment_amount" class="form-label">Amount</label>
@@ -50,11 +52,16 @@
                          class="form-control"></textarea>
             </div>
             <div class="d-flex justify-content-end gap-2">
+                <button type="button" id="historyFormCancelEditBtn"
+                        class="btn btn-outline-secondary d-none"
+                        onclick="resetPaymentHistoryForm()">
+                    Cancel edit
+                </button>
                 <button type="button" onclick="closePaymentHistoryPopup()"
                         class="btn btn-secondary">
-                    Cancel
+                    Close
                 </button>
-                <button type="submit"
+                <button type="submit" id="historyFormSubmitBtn"
                         class="btn btn-primary">
                     Save Entry
                 </button>
@@ -70,28 +77,48 @@ const notifyToast = (msg, type = 'info', duration = 3000) => {
     }
 };
 
+function resetPaymentHistoryForm() {
+    const form = document.getElementById('newHistoryForm');
+    if (form) form.reset();
+    document.getElementById('editingPaymentId').value = '';
+    document.getElementById('historyFormModeLabel').textContent = 'Add entry';
+    document.getElementById('historyFormSubmitBtn').textContent = 'Save Entry';
+    document.getElementById('historyFormCancelEditBtn').classList.add('d-none');
+}
+
+function startEditPaymentHistoryEntry(entry) {
+    document.getElementById('editingPaymentId').value = entry.id;
+    document.getElementById('payment_amount').value = entry.payment_amount;
+    document.getElementById('payment_date').value = entry.payment_date.split('T')[0];
+    document.getElementById('reference_number').value = entry.reference_number || '';
+    document.getElementById('payment_info').value = entry.payment_info || '';
+    document.getElementById('historyFormModeLabel').textContent = 'Edit entry';
+    document.getElementById('historyFormSubmitBtn').textContent = 'Update Entry';
+    document.getElementById('historyFormCancelEditBtn').classList.remove('d-none');
+    document.getElementById('newHistoryForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function openPaymentHistoryPopup(entityType, entityId, paymentType, sourcePage, currentValue) {
     const popup = document.getElementById('paymentHistoryPopup');
     popup.dataset.entityType = entityType;
     popup.dataset.entityId = entityId;
     popup.dataset.fieldType = paymentType;
     popup.dataset.sourcePage = sourcePage;
+    resetPaymentHistoryForm();
 
-    // Fetch entity details
     fetch(`/contracts/api/payment-history/${entityType}/${entityId}/details/`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 const details = data.details;
-                const entityTitle = entityType === 'contract' ? 'Contract' : 'CLIN';
+                const entityTitle = entityType === 'contract' ? 'Contract'
+                    : entityType === 'clinshipment' ? 'Shipment' : 'CLIN';
 
-                // Update popup title and details
                 document.getElementById('popupTitle').textContent =
                     `Payment History - ${formatFieldType(paymentType)}`;
                 document.getElementById('popupSubtitle').textContent =
                     `${entityTitle}: ${details.number}${details.contract_number ? ` (Contract: ${details.contract_number})` : ''}`;
 
-                // Handle the current value display with proper formatting
                 const formattedValue = currentValue ? formatCurrency(currentValue) : 'Not Available';
                 document.getElementById('currentValue').textContent = `Current Value: ${formattedValue}`;
 
@@ -102,7 +129,6 @@ function openPaymentHistoryPopup(entityType, entityId, paymentType, sourcePage, 
     popup.classList.remove('hidden');
 }
 
-// Handle form submission
 const form = document.getElementById('newHistoryForm');
 if (form) {
     form.addEventListener('submit', function(e) {
@@ -112,11 +138,8 @@ if (form) {
         const entityId = popup.dataset.entityId;
         const entityType = popup.dataset.entityType;
         const fieldType = popup.dataset.fieldType;
-        const sourcePage = popup.dataset.sourcePage;
+        const editingId = document.getElementById('editingPaymentId').value;
 
-        console.log('Form submission:', { entityId, entityType, fieldType, sourcePage });
-
-        // Convert FormData to JSON
         const jsonData = {
             payment_amount: parseFloat(formData.get('payment_amount')),
             payment_date: formData.get('payment_date'),
@@ -124,12 +147,15 @@ if (form) {
             reference_number: formData.get('reference_number') || ''
         };
 
-        // Get CSRF token
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const isEdit = !!editingId;
+        const url = isEdit
+            ? `/contracts/api/payment-history/${editingId}/update/`
+            : `/contracts/api/payment-history/${entityType}/${entityId}/${fieldType}/`;
+        const method = isEdit ? 'PATCH' : 'POST';
 
-        // Submit to API
-        fetch(`/contracts/api/payment-history/${entityType}/${entityId}/${fieldType}/`, {
-            method: 'POST',
+        fetch(url, {
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
@@ -139,35 +165,27 @@ if (form) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Update the history table
                 loadPaymentHistory(entityType, entityId, fieldType);
+                resetPaymentHistoryForm();
 
-                // Clear the form
-                this.reset();
-
-                // Update the cell value and current value display
-                console.log('Updating values with new total:', data.new_total);
-
-                // Update the current value display in the popup
                 const formattedValue = formatCurrency(data.new_total);
                 document.getElementById('currentValue').textContent = `Current Value: ${formattedValue}`;
 
-                // Update the main form field
                 if (typeof window.updateCellValue === 'function') {
                     window.updateCellValue(entityId, fieldType, data.new_total);
-                } else {
-                    console.error('updateCellValue function not found');
                 }
 
-                // Show success notification
-                notifyToast("Payment history entry added successfully", 'success');
+                notifyToast(
+                    isEdit ? 'Payment history entry updated' : 'Payment history entry added',
+                    'success'
+                );
             } else {
-                throw new Error(data.error || 'Failed to add payment history entry');
+                throw new Error(data.error || 'Failed to save payment history entry');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            notifyToast(error.message || "Failed to add payment history entry", 'error');
+            notifyToast(error.message || 'Failed to save payment history entry', 'error');
         });
     });
 }
@@ -175,6 +193,18 @@ if (form) {
 const historyContent = document.getElementById('historyContent');
 if (historyContent) {
     historyContent.addEventListener('click', function(e) {
+        const editBtn = e.target.closest('.js-edit-payment-history');
+        if (editBtn) {
+            startEditPaymentHistoryEntry({
+                id: editBtn.dataset.paymentId,
+                payment_amount: editBtn.dataset.paymentAmount,
+                payment_date: editBtn.dataset.paymentDate,
+                payment_info: editBtn.dataset.paymentInfo,
+                reference_number: editBtn.dataset.referenceNumber,
+            });
+            return;
+        }
+
         const btn = e.target.closest('.js-delete-payment-history');
         if (!btn) return;
         if (!confirm('Delete this payment history entry? This cannot be undone.')) return;
@@ -193,6 +223,9 @@ if (historyContent) {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
+                if (String(document.getElementById('editingPaymentId').value) === String(paymentId)) {
+                    resetPaymentHistoryForm();
+                }
                 loadPaymentHistory(entityType, entityId, fieldType);
                 const formattedValue = formatCurrency(data.new_total);
                 document.getElementById('currentValue').textContent = `Current Value: ${formattedValue}`;
@@ -214,7 +247,7 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
         .then(data => {
             const historyContent = document.getElementById('historyContent');
             const popupEntityType = document.getElementById('paymentHistoryPopup').dataset.entityType;
-            const showDelete = popupEntityType !== 'finance_line';
+            const showActions = popupEntityType !== 'finance_line';
             if (data.history && data.history.length > 0) {
                 let html = `
                     <div class="table-responsive">
@@ -225,26 +258,35 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                                     <th class="text-end" style="width:90px; white-space:nowrap">Amount</th>
                                     <th class="text-start">Notes</th>
                                     <th class="text-start" style="width:80px; white-space:nowrap">Created By</th>
-                                    ${showDelete ? '<th style="width:36px"></th>' : ''}
+                                    ${showActions ? '<th style="width:72px"></th>' : ''}
                                 </tr>
                             </thead>
                             <tbody>
                 `;
 
                 data.history.forEach(entry => {
+                    const ref = (entry.reference_number || '').replace(/"/g, '&quot;');
+                    const info = (entry.payment_info || '').replace(/"/g, '&quot;');
                     html += `
                         <tr>
                             <td class="small" style="width:90px; white-space:nowrap">${formatDate(entry.payment_date)}</td>
                             <td class="small text-end" style="width:90px; white-space:nowrap">${formatCurrency(entry.payment_amount)}</td>
-                            <td class="small">${entry.payment_info || '-'}</td>
+                            <td class="small">${entry.payment_info || entry.reference_number || '-'}</td>
                             <td class="small" style="width:80px; white-space:nowrap">${entry.created_by}</td>
-                            ${showDelete ? `
-                            <td class="text-center" style="width:36px">
-                                <button class="btn btn-link p-0 text-danger js-delete-payment-history"
+                            ${showActions && entry.id ? `
+                            <td class="text-end text-nowrap" style="width:72px">
+                                <button type="button" class="btn btn-link btn-sm p-0 text-primary js-edit-payment-history"
+                                        data-payment-id="${entry.id}"
+                                        data-payment-amount="${entry.payment_amount}"
+                                        data-payment-date="${entry.payment_date}"
+                                        data-payment-info="${info}"
+                                        data-reference-number="${ref}"
+                                        title="Edit entry">Edit</button>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-danger js-delete-payment-history ms-1"
                                         data-payment-id="${entry.id}"
                                         title="Delete entry"
                                         style="line-height:1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
                                       <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
                                       <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
                                     </svg>
@@ -254,7 +296,7 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                     `;
                 });
 
-                const totalColspan = showDelete ? 3 : 2;
+                const totalColspan = showActions ? 3 : 2;
                 html += `
                             </tbody>
                             <tfoot class="table-secondary">
@@ -269,19 +311,15 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
                 `;
                 historyContent.innerHTML = html;
 
-                // Update the current value display and main form field
                 const formattedTotal = formatCurrency(data.total);
                 document.getElementById('currentValue').textContent = `Current Value: ${formattedTotal}`;
 
-                // Sync main form/clin display when history loads. Packaging reloads the
-                // Finance Audit page only via updateCellValue after save/delete (see
-                // finance_audit.html packaging override), not when opening the popup.
                 const entityTypeForSync = document.getElementById('paymentHistoryPopup').dataset.entityType;
                 if (typeof window.updateCellValue === 'function' && entityTypeForSync !== 'contract_packaging') {
                     window.updateCellValue(entityId, paymentType, data.total);
                 }
             } else {
-                historyContent.innerHTML = '<p class="small text-body-secondary text-center">No payment history found</p>';
+                historyContent.innerHTML = '<p class="small text-body-secondary text-center py-3">No payment history found</p>';
             }
         });
 }
@@ -289,7 +327,7 @@ function loadPaymentHistory(entityType, entityId, paymentType) {
 function closePaymentHistoryPopup() {
     const popup = document.getElementById('paymentHistoryPopup');
     popup.classList.add('hidden');
-    document.getElementById('newHistoryForm').reset();
+    resetPaymentHistoryForm();
 }
 
 function formatFieldType(type) {
@@ -323,14 +361,10 @@ function formatCurrency(amount) {
 
 function formatDate(dateString) {
     if (!dateString) return '—';
-    // Parse date parts directly to avoid UTC-to-local timezone shift
-    // that causes ISO date strings (YYYY-MM-DD) to display as the previous day
     const [year, month, day] = dateString.split('T')[0].split('-');
     return `${parseInt(month)}/${parseInt(day)}/${year}`;
 }
 
-// Outside-click close: register on the next tick so the same click that opened the
-// popup (e.g. packaging Q/Pd on Finance Audit) does not bubble here and close it.
 setTimeout(function() {
     if (window.__paymentHistoryOutsideClickBound) {
         return;

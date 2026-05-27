@@ -36,8 +36,7 @@ DOCX_CONTENT_TYPE = (
 
 
 def _acknowledgment_pdf_filename(letter) -> str:
-    po_slug = (letter.po or 'unknown').strip().replace(' ', '-').lower()
-    return f"{po_slug}-purchase-order-acknowledge-letter.pdf"
+    return "Purchase Order Acknowledgment Letter.pdf"
 
 
 def _build_letter_substitutions(letter) -> dict:

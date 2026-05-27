@@ -234,6 +234,9 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                         (l.amount_billed for l in flist),
                         Decimal('0.00'),
                     )
+                    clin.needs_unit_price = (
+                        clin.unit_price is None or clin.price_per_unit is None
+                    )
                 context['clins'] = clins_list
                 clin_adj_gross_sum = sum(
                     (c.adjusted_gross for c in clins_list),
@@ -424,6 +427,9 @@ def finance_audit_clin_api(request, contract_id, clin_id):
             'wawf_payment': str(clin.wawf_payment or 0),
             'adjusted_gross': str(clin.adjusted_gross),
             'has_shipments': has_shipments,
+            'needs_unit_price': (
+                clin.unit_price is None or clin.price_per_unit is None
+            ),
             'shipment_item_value_sum': str(shipment_subtotals['item_value']),
             'shipment_item_value_delta': str(shipment_item_value_delta),
             'shipment_item_value_balanced': shipment_item_value_balanced,
