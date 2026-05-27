@@ -349,6 +349,29 @@ def clin_copy_defaults(request, clin_id):
     })
 
 
+@conditional_login_required
+@require_http_methods(["GET"])
+def clin_ship_qty_api(request, clin_id):
+    """
+    Return the current ship_qty rollup for a CLIN.
+    Used by clin_detail.html to refresh the displayed ship_qty after
+    a shipment add/update/delete without a full page reload.
+    """
+    company = getattr(request, 'active_company', None)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'},
+                            status=403)
+    clin = get_object_or_404(
+        Clin.objects.filter(contract__company=company),
+        id=clin_id,
+    )
+    return JsonResponse({
+        'success': True,
+        'ship_qty': float(clin.ship_qty) if clin.ship_qty is not None else 0,
+        'has_shipments': clin.shipments.exists(),
+    })
+
+
 @login_required
 @require_http_methods(["POST"])
 def update_clin_field(request, clin_id):

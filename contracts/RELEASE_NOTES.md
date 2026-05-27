@@ -16,6 +16,12 @@
 
 ### Changed
 
+- **[2026-05-27] Contract Management — CLIN card Ship Qty now read-only on converted CLINs.** The Ship Qty field on the contract management CLIN detail card is now shown as a read-only value (not an edit button) when the CLIN has shipments, matching the same rule on the CLIN detail page. Ship Qty is always the sum of individual shipment quantities on converted CLINs.
+
+- **[2026-05-27] CLIN Detail — Shipment and value displays stay in sync.** Ship Qty on the CLIN detail page now updates automatically after any shipment is added, edited, or deleted — no page reload needed. On CLINs with shipments, Ship Qty is shown as a read-only rollup (∑) since it is always the sum of individual shipment quantities. Total Value and Quote Total also refresh immediately when Order Qty, Unit Price, or Price Per Unit are changed.
+
+- **[2026-05-27] CLIN Detail — Quantity and price changes now update totals automatically.** Changing Order Qty, Unit Price, or Price Per Unit on a CLIN now immediately updates the Total Value and Quote Total fields on the page — no page reload needed. The values are also saved to the database and fully audited in the change history. Ship Qty is now shown as a read-only rollup on CLINs that have shipments, reflecting the sum of all individual shipment quantities.
+
 - **[2026-05-27] Finance Audit — one workbench on the CLIN table.** The top **Add Shipment**, **Add Finance Line**, and **Log Payment** buttons are gone. Every CLIN has **+ Shipment** and **+ cost** on its row; each shipment has **+ cost** for trucking and other unplanned costs. Supplier and customer payments are logged by clicking **Paid** or **Customer Pay** on the shipment — you can now **edit** a mistyped amount in the ledger instead of deleting and re-entering. CLIN **Paid** and **Customer Pay** are always read-only; add a shipment first, then record money there. The Payment Activity panel is a read-only history.
 
 - **[2026-05-27] Finance Audit — Paid & Customer Pay roll up from shipments.** For CLINs that have shipments (marked with the blue "S"), Paid and Customer Pay are now calculated automatically from the shipments and are no longer edited directly on the CLIN — record those amounts on the shipment instead. CLINs that haven't been converted to shipments yet keep working exactly as before. This removes a behind-the-scenes duplication that could cause totals to drift.

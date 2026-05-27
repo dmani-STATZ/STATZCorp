@@ -253,6 +253,9 @@ const ClinShipments = {
                 
                 this.showMessage('Shipment saved successfully', 'success');
                 this.updateTotalShipQty();
+                if (typeof refreshClinShipQty === 'function') {
+                    refreshClinShipQty();
+                }
             } else {
                 throw new Error(data.error || 'Failed to save shipment');
             }
@@ -288,6 +291,9 @@ const ClinShipments = {
             if (data.success) {
                 row.remove();
                 this.updateTotalShipQty();
+                if (typeof refreshClinShipQty === 'function') {
+                    refreshClinShipQty();
+                }
                 this.showMessage('Shipment deleted successfully', 'success');
             } else {
                 throw new Error(data.error || 'Failed to delete shipment');

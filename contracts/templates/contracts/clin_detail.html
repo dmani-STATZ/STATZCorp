@@ -13,23 +13,86 @@ window.clinId = {{ clin.id }};
 
 window.onTransactionSaved = function(data) {
   if (!data || !data.success) return;
-  if (data.content_type_id == window.clinContentTypeId && data.object_id == window.clinId) {
+
+  // ── CLIN field updates ────────────────────────────────────────────
+  if (data.content_type_id == window.clinContentTypeId &&
+      data.object_id == window.clinId) {
+
+    // Generic: update the directly-edited field's display span
     var fieldHyphen = data.field_name.replace(/_/g, '-');
     var el = document.getElementById('clin-' + fieldHyphen + '-value');
     if (el) el.textContent = data.display_value || 'N/A';
-    fetch('/transactions/list/' + window.clinContentTypeId + '/' + window.clinId + '/')
+
+    // Slice B: handle derived_updates returned by server after
+    // order_qty / unit_price / price_per_unit changes
+    var derived = data.derived_updates || {};
+
+    if (derived.item_value !== undefined) {
+      var ivEl = document.getElementById('clin-item-value-value');
+      if (ivEl) {
+        var iv = parseFloat(derived.item_value);
+        ivEl.textContent = '$' + iv.toLocaleString('en-US', {
+          minimumFractionDigits: 4, maximumFractionDigits: 4
+        });
+      }
+    }
+
+    if (derived.quote_value !== undefined) {
+      var qvEl = document.getElementById('clin-quote-value-value');
+      if (qvEl) {
+        var qv = parseFloat(derived.quote_value);
+        qvEl.textContent = '$' + qv.toLocaleString('en-US', {
+          minimumFractionDigits: 2, maximumFractionDigits: 2
+        });
+      }
+    }
+
+    // Refresh change history panel
+    fetch('/transactions/list/' + window.clinContentTypeId + '/' +
+          window.clinId + '/')
       .then(function(r) { return r.text(); })
       .then(function(html) {
         var hist = document.getElementById('clin-transaction-history');
         if (hist) hist.innerHTML = html;
       });
   }
+
+  // ── ClinShipment field updates ────────────────────────────────────
   if (data.content_type_id == window.clinShipmentContentTypeId) {
-    var fieldHyphen = data.field_name.replace(/_/g, '-');
-    var el = document.getElementById('shipment-' + data.object_id + '-' + fieldHyphen + '-value');
-    if (el) el.textContent = data.display_value || '—';
+    var fieldHyphen2 = data.field_name.replace(/_/g, '-');
+    var el2 = document.getElementById('shipment-' + data.object_id +
+              '-' + fieldHyphen2 + '-value');
+    if (el2) el2.textContent = data.display_value || '—';
+
+    // After any shipment field save, refresh the CLIN-level ship_qty
+    // rollup display so it stays in sync with SUM(shipment.ship_qty)
+    refreshClinShipQty();
   }
 };
+
+/**
+ * Fetches the current ship_qty rollup from the server and updates
+ * the ship_qty display span on this page.
+ * Called after any shipment create / update / delete so the CLIN-level
+ * displayed total stays in sync with SUM(ClinShipment.ship_qty).
+ */
+function refreshClinShipQty() {
+  fetch('/contracts/api/clin/' + window.clinId + '/ship-qty/', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data || !data.success) return;
+    var el = document.getElementById('clin-ship-qty-value');
+    if (el) {
+      var qty = data.ship_qty;
+      el.textContent = qty % 1 === 0
+        ? qty.toFixed(0)
+        : qty.toString();
+    }
+  })
+  .catch(function() { /* silent — display stays stale rather than erroring */ });
+}
 </script>
 
 <div class="clin-detail-layout">
@@ -314,6 +377,34 @@ window.onTransactionSaved = function(data) {
             <div class="card clin-section-card clin-card-shipping">
                 <div class="card-header clin-section-header">Shipping</div>
                 <div class="card-body p-0">
+                    <div class="px-3 pt-3 pb-2 border-bottom">
+                        {% if clin_has_shipments %}
+                        <div class="form-group mb-0">
+                            <span class="clin-field-label d-block">SHIP QTY</span>
+                            <p class="font-medium text-sm mt-1 mb-0">
+                                <span id="clin-ship-qty-value">
+                                    {{ clin.ship_qty|default:"0" }}
+                                </span>
+                                <span class="text-body-secondary ms-1"
+                                      style="font-size:0.7rem;"
+                                      title="Sum of shipment quantities — edit via shipments below">
+                                    ∑
+                                </span>
+                            </p>
+                        </div>
+                        {% else %}
+                        <div class="form-group mb-0">
+                            <button type="button"
+                                onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'ship_qty')"
+                                class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                Ship Qty
+                            </button>
+                            <p class="font-medium text-sm mt-1 mb-0">
+                                <span id="clin-ship-qty-value">{{ clin.ship_qty|default:"0" }}</span>
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
                     {% include "contracts/partials/clin_shipments.html" with mode="form" %}
                 </div>
             </div>

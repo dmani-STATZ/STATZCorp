@@ -38,7 +38,7 @@ class ClinDetailView(ActiveCompanyQuerysetMixin, DetailView):
             'special_payment_terms',
             'created_by',
             'modified_by',
-        ).prefetch_related('splits').filter(company=company)
+        ).prefetch_related('splits', 'shipments').filter(company=company)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -62,6 +62,7 @@ class ClinDetailView(ActiveCompanyQuerysetMixin, DetailView):
         context['clin_content_type_id'] = ContentType.objects.get_for_model(Clin).id
         context['clinshipment_content_type_id'] = ContentType.objects.get_for_model(ClinShipment).id
         context['clin_splits'] = clin.splits.all()
+        context['clin_has_shipments'] = clin.shipments.exists()
         return context
 
 

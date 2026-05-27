@@ -56,6 +56,7 @@ def get_clin_details(request, clin_id):
             'pod_date': clin.pod_date.strftime('%m/%d/%Y') if clin.pod_date else '—',
             'pod_status': pod_status,
             'ship_qty': clin.ship_qty if clin.ship_qty is not None else '—',
+            'has_shipments': total_shipments > 0,
             'total_shipped': float(clin.ship_qty) if clin.ship_qty is not None else 0,
             'is_partial': (
                 (clin.ship_qty or 0) > 0

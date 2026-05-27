@@ -141,6 +141,7 @@ from .views.api_views import (
     get_select_options,
     update_clin_field,
     clin_copy_defaults,
+    clin_ship_qty_api,
     create_buyer,
     create_supplier,
     contract_day_counts,
@@ -710,6 +711,11 @@ urlpatterns = [
         "api/clin/<int:clin_id>/copy-defaults/",
         clin_copy_defaults,
         name="clin_copy_defaults",
+    ),
+    path(
+        "api/clin/<int:clin_id>/ship-qty/",
+        clin_ship_qty_api,
+        name="clin_ship_qty_api",
     ),
     path(
         "api/clin/<int:clin_id>/update-field/",

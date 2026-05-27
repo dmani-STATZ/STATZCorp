@@ -125,14 +125,24 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
             except (InvalidOperation, ZeroDivisionError, TypeError):
                 # Bad/zero qty -> leave value standing alone, do not crash the edit.
                 pass
+        derived = {}
+        CLIN_FORWARD_DERIVE_FIELDS = {'order_qty', 'unit_price', 'price_per_unit'}
+        if model_class.__name__ == 'Clin' and field_name in CLIN_FORWARD_DERIVE_FIELDS:
+            from contracts.services.clin_compute import recompute_clin_derived_values
+            derived = recompute_clin_derived_values(instance, request.user)
         new_display = get_display_value(instance, field_name)
-        return JsonResponse({
+        response_data = {
             "success": True,
             "field_name": field_name,
             "content_type_id": content_type_id,
             "object_id": object_id,
             "display_value": new_display,
-        })
+        }
+        if model_class.__name__ == 'Clin' and field_name in CLIN_FORWARD_DERIVE_FIELDS:
+            response_data["derived_updates"] = {
+                k: str(v) for k, v in derived.items()
+            }
+        return JsonResponse(response_data)
 
     old_value_str = get_field_value_display(instance, field_name)
     form = EditFieldForm(
