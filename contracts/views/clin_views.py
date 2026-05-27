@@ -81,6 +81,20 @@ class ClinCreateView(ActiveCompanyQuerysetMixin, CreateView):
             initial['po_number'] = contract_data.po_number
             initial['tab_num'] = contract_data.tab_num
         return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        contract_id = self.kwargs.get('contract_id')
+        if contract_id:
+            company = getattr(self.request, 'active_company', None)
+            qs = Clin.objects.filter(
+                contract_id=contract_id,
+                contract__company=company,
+            ).select_related('supplier', 'nsn').order_by('item_number')
+            context['copy_from_clins'] = list(qs) if qs.exists() else []
+        else:
+            context['copy_from_clins'] = []
+        return context
     
     def form_valid(self, form):
         # Debugging information

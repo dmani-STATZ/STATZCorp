@@ -64,6 +64,36 @@
         <form method="post" id="clin-form">
             {% csrf_token %}
 
+            {% if copy_from_clins %}
+            <div id="copy-from-banner" class="alert alert-info d-flex align-items-center gap-3 mb-4 py-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor"
+                     viewBox="0 0 16 16" aria-hidden="true" class="flex-shrink-0">
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194
+                             0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703
+                             0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381
+                             2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                </svg>
+                <label for="copy-from-select" class="mb-0 fw-semibold text-nowrap">
+                    Copy from existing CLIN:
+                </label>
+                <select id="copy-from-select" class="form-select form-select-sm"
+                        style="max-width:400px;">
+                    <option value="">— Select a CLIN to copy defaults —</option>
+                    {% for src_clin in copy_from_clins %}
+                    <option value="{{ src_clin.id }}">
+                        CLIN {{ src_clin.item_number }}{% if src_clin.supplier %} — {{ src_clin.supplier.name }}{% endif %}{% if src_clin.nsn %} ({{ src_clin.nsn.nsn_code }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <span id="copy-from-spinner" class="d-none">
+                    <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                </span>
+                <span id="copy-from-status" class="text-success small d-none fw-semibold">
+                    ✓ Defaults applied
+                </span>
+            </div>
+            {% endif %}
+
             {% if not form.instance.pk and not form.initial.contract %}
             <div class="rounded border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 mb-4">
                 <label for="{{ form.contract.id_for_label }}" class="form-label font-semibold">Contract</label>
@@ -124,7 +154,7 @@
                                    class="form-control cursor-pointer bg-gray-50"
                                    placeholder="Click to select NSN"
                                    value="{% if form.instance.nsn %}{{ form.instance.nsn.nsn_code }} - {{ form.instance.nsn.description }}{% elif form.nsn_value %}{{ form.nsn_value.nsn_code }} - {{ form.nsn_value.description }}{% endif %}">
-                            <button type="button" onclick="openNsnModal()"
+                            <button type="button" id="btn-match-nsn" onclick="openNsnModal()"
                                     class="btn btn-primary btn-sm">Match</button>
                             <button type="button" onclick="clearNsnSelection()"
                                     class="btn btn-outline-danger btn-sm" title="Clear NSN">✕</button>
@@ -181,7 +211,7 @@
                                    class="form-control cursor-pointer bg-gray-50"
                                    placeholder="Click to select Supplier"
                                    value="{% if form.instance.supplier %}{{ form.instance.supplier.name }} ({{ form.instance.supplier.cage_code }}){% elif form.supplier_value %}{{ form.supplier_value.name }} ({{ form.supplier_value.cage_code }}){% endif %}">
-                            <button type="button" onclick="openSupplierModal()"
+                            <button type="button" id="btn-match-supplier" onclick="openSupplierModal()"
                                     class="btn btn-primary btn-sm">Match</button>
                             <button type="button" onclick="clearSupplierSelection()"
                                     class="btn btn-outline-danger btn-sm" title="Clear Supplier">✕</button>
@@ -292,12 +322,14 @@
         var d = document.getElementById('nsn_display');
         if (h) { h.value = ''; }
         if (d) { d.value = ''; }
+        if (window.updateMatchButtonState) window.updateMatchButtonState('nsn');
     };
     window.clearSupplierSelection = function () {
         var h = document.getElementById('id_supplier');
         var d = document.getElementById('supplier_display');
         if (h) { h.value = ''; }
         if (d) { d.value = ''; }
+        if (window.updateMatchButtonState) window.updateMatchButtonState('supplier');
     };
 
     var nsnCurrentPage = 1;
@@ -350,6 +382,7 @@
                             if (disp) {
                                 try { disp.value = decodeURIComponent(enc); } catch (e) { disp.value = ''; }
                             }
+                            if (window.updateMatchButtonState) window.updateMatchButtonState('nsn');
                             closeNsnModal();
                         });
                         frag.appendChild(div);
@@ -430,6 +463,7 @@
                             if (disp) {
                                 try { disp.value = decodeURIComponent(enc); } catch (e) { disp.value = ''; }
                             }
+                            if (window.updateMatchButtonState) window.updateMatchButtonState('supplier');
                             closeSupplierModal();
                         });
                         frag.appendChild(div);
@@ -475,24 +509,130 @@
         if (itemVal) itemVal.readOnly = true;
         if (quoteVal) quoteVal.readOnly = true;
 
+        /**
+         * Updates the NSN or Supplier "Match" button to reflect populated state.
+         * type: 'nsn' | 'supplier'
+         */
+        function updateMatchButtonState(type) {
+            var hiddenId = type === 'nsn' ? 'id_nsn' : 'id_supplier';
+            var btnId = type === 'nsn' ? 'btn-match-nsn' : 'btn-match-supplier';
+            var hidden = document.getElementById(hiddenId);
+            var btn = document.getElementById(btnId);
+            if (!hidden || !btn) return;
+
+            if (hidden.value) {
+                btn.className = 'btn btn-success btn-sm';
+                btn.innerHTML =
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" ' +
+                    'fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" ' +
+                    'style="margin-bottom:1px">' +
+                    '<path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 ' +
+                    '0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 ' +
+                    '0 1 .708 0z"/></svg> Matched';
+            } else {
+                btn.className = 'btn btn-primary btn-sm';
+                btn.innerHTML = 'Match';
+            }
+        }
+        window.updateMatchButtonState = updateMatchButtonState;
+        updateMatchButtonState('nsn');
+        updateMatchButtonState('supplier');
+
+        function triggerAutoCalc() {
+            if (!orderQty) return;
+            var q = parseFloat(orderQty.value);
+            if (isNaN(q)) return;
+
+            var up = parseFloat((unitPrice && unitPrice.value) ? unitPrice.value : 'NaN');
+            if (itemVal && !isNaN(up)) {
+                itemVal.value = (q * up).toFixed(4);
+            }
+
+            var pp = parseFloat((pricePer && pricePer.value) ? pricePer.value : 'NaN');
+            if (quoteVal && !isNaN(pp)) {
+                quoteVal.value = (q * pp).toFixed(2);
+            }
+        }
+
         var btnItem = document.getElementById('btn-recalc-item-value');
         if (btnItem) {
-            btnItem.addEventListener('click', function () {
-                var q = parseFloat((orderQty && orderQty.value) ? orderQty.value : 'NaN');
-                var p = parseFloat((unitPrice && unitPrice.value) ? unitPrice.value : 'NaN');
-                if (itemVal && !isNaN(q) && !isNaN(p)) {
-                    itemVal.value = (q * p).toFixed(4);
-                }
-            });
+            btnItem.addEventListener('click', triggerAutoCalc);
         }
         var btnQuote = document.getElementById('btn-recalc-quote-value');
         if (btnQuote) {
-            btnQuote.addEventListener('click', function () {
-                var q = parseFloat((orderQty && orderQty.value) ? orderQty.value : 'NaN');
-                var p = parseFloat((pricePer && pricePer.value) ? pricePer.value : 'NaN');
-                if (quoteVal && !isNaN(q) && !isNaN(p)) {
-                    quoteVal.value = (q * p).toFixed(2);
-                }
+            btnQuote.addEventListener('click', triggerAutoCalc);
+        }
+
+        if (orderQty) {
+            orderQty.addEventListener('input', triggerAutoCalc);
+            orderQty.addEventListener('change', triggerAutoCalc);
+        }
+
+        var copySelect = document.getElementById('copy-from-select');
+        if (copySelect) {
+            copySelect.addEventListener('change', function () {
+                var clinId = this.value;
+                if (!clinId) return;
+
+                var spinner = document.getElementById('copy-from-spinner');
+                var status = document.getElementById('copy-from-status');
+                if (spinner) spinner.classList.remove('d-none');
+                if (status) status.classList.add('d-none');
+
+                fetch('/contracts/api/clin/' + clinId + '/copy-defaults/', {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (!data.success) return;
+
+                        var suppHidden = document.getElementById('id_supplier');
+                        var suppDisplay = document.getElementById('supplier_display');
+                        if (suppHidden && data.supplier_id) {
+                            suppHidden.value = data.supplier_id;
+                        }
+                        if (suppDisplay && data.supplier_display) {
+                            suppDisplay.value = data.supplier_display;
+                        }
+
+                        var nsnHidden = document.getElementById('id_nsn');
+                        var nsnDisp = document.getElementById('nsn_display');
+                        if (nsnHidden && data.nsn_id) {
+                            nsnHidden.value = data.nsn_id;
+                        }
+                        if (nsnDisp && data.nsn_display) {
+                            nsnDisp.value = data.nsn_display;
+                        }
+
+                        function setField(id, val) {
+                            if (!val && val !== 0) return;
+                            var el = document.getElementById(id);
+                            if (el) el.value = val;
+                        }
+
+                        setField('id_ia', data.ia);
+                        setField('id_fob', data.fob);
+                        setField('id_uom', data.uom);
+                        setField('id_unit_price', data.unit_price);
+                        setField('id_price_per_unit', data.price_per_unit);
+                        setField('id_special_payment_terms', data.special_payment_terms_id);
+                        setField('id_po_number', data.po_number);
+                        setField('id_clin_po_num', data.clin_po_num);
+                        setField('id_tab_num', data.tab_num);
+                        setField('id_due_date', data.due_date);
+                        setField('id_supplier_due_date', data.supplier_due_date);
+
+                        updateMatchButtonState('nsn');
+                        updateMatchButtonState('supplier');
+
+                        triggerAutoCalc();
+
+                        if (spinner) spinner.classList.add('d-none');
+                        if (status) status.classList.remove('d-none');
+                    })
+                    .catch(function () {
+                        if (spinner) spinner.classList.add('d-none');
+                    });
             });
         }
 

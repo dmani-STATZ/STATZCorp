@@ -6,6 +6,7 @@ from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
 import json
 
+from STATZWeb.decorators import conditional_login_required
 from processing.services.contract_utils import normalize_nsn
 
 from ..models import (
@@ -303,6 +304,50 @@ def get_select_options(request, field_name):
                 'page_size': page_size
             }
         })
+
+@conditional_login_required
+@require_http_methods(["GET"])
+def clin_copy_defaults(request, clin_id):
+    """
+    Return copyable default field values from an existing CLIN.
+    Used by the Add CLIN form's "Copy From" dropdown.
+    Scoped to active company. Returns only fields safe to copy to a new CLIN.
+    """
+    company = getattr(request, 'active_company', None)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
+
+    clin = get_object_or_404(
+        Clin.objects.select_related('supplier', 'nsn', 'special_payment_terms')
+        .filter(contract__company=company),
+        id=clin_id,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'supplier_id': clin.supplier_id,
+        'supplier_display': (
+            f"{clin.supplier.name} ({clin.supplier.cage_code})" if clin.supplier else ''
+        ),
+        'nsn_id': clin.nsn_id,
+        'nsn_display': (
+            f"{clin.nsn.nsn_code} - {clin.nsn.description}" if clin.nsn else ''
+        ),
+        'ia': clin.ia or '',
+        'fob': clin.fob or '',
+        'uom': clin.uom or '',
+        'unit_price': str(clin.unit_price) if clin.unit_price is not None else '',
+        'price_per_unit': str(clin.price_per_unit) if clin.price_per_unit is not None else '',
+        'special_payment_terms_id': clin.special_payment_terms_id or '',
+        'po_number': clin.po_number or '',
+        'clin_po_num': clin.clin_po_num or '',
+        'tab_num': clin.tab_num or '',
+        'due_date': clin.due_date.strftime('%Y-%m-%d') if clin.due_date else '',
+        'supplier_due_date': (
+            clin.supplier_due_date.strftime('%Y-%m-%d') if clin.supplier_due_date else ''
+        ),
+    })
+
 
 @login_required
 @require_http_methods(["POST"])

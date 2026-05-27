@@ -140,6 +140,7 @@ from .views.contract_views import check_contract_number
 from .views.api_views import (
     get_select_options,
     update_clin_field,
+    clin_copy_defaults,
     create_buyer,
     create_supplier,
     contract_day_counts,
@@ -705,6 +706,11 @@ urlpatterns = [
         name="payment_history_update",
     ),
     # CLIN Field Update API
+    path(
+        "api/clin/<int:clin_id>/copy-defaults/",
+        clin_copy_defaults,
+        name="clin_copy_defaults",
+    ),
     path(
         "api/clin/<int:clin_id>/update-field/",
         update_clin_field,
