@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from sales.models import AwardImportBatch, DibbsAward, WeWonAward
+
+if TYPE_CHECKING:
+    from contracts.models import Company
 
 from intake.ingest import (
     DuplicateContractNumber,
@@ -23,6 +27,32 @@ _LOG_PREFIX = "[queue_we_won_drafts]"
 
 def _str_field(value) -> str:
     return str(value) if value is not None else ""
+
+
+def _resolve_company_for_award(award) -> 'Company | None':
+    """
+    Look up the Company for a DibbsAward via the dibbs_company_cage join table.
+
+    CompanyCAGE lives in the sales app (table dibbs_company_cage).
+    Returns None if no match found — callers must handle gracefully.
+    """
+    from sales.models import CompanyCAGE
+
+    cage = (getattr(award, 'awardee_cage', None) or '').strip()
+    if not cage:
+        return None
+    try:
+        entry = CompanyCAGE.objects.select_related('company').filter(
+            cage_code=cage,
+            is_active=True,
+        ).first()
+        if entry and entry.company_id:
+            return entry.company
+    except Exception as exc:
+        logger.warning(
+            '%s company lookup failed for cage %r: %s', _LOG_PREFIX, cage, exc
+        )
+    return None
 
 
 def _award_to_scraper_record(award: DibbsAward) -> dict[str, str]:
@@ -74,8 +104,9 @@ def queue_we_won_drafts(
 
         for award in base_qs:
             record = _award_to_scraper_record(award)
+            company = _resolve_company_for_award(award)
             try:
-                ingest_dibbs_record(record)
+                draft = ingest_dibbs_record(record, company=company)
             except DuplicateContractNumber:
                 result["skipped"] += 1
             except IngestionError as exc:
@@ -91,6 +122,15 @@ def queue_we_won_drafts(
                 )
             else:
                 result["queued"] += 1
+                if company is not None:
+                    try:
+                        from intake.services.sharepoint_intake import (
+                            probe_draft_sharepoint_folder,
+                        )
+                        probe_draft_sharepoint_folder(draft)
+                    except Exception as exc:
+                        result["errors"] += 1
+                        _emit(f'SP probe error for {draft.contract_number}: {exc}')
 
     except Exception as exc:
         result["errors"] += 1

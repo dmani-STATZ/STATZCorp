@@ -20,4 +20,6 @@ urlpatterns = [
     path('drafts/<int:pk>/finalize/', views.finalize_draft_view, name='finalize_draft'),
     # Phase 3c: PDF drag-and-drop ingestion
     path('upload/', views.upload_pdfs, name='upload_pdfs'),
+    # SharePoint scan API
+    path('api/scan-sharepoint/', views.scan_sharepoint_drafts, name='scan_sharepoint_drafts'),
 ]

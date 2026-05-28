@@ -34,6 +34,8 @@
     [data-bs-theme="dark"] .intake-queue-cell-data { color: #e9ecef; }
     .intake-queue-row:hover { background-color: #f9fafb; }
     [data-bs-theme="dark"] .intake-queue-row:hover { background-color: #343a40; }
+    [data-bs-theme="dark"] .sp-folder-exists-icon svg { color: var(--bs-success) !important; }
+    [data-bs-theme="dark"] .sp-row-scan-btn svg { color: var(--bs-secondary-color) !important; }
     </style>
 
     <div class="container mx-auto px-4 py-8">
@@ -72,8 +74,8 @@
         </div>
         <div id="intake-upload-results" class="mb-3"></div>
 
-        <!-- Stat badges -->
-        <div class="d-flex align-items-stretch flex-wrap gap-3 mb-3">
+        <!-- Stat badges + SharePoint scan -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
             <div class="d-flex align-items-center gap-2 flex-shrink-0 flex-wrap">
                 <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis px-3 py-2 fw-medium">
                     {{ total_count|default:0 }} drafts
@@ -88,6 +90,19 @@
                     {{ ready_count|default:0 }} ready for review
                 </span>
             </div>
+            <div class="d-flex flex-column align-items-end gap-0">
+                <button type="button" id="intake-scan-sp-btn"
+                        class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                        title="Scan SharePoint for draft folders">
+                    <svg xmlns="http://www.w3.org/2000/svg" style="width:1rem;height:1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Scan SP
+                </button>
+                <span id="intake-last-scan-label" class="small text-muted d-none">
+                    Last scanned <span id="intake-last-scan-time"></span>
+                </span>
+            </div>
         </div>
 
         <div class="card shadow-md overflow-x-auto intake-queue-scroll-wrap" style="max-height: calc(100vh - 280px); overflow-y: auto;">
@@ -95,9 +110,11 @@
                 <thead class="sticky-top intake-queue-thead" style="z-index: 10;">
                     <tr>
                         <th class="px-6 py-2 text-left tracking-wider label">Contract Number</th>
+                        <th class="px-6 py-2 text-left tracking-wider label">Company</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Type</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Status</th>
                         <th class="px-3 py-2 text-center tracking-wider label">PDF</th>
+                        <th class="px-3 py-2 text-center tracking-wider label">SP Folder</th>
                         <th class="px-6 py-2 text-left tracking-wider label">Actions</th>
                     </tr>
                 </thead>
@@ -113,6 +130,15 @@
                                    title="This contract is already finalized.">
                                     Already in DB
                                 </a>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            {% if draft.company %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:0.7rem;">
+                                    {{ draft.company.name }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
                             {% endif %}
                         </td>
                         <td class="px-6 py-2 whitespace-nowrap">
@@ -172,8 +198,69 @@
                                 <span class="badge bg-secondary-subtle text-secondary-emphasis" title="Pending">Pending</span>
                             {% endif %}
                         </td>
+                        <td class="px-3 py-2 whitespace-nowrap text-center"
+                            id="sp-folder-cell-{{ draft.id }}">
+                            {% if draft.sharepoint_folder_status == 'exists' or draft.sharepoint_folder_status == 'created' %}
+                                <span title="SharePoint folder exists" class="sp-folder-exists-icon" data-draft-id="{{ draft.id }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;" class="text-success d-inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z"/>
+                                    </svg>
+                                </span>
+                                <button type="button" class="btn btn-link p-0 ms-1 sp-row-scan-btn"
+                                        id="sp-scan-btn-{{ draft.id }}"
+                                        data-draft-id="{{ draft.id }}"
+                                        title="Re-scan SharePoint"
+                                        style="line-height:1;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" style="width:0.75rem;height:0.75rem;" class="text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                </button>
+                            {% elif draft.sharepoint_folder_status == 'not_found' %}
+                                <span title="SharePoint folder not found">
+                                    <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;opacity:0.4;" class="text-secondary d-inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z"/>
+                                    </svg>
+                                </span>
+                                <button type="button" class="btn btn-link p-0 ms-1 sp-row-scan-btn"
+                                        id="sp-scan-btn-{{ draft.id }}"
+                                        data-draft-id="{{ draft.id }}"
+                                        title="Scan SharePoint for this contract">
+                                    <svg xmlns="http://www.w3.org/2000/svg" style="width:0.75rem;height:0.75rem;" class="text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                </button>
+                            {% elif draft.sharepoint_folder_status == 'error' %}
+                                <span class="text-danger small" title="SharePoint scan error">err</span>
+                                <button type="button" class="btn btn-link p-0 ms-1 sp-row-scan-btn"
+                                        id="sp-scan-btn-{{ draft.id }}"
+                                        data-draft-id="{{ draft.id }}"
+                                        title="Retry SharePoint scan">
+                                    <svg xmlns="http://www.w3.org/2000/svg" style="width:0.75rem;height:0.75rem;" class="text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                </button>
+                            {% else %}
+                                <span title="SharePoint status unknown">
+                                    <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;opacity:0.2;" class="d-inline" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z"/>
+                                    </svg>
+                                </span>
+                            {% endif %}
+                        </td>
                         <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 flex-wrap align-items-center">
+                                {% if draft.contract_number %}
+                                <button type="button"
+                                        class="btn btn-sm {% if draft.sharepoint_folder_status == 'exists' or draft.sharepoint_folder_status == 'created' %}btn-outline-info{% else %}btn-outline-secondary{% endif %}"
+                                        {% if draft.sharepoint_folder_status != 'exists' and draft.sharepoint_folder_status != 'created' %}style="opacity: 0.5;"{% endif %}
+                                        title="{% if draft.sharepoint_folder_status == 'exists' or draft.sharepoint_folder_status == 'created' %}Open SharePoint documents{% else %}SharePoint folder not yet confirmed — scan first{% endif %}"
+                                        onclick="openDraftDocuments({{ draft.id }})">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;vertical-align:-2px;">
+                                        <path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z"/>
+                                    </svg>
+                                    Docs
+                                </button>
+                                {% endif %}
                                 {% if draft.lock_active and draft.locked_by_id == request.user.id %}
                                     <form method="post" action="{% url 'intake:start_draft' draft.id %}" class="d-inline">
                                         {% csrf_token %}
@@ -206,7 +293,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-5">
+                        <td colspan="7" class="text-center text-muted py-5">
                             No drafts in the queue. Drop a DLA 1155 PDF above to ingest one.
                         </td>
                     </tr>
@@ -302,6 +389,117 @@
         const files = e.dataTransfer && e.dataTransfer.files;
         if (files) upload(files);
     });
+
+    // ── SharePoint scan ──────────────────────────────────────────────────────
+    const SCAN_SP_URL = "{% url 'intake:scan_sharepoint_drafts' %}";
+    const CSRF_TOKEN = () => document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    function showToast(message, type) {
+        const cls = type === 'error' ? 'alert-danger' : (type === 'success' ? 'alert-success' : 'alert-info');
+        const el = document.createElement('div');
+        el.className = 'alert ' + cls + ' py-2 mb-2';
+        el.textContent = message;
+        results.appendChild(el);
+        setTimeout(() => el.remove(), 5000);
+    }
+
+    const SPIN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" style="width:1rem;height:1rem;" class="text-muted d-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>';
+
+    const FOLDER_GREEN = '<span title="SharePoint folder exists" class="sp-folder-exists-icon"><svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;" class="text-success d-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z"/></svg></span>';
+    const FOLDER_GRAY = '<span title="SharePoint folder not found"><svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;opacity:0.4;" class="text-secondary d-inline" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 21a3 3 0 0 0 3-3v-4.5a3 3 0 0 0-3-3h-15a3 3 0 0 0-3 3V18a3 3 0 0 0 3 3h15ZM1.5 10.147V6a3 3 0 0 1 3-3h5.379a2.25 2.25 0 0 1 1.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 0 1 3 3v1.146A4.483 4.483 0 0 0 19.5 12h-15a4.483 4.483 0 0 0-3 1.146V10.147Z"/></svg></span>';
+    const RESCAN_BTN = (draftId) => '<button type="button" class="btn btn-link p-0 ms-1 sp-row-scan-btn" data-draft-id="' + draftId + '" title="Re-scan SharePoint" style="line-height:1;"><svg xmlns="http://www.w3.org/2000/svg" style="width:0.75rem;height:0.75rem;" class="text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>';
+
+    function _applySpResult(result) {
+        const cell = document.getElementById('sp-folder-cell-' + result.draft_id);
+        if (!cell) return;
+        if (result.error && !result.folder_exists) {
+            cell.innerHTML = '<span class="text-danger small" title="' + escapeHtml(result.error) + '">err</span>' + RESCAN_BTN(result.draft_id);
+            cell.querySelector('.sp-row-scan-btn')?.addEventListener('click', () => scanRowSP(result.draft_id));
+            return;
+        }
+        if (result.folder_exists) {
+            cell.innerHTML = FOLDER_GREEN + RESCAN_BTN(result.draft_id);
+        } else {
+            cell.innerHTML = FOLDER_GRAY + RESCAN_BTN(result.draft_id);
+        }
+        cell.querySelector('.sp-row-scan-btn')?.addEventListener('click', () => scanRowSP(result.draft_id));
+    }
+
+    function scanRowSP(draftId) {
+        const cell = document.getElementById('sp-folder-cell-' + draftId);
+        if (cell) cell.innerHTML = SPIN_SVG;
+        fetch(SCAN_SP_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN()},
+            body: JSON.stringify({draft_id: draftId}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            const result = (data.results || [])[0];
+            if (result) _applySpResult(result);
+        })
+        .catch(() => {
+            const cellErr = document.getElementById('sp-folder-cell-' + draftId);
+            if (cellErr) {
+                cellErr.innerHTML = '<span class="text-danger small">err</span>' + RESCAN_BTN(draftId);
+                cellErr.querySelector('.sp-row-scan-btn')?.addEventListener('click', () => scanRowSP(draftId));
+            }
+        });
+    }
+
+    function scanAllSP() {
+        const btn = document.getElementById('intake-scan-sp-btn');
+        const icon = btn?.querySelector('svg');
+        if (btn) btn.disabled = true;
+        if (icon) icon.style.animation = 'spin 1s linear infinite';
+
+        fetch(SCAN_SP_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN()},
+            body: JSON.stringify({all: true}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            (data.results || []).forEach(_applySpResult);
+            const total = (data.results || []).length;
+            const found = (data.results || []).filter(r => r.folder_exists).length;
+            showToast('Scanned ' + total + ' draft(s) — ' + found + ' folder(s) found in SharePoint', 'info');
+            const label = document.getElementById('intake-last-scan-label');
+            const time = document.getElementById('intake-last-scan-time');
+            if (label && time) {
+                label.classList.remove('d-none');
+                time.textContent = 'just now';
+                let mins = 1;
+                clearInterval(window._intakeLastScanInterval);
+                window._intakeLastScanInterval = setInterval(() => {
+                    time.textContent = mins + ' min ago';
+                    mins++;
+                }, 60000);
+            }
+        })
+        .catch(() => showToast('SharePoint scan failed', 'error'))
+        .finally(() => {
+            if (btn) btn.disabled = false;
+            if (icon) icon.style.animation = '';
+        });
+    }
+
+    document.getElementById('intake-scan-sp-btn')?.addEventListener('click', scanAllSP);
+
+    document.querySelectorAll('.sp-row-scan-btn').forEach(btn => {
+        const draftId = parseInt(btn.dataset.draftId, 10);
+        if (draftId) btn.addEventListener('click', () => scanRowSP(draftId));
+    });
 })();
+</script>
+<script>
+const DRAFT_DOCS_BASE_URL = "{% url 'contracts:intake_draft_documents_browser' %}";
+
+function openDraftDocuments(draftId) {
+    const url = DRAFT_DOCS_BASE_URL + '?draft_id=' + draftId;
+    const popup = window.open(url, 'statz_documents',
+        'width=1000,height=700,resizable=yes,scrollbars=no');
+    if (popup) popup.focus();
+}
 </script>
 {% endblock %}

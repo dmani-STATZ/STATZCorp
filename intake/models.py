@@ -88,6 +88,31 @@ class DraftContract(models.Model):
         related_name='intake_source_drafts',
     )
 
+    company = models.ForeignKey(
+        'contracts.Company',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='draft_contracts',
+        help_text='Company this draft belongs to. Set at ingestion time.',
+    )
+
+    sharepoint_folder_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('exists', 'Exists'),
+            ('not_found', 'Not Found'),
+            ('created', 'Created'),
+            ('error', 'Error'),
+        ],
+        default='pending',
+        help_text=(
+            'Whether the SharePoint folder for this contract has been confirmed '
+            'or created.'
+        ),
+    )
+
     created_at = models.DateTimeField(default=timezone.now)
     modified_at = models.DateTimeField(auto_now=True)
 
@@ -100,6 +125,7 @@ class DraftContract(models.Model):
             models.Index(fields=['contract_type']),
             models.Index(fields=['locked_by']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['company'], name='intake_draf_company_idx'),
         ]
 
     def __str__(self):

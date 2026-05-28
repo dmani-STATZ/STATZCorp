@@ -177,7 +177,7 @@ def _result_to_data(result: AwardParseResult) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def ingest_pdf(pdf_file, *, original_filename: str = '') -> DraftContract:
+def ingest_pdf(pdf_file, *, original_filename: str = '', company=None) -> DraftContract:
     """Parse one PDF and create a DraftContract.
 
     `pdf_file` is anything `parse_award_pdf` accepts (file-like object or
@@ -222,6 +222,7 @@ def ingest_pdf(pdf_file, *, original_filename: str = '') -> DraftContract:
             contract_type=result.contract_type,
             status=DraftContract.Status.QUEUED,
             pdf_parse_status=result.pdf_parse_status or DraftContract.PdfParseStatus.PARTIAL,
+            company=company,
             data=data,
         )
     except DraftDataValidationError as exc:
@@ -308,7 +309,7 @@ def _dibbs_contract_number(record: dict) -> Optional[str]:
     return do or basic or None
 
 
-def ingest_dibbs_record(record: dict) -> DraftContract:
+def ingest_dibbs_record(record: dict, company=None) -> DraftContract:
     """Create a skeleton DraftContract from one scraped DIBBS award row.
 
     The contract type is derived from the contract number (same rules as
@@ -345,6 +346,7 @@ def ingest_dibbs_record(record: dict) -> DraftContract:
             contract_type=contract_type,
             status=DraftContract.Status.QUEUED,
             pdf_parse_status=DraftContract.PdfParseStatus.NO_PDF,
+            company=company,
             data=data,
         )
     except DraftDataValidationError as exc:

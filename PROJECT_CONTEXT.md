@@ -108,6 +108,29 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 
 ---
 
+### `intake` — Contract Intake Queue
+**Purpose:** JSON-backed draft workspace for new contracts before finalization into `contracts`. Replaces processing queue over time; independent of processing staging tables.
+
+**Owns:** `DraftContract` (with `company` FK and `sharepoint_folder_status`), Pydantic schemas, soft locks, PDF/DIBBS ingestion, finalization into canonical tables
+
+**Consumes from other apps:**
+- `contracts.Company`, `contracts.Contract` — company scoping, dedup badge, finalization target
+- `sales.CompanyCAGE` (`dibbs_company_cage`) — CAGE → company resolution at DIBBS injection
+- `contracts.services.sharepoint_service` / `sharepoint_paths` via `intake/services/sharepoint_intake.py` — folder path build, probe, create (no `processing.*` imports)
+
+**Other apps consume from it:** Nothing yet — intake is the entry point, not a dependency for other apps
+
+**URL prefix:** `/intake/`
+
+**Critical notes:**
+- Drafts are deleted on successful finalization; `DraftContract` is not audited by `transactions`
+- SharePoint folder path lives in `data['sharepoint_folder_path']`; status in `sharepoint_folder_status`
+- DIBBS piggyback (`queue_we_won_drafts`) probes SharePoint only when `company` resolves; never creates folders at injection time
+- Draft documents browser at `/contracts/documents/draft/` (owned by contracts URL space, intake-authorized)
+- SharePoint folder path carried to `Contract.files_url` at finalization
+
+---
+
 ### `suppliers` — Supplier Domain
 **Purpose:** Supplier profiles, contacts, documents, certifications/classifications, AI enrichment pipeline, global AI model configuration.
 

@@ -31,7 +31,11 @@ First-class columns:
 | `pdf_parse_status` | `pending`, `no_pdf`, `parseable`, `partial`, `success` |
 | `data` | JSONField — everything else |
 | `final_contract` | Set briefly at finalization; draft is then deleted |
+| `company` | FK to `contracts.Company`; set at ingestion (DIBBS CAGE lookup or PDF upload active company) |
+| `sharepoint_folder_status` | `pending`, `exists`, `not_found`, `created`, `error` — folder probe/create state |
 | `created_at`, `modified_at` | Audit timestamps |
+
+SharePoint folder path is stored in `data['sharepoint_folder_path']` (not a model column).
 
 ### `data` JSON shape
 Varies by `contract_type`. See `intake/schemas.py` for the authoritative
@@ -270,6 +274,26 @@ the upload endpoint and reloads the queue on any success.
 - **Finalization email** — redirects to `/processing/email-compose/` with
   prefilled subject + body on Contract-creating finalize paths
 
+**Company scoping** — `DraftContract.company` FK added. Queue view filters to all
+companies the user has membership in (superusers see all, including unscoped
+drafts with `company=None`). DIBBS injection resolves company via
+`dibbs_company_cage` CAGE lookup (`sales.CompanyCAGE`).
+
+**SharePoint folder status** — `DraftContract.sharepoint_folder_status` column
+(`pending` / `exists` / `not_found` / `created` / `error`). Path stored in
+`data['sharepoint_folder_path']`. Probe runs after DIBBS injection when company
+is known; folder creation is reserved for PDF upload (next phase UI).
+
+SharePoint scan API — POST /intake/api/scan-sharepoint/ (`intake:scan_sharepoint_drafts`). Accepts `draft_id` or `all=true`. Probes SharePoint and updates `sharepoint_folder_status` + `data['sharepoint_folder_path']` on each draft. Company-scoped: non-superusers only see their companies' drafts.
+
+Queue SP column — Draft queue table shows SP folder status badge per row with per-row rescan icon and bulk "Scan SP" toolbar button.
+
+Company column — Draft queue table shows company badge per row.
+
+PDF upload creates folder — `upload_pdfs` calls `create_draft_sharepoint_folder` after successful ingestion. Non-blocking.
+
+Draft documents browser — `contracts:intake_draft_documents_browser` at `/contracts/documents/draft/?draft_id=N`. Opens the shared documents browser popup in draft mode. Save Path writes to `draft.data['sharepoint_folder_path']` via `contracts:set_draft_file_path_api`. "Docs" button appears on each queue row. At finalization, `sharepoint_folder_path` is carried through to `Contract.files_url` (or `IdiqContract.files_url`) automatically.
+
 ## Not Yet Built (explicitly out of scope)
 - CSV ingestion path — depends on an external group that has not delivered
   the CSV feed; deferred indefinitely
@@ -283,6 +307,12 @@ the upload endpoint and reloads the queue on any success.
 ## Coupling
 - Reads `contracts.models.Contract` for the "Already in DB" queue badge and
   for the `final_contract` FK target.
+- Reads `sales.CompanyCAGE` (`dibbs_company_cage`) for company resolution at
+  DIBBS injection time.
+- Calls `contracts.services.sharepoint_service` and
+  `contracts.services.sharepoint_paths` for SharePoint operations via
+  `intake/services/sharepoint_intake.py`. Does **not** import from
+  `processing.*`.
 - Templates extend `contracts/contract_base.html`.
 - No signal coupling. No `transactions` audit hooks on `DraftContract` —
   drafts are pre-canonical and out of scope for audit history.

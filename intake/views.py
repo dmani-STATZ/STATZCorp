@@ -8,6 +8,7 @@ the same draft concurrently.
 from __future__ import annotations
 
 import json
+import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -36,6 +37,8 @@ from .matchers import (
 from .models import DraftContract
 from .schemas import DraftDataValidationError
 
+logger = logging.getLogger('intake.views')
+
 
 @method_decorator(login_required, name='dispatch')
 class DraftQueueView(ListView):
@@ -45,15 +48,38 @@ class DraftQueueView(ListView):
     paginate_by = None
 
     def get_queryset(self):
+        from contracts.models import Company
+
+        if self.request.user.is_superuser:
+            user_companies = Company.objects.filter(is_active=True)
+        else:
+            user_companies = Company.objects.filter(
+                user_memberships__user=self.request.user,
+            )
+
+        if self.request.user.is_superuser:
+            qs = DraftContract.objects.exclude(status=DraftContract.Status.COMPLETED)
+        else:
+            qs = DraftContract.objects.exclude(
+                status=DraftContract.Status.COMPLETED,
+            ).filter(company__in=user_companies)
+
         return (
-            DraftContract.objects
-            .exclude(status=DraftContract.Status.COMPLETED)
-            .select_related('locked_by')
+            qs
+            .select_related('locked_by', 'company')
             .order_by('-created_at')
         )
 
     def get_context_data(self, **kwargs):
+        from contracts.models import Company
+
         ctx = super().get_context_data(**kwargs)
+        if self.request.user.is_superuser:
+            ctx['user_companies'] = Company.objects.filter(is_active=True)
+        else:
+            ctx['user_companies'] = Company.objects.filter(
+                user_memberships__user=self.request.user,
+            )
         qs = self.get_queryset()
         ctx['total_count'] = qs.count()
         ctx['queued_count'] = qs.filter(status=DraftContract.Status.QUEUED).count()
@@ -366,7 +392,8 @@ def upload_pdfs(request):
     for f in files:
         outcome = {'filename': f.name, 'ok': False, 'message': '', 'draft_pk': None}
         try:
-            draft = ingest_pdf(f, original_filename=f.name)
+            active_company = getattr(request, 'active_company', None)
+            draft = ingest_pdf(f, original_filename=f.name, company=active_company)
         except DuplicateContractNumber as exc:
             outcome['message'] = str(exc)
             outcome['duplicate'] = True
@@ -385,7 +412,108 @@ def upload_pdfs(request):
                 f'Created draft {draft.contract_number} '
                 f'({draft.contract_type}, parse: {draft.pdf_parse_status}).'
             )
+            # Non-blocking SharePoint folder creation — runs at PDF upload time only.
+            # Probe first; create only if missing. Wrap in try/except so a SP failure
+            # never aborts or degrades the upload response.
+            try:
+                from intake.services.sharepoint_intake import create_draft_sharepoint_folder
+                sp_result = create_draft_sharepoint_folder(draft)
+                outcome['sp_folder_status'] = sp_result['status']
+                outcome['sp_folder_path'] = sp_result.get('folder_path') or ''
+            except Exception as _sp_exc:
+                logger.warning('SP folder create error for draft %s: %s', draft.pk, _sp_exc)
+                outcome['sp_folder_status'] = 'error'
+                outcome['sp_folder_path'] = ''
         results.append(outcome)
+    return JsonResponse({'results': results})
+
+
+@login_required
+@require_POST
+def scan_sharepoint_drafts(request):
+    """
+    Check SharePoint folder existence for one or all drafts.
+
+    Body JSON:
+        {"draft_id": 123}   — single draft
+        {"all": true}       — all drafts with status pending or error, with a contract_number
+
+    Updates each draft's sharepoint_folder_status and data['sharepoint_folder_path']
+    via probe_draft_sharepoint_folder (no folder creation).
+
+    Returns:
+        {"results": [
+            {
+                "draft_id": 123,
+                "contract_number": "...",
+                "folder_status": "exists|not_found|error|pending",
+                "folder_path": "...",
+                "folder_exists": true|false,
+                "error": null | "..."
+            },
+            ...
+        ]}
+    """
+    from intake.services.sharepoint_intake import probe_draft_sharepoint_folder
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError, ValueError):
+        body = {}
+
+    draft_id = body.get('draft_id')
+    scan_all = body.get('all')
+
+    # Company scoping — same pattern as DraftQueueView
+    from contracts.models import Company
+    if request.user.is_superuser:
+        company_filter = {}  # no filter
+    else:
+        user_companies = Company.objects.filter(
+            user_memberships__user=request.user
+        )
+        company_filter = {'company__in': user_companies}
+
+    if draft_id:
+        drafts = DraftContract.objects.filter(
+            pk=draft_id,
+            contract_number__isnull=False,
+            **company_filter,
+        ).exclude(contract_number='')
+    elif scan_all:
+        drafts = DraftContract.objects.filter(
+            contract_number__isnull=False,
+            sharepoint_folder_status__in=['pending', 'error', 'not_found'],
+            **company_filter,
+        ).exclude(contract_number='').exclude(
+            status__in=[DraftContract.Status.COMPLETED, DraftContract.Status.CANCELLED]
+        )
+    else:
+        return JsonResponse({'error': 'Provide draft_id or all=true'}, status=400)
+
+    results = []
+    for draft in drafts:
+        try:
+            result = probe_draft_sharepoint_folder(draft)
+            results.append({
+                'draft_id': draft.pk,
+                'contract_number': draft.contract_number,
+                'folder_status': draft.sharepoint_folder_status,
+                'folder_path': result.get('folder_path') or '',
+                'folder_exists': result['folder_exists'],
+                'error': result.get('error'),
+            })
+        except Exception as exc:
+            logger.warning('SP scan error for draft %s: %s', draft.pk, exc)
+            results.append({
+                'draft_id': draft.pk,
+                'contract_number': draft.contract_number,
+                'folder_status': 'error',
+                'folder_path': '',
+                'folder_exists': False,
+                'error': str(exc)[:200],
+            })
+
     return JsonResponse({'results': results})
 
 

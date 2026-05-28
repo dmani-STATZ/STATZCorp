@@ -144,6 +144,11 @@ def finalize_draft(draft: DraftContract, user: User) -> CanonicalTarget:
 def _draft_to_service_payload(draft: DraftContract, kind: str) -> dict:
     """Translate draft.data into the contract_create service payload."""
     data = draft.data or {}
+    files_url_value = (
+        data.get('files_url')
+        or data.get('sharepoint_folder_path')
+        or ''
+    )
     return {
         'contract_type_kind': kind,
         'contract_number': draft.contract_number,
@@ -159,7 +164,7 @@ def _draft_to_service_payload(draft: DraftContract, kind: str) -> dict:
         'award_date': data.get('award_date'),
         'due_date': data.get('due_date'),
         'contract_value': data.get('contract_value'),
-        'files_url': data.get('files_url'),
+        'files_url': files_url_value,
         'clins': [_draft_clin_to_payload(c) for c in (data.get('clins') or [])],
         'packaging': data.get('packaging'),
         'seed_payment_history': False,
@@ -311,6 +316,11 @@ def _finalize_mod_amd(draft: DraftContract, user: User) -> Contract:
 
 def _finalize_idiq(draft: DraftContract, user: User) -> IdiqContract:
     data = draft.data or {}
+    files_url_value = (
+        data.get('files_url')
+        or data.get('sharepoint_folder_path')
+        or ''
+    )
     payload = {
         'contract_number': draft.contract_number,
         'buyer_id': data.get('buyer_id'),
@@ -319,7 +329,7 @@ def _finalize_idiq(draft: DraftContract, user: User) -> IdiqContract:
         'option_length': data.get('option_months'),
         'max_value': data.get('max_value'),
         'min_guarantee': data.get('min_guarantee'),
-        'files_url': data.get('files_url'),
+        'files_url': files_url_value,
         'approved_nsns': data.get('approved_nsns') or [],
         'approved_suppliers': data.get('approved_suppliers') or [],
     }

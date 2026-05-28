@@ -204,6 +204,9 @@ from .views.documents_views import (
     folder_weburl_api,
     idiq_contract_details_api,
     idiq_documents_browser_view,
+    intake_draft_details_api,
+    intake_draft_documents_browser_view,
+    set_draft_file_path_api,
     set_idiq_file_path_api,
     set_file_path_api,
     sharepoint_files_api,
@@ -297,9 +300,19 @@ urlpatterns = [
     path("open-export-folder/", open_export_folder, name="open_export_folder"),
     path("documents/", documents_browser_view, name="documents_browser"),
     path(
+        "documents/draft/",
+        intake_draft_documents_browser_view,
+        name="intake_draft_documents_browser",
+    ),
+    path(
         "api/contracts/<int:contract_id>/details/",
         contract_details_api,
         name="contract_details_api",
+    ),
+    path(
+        "api/drafts/<int:draft_id>/details/",
+        intake_draft_details_api,
+        name="intake_draft_details_api",
     ),
     path("api/sharepoint-files/", sharepoint_files_api, name="sharepoint_files_api"),
     path("api/download-file/", download_file_api, name="download_file_api"),
@@ -307,6 +320,11 @@ urlpatterns = [
     path("api/folder-weburl/", folder_weburl_api, name="folder_weburl_api"),
     path("api/create-folder/", create_folder_api, name="create_folder_api"),
     path("api/set-file-path/", set_file_path_api, name="set_file_path_api"),
+    path(
+        "api/drafts/set-file-path/",
+        set_draft_file_path_api,
+        name="set_draft_file_path_api",
+    ),
     # Contract management
     path("<int:pk>/", ContractManagementView.as_view(), name="contract_management"),
     path("<int:pk>/detail/", ContractDetailView.as_view(), name="contract_detail"),

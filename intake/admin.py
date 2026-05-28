@@ -40,8 +40,10 @@ class StaleLockFilter(admin.SimpleListFilter):
 class DraftContractAdmin(admin.ModelAdmin):
     list_display = (
         'contract_number',
+        'company',
         'contract_type',
         'status',
+        'sharepoint_folder_status',
         'lock_summary',
         'pdf_parse_status',
         'created_at',
@@ -50,12 +52,17 @@ class DraftContractAdmin(admin.ModelAdmin):
     list_filter = (
         'contract_type',
         'status',
+        'company',
+        'sharepoint_folder_status',
         'pdf_parse_status',
         StaleLockFilter,
     )
     search_fields = ('contract_number',)
     readonly_fields = ('created_at', 'modified_at', 'final_contract')
     actions = ('clear_locks',)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('company', 'locked_by')
 
     def lock_summary(self, obj):
         if obj.locked_by_id is None:

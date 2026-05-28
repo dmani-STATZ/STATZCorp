@@ -73,9 +73,9 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   finalization path.
 - No `transactions` signal coupling on `DraftContract` — drafts are
   pre-canonical.
-- No `request.active_company` scoping on the queue yet (Phase 1 design
-  intentionally simple). When company scoping is added it should mirror the
-  pattern in `contracts.views.mixins.ActiveCompanyQuerysetMixin`.
+- Queue scoping uses `UserCompanyMembership` (all companies the user belongs to).
+  Superusers see every non-completed draft including `company=None` rows.
+  PDF upload sets `company` from `request.active_company`.
 
 ### Editor changes
 - Field name convention in `draft_edit.html` is the load-bearing contract
@@ -181,6 +181,39 @@ single transaction.
 Dedup is enforced against both `DraftContract.contract_number` and
 canonical `Contract.contract_number`.
 
+
+### SharePoint Integration Rules
+
+- Intake owns its own SharePoint service at `intake/services/sharepoint_intake.py`.
+  Do **NOT** import SharePoint helpers from `processing.*`.
+- `build_draft_folder_path(draft)` is the single source of truth for draft folder
+  paths. Drafts are always open-contract paths — no Closed/Cancelled routing at
+  draft time.
+- `probe_draft_sharepoint_folder(draft)` — probe only, no create.
+- `create_draft_sharepoint_folder(draft)` — probe first, create if missing. Called
+  at PDF upload time only.
+- SharePoint folder path is stored in `draft.data['sharepoint_folder_path']`
+  (JSON). It is **not** a model column.
+- `sharepoint_folder_status` is a real model column
+  (`pending` / `exists` / `not_found` / `created` / `error`).
+- Company lookup at DIBBS injection uses `sales.CompanyCAGE` (`dibbs_company_cage`)
+  CAGE code join. If no company found, `draft.company=None` and SP probe is
+  skipped.
+- At finalization, copy `draft.data.get('sharepoint_folder_path')` →
+  `contract.files_url` for all Contract-creating types
+  (AWD/PO/DO/IDIQ/INTERNAL). Skip for MOD/AMD (they modify existing contracts
+  that already have `files_url`).
+- Scan endpoint: `intake:scan_sharepoint_drafts` at POST `/intake/api/scan-sharepoint/`. Body: `{"draft_id": N}` or `{"all": true}`. Returns `results` array with per-draft status.
+- Scan is company-scoped: non-superusers filtered to their membership companies. Superusers see all.
+- Folder creation at PDF upload: `create_draft_sharepoint_folder(draft)` is called inside `upload_pdfs` after successful `ingest_pdf`. It is non-blocking and does not affect the HTTP response status.
+- Do NOT call `create_draft_sharepoint_folder` at DIBBS injection time — probe only (`probe_draft_sharepoint_folder`).
+- The "Scan SP" bulk button only scans drafts with `sharepoint_folder_status` in `['pending', 'error', 'not_found']`. It does not re-probe already confirmed `exists`/`created` folders.
+- Draft documents browser lives at `contracts:intake_draft_documents_browser` (`/contracts/documents/draft/`). It reuses `contracts/documents_browser.html` with `is_draft_mode=True` context. Do not create a separate template.
+- Authorization gate for draft browser: `_draft_for_request()` in `contracts/views/documents_views.py`. Non-superusers must have membership in `draft.company`.
+- All file API endpoints (list, upload, download, delete, folder weburl, create folder) now accept `draft_id` as an alternative to `contract_id` for the authorization gate. The actual path resolution is always `folder_path`-based and does not use the contract/draft FK.
+- `set_draft_file_path_api` (POST `/contracts/api/drafts/set-file-path/`) saves the confirmed path to `draft.data['sharepoint_folder_path']` and sets `sharepoint_folder_status = 'exists'`.
+- Finalization carry-through: `_draft_to_service_payload` and `_finalize_idiq` both fall back to `data['sharepoint_folder_path']` when `data['files_url']` is empty. This is the zero-extra-step path from SP probe → finalization.
+- MOD/AMD finalization does NOT carry through `files_url` — they modify existing contracts that already have their own `files_url`.
 
 ### DIBBS Ingestion
 - `intake/ingest.py::ingest_dibbs_record` is the single converter from a

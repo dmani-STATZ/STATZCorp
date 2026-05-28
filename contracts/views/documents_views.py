@@ -17,6 +17,7 @@ from contracts.services import sharepoint_service
 from contracts.services.sharepoint_paths import (
     get_idiq_root_fallback_path,
     get_root_fallback_path,
+    get_sharepoint_prefix,
     resolve_idiq_folder_path,
     resolve_contract_folder_path,
 )
@@ -47,6 +48,41 @@ def _parse_contract_id(value) -> Optional[int]:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _draft_for_request(request, draft_id: int):
+    """Fetch a DraftContract, enforcing login and company membership."""
+    from intake.models import DraftContract
+    from contracts.models import Company
+
+    draft = get_object_or_404(DraftContract, pk=draft_id)
+
+    if not request.user.is_superuser:
+        if draft.company_id is None:
+            raise PermissionDenied(
+                "You do not have access to this draft (no company assigned)."
+            )
+        user_companies = Company.objects.filter(
+            user_memberships__user=request.user
+        ).values_list('id', flat=True)
+        if draft.company_id not in list(user_companies):
+            raise PermissionDenied(
+                "You do not have access to this draft's company."
+            )
+    return draft
+
+
+def _authorize_contract_or_draft(
+    request,
+    contract_pk: Optional[int],
+    draft_pk: Optional[int],
+) -> tuple[Optional[Contract], object | None]:
+    """Return (contract, draft) after access checks; exactly one may be set."""
+    if contract_pk is not None:
+        return _contract_for_request(request, contract_pk), None
+    if draft_pk is not None:
+        return None, _draft_for_request(request, draft_pk)
+    raise ValueError("contract_id or draft_id required")
 
 
 def _error_response(error: SharePointError, *, status: Optional[int] = None) -> JsonResponse:
@@ -168,6 +204,87 @@ def idiq_contract_details_api(request, idiq_id):
 
 
 @conditional_login_required
+@require_GET
+def intake_draft_documents_browser_view(request):
+    """
+    Popup document browser for an intake DraftContract.
+
+    Operates in 'draft mode': uses draft_id instead of contract_id,
+    resolves path from draft.data['sharepoint_folder_path'] (set by
+    intake SharePoint service), and 'Save Path' writes back to the draft
+    data JSON via contracts:set_draft_file_path_api instead of Contract.files_url.
+    """
+    from intake.services.sharepoint_intake import build_draft_folder_path
+
+    draft_id_raw = request.GET.get("draft_id")
+    draft_pk = _parse_contract_id(draft_id_raw)
+    if draft_pk is None:
+        return render(
+            request,
+            "contracts/documents_browser.html",
+            {"error": "No draft ID provided."},
+        )
+
+    draft = _draft_for_request(request, draft_pk)
+
+    stored_path = (draft.data or {}).get('sharepoint_folder_path') or ''
+    if stored_path:
+        initial_path = sharepoint_service.normalize_folder_path(stored_path)
+    else:
+        initial_path = build_draft_folder_path(draft) or ''
+
+    documents_root = get_sharepoint_prefix(company=draft.company) + '/'
+
+    return render(
+        request,
+        "contracts/documents_browser.html",
+        {
+            "draft_id": draft.pk,
+            "contract_id": None,
+            "contract_number": draft.contract_number or "",
+            "initial_folder_path": initial_path,
+            "is_idiq": False,
+            "is_draft_mode": True,
+            "contract_details_url": reverse(
+                "contracts:intake_draft_details_api",
+                kwargs={"draft_id": draft.pk},
+            ),
+            "sharepoint_files_url": reverse("contracts:sharepoint_files_api"),
+            "set_file_path_url": reverse("contracts:set_draft_file_path_api"),
+            "documents_root": documents_root,
+            "create_folder_url": reverse("contracts:create_folder_api"),
+        },
+    )
+
+
+@conditional_login_required
+@require_GET
+def intake_draft_details_api(request, draft_id):
+    """Return draft details for the documents browser (draft mode)."""
+    from intake.services.sharepoint_intake import build_draft_folder_path
+
+    draft = _draft_for_request(request, draft_id)
+
+    stored_path = (draft.data or {}).get('sharepoint_folder_path') or ''
+    if stored_path:
+        default_path = sharepoint_service.normalize_folder_path(stored_path)
+        path_source = 'stored'
+    else:
+        default_path = build_draft_folder_path(draft) or ''
+        path_source = 'pattern'
+
+    return JsonResponse({
+        "success": True,
+        "draft_id": draft.pk,
+        "contract_id": draft.pk,
+        "contract_number": draft.contract_number or "",
+        "default_folder_path": default_path,
+        "path_source": path_source,
+        "legacy_detected": False,
+    })
+
+
+@conditional_login_required
 @require_http_methods(["GET", "POST"])
 def sharepoint_files_api(request):
     if request.method == "GET":
@@ -176,26 +293,40 @@ def sharepoint_files_api(request):
 
 
 def _list_sharepoint_files(request) -> JsonResponse:
-    contract_id = request.GET.get("contract_id")
-    contract_pk = _parse_contract_id(contract_id)
-    if contract_pk is None:
-        return JsonResponse({"success": False, "error": "contract_id is required."}, status=400)
+    contract_pk = _parse_contract_id(request.GET.get("contract_id"))
+    draft_pk = _parse_contract_id(request.GET.get("draft_id"))
+    try:
+        contract, draft = _authorize_contract_or_draft(request, contract_pk, draft_pk)
+    except ValueError:
+        return JsonResponse(
+            {"success": False, "error": "contract_id or draft_id is required."},
+            status=400,
+        )
+    except PermissionDenied as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=403)
 
-    contract = _contract_for_request(request, contract_pk)
     raw_folder_path = (request.GET.get("folder_path") or "").strip()
 
     legacy_detected = False
     if raw_folder_path:
-        # Caller-supplied path (breadcrumb navigation, search, etc.) — translate
-        # any pasted SharePoint URL/UNC into a drive-relative form, but trust it.
-        requested_path = sharepoint_service.normalize_legacy_path(
-            raw_folder_path, contract=contract
-        )
-    else:
-        # No path supplied — resolve from the contract using strict validation.
+        if contract is not None:
+            requested_path = sharepoint_service.normalize_legacy_path(
+                raw_folder_path, contract=contract
+            )
+        else:
+            requested_path = sharepoint_service.normalize_folder_path(raw_folder_path)
+    elif contract is not None:
         resolution = resolve_contract_folder_path(contract)
         requested_path = resolution["path"]
         legacy_detected = resolution["legacy_detected"]
+    else:
+        from intake.services.sharepoint_intake import build_draft_folder_path
+
+        stored_path = (draft.data or {}).get('sharepoint_folder_path') or ''
+        if stored_path:
+            requested_path = sharepoint_service.normalize_folder_path(stored_path)
+        else:
+            requested_path = build_draft_folder_path(draft) or ''
 
     try:
         data = sharepoint_service.list_folder_contents(requested_path)
@@ -207,9 +338,13 @@ def _list_sharepoint_files(request) -> JsonResponse:
     except (SharePointNotFound, SharePointError) as error:
         # If the path doesn't exist or is invalid (400/404), try to find a valid parent
         if isinstance(error, SharePointNotFound) or (isinstance(error, SharePointError) and error.status_code in (400, 404)):
+            if contract is not None:
+                root_fallback = get_root_fallback_path(contract)
+            else:
+                root_fallback = get_sharepoint_prefix(company=draft.company) + '/'
             fallback_path = (
                 sharepoint_service.fallback_to_root(requested_path)
-                or get_root_fallback_path(contract)
+                or root_fallback
             )
             try:
                 data = sharepoint_service.list_folder_contents(fallback_path)
@@ -234,17 +369,28 @@ def _list_sharepoint_files(request) -> JsonResponse:
 
 
 def _upload_sharepoint_file(request) -> JsonResponse:
-    contract_id = request.POST.get("contract_id")
     folder_path = request.POST.get("folder_path")
     uploaded_file = request.FILES.get("file")
-    contract_pk = _parse_contract_id(contract_id)
-    if contract_pk is None or not folder_path or uploaded_file is None:
+    contract_pk = _parse_contract_id(request.POST.get("contract_id"))
+    draft_pk = _parse_contract_id(request.POST.get("draft_id"))
+    if (contract_pk is None and draft_pk is None) or not folder_path or uploaded_file is None:
         return JsonResponse(
-            {"success": False, "error": "contract_id, folder_path, and file are required."},
+            {
+                "success": False,
+                "error": "contract_id or draft_id, folder_path, and file are required.",
+            },
             status=400,
         )
 
-    _contract_for_request(request, contract_pk)
+    try:
+        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+    except ValueError:
+        return JsonResponse(
+            {"success": False, "error": "contract_id or draft_id is required."},
+            status=400,
+        )
+    except PermissionDenied as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=403)
     try:
         file_payload = sharepoint_service.upload_file_to_folder(folder_path, uploaded_file)
     except SharePointError as error:
@@ -276,29 +422,31 @@ def create_folder_api(request):
     except json.JSONDecodeError:
         return JsonResponse({"success": False, "error": "Invalid request body."}, status=400)
 
-    contract_id = payload.get("contract_id")
     parent_path = (payload.get("parent_path") or "").strip()
     folder_name = (payload.get("folder_name") or "").strip()
 
-    contract_pk = _parse_contract_id(contract_id)
-    if contract_pk is None or not parent_path or not folder_name:
+    contract_pk = _parse_contract_id(payload.get("contract_id"))
+    draft_pk = _parse_contract_id(payload.get("draft_id"))
+    if (contract_pk is None and draft_pk is None) or not parent_path or not folder_name:
         return JsonResponse(
             {
                 "success": False,
-                "error": "contract_id, parent_path, and folder_name are required.",
+                "error": "contract_id or draft_id, parent_path, and folder_name are required.",
             },
             status=400,
         )
 
     try:
-        _contract_for_request(request, contract_pk)
-    except Http404:
-        return JsonResponse({"success": False, "error": "Contract not found."}, status=404)
-    except PermissionDenied:
+        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+    except ValueError:
         return JsonResponse(
-            {"success": False, "error": "An active company is required."},
-            status=403,
+            {"success": False, "error": "contract_id or draft_id is required."},
+            status=400,
         )
+    except PermissionDenied as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=403)
+    except Http404:
+        return JsonResponse({"success": False, "error": "Contract or draft not found."}, status=404)
 
     try:
         folder = sharepoint_service.create_folder(parent_path, folder_name)
@@ -346,6 +494,41 @@ def set_file_path_api(request):
 
 @conditional_login_required
 @require_POST
+def set_draft_file_path_api(request):
+    """
+    Save a confirmed SharePoint folder path to a DraftContract.
+
+    Writes to draft.data['sharepoint_folder_path'] and sets
+    sharepoint_folder_status = 'exists'.
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON body."}, status=400)
+
+    draft_id = payload.get("draft_id") or payload.get("contract_id")
+    file_path = sharepoint_service.normalize_folder_path(payload.get("file_path") or "")
+
+    draft_pk = _parse_contract_id(draft_id)
+    if draft_pk is None or not file_path:
+        return JsonResponse(
+            {"success": False, "error": "draft_id and file_path are required."},
+            status=400,
+        )
+
+    draft = _draft_for_request(request, draft_pk)
+
+    data = dict(draft.data or {})
+    data['sharepoint_folder_path'] = file_path
+    draft.data = data
+    draft.sharepoint_folder_status = 'exists'
+    draft.save(update_fields=['data', 'sharepoint_folder_status', 'modified_at'])
+
+    return JsonResponse({"success": True, "message": "Path saved to draft."})
+
+
+@conditional_login_required
+@require_POST
 def set_idiq_file_path_api(request):
     from contracts.models import IdiqContract
 
@@ -383,18 +566,26 @@ def download_file_api(request):
     except json.JSONDecodeError:
         return JsonResponse({"success": False, "error": "Invalid request body."}, status=400)
 
-    contract_id = payload.get("contract_id")
     file_id = (payload.get("file_id") or "").strip()
     filename = payload.get("filename") or ""
 
-    contract_pk = _parse_contract_id(contract_id)
-    if contract_pk is None or not file_id:
+    contract_pk = _parse_contract_id(payload.get("contract_id"))
+    draft_pk = _parse_contract_id(payload.get("draft_id"))
+    if (contract_pk is None and draft_pk is None) or not file_id:
         return JsonResponse(
-            {"success": False, "error": "contract_id and file_id are required."},
+            {"success": False, "error": "contract_id or draft_id and file_id are required."},
             status=400,
         )
 
-    _contract_for_request(request, contract_pk)
+    try:
+        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+    except ValueError:
+        return JsonResponse(
+            {"success": False, "error": "contract_id or draft_id is required."},
+            status=400,
+        )
+    except PermissionDenied as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=403)
     try:
         file_bytes = sharepoint_service.download_file_bytes_by_id(file_id)
     except SharePointError as error:
@@ -423,18 +614,26 @@ def delete_file_api(request):
     except json.JSONDecodeError:
         return JsonResponse({"success": False, "error": "Invalid request body."}, status=400)
 
-    contract_id = payload.get("contract_id")
     file_id = (payload.get("file_id") or "").strip()
     filename = payload.get("filename") or ""
 
-    contract_pk = _parse_contract_id(contract_id)
-    if contract_pk is None or not file_id:
+    contract_pk = _parse_contract_id(payload.get("contract_id"))
+    draft_pk = _parse_contract_id(payload.get("draft_id"))
+    if (contract_pk is None and draft_pk is None) or not file_id:
         return JsonResponse(
-            {"success": False, "error": "contract_id and file_id are required."},
+            {"success": False, "error": "contract_id or draft_id and file_id are required."},
             status=400,
         )
 
-    _contract_for_request(request, contract_pk)
+    try:
+        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+    except ValueError:
+        return JsonResponse(
+            {"success": False, "error": "contract_id or draft_id is required."},
+            status=400,
+        )
+    except PermissionDenied as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=403)
     try:
         sharepoint_service.delete_item_by_id(file_id)
     except SharePointError as error:
@@ -449,17 +648,25 @@ def delete_file_api(request):
 @conditional_login_required
 @require_GET
 def folder_weburl_api(request):
-    contract_id = request.GET.get("contract_id")
     folder_path = (request.GET.get("folder_path") or "").strip()
 
-    contract_pk = _parse_contract_id(contract_id)
-    if contract_pk is None or not folder_path:
+    contract_pk = _parse_contract_id(request.GET.get("contract_id"))
+    draft_pk = _parse_contract_id(request.GET.get("draft_id"))
+    if (contract_pk is None and draft_pk is None) or not folder_path:
         return JsonResponse(
-            {"success": False, "error": "contract_id and folder_path are required."},
+            {"success": False, "error": "contract_id or draft_id and folder_path are required."},
             status=400,
         )
 
-    _contract_for_request(request, contract_pk)
+    try:
+        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+    except ValueError:
+        return JsonResponse(
+            {"success": False, "error": "contract_id or draft_id is required."},
+            status=400,
+        )
+    except PermissionDenied as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=403)
     try:
         web_url = sharepoint_service.get_folder_weburl(folder_path)
     except SharePointError as error:

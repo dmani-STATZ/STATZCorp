@@ -53,8 +53,8 @@ class TransactionForm(forms.ModelForm):
             self.fields["old_value"].widget = forms.Select(choices=choices, attrs=attrs)
             self.fields["new_value"].widget = forms.Select(choices=choices, attrs=attrs)
         elif wt == WIDGET_NUMBER:
-            self.fields["old_value"].widget = forms.NumberInput(attrs=attrs)
-            self.fields["new_value"].widget = forms.NumberInput(attrs=attrs)
+            self.fields["old_value"].widget = forms.NumberInput(attrs={**attrs, "step": "any"})
+            self.fields["new_value"].widget = forms.NumberInput(attrs={**attrs, "step": "any"})
         else:
             self.fields["old_value"].widget = forms.Textarea(attrs={**attrs, "rows": 2})
             self.fields["new_value"].widget = forms.Textarea(attrs={**attrs, "rows": 2})
@@ -94,7 +94,7 @@ class EditFieldForm(forms.Form):
         elif wt == WIDGET_SELECT:
             self.fields["new_value"].widget = forms.Select(choices=choices or [], attrs=attrs)
         elif wt == WIDGET_NUMBER:
-            self.fields["new_value"].widget = forms.NumberInput(attrs=attrs)
+            self.fields["new_value"].widget = forms.NumberInput(attrs={**attrs, "step": "any"})
         else:
             self.fields["new_value"].widget = forms.Textarea(attrs={**attrs, "rows": 2})
 

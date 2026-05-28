@@ -251,6 +251,8 @@ This pattern (popup_base + popup view + popup_add + popup_edit) is the approved 
 - `SHAREPOINT_PATH_PREFIX` setting defines the global canonical root when `Company.sharepoint_documents_path` is unset. `get_contract_documents_root()` in `sharepoint_service.py` remains the documents-root helper for browser config and legacy path normalization.
 - When the path naming convention changes, update `Contract.get_sharepoint_relative_path()` (and IDIQ helpers in `sharepoint_paths.py` if IDIQ parent folders change). Validation is prefix-based and stays the same.
 - Contract field for stored folder path is `files_url` (NOT `file_url`). Status values that trigger the Closed Contracts segment: `Closed`, `Canceled` (canonical `ContractStatus.description` spelling, one L).
+- `intake_draft_documents_browser_view`, `intake_draft_details_api`, and `set_draft_file_path_api` are intake-facing views that live in `documents_views.py` because they reuse the shared browser template and SharePoint service layer. They import from `intake.*` internally (lazy imports inside the function body) to avoid circular imports at module level.
+- All file API endpoints now support dual-gate authorization: `contract_id` for canonical contracts, `draft_id` for intake drafts. Add this same dual-gate to any new file API endpoints added in the future.
 
 ### Notes popup window
 - `contracts/views/note_views.py` — `notes_popup`, `notes_popup_tab`, `note_detail_json` views
@@ -461,7 +463,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 14. **`IdiqContract` has no `company` FK.** Do not try to apply company-level SharePoint root overrides to IDIQ path resolution. Use `get_sharepoint_prefix()` directly for IDIQ folder patterns and root fallbacks.
 
-15. **`documents_browser.html` payload key switches by mode.** The template uses `IS_IDIQ` to choose between posting `{contract_id, file_path}` and `{idiq_id, file_path}` for Save Path. If you change the browser payload shape, update both branches together.
+15. **`documents_browser.html` payload key switches by mode.** The template uses `IS_DRAFT`, `IS_IDIQ`, and contract mode to choose auth params and Save Path payloads (`draft_id`, `idiq_id`, or `contract_id` plus `file_path`). If you change the browser payload shape, update all branches together.
 
 16. **Inline `onclick` attributes on buttons inside delegated listener zones will silently kill those listeners in some browsers.** If a button has `onclick="event.stopPropagation();"` inline AND the same event is handled by a delegated listener on a parent element, the inline handler can throw or interfere before the delegated listener fires — leaving the button appearing dead with nothing in the console. **Rule: never use inline `onclick` on interactive elements inside a container that has a delegated click listener.** Instead, give the element a class (e.g. `.js-edit-btn`), handle it in the delegated listener with `e.target.closest('.js-edit-btn')`, and call `e.stopPropagation()` from inside that listener. See `reminders_popup.html` for the correct pattern.
 
