@@ -36,6 +36,10 @@ class DuplicateContractNumber(IngestionError):
     """The parsed contract_number already exists as a draft or canonical contract."""
 
 
+class UnknownContractType(IngestionError):
+    """Contract type could not be derived from the contract number."""
+
+
 # ---------------------------------------------------------------------------
 # Conversion helpers
 # ---------------------------------------------------------------------------
@@ -326,7 +330,7 @@ def ingest_dibbs_record(record: dict, company=None) -> DraftContract:
         )
     contract_type = detect_contract_type(contract_number)
     if not contract_type:
-        raise IngestionError(
+        raise UnknownContractType(
             f'Could not derive contract type from {contract_number!r}.'
         )
 

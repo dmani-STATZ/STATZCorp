@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 from intake.ingest import (
     DuplicateContractNumber,
     IngestionError,
+    UnknownContractType,
+    _dibbs_contract_number,
     ingest_dibbs_record,
 )
 
@@ -86,7 +88,12 @@ def queue_we_won_drafts(
         logger.info(line)
         emit(line)
 
-    result: dict[str, int] = {"queued": 0, "skipped": 0, "errors": 0}
+    result: dict[str, int] = {
+        "queued": 0,
+        "skipped": 0,
+        "errors": 0,
+        "sp_probe_errors": 0,
+    }
 
     if batch is None:
         _emit("skip: batch is None")
@@ -104,19 +111,22 @@ def queue_we_won_drafts(
 
         for award in base_qs:
             record = _award_to_scraper_record(award)
+            cn = _dibbs_contract_number(record) or f"<award id={award.pk}>"
             company = _resolve_company_for_award(award)
             try:
                 draft = ingest_dibbs_record(record, company=company)
-            except DuplicateContractNumber:
+            except DuplicateContractNumber as exc:
                 result["skipped"] += 1
+                _emit(f"skip dup: {cn}: {exc}")
+            except UnknownContractType as exc:
+                result["skipped"] += 1
+                _emit(f"skip unknown-type: {cn}: {exc}")
             except IngestionError as exc:
                 result["errors"] += 1
-                if activity_log:
-                    activity_log(f"intake draft skip: {exc}")
+                _emit(f"skip ingest: {cn}: {exc}")
             except Exception as exc:
                 result["errors"] += 1
-                if activity_log:
-                    activity_log(f"intake draft error: {exc}")
+                _emit(f"error: {cn}: {exc}")
                 logger.exception(
                     "%s unhandled error for award id=%s", _LOG_PREFIX, award.pk
                 )
@@ -129,7 +139,7 @@ def queue_we_won_drafts(
                         )
                         probe_draft_sharepoint_folder(draft)
                     except Exception as exc:
-                        result["errors"] += 1
+                        result["sp_probe_errors"] += 1
                         _emit(f'SP probe error for {draft.contract_number}: {exc}')
 
     except Exception as exc:

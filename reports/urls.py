@@ -26,6 +26,10 @@ urlpatterns = [
     path("admin/delete/<uuid:pk>/", views.admin_delete_request, name="admin_delete_request"),
     path("admin/ai/generate/", views.admin_ai_generate, name="admin_ai_generate"),
 
+    # Admin report editor
+    path("admin/editor/", views.admin_report_editor, name="admin_report_editor"),
+    path("admin/editor/<uuid:pk>/save/", views.admin_report_save_edit, name="admin_report_save_edit"),
+
     # Prototype builder (is_staff)
     path("build/", views.draft_builder, name="draft_builder"),
     path("build/<uuid:pk>/", views.draft_iterate, name="draft_iterate"),

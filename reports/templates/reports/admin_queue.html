@@ -124,7 +124,12 @@
   <!-- ══ SIDEBAR ═══════════════════════════════════════ -->
   <div class="queue-sidebar">
     <div class="queue-sidebar-header">
-      <h6 class="fw-bold mb-2">Request Queue</h6>
+      <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+        <h6 class="fw-bold mb-0">Request Queue</h6>
+        <a href="{% url 'reports:admin_report_editor' %}" class="btn btn-sm btn-outline-secondary">
+          Edit Reports Directly
+        </a>
+      </div>
       <div class="d-flex flex-wrap gap-1" id="filter-pills">
         <span class="badge filter-pill bg-primary" data-filter="all" style="cursor:pointer;">All <span>{{ queue|length }}</span></span>
         <span class="badge filter-pill text-body border" data-filter="pending" style="cursor:pointer;">Pending</span>

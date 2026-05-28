@@ -29,7 +29,7 @@ The app stores report library items, immutable versions, sharing state, and requ
   - `ReportVersion`: immutable SQL snapshots with per-report version numbering.
   - `ReportShare`: user-to-user sharing permissions (`can_branch`).
 - `reports/views.py`: all user/admin/staff-builder workflows and permission checks.
-- `reports/forms.py`: request/change/admin/version/share/draft forms.
+- `reports/forms.py`: request/change/admin/version/share/draft forms; `AdminReportEditForm` for superuser direct report editing.
 - `reports/urls.py`: hub, user actions, admin queue actions, builder actions.
 - `reports/admin.py`: admin registrations for all reporting models.
 - `reports/utils.py`: SQL safety and execution helpers plus `get_next_version_number`.
@@ -87,6 +87,7 @@ All templates are production-quality Bootstrap 5 (Spacelab theme) UIs. No placeh
 - `ReportRequestChangeForm`: change request + `keep_original`.
 - `AdminReportRequestForm`: superuser-only status/notes updates (cannot set status back to pending).
 - `ReportVersionForm`: SQL/context/change notes for immutable version creation.
+- `AdminReportEditForm`: plain form combining report title/tags with version SQL/notes for admin direct edit (bypasses request queue).
 - `ReportShareForm`: recipient + branch permission (`shared_with` queryset set in view).
 - Draft forms for prompt and feedback.
 - SQL execution always routes through `run_select` (safety and limit enforcement).
@@ -118,6 +119,8 @@ All templates are production-quality Bootstrap 5 (Spacelab theme) UIs. No placeh
 | `reports:admin_update_request` | `/reports/admin/update/<uuid:pk>/` | Update request status/notes |
 | `reports:admin_delete_request` | `/reports/admin/delete/<uuid:pk>/` | Delete request |
 | `reports:admin_ai_generate` | `/reports/admin/ai/generate/` | Superuser AI SQL/title/tags endpoint |
+| `reports:admin_report_editor` | `/reports/admin/editor/` | Admin direct report browser + editor |
+| `reports:admin_report_save_edit` | `/reports/admin/editor/<uuid:pk>/save/` | Save admin-edited report version |
 | `reports:draft_builder` | `/reports/build/` | Start draft builder |
 | `reports:draft_iterate` | `/reports/build/<uuid:pk>/` | Iterate draft with feedback |
 | `reports:draft_promote` | `/reports/build/<uuid:pk>/promote/` | Promote draft into report |

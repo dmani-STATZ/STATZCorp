@@ -442,7 +442,8 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                 f"Intake draft injection: "
                 f"queued={draft_result['queued']} "
                 f"skipped={draft_result['skipped']} "
-                f"errors={draft_result['errors']}."
+                f"errors={draft_result['errors']} "
+                f"sp_probe_errors={draft_result.get('sp_probe_errors', 0)}."
             )
         except Exception as exc:
             self._activity(f"Intake draft injection failed unexpectedly: {exc}")

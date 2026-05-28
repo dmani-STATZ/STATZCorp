@@ -16,6 +16,7 @@ from django.views.decorators.http import require_POST
 from contracts.utils.contracts_schema import generate_db_schema_snapshot
 
 from .forms import (
+    AdminReportEditForm,
     AdminReportRequestForm,
     ReportDraftFeedbackForm,
     ReportDraftPromptForm,
@@ -493,6 +494,105 @@ def admin_delete_request(request, pk):
     request_obj.delete()
     messages.success(request, "Request deleted.")
     return redirect("reports:admin_queue")
+
+
+@login_required
+@user_passes_test(_is_admin)
+def admin_report_editor(request):
+    user_id = request.GET.get("user_id")
+    if user_id:
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            user_id = None
+
+    q = (request.GET.get("q") or "").strip() or None
+
+    reports_qs = (
+        Report.objects.select_related("owner", "active_version")
+        .order_by("owner__last_name", "owner__first_name", "title")
+    )
+    if user_id:
+        reports_qs = reports_qs.filter(owner__pk=user_id)
+    if q:
+        reports_qs = reports_qs.filter(title__icontains=q)
+
+    users = (
+        User.objects.filter(owned_reports__isnull=False)
+        .distinct()
+        .order_by("last_name", "first_name")
+    )
+
+    selected = None
+    form = AdminReportEditForm()
+    selected_id = request.GET.get("id")
+    if selected_id:
+        selected = get_object_or_404(
+            Report.objects.select_related("owner", "active_version"),
+            pk=selected_id,
+        )
+        tags_str = ""
+        if isinstance(selected.tags, list):
+            tags_str = ", ".join(selected.tags)
+        form = AdminReportEditForm(
+            initial={
+                "title": selected.title,
+                "tags": tags_str,
+                "sql_query": selected.active_version.sql_query if selected.active_version else "",
+                "context_notes": selected.active_version.context_notes if selected.active_version else "",
+                "change_notes": "",
+            }
+        )
+
+    return render(
+        request,
+        "reports/admin_report_editor.html",
+        {
+            "reports_list": reports_qs,
+            "users": users,
+            "selected": selected,
+            "form": form,
+            "selected_user_id": user_id,
+            "search_q": q,
+        },
+    )
+
+
+@login_required
+@user_passes_test(_is_admin)
+@require_POST
+def admin_report_save_edit(request, pk):
+    report = get_object_or_404(
+        Report.objects.select_related("active_version"),
+        pk=pk,
+    )
+    form = AdminReportEditForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Invalid report data.")
+        return redirect(f"{reverse('reports:admin_report_editor')}?id={report.pk}")
+
+    with transaction.atomic():
+        raw_tags = form.cleaned_data["tags"]
+        tags = [t.strip().lower() for t in raw_tags.split(",") if t.strip()][:6]
+
+        report.title = form.cleaned_data["title"]
+        report.tags = tags
+        report.save(update_fields=["title", "tags", "updated_at"])
+
+        version = ReportVersion.objects.create(
+            report=report,
+            version_number=get_next_version_number(report),
+            sql_query=form.cleaned_data["sql_query"],
+            context_notes=form.cleaned_data["context_notes"],
+            change_notes=form.cleaned_data["change_notes"] or "Admin direct edit",
+            created_by=request.user,
+        )
+
+        report.active_version = version
+        report.save(update_fields=["active_version", "updated_at"])
+
+    messages.success(request, "Report updated — new version saved.")
+    return redirect(f"{reverse('reports:admin_report_editor')}?id={report.pk}")
 
 
 @login_required

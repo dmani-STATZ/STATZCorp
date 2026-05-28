@@ -40,6 +40,7 @@ def apply_limit(sql: str, limit: int = 500) -> str:
 
     - SQLite/Postgres/MySQL: append LIMIT N (if not present)
     - SQL Server: inject TOP N after SELECT (if not present)
+      Handles SELECT DISTINCT correctly: produces SELECT DISTINCT TOP N ...
     """
     q = (sql or "").strip()
     if not q:
@@ -55,9 +56,21 @@ def apply_limit(sql: str, limit: int = 500) -> str:
     # SQL Server handling
     if vendor == "microsoft" or "mssql" in engine or "sql_server" in engine:
         if re.search(r"\btop\s+\d+\b", q, re.I):
-            return q
-        # Inject TOP N after the first SELECT
-        return re.sub(r"(?i)^\s*select\s+", f"SELECT TOP {int(limit)} ", q, count=1)
+            return q  # TOP already present, nothing to do
+
+        top_clause = f"TOP {int(limit)}"
+
+        # If query starts with SELECT DISTINCT, inject TOP after DISTINCT
+        if re.match(r"(?i)^\s*select\s+distinct\b", q):
+            return re.sub(
+                r"(?i)^\s*select\s+distinct\s+",
+                f"SELECT DISTINCT {top_clause} ",
+                q,
+                count=1,
+            )
+
+        # Standard SELECT — inject TOP after SELECT
+        return re.sub(r"(?i)^\s*select\s+", f"SELECT {top_clause} ", q, count=1)
 
     # Default: LIMIT syntax
     if re.search(r"\blimit\b", q, re.I):

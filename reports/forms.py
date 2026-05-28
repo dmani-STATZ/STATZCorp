@@ -31,6 +31,21 @@ class ReportRequestChangeForm(forms.ModelForm):
         }
 
 
+class AdminReportEditForm(forms.Form):
+    title = forms.CharField(max_length=200, required=True)
+    tags = forms.CharField(
+        required=False,
+        help_text="Comma-separated tags, max 6, lowercase enforced.",
+    )
+    sql_query = forms.CharField(widget=forms.Textarea, required=True)
+    context_notes = forms.CharField(widget=forms.Textarea, required=False)
+    change_notes = forms.CharField(
+        widget=forms.Textarea,
+        required=False,
+        help_text="Optional — describe what changed in this version.",
+    )
+
+
 class AdminReportRequestForm(forms.ModelForm):
     class Meta:
         model = ReportRequest

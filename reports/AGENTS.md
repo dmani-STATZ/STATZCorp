@@ -58,6 +58,7 @@ All seven templates are production-built Bootstrap 5 UIs. Current template files
 | Change builder behavior | `models.py` (`ReportDraft`) + `forms.py` + `views.py` + draft templates |
 | Change request flow modification | `models.py` + migration + `views.py` (`request_change`) + `admin_queue.html` (parent version context card) + `admin_ai_generate` (`existing_sql` parameter) |
 | Change URL names | `urls.py` + template `{% url %}` usage + `reverse(...)` call sites |
+| Admin direct report edit | `views.py` (`admin_report_editor`, `admin_report_save_edit`) + `forms.py` (`AdminReportEditForm`) + `admin_report_editor.html` + `urls.py` |
 
 ## 6. Cross-App Dependency Warnings
 - Depends on `AUTH_USER_MODEL` for all ownership/share relations.
@@ -89,6 +90,8 @@ All seven templates are production-built Bootstrap 5 UIs. Current template files
   - `reports:admin_update_request`
   - `reports:admin_delete_request`
   - `reports:admin_ai_generate`
+  - `reports:admin_report_editor`
+  - `reports:admin_report_save_edit`
 - Keep builder URL names stable:
   - `reports:draft_builder`
   - `reports:draft_iterate`

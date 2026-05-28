@@ -1,0 +1,225 @@
+{% extends "base_template.html" %}
+
+{% block extra_head %}
+<style>
+.reports-admin-editor {
+    display: flex;
+    height: calc(100vh - 48px);
+    overflow: hidden;
+}
+.editor-sidebar {
+    width: 30%;
+    min-width: 260px;
+    max-width: 380px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--bs-border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.editor-sidebar-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    flex-shrink: 0;
+}
+.editor-sidebar-list { overflow-y: auto; flex: 1; }
+
+.editor-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+.editor-main-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem 1.75rem;
+}
+
+.editor-report-item {
+    cursor: pointer;
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 0.65rem 1rem;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: background 0.1s;
+}
+.editor-report-item:hover {
+    background: var(--bs-tertiary-bg, #f8f9fa);
+    color: inherit;
+}
+.editor-report-item.active {
+    background: var(--bs-secondary-bg, #e9ecef);
+    border-left: 3px solid var(--bs-primary);
+    padding-left: calc(1rem - 3px);
+    color: inherit;
+}
+
+.sql-editor {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    resize: vertical;
+}
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+<div class="reports-admin-editor">
+
+  <!-- Sidebar: report browser -->
+  <div class="editor-sidebar">
+    <div class="editor-sidebar-header">
+      <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+        <h6 class="fw-bold mb-0">Admin Report Editor</h6>
+        <a href="{% url 'reports:admin_queue' %}" class="btn btn-sm btn-outline-secondary">Request Queue</a>
+      </div>
+      <form method="get" class="d-flex flex-column gap-2">
+        {% if selected %}
+        <input type="hidden" name="id" value="{{ selected.pk }}">
+        {% endif %}
+        <select name="user_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Users</option>
+          {% for u in users %}
+          <option value="{{ u.pk }}"{% if selected_user_id == u.pk %} selected{% endif %}>
+            {{ u.get_full_name|default:u.username }}
+          </option>
+          {% endfor %}
+        </select>
+        <div class="input-group input-group-sm">
+          <input type="search" name="q" class="form-control" placeholder="Search by title…"
+                 value="{{ search_q|default:'' }}">
+          <button type="submit" class="btn btn-outline-secondary">Search</button>
+        </div>
+      </form>
+    </div>
+    <div class="editor-sidebar-list">
+      {% for report in reports_list %}
+      <a href="?{% if selected_user_id %}user_id={{ selected_user_id }}&{% endif %}{% if search_q %}q={{ search_q|urlencode }}&{% endif %}id={{ report.pk }}"
+         class="editor-report-item{% if selected and report.pk == selected.pk %} active{% endif %}">
+        <div class="small fw-semibold text-truncate">{{ report.title }}</div>
+        <div class="small text-muted text-truncate">
+          {{ report.owner.get_full_name|default:report.owner.username }}
+        </div>
+        <div class="mt-1">
+          {% if report.active_version %}
+          <span class="badge bg-secondary">v{{ report.active_version.version_number }}</span>
+          {% else %}
+          <span class="badge text-bg-light border text-muted">No SQL</span>
+          {% endif %}
+        </div>
+      </a>
+      {% empty %}
+      <div class="text-center text-muted py-5 px-3">
+        <p class="small mb-0">No reports match your filters.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Main: editor panel -->
+  <div class="editor-main">
+    <div class="editor-main-scroll">
+
+      {% if messages %}
+      {% for message in messages %}
+        {% if 'error' in message.tags %}
+        <div class="alert alert-danger mb-3 py-2">{{ message }}</div>
+        {% elif 'warning' in message.tags %}
+        <div class="alert alert-warning mb-3 py-2">{{ message }}</div>
+        {% elif 'success' in message.tags %}
+        <div class="alert alert-success mb-3 py-2">{{ message }}</div>
+        {% else %}
+        <div class="alert alert-info mb-3 py-2">{{ message }}</div>
+        {% endif %}
+      {% endfor %}
+      {% endif %}
+
+      {% if not selected %}
+      <div class="d-flex flex-column align-items-center justify-content-center text-muted" style="min-height: 60vh;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" fill="currentColor" class="mb-3 opacity-25" viewBox="0 0 16 16">
+          <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
+        </svg>
+        <p class="fw-semibold mb-0">Select a report to edit.</p>
+      </div>
+
+      {% else %}
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+        <h5 class="fw-bold mb-0">{{ selected.title }}</h5>
+        <span class="text-muted small">
+          {{ selected.owner.get_full_name|default:selected.owner.username }}
+        </span>
+        {% if selected.active_version %}
+        <span class="badge bg-primary">v{{ selected.active_version.version_number }}</span>
+        {% else %}
+        <span class="badge text-bg-light border text-muted">No SQL</span>
+        {% endif %}
+      </div>
+
+      <form method="post" action="{% url 'reports:admin_report_save_edit' selected.pk %}">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label for="id_title" class="form-label fw-semibold">Title</label>
+          <input type="text" name="title" id="id_title" class="form-control"
+                 value="{{ form.title.value|default:'' }}" maxlength="200" required>
+          {% if form.title.errors %}
+          <div class="text-danger small mt-1">{{ form.title.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="id_tags" class="form-label fw-semibold">Tags</label>
+          <input type="text" name="tags" id="id_tags" class="form-control"
+                 value="{{ form.tags.value|default:'' }}"
+                 placeholder="contracts, weekly, supplier">
+          {% if form.tags.help_text %}
+          <div class="form-text">{{ form.tags.help_text }}</div>
+          {% endif %}
+          {% if form.tags.errors %}
+          <div class="text-danger small mt-1">{{ form.tags.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="id_sql_query" class="form-label fw-semibold">SQL Query</label>
+          <textarea name="sql_query" id="id_sql_query" class="form-control sql-editor" rows="14"
+                    required>{{ form.sql_query.value|default:'' }}</textarea>
+          {% if form.sql_query.errors %}
+          <div class="text-danger small mt-1">{{ form.sql_query.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="id_context_notes" class="form-label fw-semibold">Context / Admin Notes</label>
+          <textarea name="context_notes" id="id_context_notes" class="form-control" rows="4">{{ form.context_notes.value|default:'' }}</textarea>
+          {% if form.context_notes.errors %}
+          <div class="text-danger small mt-1">{{ form.context_notes.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-4">
+          <label for="id_change_notes" class="form-label fw-semibold">What changed? (optional)</label>
+          <textarea name="change_notes" id="id_change_notes" class="form-control" rows="3">{{ form.change_notes.value|default:'' }}</textarea>
+          {% if form.change_notes.help_text %}
+          <div class="form-text">{{ form.change_notes.help_text }}</div>
+          {% endif %}
+          {% if form.change_notes.errors %}
+          <div class="text-danger small mt-1">{{ form.change_notes.errors }}</div>
+          {% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save New Version</button>
+        <p class="text-muted small mt-2 mb-0">
+          This will immediately create a new version and update the active SQL
+          for this report. The previous version is preserved in history.
+        </p>
+      </form>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock body %}
