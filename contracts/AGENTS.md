@@ -409,6 +409,10 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 ---
 
+## Recent completions
+
+- **Dashboard period boundaries (2026-05-28):** `get_period_boundaries()` in `contracts/views/dashboard_views.py` now calls `timezone.localtime(now)` as its first step to prevent UTC-offset boundary bleed. `_start_end_of_day()` updated to return `date` objects for compatibility with `DateField` range filters (post migration 0054).
+
 ## Recent fixes
 
 - **Contract search spelling bug fixed:** `contract_search` view was filtering on `'Cancelled'` (2 L) which did not match the `ContractStatus` DB record `'Canceled'` (1 L). Fixed. Dashboard and contract log filters now use `'Canceled'` for `status__description` comparisons; treat any remaining `'Cancelled'` literal against `ContractStatus.description` as a bug.

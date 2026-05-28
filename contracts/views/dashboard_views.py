@@ -18,6 +18,7 @@ from django.http import HttpResponse
 
 def get_period_boundaries(now):
     """Return start/end datetimes for all dashboard periods."""
+    now = timezone.localtime(now)
     this_week_start = now - timedelta(days=now.weekday())
     this_week_end = this_week_start + timedelta(days=6)
     last_week_start = this_week_start - timedelta(weeks=1)
@@ -419,10 +420,9 @@ class DashboardMetricDetailView(TemplateView):
 
     @staticmethod
     def _start_end_of_day(dt):
-        return (
-            dt.replace(hour=0, minute=0, second=0, microsecond=0),
-            dt.replace(hour=23, minute=59, second=59, microsecond=999999),
-        )
+        """Return (date, date) tuple for use in DateField range filters."""
+        d = dt.date() if hasattr(dt, 'date') else dt
+        return (d, d)
 
     @staticmethod
     def _month_start(dt):
@@ -523,6 +523,8 @@ class DashboardMetricDetailView(TemplateView):
         if metric == 'new_contract_value':
             # Use the start of the requested period as the anchor for series generation
             anchor_start = start_date
+            if not isinstance(anchor_start, datetime):
+                anchor_start = datetime.combine(anchor_start, datetime.min.time())
             value_series = self._build_value_series(period, anchor_start)
 
         context.update({

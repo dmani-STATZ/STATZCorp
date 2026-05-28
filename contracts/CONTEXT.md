@@ -310,6 +310,8 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 
 ## Recent completions
 
+**Dashboard period boundaries (2026-05-28):** `get_period_boundaries()` in `contracts/views/dashboard_views.py` now calls `timezone.localtime(now)` as its first step so monthly/weekly/quarterly/yearly boundaries use local calendar dates instead of UTC (preventing off-by-one-day bleed at period edges). `_start_end_of_day()` on `DashboardMetricDetailView` now returns plain `date` objects for `DateField` range filters on `award_date` and `due_date` (post migration 0054).
+
 **DateField migration (2026-05-04):** A widespread `DateTimeField` → `DateField` migration was applied across three apps (`contracts`, `processing`, `suppliers`). Root cause was a timezone offset bug — with `USE_TZ=True` and `TIME_ZONE='America/Chicago'`, dates stored as midnight UTC were rendering one day behind in Django templates. Barbara discovered it when `Contract.due_date` showed Jun 28 in the header but Jun 29 in the Transactions edit modal.
 
 **Fields changed to `DateField`:**
