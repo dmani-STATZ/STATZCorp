@@ -1,7 +1,7 @@
 ---
 id: intake_sharepoint_phase1
 title: Intake Queue — Company Scoping & SharePoint Folder Tracking
-published: true
+published: false
 publish_date: 2026-05-28
 tags: [improved, contracts]
 critical: false
