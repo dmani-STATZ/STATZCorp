@@ -194,7 +194,7 @@ defeat the supplier-matching prefill flow.
 ## 7. Security / Permissions Rules
 
 - Every view function in `processing_views.py`, `api_views.py`, and `matching_views.py` is decorated with `@login_required`. **Do not remove this decorator from any endpoint.**
-- `delete_queue_contract` enforces `request.user.is_superuser` — preserve this check when modifying the delete path.
+- `delete_queue_contract` enforces `is_staff` or `is_superuser` — preserve this check. Do not weaken to `is_authenticated`. Log line must remain on every successful delete path.
 - `download_test_data` raises `PermissionDenied` if `settings.DEBUG` is `False` — do not weaken this guard.
 - `start_processing` and `initiate_processing` use `select_for_update` inside an atomic transaction to prevent two users from claiming the same queue item. Do not refactor these into non-atomic paths.
 - The `nsn`, `supplier`, `buyer`, and **`packhouse`** fields on process records are protected from direct writes in `update_clin_field` and `update_process_contract_field` (`packhouse` must use `processing:match_packhouse`). This is a deliberate data integrity control, not a bug. Preserve these guards.

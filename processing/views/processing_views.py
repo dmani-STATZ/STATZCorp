@@ -2823,11 +2823,10 @@ def delete_queue_contract(request, queue_id):
     try:
         queue_contract = get_object_or_404(QueueContract, id=queue_id)
         
-        # Only superusers can delete contracts
-        if not request.user.is_superuser:
+        if not (request.user.is_staff or request.user.is_superuser):
             return JsonResponse({
                 'success': False,
-                'error': 'Only superusers can delete contracts'
+                'error': 'Only staff or superusers can delete contracts'
             }, status=403)
             
         # Check if contract is being processed
@@ -2844,6 +2843,13 @@ def delete_queue_contract(request, queue_id):
         
         # Delete the queue contract
         queue_contract.delete()
+
+        logger.info(
+            "QueueContract %s (%s) deleted by %s",
+            queue_id,
+            queue_contract.contract_number,
+            request.user.username,
+        )
         
         return JsonResponse({
             'success': True,

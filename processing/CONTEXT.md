@@ -167,11 +167,11 @@ or form layer.
 - **Matching endpoints:** `/processing/match-buyer/<id>/`, `/processing/match-nsn/<process_clin_id>/` (GET search + POST match/create), `/processing/match-supplier/<process_clin_id>/` (same), `/processing/match-idiq/<id>/`.
 - **AJAX/API:** `/processing/api/...` handles GET/PUT for processing contracts, create/update/delete CLINs, update single fields, `save_clin`, and `update_contract_values`.
 - **CLIN splits:** `/processing/clin/<clin_pk>/splits/add/`, `/processing/clin/splits/<split_pk>/update/`, `/processing/clin/splits/<split_pk>/delete/`, `/processing/clin/<clin_pk>/splits/calc/`.
-- **Admin-like actions:** `/processing/queue/delete/<queue_id>/` (superusers only), `/processing/contract/<pk>/save/`, `/processing/save-contract/` (duplicate alias).
+- **Admin-like actions:** `/processing/queue/delete/<queue_id>/` (staff or superuser), `/processing/contract/<pk>/save/`, `/processing/save-contract/` (duplicate alias).
 
 ## 13. Permissions / Security Considerations
 - `@login_required` decorates every view in `processing_views.py`, `api_views.py`, and `matching_views.py`; anonymous traffic cannot access the workflow.
-- `delete_queue_contract` explicitly enforces `request.user.is_superuser`.
+- `delete_queue_contract` enforces `request.user.is_staff` or `request.user.is_superuser` (previously superuser-only). Successful deletions are logged via `logger.info` with queue ID, contract number, and username.
 - `download_test_data` immediately raises `PermissionDenied` if `settings.DEBUG` is `False`.
 - Finalization views require matched buyer/NSN/supplier FKs (`finalize_contract` returns errors if they are absent), so workflow fails fast when data is incomplete.
 - `start_processing`/`initiate_processing` use `select_for_update`/atomic transactions so two users cannot claim the same queue record.
