@@ -643,14 +643,18 @@ class FinalizationTests(TestCase):
                 'min_guarantee': 1000,
                 'approved_pairs': [
                     {
-                        'nsn_id': self.nsn1.id, 'nsn_text': '1111',
-                        'supplier_id': self.supplier1.id, 'supplier_text': 'Supp A',
+                        'nsn_id': self.nsn1.id,
+                        'nsn_text': '1111',
+                        'supplier_id': self.supplier1.id,
+                        'supplier_text': 'Supp A',
                         'min_order_qty': '10',
                         'supplier_part_number': 'PN-ALPHA',
                     },
                     {
-                        'nsn_id': self.nsn2.id, 'nsn_text': '2222',
-                        'supplier_id': self.supplier2.id, 'supplier_text': 'Supp B',
+                        'nsn_id': self.nsn2.id,
+                        'nsn_text': '2222',
+                        'supplier_id': self.supplier2.id,
+                        'supplier_text': 'Supp B',
                         'min_order_qty': '20',
                         'supplier_part_number': None,
                     },
@@ -666,10 +670,8 @@ class FinalizationTests(TestCase):
         pair_keys = {(d.nsn_id, d.supplier_id) for d in details}
         self.assertIn((self.nsn1.id, self.supplier1.id), pair_keys)
         self.assertIn((self.nsn2.id, self.supplier2.id), pair_keys)
-
         pn_row = next(d for d in details if d.nsn_id == self.nsn1.id)
         self.assertEqual(pn_row.supplier_part_number, 'PN-ALPHA')
-
         no_pn_row = next(d for d in details if d.nsn_id == self.nsn2.id)
         self.assertIsNone(no_pn_row.supplier_part_number)
 
@@ -680,7 +682,10 @@ class FinalizationTests(TestCase):
             status=DraftContract.Status.READY_FOR_REVIEW,
             data={
                 'term_months': 36,
-                'approved_pairs': [{'nsn_text': 'unmatched', 'nsn_id': None, 'supplier_id': None}],
+                'approved_pairs': [
+                    {'nsn_text': 'unmatched', 'nsn_id': None,
+                     'supplier_text': '', 'supplier_id': None},
+                ],
             },
         )
         with transaction.atomic():
