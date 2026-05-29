@@ -108,10 +108,13 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   grammar without also expanding the test in `MatcherUnitTests` — the
   endpoint will accept any JSON the matchers module accepts.
 - **IDIQ pairs:** `approved_pairs` replaces the old `approved_nsns` +
-  `approved_suppliers` split. Each pair row has both NSN and Supplier fields.
-  Finalization creates one `IdiqContractDetails` row per pair where both
-  `nsn_id` and `supplier_id` are matched. Do not reintroduce cross-product
-  logic — it was intentionally removed.
+  `approved_suppliers` split. Each pair row carries NSN fields, supplier
+  fields, `min_order_qty`, and `supplier_part_number`. Finalization
+  creates one `IdiqContractDetails` row per pair where both `nsn_id`
+  and `supplier_id` are matched. `supplier_part_number` is stored as-is
+  (no canonical lookup). Do not reintroduce cross-product logic.
+  Do not add `supplier_part_number` to any canonical lookup table —
+  it is a free-text field on IdiqContractDetails only.
   - `approved_pair:<i>:nsn` — writes NSN fields into `approved_pairs[i]`
   - `approved_pair:<i>:supplier` — writes supplier fields into `approved_pairs[i]`
 - `match_endpoint` saves via `draft.save()` which re-validates the whole
@@ -178,6 +181,15 @@ contractor) as supplier fallback — they are different entities.
 
 **Packhouse drill-down:** Same pattern. Contract-level "PLACE OF INSPECTION
 FOR PACKAGING" is the default. CLIN-level overrides per CLIN.
+
+**IDIQ supplier extraction:** `_extract_idiq_supplier_via_claude_api`
+sends Section B text to the Claude API (same pattern as
+`_extract_clins_via_claude_api`) and returns supplier_name, cage,
+part_number as a JSON object. Called only when contract_type == 'IDIQ'.
+Must use `_section_b_slice(text)` as input — never full document text —
+to avoid matching the prime contractor in Block 9. Returns None on
+failure; ingest handles None gracefully (no approved_pairs populated).
+part_number is optional and may be null.
 
 **`ia` mapping:** `ia` is derived from `ClinParseResult.inspection_point`
 only (not acceptance). ORIGIN → 'O', DESTINATION → 'D'.

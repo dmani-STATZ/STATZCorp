@@ -169,18 +169,18 @@ def create_idiq_from_payload(payload: dict, user: User) -> IdiqContract:
         modified_by=user,
     )
 
-    explicit_pairs = payload.get('idiq_details')
-    approved_pairs = payload.get('approved_pairs')
-    if explicit_pairs:
-        _create_idiq_details_pairs(idiq, explicit_pairs)
-    elif approved_pairs is not None:
-        _create_idiq_details_pairs(idiq, approved_pairs)
-    else:
-        _create_idiq_details_cross_product(
-            idiq,
-            payload.get('approved_nsns') or [],
-            payload.get('approved_suppliers') or [],
-        )
+    approved_pairs = payload.get('approved_pairs') or []
+    for pair in approved_pairs:
+        nsn_id = pair.get('nsn_id')
+        supplier_id = pair.get('supplier_id')
+        if nsn_id and supplier_id:
+            IdiqContractDetails.objects.create(
+                idiq_contract=idiq,
+                nsn_id=nsn_id,
+                supplier_id=supplier_id,
+                min_order_qty=pair.get('min_order_qty') or '',
+                supplier_part_number=pair.get('supplier_part_number') or None,
+            )
 
     return idiq
 
@@ -487,54 +487,6 @@ def _seed_payment_history(contract, payload: dict, clins: list) -> None:
                 payment_info='Initial quote value',
                 created_by=created_by,
                 modified_by=created_by,
-            )
-
-
-def _create_idiq_details_pairs(idiq, pairs: list) -> None:
-    """Direct {nsn_id, supplier_id, min_order_qty} → IdiqContractDetails rows."""
-    nsn_ids = {p['nsn_id'] for p in pairs if p.get('nsn_id')}
-    supplier_ids = {p['supplier_id'] for p in pairs if p.get('supplier_id')}
-    nsns = Nsn.objects.in_bulk(nsn_ids)
-    suppliers = Supplier.objects.in_bulk(supplier_ids)
-    for p in pairs:
-        nsn = nsns.get(p.get('nsn_id'))
-        supplier = suppliers.get(p.get('supplier_id'))
-        if nsn is None or supplier is None:
-            continue
-        IdiqContractDetails.objects.create(
-            idiq_contract=idiq,
-            nsn=nsn,
-            supplier=supplier,
-            min_order_qty=p.get('min_order_qty'),
-        )
-
-
-def _create_idiq_details_cross_product(
-    idiq, approved_nsns: list, approved_suppliers: list
-) -> None:
-    """Intake-style cross-product: every matched NSN paired with every
-    matched supplier becomes an IdiqContractDetails row."""
-    matched_nsn_rows = [n for n in approved_nsns if n.get('nsn_id')]
-    matched_supplier_ids = [
-        s['supplier_id'] for s in approved_suppliers if s.get('supplier_id')
-    ]
-    if not (matched_nsn_rows and matched_supplier_ids):
-        return
-    nsns = Nsn.objects.in_bulk([r['nsn_id'] for r in matched_nsn_rows])
-    suppliers = Supplier.objects.in_bulk(matched_supplier_ids)
-    for nsn_row in matched_nsn_rows:
-        nsn = nsns.get(nsn_row['nsn_id'])
-        if nsn is None:
-            continue
-        for supp_id in matched_supplier_ids:
-            supplier = suppliers.get(supp_id)
-            if supplier is None:
-                continue
-            IdiqContractDetails.objects.create(
-                idiq_contract=idiq,
-                nsn=nsn,
-                supplier=supplier,
-                min_order_qty=nsn_row.get('min_order_qty'),
             )
 
 

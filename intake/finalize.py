@@ -49,6 +49,9 @@ IDIQ
   data.min_guarantee         → IdiqContract.min_guarantee
   data.files_url             → IdiqContract.files_url
   approved_pairs[i].nsn_id + supplier_id (matched rows only)
+                             → IdiqContractDetails (one row per explicit
+                               pair; supplier_part_number stored when present)
+  approved_pairs[i].nsn_id + supplier_id (matched rows only)
                              → IdiqContractDetails (one row per explicit pair)
 """
 from __future__ import annotations

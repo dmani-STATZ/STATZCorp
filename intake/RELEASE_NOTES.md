@@ -1,14 +1,31 @@
 # intake — Release Notes
 
-## IDIQ Editor: Explicit NSN+Supplier Pairs (2026-05-29)
+## IDIQ Parser: Auto-Extract Approved Supplier from PDF (2026-05-29)
+
+User-visible changes:
+
+When an IDIQ PDF is ingested, the parser now attempts to extract the
+approved manufacturer/supplier name, CAGE code, and part number from
+Section B of the award document.
+If found, the supplier is pre-populated as the first row in the CLINs
+(pairs) table on the IDIQ draft editor. Analysts still need to use the
+Match button to link it to a canonical Supplier record.
+Part number is captured when present (e.g. SMTC-18). Many IDIQ
+documents do not include a part number; the field will be blank in
+those cases.
+
+## IDIQ Editor: Explicit NSN+Supplier Pairs + Supplier Part Number (2026-05-29)
 
 User-visible changes:
 
 The IDIQ draft editor now shows a single "CLINs" table where each row
-is one NSN paired with one Supplier and a Min Order Qty — replacing the
-previous two separate sections (Approved NSNs and Approved Suppliers).
-Each row finalizes to exactly one IdiqContractDetails record. Two rows
-produce two records, not a cross-product.
+is one NSN paired with one Supplier, a Min Order Qty, and a Supplier
+Part Number — replacing the previous separate Approved NSNs and
+Approved Suppliers sections.
+Each row finalizes to exactly one IdiqContractDetails record. Two
+rows produce two records, not a cross-product.
+New field: Supplier Part Number (e.g. SMTC-18) is now captured per
+NSN+Supplier pair and stored on IdiqContractDetails.
 
 ## IDIQ Editor: Clean Up Contract Details Card (2026-05-29)
 

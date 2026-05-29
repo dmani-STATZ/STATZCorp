@@ -115,6 +115,7 @@ class IdiqPair(BaseModel):
     supplier_id: Optional[int] = None
     cage: Optional[str] = None
     min_order_qty: Optional[str] = None
+    supplier_part_number: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

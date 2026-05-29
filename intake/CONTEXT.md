@@ -95,7 +95,7 @@ schema:
 > conditionally hides fields that do not apply to IDIQ contracts
 > (due_date, contract_value, pr_number, plan_gross, planned_split, nist,
 > po_number). Use `{% if draft.contract_type != 'IDIQ' %}` guards. The
-> IDIQ Terms card and approved NSNs/suppliers section are always shown for
+> IDIQ Terms card and paired CLINs section are always shown for
 > IDIQ and never shown for other types.
 
 Unknown keys are dropped at parse time. All-blank rows are dropped. Date /
@@ -237,6 +237,12 @@ parser — no dependency on processing) and converts the resulting
 `AwardParseResult` dataclass into the intake `data` JSON shape. The mapping
 lives ONLY in `_result_to_data` — when the parser grows new fields, update
 the mapping there.
+
+For IDIQ contracts, `_result_to_data` pre-populates one `approved_pairs`
+entry from the parsed supplier/CAGE/part_number when the parser
+successfully extracted it. The NSN side of the pair is left blank for
+analyst matching. The supplier_id is left null until the analyst uses
+the Match button in the editor.
 
 `ingest_pdf(file, original_filename='...')` returns the new `DraftContract`
 or raises:

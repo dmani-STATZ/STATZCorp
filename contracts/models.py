@@ -1118,6 +1118,13 @@ class IdiqContractDetails(models.Model):
     nsn = models.ForeignKey(Nsn, on_delete=models.CASCADE)
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
     min_order_qty = models.CharField(max_length=50, null=True, blank=True)
+    supplier_part_number = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Supplier's part number for this NSN (e.g. SMTC-18). "
+                  "Parsed from IDIQ award document or entered manually.",
+    )
 
     class Meta:
         indexes = [

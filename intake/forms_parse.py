@@ -59,7 +59,7 @@ PKG_FIELDS = {
 PAIR_FIELDS = {
     'nsn_text', 'nsn_id', 'nsn_description',
     'supplier_text', 'supplier_id', 'cage',
-    'min_order_qty',
+    'min_order_qty', 'supplier_part_number',
 }
 
 # Top-level row buckets. Note 'fin' is no longer here — finance_lines now

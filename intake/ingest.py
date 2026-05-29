@@ -173,6 +173,26 @@ def _result_to_data(result: AwardParseResult) -> dict:
             data['min_guarantee'] = int(result.idiq_min_guarantee)
         except (TypeError, ValueError):
             pass
+
+    # IDIQ approved pair — pre-populate from parser if supplier was extracted.
+    # Analysts can match the supplier canonical record and add more pairs
+    # manually in the editor.
+    if (
+        result.idiq_supplier_name is not None
+        or result.idiq_supplier_cage is not None
+    ):
+        pair = {
+            'supplier_text': result.idiq_supplier_name or '',
+            'supplier_id': None,
+            'cage': result.idiq_supplier_cage or '',
+            'nsn_text': '',
+            'nsn_id': None,
+            'min_order_qty': '',
+        }
+        if result.idiq_supplier_part_number:
+            pair['supplier_part_number'] = result.idiq_supplier_part_number
+        data['approved_pairs'] = [pair]
+
     return data
 
 

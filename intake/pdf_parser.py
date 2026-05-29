@@ -362,6 +362,9 @@ class AwardParseResult:
     contract_supplier_cage: Optional[str]
     contract_supplier_name: Optional[str]
     packhouse_cage: Optional[str]
+    idiq_supplier_name: Optional[str]
+    idiq_supplier_cage: Optional[str]
+    idiq_supplier_part_number: Optional[str]
     contract_packhouse_name: Optional[str]
 
 
@@ -1072,6 +1075,80 @@ SECTION B TEXT:
         return None
 
 
+def _extract_idiq_supplier_via_claude_api(
+    section_b_text: str,
+) -> Optional[dict]:
+    """
+    Send Section B text to Claude API and extract the approved
+    manufacturer/supplier line for an IDIQ contract.
+
+    Returns a dict with keys:
+      supplier_name: str or null
+      cage: str or null  (5-character alphanumeric CAGE code)
+      part_number: str or null
+
+    Returns None if the API call fails or returns unparseable JSON.
+    """
+    try:
+        import urllib.request
+
+        prompt = f"""Find the approved manufacturer/supplier line in Section B. This is NOT the prime contractor (which appears in Block 9 on page 1 before Section B). It is the manufacturer or approved source for the NSN.
+
+Three patterns to look for:
+1. Inline line: SUPPLIER NAME CAGE_CODE P/N PART_NUMBER (e.g. ADVANCED CUTTING TECHNOLOGIES, INC 416L3 P/N SMTC-18)
+2. MFR label: MFR. CAGE: CAGE_CODE P/N: PART_NUMBER with supplier name on the SUPPLIES/SERVICES line above it (e.g. MFR. CAGE: 75535 P/N: 1225091)
+3. Manufacturing Facilities block: Manufacturing Facilities:\\nCAGE CAGE_CODE\\nSUPPLIER NAME\\n... (no part number in this pattern)
+
+- CAGE code is always a 5-character alphanumeric code
+- Part number is optional — return null if not present
+- Return ONLY a JSON object (not an array) with keys: supplier_name, cage, part_number
+- No markdown, no explanation, no code fences
+
+SECTION B TEXT:
+{section_b_text}"""
+
+        payload = json.dumps(
+            {
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 500,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "anthropic-version": "2023-06-01",
+                "x-api-key": os.environ.get("ANTHROPIC_API_KEY", ""),
+            },
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+
+        raw_text = ""
+        for block in body.get("content", []):
+            if block.get("type") == "text":
+                raw_text += block.get("text", "")
+
+        raw_text = raw_text.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```[a-z]*\n?", "", raw_text)
+            raw_text = re.sub(r"\n?```$", "", raw_text)
+
+        result = json.loads(raw_text)
+        if isinstance(result, dict):
+            return result
+        return None
+
+    except Exception as exc:
+        logger.warning("Claude API IDIQ supplier extraction failed: %s", exc)
+        return None
+
+
 def _extract_nsn_descriptions_from_section_b(full_text: str) -> dict[str, str]:
     """
     Section B narrative may appear before the CLIN table (e.g. page 3 vs page 4).
@@ -1724,6 +1801,9 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contract_supplier_cage=None,
             contract_supplier_name=None,
             packhouse_cage=None,
+            idiq_supplier_name=None,
+            idiq_supplier_cage=None,
+            idiq_supplier_part_number=None,
             contract_packhouse_name=None,
         )
 
@@ -1753,6 +1833,9 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contract_supplier_cage=None,
             contract_supplier_name=None,
             packhouse_cage=None,
+            idiq_supplier_name=None,
+            idiq_supplier_cage=None,
+            idiq_supplier_part_number=None,
             contract_packhouse_name=None,
         )
 
@@ -1811,7 +1894,18 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
         idiq_min_guarantee: Optional[Decimal] = None
         idiq_term_months: Optional[int] = None
         idiq_option_months: Optional[int] = None
+        idiq_supplier_name: Optional[str] = None
+        idiq_supplier_cage: Optional[str] = None
+        idiq_supplier_part_number: Optional[str] = None
+
         if contract_type == "IDIQ":
+            section_b = _section_b_slice(text)
+            supplier_data = _extract_idiq_supplier_via_claude_api(section_b)
+            if supplier_data:
+                idiq_supplier_name = supplier_data.get("supplier_name") or None
+                idiq_supplier_cage = supplier_data.get("cage") or None
+                idiq_supplier_part_number = supplier_data.get("part_number") or None
+
             m_max = _RE_IDIQ_MAX_VALUE.search(text)
             if m_max:
                 idiq_max_value = _to_decimal(m_max.group(1))
@@ -1881,6 +1975,9 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contract_supplier_cage=contract_supplier_cage,
             contract_supplier_name=contract_supplier_name,
             packhouse_cage=packaging_cage,
+            idiq_supplier_name=idiq_supplier_name,
+            idiq_supplier_cage=idiq_supplier_cage,
+            idiq_supplier_part_number=idiq_supplier_part_number,
             contract_packhouse_name=contract_packhouse_name,
         )
     except Exception as exc:
@@ -1909,5 +2006,8 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             contract_supplier_cage=None,
             contract_supplier_name=None,
             packhouse_cage=None,
+            idiq_supplier_name=None,
+            idiq_supplier_cage=None,
+            idiq_supplier_part_number=None,
             contract_packhouse_name=None,
         )
