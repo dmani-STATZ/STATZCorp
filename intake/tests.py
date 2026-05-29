@@ -809,6 +809,9 @@ def _stub_parse_result(**overrides) -> AwardParseResult:
         contract_supplier_name=None,
         packhouse_cage=None,
         contract_packhouse_name=None,
+        idiq_supplier_name=None,
+        idiq_supplier_cage=None,
+        idiq_supplier_part_number=None,
     )
     base.update(overrides)
     return AwardParseResult(**base)
