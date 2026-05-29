@@ -171,53 +171,91 @@ def _generate_letter_pdf_bytes(letter) -> bytes:
 def _get_or_create_acknowledgment_letter(clin, request):
     """Get or create an AcknowledgementLetter for a CLIN with prefill logic."""
     letter = AcknowledgementLetter.objects.filter(clin=clin).first()
-
     if not letter:
         letter = AcknowledgementLetter(clin=clin)
 
-        if clin.supplier:
-            supplier = clin.supplier
-            letter.supplier = supplier.name
+    if letter.pk is not None and letter.is_user_edited:
+        return letter
 
-            contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
-            if contact:
-                letter.salutation = contact.salutation
-                if contact.name:
-                    names = contact.name.split(maxsplit=1)
-                    letter.addr_fname = names[0]
-                    letter.addr_lname = names[1] if len(names) > 1 else ''
+    if clin.supplier:
+        supplier = clin.supplier
+        letter.supplier = supplier.name
 
-            if supplier.physical_address:
-                addr = supplier.physical_address
-                letter.st_address = addr.address_line_1
-                letter.city = addr.city
-                letter.state = addr.state
-                letter.zip = addr.zip
+        contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
+        if contact:
+            letter.salutation = contact.salutation
+            if contact.name:
+                names = contact.name.split(maxsplit=1)
+                letter.addr_fname = names[0]
+                letter.addr_lname = names[1] if len(names) > 1 else ''
+        else:
+            letter.salutation = None
+            letter.addr_fname = None
+            letter.addr_lname = None
 
-        letter.po = clin.po_number
-        letter.po_ext = clin.po_num_ext
-        letter.contract_num = clin.contract.contract_number if clin.contract else None
-        letter.supplier_due_date = clin.supplier_due_date
+        if supplier.physical_address:
+            addr = supplier.physical_address
+            letter.st_address = addr.address_line_1
+            letter.city = addr.city
+            letter.state = addr.state
+            letter.zip = addr.zip
+        else:
+            letter.st_address = None
+            letter.city = None
+            letter.state = None
+            letter.zip = None
+    else:
+        letter.supplier = None
+        letter.salutation = None
+        letter.addr_fname = None
+        letter.addr_lname = None
+        letter.st_address = None
+        letter.city = None
+        letter.state = None
+        letter.zip = None
 
-        fat_plt_clin = Clin.objects.filter(
-            contract=clin.contract,
-            item_type__in=['G', 'C', 'L']
-        ).first()
-        if fat_plt_clin:
-            letter.fat_due_date = fat_plt_clin.supplier_due_date
+    letter.po = clin.po_number
+    letter.po_ext = clin.po_num_ext
+    letter.contract_num = clin.contract.contract_number if clin.contract else None
 
-        letter.statz_contact = f"{request.user.first_name} {request.user.last_name}".strip()
-        letter.statz_contact_email = request.user.email
+    p_clin = (
+        Clin.objects
+        .filter(contract=clin.contract, item_type='P', supplier_due_date__isnull=False)
+        .order_by('supplier_due_date')
+        .first()
+    )
+    letter.supplier_due_date = p_clin.supplier_due_date if p_clin else None
 
-        user_settings = UserSettings.get_multiple_settings(request.user, [
-            'statz_contact_title',
-            'statz_contact_phone'
-        ])
-        letter.statz_contact_title = user_settings.get('statz_contact_title', 'Contract Manager')
-        letter.statz_contact_phone = user_settings.get('statz_contact_phone', '')
+    fat_clin = (
+        Clin.objects
+        .filter(contract=clin.contract, item_type__in=['C', 'G'], supplier_due_date__isnull=False)
+        .order_by('supplier_due_date')
+        .first()
+    )
+    letter.fat_due_date = fat_clin.supplier_due_date if fat_clin else None
+
+    plt_clin = (
+        Clin.objects
+        .filter(contract=clin.contract, item_type='L', supplier_due_date__isnull=False)
+        .order_by('supplier_due_date')
+        .first()
+    )
+    letter.plt_due_date = plt_clin.supplier_due_date if plt_clin else None
+
+    letter.statz_contact = f"{request.user.first_name} {request.user.last_name}".strip()
+    letter.statz_contact_email = request.user.email
+
+    user_settings = UserSettings.get_multiple_settings(request.user, [
+        'statz_contact_title',
+        'statz_contact_phone',
+    ])
+    letter.statz_contact_title = user_settings.get('statz_contact_title', 'Contract Manager')
+    letter.statz_contact_phone = user_settings.get('statz_contact_phone', '')
+
+    if not letter.pk:
         letter.letter_date = timezone.now().date()
-        letter.save()
 
+    letter.save()
     return letter
 
 
@@ -322,6 +360,9 @@ def send_acknowledgment_to_contract_folder(request, letter_id):
         pdf_filename = _acknowledgment_pdf_filename(letter)
 
         send_pdf_bytes_to_folder(contract_folder, pdf_filename, pdf_bytes)
+
+        letter.is_user_edited = True
+        letter.save(update_fields=['is_user_edited'])
 
         return JsonResponse({
             'success': True,

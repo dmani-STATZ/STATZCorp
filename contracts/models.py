@@ -1234,6 +1234,14 @@ class AcknowledgementLetter(models.Model):
     plt_due_date = models.DateField(null=True, blank=True)
     supplier_due_date = models.DateField(null=True, blank=True)
     dpas_priority = models.CharField(max_length=10, null=True, blank=True)
+    is_user_edited = models.BooleanField(
+        default=False,
+        help_text=(
+            "Set to True when the letter is sent to the contract folder. "
+            "While False, the prefill logic re-runs on every page open, "
+            "overwriting all fields with current contract data."
+        ),
+    )
     created_on = models.DateTimeField(auto_now_add=True)
     modified_on = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='acknowledgement_letters_created')

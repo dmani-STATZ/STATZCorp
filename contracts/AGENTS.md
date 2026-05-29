@@ -449,6 +449,8 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 **`AcknowledgementLetter` due dates:** `fat_due_date` and `plt_due_date` replaced the legacy `fat_plt_due_date` field (migration `0070`). Word template placeholders: `{{FAT_DUE_DATE}}` and `{{PLT_DUE_DATE}}` (not `{{FAT_PLT_DUE_DATE}}`). Preview and send-to-folder must substitute both tokens from the saved letter row.
 
+`acknowledgement-letter-prefill-lock`: `AcknowledgementLetter.is_user_edited` controls whether prefill runs on open. It is ONLY set to True inside `send_acknowledgment_to_contract_folder`. Do not set it in the Save view, do not set it manually in migrations, and do not add other write paths without updating the CONTEXT.md state machine docs.
+
 **Acknowledgment letter URL names:**
 | Name | View | Notes |
 |------|------|-------|
