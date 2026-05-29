@@ -185,8 +185,7 @@ def _editor_context(draft: DraftContract, user) -> dict:
         ]),
         'sales_classes': SalesClass.objects.all().order_by('sales_team'),
         'contract_types': ContractType.objects.all().order_by('description'),
-        'approved_nsns': data.get('approved_nsns') or [],
-        'approved_suppliers': data.get('approved_suppliers') or [],
+        'approved_pairs': data.get('approved_pairs') or [],
         'lock_held_by_user': (
             draft.locked_by_id == user.id and not is_expired(draft.locked_at)
         ),

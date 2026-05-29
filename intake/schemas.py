@@ -105,21 +105,16 @@ class DraftClin(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class ApprovedNsn(BaseModel):
+class IdiqPair(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     nsn_text: Optional[str] = None
     nsn_id: Optional[int] = None
     nsn_description: Optional[str] = None
-    min_order_qty: Optional[str] = None
-
-
-class ApprovedSupplier(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
     supplier_text: Optional[str] = None
     supplier_id: Optional[int] = None
     cage: Optional[str] = None
+    min_order_qty: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -166,14 +161,13 @@ class DoData(AwdPoData):
 
 
 class IdiqData(_CommonContractFields):
-    """IDIQ — no CLINs; approved NSNs/suppliers plus term/option/max/min."""
+    """IDIQ — no CLINs; explicit NSN+Supplier pairs plus term/option/max/min."""
 
     term_months: Optional[int] = None
     option_months: Optional[int] = None
     max_value: Optional[Decimal] = None
     min_guarantee: Optional[int] = None
-    approved_nsns: List[ApprovedNsn] = Field(default_factory=list)
-    approved_suppliers: List[ApprovedSupplier] = Field(default_factory=list)
+    approved_pairs: List[IdiqPair] = Field(default_factory=list)
 
 
 class ModAmdData(_CommonContractFields):

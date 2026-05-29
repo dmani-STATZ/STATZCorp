@@ -1,5 +1,26 @@
 # intake — Release Notes
 
+## IDIQ Editor: Explicit NSN+Supplier Pairs (2026-05-29)
+
+User-visible changes:
+
+The IDIQ draft editor now shows a single "CLINs" table where each row
+is one NSN paired with one Supplier and a Min Order Qty — replacing the
+previous two separate sections (Approved NSNs and Approved Suppliers).
+Each row finalizes to exactly one IdiqContractDetails record. Two rows
+produce two records, not a cross-product.
+
+## IDIQ Editor: Clean Up Contract Details Card (2026-05-29)
+
+User-visible changes:
+
+The Contract Details section of the IDIQ draft editor now only shows
+fields relevant to IDIQ contracts: Contract Number, Buyer, Award Date,
+and Files URL.
+Fields not tracked on IDIQ contracts (Due Date, Contract Value, PR Number,
+Plan Gross, Planned Split, NIST, PO Number) are now hidden for IDIQ drafts.
+They remain visible for all other contract types (AWD, PO, DO, etc.).
+
 ## [Unreleased]
 
 ### Added

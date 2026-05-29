@@ -89,8 +89,14 @@ schema:
 | `clin-<i>-fin-<j>-<field>`          | `clins[i].finance_lines[j]`     |
 | `clin-<i>-split-<j>-<field>`        | `clins[i].splits[j]`            |
 | `pkg-<field>`                       | `packaging` (singleton)         |
-| `nsn-<i>-<field>`                   | `approved_nsns[i]` (IDIQ)       |
-| `supp-<i>-<field>`                  | `approved_suppliers[i]` (IDIQ)  |
+| `pair-<i>-<field>`                  | `approved_pairs[i]` (IDIQ only) |
+
+> **IDIQ type-awareness:** The Contract Details card in `draft_edit.html`
+> conditionally hides fields that do not apply to IDIQ contracts
+> (due_date, contract_value, pr_number, plan_gross, planned_split, nist,
+> po_number). Use `{% if draft.contract_type != 'IDIQ' %}` guards. The
+> IDIQ Terms card and approved NSNs/suppliers section are always shown for
+> IDIQ and never shown for other types.
 
 Unknown keys are dropped at parse time. All-blank rows are dropped. Date /
 Decimal coercion is deferred to the Pydantic schema on `DraftContract.save()`.
@@ -210,7 +216,7 @@ Supported types: **AWD, PO, DO, IDIQ, INTERNAL, MOD, AMD**.
 |----------|----------------------------------------------------|----------------------------------------------------|
 | AWD/PO   | `buyer_id` + ≥1 CLIN, each with `nsn_id`+`supplier_id` | new Contract + Clins + optional Packaging + finance_lines on first CLIN |
 | DO       | Same as AWD/PO + `parent_idiq_id`                  | new Contract with `idiq_contract` FK set           |
-| IDIQ     | (nothing required; buyer optional)                 | new IdiqContract + cross-product IdiqContractDetails |
+| IDIQ     | (nothing required; buyer optional)                 | new IdiqContract + one IdiqContractDetails row per explicit NSN+Supplier pair |
 | INTERNAL | If any CLIN provided, each must be fully matched   | new Contract; CLINs optional; notes append as Note |
 | MOD/AMD  | `parent_contract_id` matched                       | appends a tagged Note on the parent Contract; returns parent (no new row) |
 

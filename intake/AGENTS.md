@@ -78,12 +78,19 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   PDF upload sets `company` from `request.active_company`.
 
 ### Editor changes
+- **IDIQ field visibility:** The Contract Details card hides fields
+  irrelevant to IDIQ (due_date, contract_value, pr_number, plan_gross,
+  planned_split, nist, po_number) using `{% if draft.contract_type != 'IDIQ' %}`
+  guards. Do not remove these guards or the hidden fields will reappear
+  for IDIQ drafts. Do not add new Contract Details fields for IDIQ without
+  first confirming the field has a column on `contracts.IdiqContract` and
+  a mapping in `intake/finalize.py::_finalize_idiq`.
 - Field name convention in `draft_edit.html` is the load-bearing contract
   with `forms_parse.parse_post`. Adding a key to a schema is **not enough** —
   the template must POST it under the right prefix and the field name must
   be in the matching allowlist set in `forms_parse.py`. Valid prefixes:
   `f_*` (scalar), `clin-i-*`, `clin-i-fin-j-*`, `clin-i-split-j-*`,
-  `pkg-*`, `nsn-i-*`, `supp-i-*`. Skip either step and the field is
+  `pkg-*`, `pair-i-*` (IDIQ only). Skip either step and the field is
   silently dropped at POST time, not flagged at validate time.
 - Nested keys (`clin-i-fin-j-*`, `clin-i-split-j-*`) require entries in
   `_NESTED_ROW_KEY` (regex) and `_NESTED_BUCKET` (allowlist map). The CLIN
@@ -100,6 +107,13 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   are valid and which match_type each one accepts. Don't widen path
   grammar without also expanding the test in `MatcherUnitTests` — the
   endpoint will accept any JSON the matchers module accepts.
+- **IDIQ pairs:** `approved_pairs` replaces the old `approved_nsns` +
+  `approved_suppliers` split. Each pair row has both NSN and Supplier fields.
+  Finalization creates one `IdiqContractDetails` row per pair where both
+  `nsn_id` and `supplier_id` are matched. Do not reintroduce cross-product
+  logic — it was intentionally removed.
+  - `approved_pair:<i>:nsn` — writes NSN fields into `approved_pairs[i]`
+  - `approved_pair:<i>:supplier` — writes supplier fields into `approved_pairs[i]`
 - `match_endpoint` saves via `draft.save()` which re-validates the whole
   payload. A schema change that tightens an Optional → Required will
   break previously-saved drafts on the next match. Keep matcher writes

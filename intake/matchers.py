@@ -9,7 +9,7 @@ with one search-and-apply pipeline. Two responsibilities:
 
 The JSON model decouples the editor UI from concrete FK names, so a single
 endpoint can target every match site (top-level buyer, parent IDIQ, per-CLIN
-NSN/supplier, IDIQ approved_nsns/approved_suppliers rows, packaging).
+NSN/supplier, IDIQ approved_pairs rows, packaging).
 
 Target-path grammar (matches what `draft_edit.html` POSTs):
 
@@ -19,8 +19,8 @@ Target-path grammar (matches what `draft_edit.html` POSTs):
     packaging                   data.packaging.packhouse_supplier_*
     clin:<i>:nsn                data.clins[i].nsn_*
     clin:<i>:supplier           data.clins[i].supplier_*
-    approved_nsn:<i>            data.approved_nsns[i].nsn_*
-    approved_supplier:<i>       data.approved_suppliers[i].*
+    approved_pair:<i>:nsn       data.approved_pairs[i].nsn_* (merges, no clobber)
+    approved_pair:<i>:supplier  data.approved_pairs[i].supplier_* (merges, no clobber)
 
 Each target writes a *triple of keys* (text + id + optional description /
 cage), which is the load-bearing piece — finalization later reads only `*_id`
@@ -329,22 +329,21 @@ def apply_match(data: dict, target_path: str, match_type: str, record_id: int) -
             row['supplier_id'] = rec['id']
             return data
 
-    if head == 'approved_nsn' and len(parts) == 2 and match_type == 'nsn':
+    if head == 'approved_pair' and len(parts) == 3:
         idx = int(parts[1])
-        row = _ensure_row(data, 'approved_nsns', idx)
-        row['nsn_text'] = rec['text']
-        row['nsn_id'] = rec['id']
-        row['nsn_description'] = rec.get('description', '')
-        return data
-
-    if head == 'approved_supplier' and len(parts) == 2 and match_type == 'supplier':
-        idx = int(parts[1])
-        row = _ensure_row(data, 'approved_suppliers', idx)
-        row['supplier_text'] = rec['text']
-        row['supplier_id'] = rec['id']
-        if rec.get('cage'):
-            row['cage'] = rec['cage']
-        return data
+        slot = parts[2]
+        row = _ensure_row(data, 'approved_pairs', idx)
+        if slot == 'nsn' and match_type == 'nsn':
+            row['nsn_text'] = rec['text']
+            row['nsn_id'] = rec['id']
+            row['nsn_description'] = rec.get('description', '')
+            return data
+        if slot == 'supplier' and match_type == 'supplier':
+            row['supplier_text'] = rec['text']
+            row['supplier_id'] = rec['id']
+            if rec.get('cage'):
+                row['cage'] = rec['cage']
+            return data
 
     raise MatcherError(
         f'target_path {target_path!r} not valid for match_type {match_type!r}'
@@ -387,18 +386,15 @@ def clear_match(data: dict, target_path: str) -> dict:
                 rows[idx].pop('supplier_id', None)
         return data
 
-    if head == 'approved_nsn' and len(parts) == 2:
+    if head == 'approved_pair' and len(parts) == 3:
         idx = int(parts[1])
-        rows = data.get('approved_nsns') or []
+        slot = parts[2]
+        rows = data.get('approved_pairs') or []
         if idx < len(rows):
-            rows[idx].pop('nsn_id', None)
-        return data
-
-    if head == 'approved_supplier' and len(parts) == 2:
-        idx = int(parts[1])
-        rows = data.get('approved_suppliers') or []
-        if idx < len(rows):
-            rows[idx].pop('supplier_id', None)
+            if slot == 'nsn':
+                rows[idx].pop('nsn_id', None)
+            elif slot == 'supplier':
+                rows[idx].pop('supplier_id', None)
         return data
 
     raise MatcherError(f'cannot clear target_path {target_path!r}')

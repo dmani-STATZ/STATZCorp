@@ -10,8 +10,7 @@ Key naming convention used by `draft_edit.html`:
     clin-<i>-fin-<j>-<field>        per-CLIN finance line j on CLIN i
     clin-<i>-split-<j>-<field>      per-CLIN GP split j on CLIN i
     pkg-<field>                     packaging (singleton)
-    nsn-<i>-<field>                 IDIQ approved_nsns row i
-    supp-<i>-<field>                IDIQ approved_suppliers row i
+    pair-<i>-<field>                IDIQ approved_pairs row i
 
 Per-CLIN nesting is the canonical home for finance_lines (was root-level
 prior to the CLIN-card redesign). Legacy drafts may still carry root-level
@@ -57,21 +56,23 @@ PKG_FIELDS = {
     'packhouse_cage', 'packhouse_supplier_text', 'packhouse_supplier_id',
     'quote_amount', 'notes',
 }
-NSN_FIELDS = {'nsn_text', 'nsn_id', 'nsn_description', 'min_order_qty'}
-SUPP_FIELDS = {'supplier_text', 'supplier_id', 'cage'}
+PAIR_FIELDS = {
+    'nsn_text', 'nsn_id', 'nsn_description',
+    'supplier_text', 'supplier_id', 'cage',
+    'min_order_qty',
+}
 
 # Top-level row buckets. Note 'fin' is no longer here — finance_lines now
 # live per-CLIN. We still accept legacy drafts with root finance_lines (the
 # schema keeps the field) but the editor doesn't POST them anymore.
-_ROW_KEY = re.compile(r'^(clin|nsn|supp)-(\d+)-(.+)$')
+_ROW_KEY = re.compile(r'^(clin|pair)-(\d+)-(.+)$')
 _NESTED_ROW_KEY = re.compile(r'^clin-(\d+)-(fin|split)-(\d+)-(.+)$')
 _PKG_KEY = re.compile(r'^pkg-(.+)$')
 _SCALAR_KEY = re.compile(r'^f_(.+)$')
 
 _ROW_BUCKET = {
     'clin': ('clins', CLIN_FIELDS),
-    'nsn': ('approved_nsns', NSN_FIELDS),
-    'supp': ('approved_suppliers', SUPP_FIELDS),
+    'pair': ('approved_pairs', PAIR_FIELDS),
 }
 _NESTED_BUCKET = {
     'fin': ('finance_lines', FIN_FIELDS),
@@ -108,7 +109,7 @@ def parse_post(post) -> dict:
     """
     out: dict = {}
     row_buckets: dict[str, dict[int, dict]] = {
-        'clin': {}, 'nsn': {}, 'supp': {},
+        'clin': {}, 'pair': {},
     }
     # nested[clin_idx][bucket_name][sub_idx] = {field: value}
     nested: dict[int, dict[str, dict[int, dict]]] = {}

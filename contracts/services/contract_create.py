@@ -170,8 +170,11 @@ def create_idiq_from_payload(payload: dict, user: User) -> IdiqContract:
     )
 
     explicit_pairs = payload.get('idiq_details')
+    approved_pairs = payload.get('approved_pairs')
     if explicit_pairs:
         _create_idiq_details_pairs(idiq, explicit_pairs)
+    elif approved_pairs is not None:
+        _create_idiq_details_pairs(idiq, approved_pairs)
     else:
         _create_idiq_details_cross_product(
             idiq,

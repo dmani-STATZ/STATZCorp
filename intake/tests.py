@@ -55,17 +55,18 @@ class SchemaValidationTests(TestCase):
         with self.assertRaises(DraftDataValidationError):
             validate_data('AWD', {'clins': [{'item_number': '0001', 'bogus_key': 1}]})
 
-    def test_idiq_accepts_approved_lists(self):
+    def test_idiq_accepts_approved_pairs(self):
         out = validate_data('IDIQ', {
             'term_months': 60,
             'option_months': 12,
             'max_value': '350000.00',
             'min_guarantee': 170,
-            'approved_nsns': [{'nsn_text': '1234-12-123-1234'}],
-            'approved_suppliers': [{'supplier_text': 'ACME', 'cage': '12345'}],
+            'approved_pairs': [
+                {'nsn_text': '1234-12-123-1234', 'supplier_text': 'ACME', 'cage': '12345'},
+            ],
         })
         self.assertEqual(out['term_months'], 60)
-        self.assertEqual(len(out['approved_nsns']), 1)
+        self.assertEqual(len(out['approved_pairs']), 1)
 
     def test_do_carries_parent_idiq_reference(self):
         out = validate_data('DO', {
@@ -628,7 +629,7 @@ class FinalizationTests(TestCase):
         self.assertEqual(pkg.packhouse_id, self.supplier2.id)
         self.assertEqual(str(pkg.quote_amount), '99.50')
 
-    def test_idiq_happy_path_creates_cross_product_details(self):
+    def test_idiq_happy_path_creates_explicit_pair_details(self):
         draft = DraftContract.objects.create(
             contract_number='SPE7L1-26-D-FIN1',
             contract_type='IDIQ',
@@ -640,13 +641,17 @@ class FinalizationTests(TestCase):
                 'option_months': 24,
                 'max_value': '500000.00',
                 'min_guarantee': 1000,
-                'approved_nsns': [
-                    {'nsn_id': self.nsn1.id, 'nsn_text': '1111', 'min_order_qty': '10'},
-                    {'nsn_id': self.nsn2.id, 'nsn_text': '2222', 'min_order_qty': '20'},
-                ],
-                'approved_suppliers': [
-                    {'supplier_id': self.supplier1.id, 'supplier_text': 'Supp A'},
-                    {'supplier_id': self.supplier2.id, 'supplier_text': 'Supp B'},
+                'approved_pairs': [
+                    {
+                        'nsn_id': self.nsn1.id, 'nsn_text': '1111',
+                        'supplier_id': self.supplier1.id, 'supplier_text': 'Supp A',
+                        'min_order_qty': '10',
+                    },
+                    {
+                        'nsn_id': self.nsn2.id, 'nsn_text': '2222',
+                        'supplier_id': self.supplier2.id, 'supplier_text': 'Supp B',
+                        'min_order_qty': '20',
+                    },
                 ],
             },
         )
@@ -655,10 +660,10 @@ class FinalizationTests(TestCase):
         self.assertIsInstance(target, IdiqContract)
         self.assertEqual(target.term_length, 60)
         details = list(IdiqContractDetails.objects.filter(idiq_contract=target))
-        self.assertEqual(len(details), 4)  # 2 NSNs × 2 suppliers
-        # min_order_qty travels with the NSN side.
-        nsn1_details = [d for d in details if d.nsn_id == self.nsn1.id]
-        self.assertTrue(all(d.min_order_qty == '10' for d in nsn1_details))
+        self.assertEqual(len(details), 2)
+        pair_keys = {(d.nsn_id, d.supplier_id) for d in details}
+        self.assertIn((self.nsn1.id, self.supplier1.id), pair_keys)
+        self.assertIn((self.nsn2.id, self.supplier2.id), pair_keys)
 
     def test_idiq_with_no_matched_approved_rows_still_finalizes(self):
         draft = DraftContract.objects.create(
@@ -667,8 +672,7 @@ class FinalizationTests(TestCase):
             status=DraftContract.Status.READY_FOR_REVIEW,
             data={
                 'term_months': 36,
-                'approved_nsns': [{'nsn_text': 'unmatched', 'nsn_id': None}],
-                'approved_suppliers': [],
+                'approved_pairs': [{'nsn_text': 'unmatched', 'nsn_id': None, 'supplier_id': None}],
             },
         )
         with transaction.atomic():

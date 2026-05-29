@@ -48,8 +48,8 @@ IDIQ
   data.max_value             → IdiqContract.max_value
   data.min_guarantee         → IdiqContract.min_guarantee
   data.files_url             → IdiqContract.files_url
-  approved_nsns × approved_suppliers (matched rows only)
-                             → IdiqContractDetails (cross-product)
+  approved_pairs[i].nsn_id + supplier_id (matched rows only)
+                             → IdiqContractDetails (one row per explicit pair)
 """
 from __future__ import annotations
 
@@ -330,8 +330,7 @@ def _finalize_idiq(draft: DraftContract, user: User) -> IdiqContract:
         'max_value': data.get('max_value'),
         'min_guarantee': data.get('min_guarantee'),
         'files_url': files_url_value,
-        'approved_nsns': data.get('approved_nsns') or [],
-        'approved_suppliers': data.get('approved_suppliers') or [],
+        'approved_pairs': data.get('approved_pairs') or [],
     }
     try:
         return create_idiq_from_payload(payload, user)
