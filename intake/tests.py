@@ -675,6 +675,7 @@ class FinalizationTests(TestCase):
         no_pn_row = next(d for d in details if d.nsn_id == self.nsn2.id)
         self.assertIsNone(no_pn_row.supplier_part_number)
 
+
     def test_idiq_with_no_matched_approved_rows_still_finalizes(self):
         draft = DraftContract.objects.create(
             contract_number='SPE7L1-26-D-FIN2',

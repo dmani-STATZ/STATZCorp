@@ -144,10 +144,9 @@ def create_idiq_from_payload(payload: dict, user: User) -> IdiqContract:
     Caller MUST wrap in `transaction.atomic()`. Raises
     `ContractCreationError` on validation failure.
 
-    Accepts either:
-      - `idiq_details`: explicit list of {nsn_id, supplier_id, min_order_qty}
-        rows (one-to-one mapping; Processing style), OR
-      - `approved_nsns` + `approved_suppliers`: cross-product (Intake style).
+    Accepts:
+      - `approved_pairs`: explicit list of {nsn_id, supplier_id, min_order_qty,
+        supplier_part_number} rows.
     """
     contract_number = (payload.get('contract_number') or '').strip()
     if not contract_number:

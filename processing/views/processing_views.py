@@ -2990,7 +2990,7 @@ def finalize_idiq_contract(request, process_contract_id):
                     'option_length': option_months,
                     'max_value': max_value,
                     'min_guarantee': min_guarantee,
-                    'idiq_details': idiq_details,
+                    'approved_pairs': idiq_details,
                 },
                 request.user,
             )

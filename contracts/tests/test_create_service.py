@@ -220,33 +220,23 @@ class IdiqCreationServiceTests(TestCase):
         payload = {
             'contract_number': 'IDIQ-EXPLICIT',
             'buyer_id': self.buyer.id,
-            'idiq_details': [
-                {'nsn_id': self.nsn1.id, 'supplier_id': self.s1.id, 'min_order_qty': '10'},
-                {'nsn_id': self.nsn2.id, 'supplier_id': self.s2.id, 'min_order_qty': '5'},
+            'approved_pairs': [
+                {
+                    'nsn_id': self.nsn1.id,
+                    'supplier_id': self.s1.id,
+                    'min_order_qty': '10',
+                },
+                {
+                    'nsn_id': self.nsn2.id,
+                    'supplier_id': self.s2.id,
+                    'min_order_qty': '20',
+                },
             ],
         }
         with transaction.atomic():
             idiq = create_idiq_from_payload(payload, self.user)
         details = list(IdiqContractDetails.objects.filter(idiq_contract=idiq))
         self.assertEqual(len(details), 2)
-
-    def test_idiq_cross_product(self):
-        payload = {
-            'contract_number': 'IDIQ-CROSS',
-            'approved_nsns': [
-                {'nsn_id': self.nsn1.id, 'min_order_qty': '5'},
-                {'nsn_id': self.nsn2.id, 'min_order_qty': '7'},
-            ],
-            'approved_suppliers': [
-                {'supplier_id': self.s1.id},
-                {'supplier_id': self.s2.id},
-            ],
-        }
-        with transaction.atomic():
-            idiq = create_idiq_from_payload(payload, self.user)
-        self.assertEqual(
-            IdiqContractDetails.objects.filter(idiq_contract=idiq).count(), 4
-        )
 
     def test_idiq_requires_contract_number(self):
         with self.assertRaises(ContractCreationError):
