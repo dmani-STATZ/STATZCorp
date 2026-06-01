@@ -1,7 +1,7 @@
 ---
 id: 2026-05-27-clin-form-and-field-sync
 title: CLIN — Smarter form defaults and live field updates
-published: false
+published: true
 publish_date: 2026-05-27
 tags: [improved, contracts]
 critical: false

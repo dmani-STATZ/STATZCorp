@@ -1,7 +1,7 @@
 ---
 id: 2026-05-28-queue-staff-delete
 title: Queue — Staff can now delete contracts from the queue
-published: false
+published: true
 publish_date: 2026-05-28
 tags: [improved, contracts]
 critical: false

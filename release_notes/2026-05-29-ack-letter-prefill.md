@@ -1,7 +1,7 @@
 ---
 id: 2026-05-29-ack-letter-prefill
 title: PO Acknowledgment Letter — smarter date and contact prefill
-published: false
+published: true
 publish_date: 2026-05-29
 tags: [improved, contracts]
 critical: false

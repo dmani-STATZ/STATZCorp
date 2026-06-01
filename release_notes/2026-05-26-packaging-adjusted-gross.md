@@ -1,7 +1,7 @@
 ---
 id: 2026-05-26-packaging-adjusted-gross
 title: Fix: Packaging cost now correctly deducted from Adjusted Gross
-published: false
+published: true
 publish_date: 2026-05-26
 tags: [fixed, finance]
 critical: false
