@@ -116,6 +116,14 @@
             </svg>
         </button>
         {% if user.is_authenticated %}
+        <script>
+          window.STATZ_SESSION_MAX_AGE = {{ session_cookie_age|default:3600 }};
+          window.STATZ_KEEPALIVE_URL   = '{% url "users:session-keep-alive" %}';
+          window.STATZ_LOGIN_URL       = '{% url "users:microsoft_login" %}';
+          window.STATZ_LOGOUT_URL      = '{% url "users:logout" %}';
+          window.STATZ_CSRF_TOKEN      = '{{ csrf_token }}';
+        </script>
+        <script src="{% static 'js/session_timeout.js' %}?v={{ cache_version }}"></script>
         <a href="{% url 'users:messages' %}" class="position-relative text-white">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -711,11 +719,20 @@
         });
     }
 
-    // Update count every minute
-    setInterval(updateUnreadMessageCount, 60000);
+    // Only run the poller when the user is active (session timeout module controls this).
+    // session_timeout.js must be loaded before this block executes.
+    function scheduleUnreadPoll() {
+        if (window.sessionTimeout && !window.sessionTimeout.isUserActive()) {
+            // User has been inactive for >= 15 min  skip this tick, reschedule
+            setTimeout(scheduleUnreadPoll, 60000);
+            return;
+        }
+        updateUnreadMessageCount();
+        setTimeout(scheduleUnreadPoll, 60000);
+    }
 
-    // Initial update
-    updateUnreadMessageCount();
+    // Delay initial poll by 2 seconds to ensure session_timeout.js has initialized
+    setTimeout(scheduleUnreadPoll, 2000);
     </script>
     {% endblock %}
     {% if unacknowledged_release_notes %}

@@ -245,6 +245,13 @@ File format and validation rules are in `release_notes/README-rn.md`.
 - `contracts/context_processors.py` — injects reminder sidebar data (scoped by `active_company`)
 - `STATZWeb.decorators.conditional_login_required` — per-view auth enforcement
 
+#### Session Timeout & Lock Screen
+- **New URL:** `users/session/keep-alive/` (name: `session-keep-alive`), POST, login required, renews session, returns `{"status": "ok", "expires_in": N}`
+- **New static asset:** `static/js/session_timeout.js` — inactivity tracker, warning modal, lock screen overlay; exposes `window.sessionTimeout.isUserActive()`
+- **Context Processor (`STATZWeb/context_processors.py`):** `version_context` now injects `session_cookie_age` for authenticated users
+- **Template Integration (`base_template.html`):** Injects `window.STATZ_SESSION_MAX_AGE`, `STATZ_KEEPALIVE_URL`, `STATZ_LOGIN_URL`, `STATZ_LOGOUT_URL`, and `STATZ_CSRF_TOKEN` for authenticated users
+- **Message Polling:** The unread message poller in `base_template.html` now checks `window.sessionTimeout.isUserActive()` and pauses automatically after 15 minutes of inactivity
+
 ---
 
 ### `reports` — Ad-Hoc SQL Reporting

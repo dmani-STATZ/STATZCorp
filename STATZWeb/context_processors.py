@@ -5,6 +5,7 @@ Provides global context variables to all templates.
 
 import os
 
+from django.conf import settings
 from .version_utils import get_version_info, get_display_version, get_detailed_version
 
 
@@ -15,11 +16,14 @@ def version_context(request):
     This context processor makes version information available in all templates
     without needing to pass it explicitly from each view.
     """
-    return {
+    result = {
         'version_info': get_version_info(),
         'display_version': get_display_version(),
         'detailed_version': get_detailed_version(),
     }
+    if request.user.is_authenticated:
+        result['session_cookie_age'] = getattr(settings, 'SESSION_COOKIE_AGE', 3600)
+    return result
 
 
 def cache_version_context(request):

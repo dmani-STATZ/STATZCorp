@@ -55,6 +55,7 @@ urlpatterns = [
     path('messages/mark-read/<int:pk>/', views.MarkMessageReadView.as_view(), name='mark-message-read'),
     path('messages/mark-all-read/', views.MarkAllMessagesReadView.as_view(), name='mark-all-messages-read'),
     path('messages/unread-count/', views.GetUnreadCountView.as_view(), name='unread-message-count'),
+    path('session/keep-alive/', views.SessionKeepAliveView.as_view(), name='session-keep-alive'),
     path('release-notes/acknowledge/', views.acknowledge_release_notes, name='release_notes_acknowledge'),
     
     # Debug URLs

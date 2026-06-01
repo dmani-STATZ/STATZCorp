@@ -81,6 +81,9 @@ Run repo-wide search before any of these changes:
   - `templates/base_template.html` + `templates/_release_notes_modal.html` + `templates/whats_new.html`
   - `release_notes/*.md` content files
   - `startup.sh` import hook
+- Session timeout / inactivity changes:
+  - `static/js/session_timeout.js` depends on 5 `window.STATZ_*` globals injected by `base_template.html`. If you rename any `{% url %}` used in the data island, update both the template and the JS fallback constants.
+  - The unread count poller in `base_template.html` is no longer a `setInterval` — it is a self-scheduling `setTimeout` chain. Do not revert it to `setInterval`.
 - Export flow changes:
 - export view/service + template triggers + downstream consumers of filenames/columns.
 - SharePoint document browser path handling:

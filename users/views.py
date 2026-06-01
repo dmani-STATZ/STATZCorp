@@ -723,6 +723,15 @@ class GetUnreadCountView(LoginRequiredMixin, View):
         count = SystemMessage.get_unread_count(request.user)
         return JsonResponse({'count': count})
 
+
+class SessionKeepAliveView(LoginRequiredMixin, View):
+    """View for extending the user session via POST request."""
+    
+    def post(self, request, *args, **kwargs):
+        request.session['_keepalive'] = True
+        expires_in = getattr(settings, 'SESSION_COOKIE_AGE', 3600)
+        return JsonResponse({'status': 'ok', 'expires_in': expires_in})
+
 class CreateMessageView(LoginRequiredMixin, View):
     """View for creating and sending system messages to other users."""
     
