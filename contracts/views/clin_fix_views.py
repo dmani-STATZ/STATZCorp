@@ -373,14 +373,23 @@ def _convert_to_partial_shipment(clin, contract, staged_data, parent_clin_id, us
     else:
         combined_comments = migration_note
 
+    def _staged_decimal(key, fallback):
+        val = staged_data.get(key)
+        if val not in (None, '', '0', '0.00'):
+            try:
+                return Decimal(str(val))
+            except Exception:
+                pass
+        return fallback
+
     shipment = ClinShipment.objects.create(
         clin=parent_clin,
         ship_qty=clin.ship_qty,
         uom=clin.uom or parent_clin.uom or '',
         ship_date=clin.ship_date,
         pod_date=clin.pod_date,
-        quote_value=clin.quote_value,
-        item_value=clin.item_value,
+        quote_value=_staged_decimal('quote_value', clin.quote_value),
+        item_value=_staged_decimal('item_value', clin.item_value),
         paid_amount=clin.paid_amount,
         wawf_payment=clin.wawf_payment,
         comments=combined_comments,

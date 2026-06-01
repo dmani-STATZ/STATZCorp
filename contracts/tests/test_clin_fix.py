@@ -211,7 +211,11 @@ class ClinFixConversionTests(ClinFixBaseTest):
         payload = {'conversions': [{
             'clin_id': legacy.id,
             'destination_type': 'partial_shipment',
-            'staged_data': {'comments': 'extra note'},
+            'staged_data': {
+                'comments': 'extra note',
+                'quote_value': '450.00',
+                'item_value': '500.00',
+            },
             'parent_clin_id': parent.id,
         }]}
         resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
@@ -219,8 +223,9 @@ class ClinFixConversionTests(ClinFixBaseTest):
 
         ship = ClinShipment.objects.get(clin=parent)
         self.assertEqual(ship.ship_qty, 10)
-        self.assertEqual(ship.quote_value, Decimal('200.00'))
-        self.assertEqual(ship.item_value, Decimal('300.00'))
+        # staged_data values should take priority over source CLIN values
+        self.assertEqual(ship.quote_value, Decimal('450.00'))
+        self.assertEqual(ship.item_value, Decimal('500.00'))
         self.assertEqual(ship.paid_amount, Decimal('150.00'))
         self.assertEqual(ship.wawf_payment, Decimal('120.00'))
         self.assertIn('Migrated from CLIN 0099', ship.comments or '')
