@@ -294,8 +294,10 @@ class ProcessContract(models.Model):
         return total
 
     def calculate_plan_gross(self):
-        """Calculate plan gross by subtracting total CLIN quote values and packhouse
-        cost from total CLIN item values.
+        """Calculate plan gross by subtracting total CLIN quote values, packhouse
+        cost, and contract-level charges from total CLIN item values.
+
+        plan_gross = item_total - quote_total - packhouse_quote_amount - SUM(ProcessContractCharge.estimated_amount)
 
         Packhouse quote amount represents an estimated cost known at bid time and
         is deducted from plan gross at contract entry. Actual or unexpected packaging
@@ -312,7 +314,10 @@ class ProcessContract(models.Model):
             packhouse_cost = Decimal('0')
         else:
             packhouse_cost = Decimal(str(packhouse_cost))
-        return base - packhouse_cost
+        charges_total = self.charges.aggregate(
+            total=models.Sum('estimated_amount', default=Decimal('0.00'))
+        )['total'] or Decimal('0.00')
+        return base - packhouse_cost - charges_total
 
     def update_calculated_values(self):
         """Update contract value and plan gross"""
@@ -337,6 +342,27 @@ class ProcessContract(models.Model):
                 clin__process_contract=self
             ).aggregate(total=Sum('split_paid'))['total'] or 0
         )
+
+
+class ProcessContractCharge(models.Model):
+    """
+    Staging model for contract-level charges during processing.
+    Copied to ContractLevelCharge at finalization.
+    """
+    process_contract = models.ForeignKey(
+        'ProcessContract',
+        on_delete=models.CASCADE,
+        related_name='charges',
+    )
+    label = models.CharField(max_length=100)
+    estimated_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.label}: ${self.estimated_amount}"
 
 class ProcessClin(models.Model):
     STATUS_CHOICES = [

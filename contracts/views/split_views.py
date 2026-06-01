@@ -9,6 +9,9 @@ from django.views.decorators.http import require_GET, require_http_methods
 from STATZWeb.decorators import conditional_login_required
 
 from ..models import Clin, ClinSplit
+from contracts.models import ContractPackaging
+from collections import defaultdict
+
 
 
 def _parse_decimal(val):
@@ -152,63 +155,113 @@ def recalc_splits(request, contract_pk):
 
     contract = get_object_or_404(Contract.objects.filter(company=company), pk=contract_pk)
 
-    # Prefetch CLINs with their splits and finance lines to avoid N+1 queries in recalculation.
+    # Step 1: Load all CLINs with prefetch to avoid N+1
     clins = list(
         Clin.objects.filter(contract=contract).prefetch_related(
             Prefetch('splits', queryset=ClinSplit.objects.all()),
             'finance_lines',
-            'finance_lines__payments',
         )
     )
 
-    updated_count = 0
-    skipped_clins = []
-
+    # Step 2: Compute sum of all CLIN adj_gross values inline
+    # (same pattern as existing code  avoids property N+1)
+    total_clin_adj_gross = Decimal('0.00')
     for clin in clins:
-        splits = list(clin.splits.all())
-        if not splits:
-            continue
-
-        splits_with_pct = [s for s in splits if s.percentage is not None]
-
-        if not splits_with_pct:
-            n = len(splits)
-            base_pct = (Decimal('100.0') / Decimal(n)).quantize(Decimal('0.1'))
-            total_assigned = base_pct * n
-            remainder = Decimal('100.0') - total_assigned
-            assigned = [base_pct] * n
-            assigned[0] += remainder
-            for split, pct in zip(splits, assigned):
-                split._recalc_pct = pct
-        else:
-            for split in splits:
-                split._recalc_pct = split.percentage if split.percentage is not None else Decimal('0.00')
-
-        total_pct = sum(s._recalc_pct for s in splits)
-        if splits_with_pct and not (Decimal('99.9') <= total_pct <= Decimal('100.1')):
-            skipped_clins.append(
-                f"CLIN {clin.item_number} (percentages sum to {total_pct}%, not 100%)"
-            )
-            continue
-
         item_val = Decimal(str(clin.item_value or 0))
         quote_val = Decimal(str(clin.quote_value or 0))
-        gross = item_val - quote_val
+        paid_val = Decimal(str(clin.paid_amount or 0))
+        cost = paid_val if paid_val != Decimal('0') else quote_val
+        gross = item_val - cost
         finance_costs = sum(
             Decimal(str(fl.amount_billed or 0))
             for fl in clin.finance_lines.all()
         )
-        adj_gross = gross - finance_costs
+        total_clin_adj_gross += gross - finance_costs
 
+    # Step 3: Packaging deduction (same COALESCE logic as Contract.adjusted_gross property)
+    packaging_deduction = Decimal('0.00')
+    try:
+        pkg = contract.packaging
+        if pkg.amount_paid is not None and Decimal(str(pkg.amount_paid)) != Decimal('0'):
+            packaging_deduction = Decimal(str(pkg.amount_paid))
+        elif pkg.quote_amount is not None and Decimal(str(pkg.quote_amount)) != Decimal('0'):
+            packaging_deduction = Decimal(str(pkg.quote_amount))
+    except Exception:
+        pass
+
+    # Step 4: Contract-level charges deduction (same COALESCE logic)
+    charges_deduction = Decimal('0.00')
+    for charge in contract.level_charges.all():
+        bp = charge.billed_paid_amount
+        if bp is not None and Decimal(str(bp)) != Decimal('0'):
+            charges_deduction += Decimal(str(bp))
+        else:
+            charges_deduction += Decimal(str(charge.estimated_amount))
+
+    # Step 5: True contract adj_gross
+    contract_adj_gross = total_clin_adj_gross - packaging_deduction - charges_deduction
+
+    # Step 6: Collect all splits across all CLINs, grouped by company_name
+    splits_by_company = defaultdict(list)
+    for clin in clins:
+        for split in clin.splits.all():
+            splits_by_company[split.company_name].append(split)
+
+    # Step 7: Determine percentage per company (first non-null percentage wins,
+    # fall back to equal split across companies if none set)
+    all_companies = list(splits_by_company.keys())
+    company_percentages = {}
+    for company, splits in splits_by_company.items():
+        pct = next((s.percentage for s in splits if s.percentage is not None), None)
+        company_percentages[company] = pct
+
+    companies_with_pct = [c for c in all_companies if company_percentages[c] is not None]
+    if not companies_with_pct:
+        # No percentages set at all  equal split across companies
+        n = len(all_companies)
+        if n == 0:
+            return JsonResponse({'success': True, 'updated_splits': 0, 'skipped_clins': []})
+        base_pct = (Decimal('100.0') / Decimal(n)).quantize(Decimal('0.1'))
+        for company in all_companies:
+            company_percentages[company] = base_pct
+    elif len(companies_with_pct) < len(all_companies):
+        # Some companies have percentages, some don't  skip the ones without and report
+        skipped = [c for c in all_companies if company_percentages[c] is None]
+        return JsonResponse({
+            'success': False,
+            'error': f'Some companies have no percentage set: {", ".join(skipped)}. '
+                     f'Set percentages for all companies before recalculating.',
+            'updated_splits': 0,
+            'skipped_clins': [],
+        })
+
+    # Validate percentages sum to ~100
+    total_pct = sum(company_percentages[c] for c in all_companies)
+    if not (Decimal('99.9') <= total_pct <= Decimal('100.1')):
+        return JsonResponse({
+            'success': False,
+            'error': f'Company percentages sum to {total_pct}%, not 100%. '
+                     f'Adjust percentages before recalculating.',
+            'updated_splits': 0,
+            'skipped_clins': [],
+        })
+
+    # Step 8: Compute split_value per company and write to ALL that company's
+    # ClinSplit rows (each gets the same value  company's share of contract total)
+    updated_count = 0
+    for company, splits in splits_by_company.items():
+        pct = company_percentages[company]
+        company_split_value = (pct / Decimal('100.0')) * contract_adj_gross
         for split in splits:
-            split.split_value = (split._recalc_pct / Decimal('100.0')) * adj_gross
+            split.split_value = company_split_value
             split.save(update_fields=['split_value', 'modified_at'])
             updated_count += 1
 
     return JsonResponse({
         'success': True,
         'updated_splits': updated_count,
-        'skipped_clins': skipped_clins,
+        'skipped_clins': [],
+        'contract_adj_gross': str(contract_adj_gross),
     })
 
 

@@ -11,6 +11,12 @@ pyodbc==5.2.0
 # Authentication / Microsoft Graph (RFQ queue mail)
 msal>=1.28.0
 
+# Azure Application Insights telemetry
+opencensus-ext-azure==1.1.13
+opencensus-ext-django==0.8.0
+opencensus-ext-sqlalchemy==0.1.2
+
+
 # Forms and UI
 django-crispy-forms==2.3
 crispy-bootstrap5==2024.10

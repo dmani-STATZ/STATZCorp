@@ -49,7 +49,9 @@ from .views.api_views import (
     update_process_contract_field,
     update_clin_field,
     save_clin,
-    update_contract_values
+    update_contract_values,
+    add_contract_charge,
+    delete_contract_charge
 )
 
 app_name = 'processing'
@@ -94,6 +96,8 @@ urlpatterns = [
     path('api/update-clin-field/<int:pk>/clin/<int:clin_id>/', update_clin_field, name='update_clin_field'),
     path('save-clin/<int:clin_id>/', save_clin, name='save_clin'),
     path('contract/<int:id>/update-values/', update_contract_values, name='update_contract_values'),
+    path('api/contract-charge/add/<int:process_contract_id>/', add_contract_charge, name='add_contract_charge'),
+    path('api/contract-charge/delete/<int:charge_id>/', delete_contract_charge, name='delete_contract_charge'),
     path('save_contract/', save_contract, name='save_contract'),
     path('save-contract/', save_contract, name='save_contract'),
 

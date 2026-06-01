@@ -169,6 +169,16 @@
                         </span>
                     </div>
                     {% endif %}
+                    {% if charges_deduction %}
+                    <div class="finance-summary-row">
+                        <span class="finance-summary-label text-danger">
+                            Contract Charges
+                        </span>
+                        <span class="fw-semibold finance-summary-value text-danger" id="contract-charges-display">
+                            -${{ charges_deduction|abs_value|floatformat:2|intcomma }}
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="finance-summary-row finance-summary-row--success">
@@ -321,6 +331,76 @@
             </div>
         </div>
         {% endif %}
+
+        {# Contract Charges card — below Packaging #}
+        <div class="card shadow-sm mt-3" id="contract-charges-card">
+            <div class="card-header py-2 small fw-semibold">
+                <span>Contract Charges</span>
+            </div>
+            <div class="card-body py-2 px-3">
+                {% if not level_charges %}
+                <p class="text-body-secondary small mb-0">No charges on this contract.</p>
+                {% else %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-borderless mb-0 align-middle text-start" style="font-size: 0.85rem;">
+                        <thead>
+                            <tr class="border-bottom text-muted" style="font-size: 0.75rem;">
+                                <th class="pb-1" style="width: 40%;">Label</th>
+                                <th class="pb-1 text-end" style="width: 20%;">Estimated</th>
+                                <th class="pb-1 text-end" style="width: 25%;">Billed / Paid</th>
+                                <th class="pb-1 text-end" style="width: 15%;">Variance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for charge in level_charges %}
+                            <tr data-charge-id="{{ charge.id }}">
+                                <td class="py-1 text-truncate" title="{{ charge.label }}">{{ charge.label }}</td>
+                                <td class="py-1 text-end">${{ charge.estimated_amount|floatformat:2|intcomma }}</td>
+                                <td class="py-1 text-end position-relative">
+                                    <div class="charge-display-wrapper d-inline-block cursor-pointer text-decoration-underline text-primary" style="cursor: pointer;"
+                                         onclick="startEditCharge('{{ charge.id }}', '{{ charge.billed_paid_amount|default_if_none:'' }}')">
+                                        <span class="billed-paid-value-text">
+                                            {% if charge.billed_paid_amount is not None %}${{ charge.billed_paid_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="charge-edit-wrapper d-none">
+                                        <div class="input-group input-group-sm" style="width: 7.5rem; flex-wrap: nowrap;">
+                                            <span class="input-group-text p-1" style="font-size: 0.75rem;">$</span>
+                                            <input type="number" step="0.01" class="form-control form-control-sm p-1 charge-edit-input" style="font-size: 0.75rem;" value="{{ charge.billed_paid_amount|default_if_none:'' }}">
+                                            <button class="btn btn-primary btn-sm px-1 py-0 save-charge-btn" type="button" onclick="saveChargeEdit('{{ charge.id }}', this)">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16">
+                                                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/>
+                                                </svg>
+                                            </button>
+                                            <button class="btn btn-secondary btn-sm px-1 py-0 cancel-charge-btn" type="button" onclick="cancelChargeEdit('{{ charge.id }}')">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="bi bi-x-lg" viewBox="0 0 16 16">
+                                                    <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-1 text-end variance-value-cell fw-semibold">
+                                    {% if charge.variance is not None %}
+                                        {% if charge.variance > 0 %}
+                                            <span class="text-success">${{ charge.variance|floatformat:2|intcomma }}</span>
+                                        {% elif charge.variance < 0 %}
+                                            <span class="text-danger">-${{ charge.variance|abs_value|floatformat:2|intcomma }}</span>
+                                        {% else %}
+                                            <span>$0.00</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
 
         </div>{# end middle column wrapper #}
 
@@ -1279,6 +1359,14 @@ function refreshContractSummary() {
                 adjGrossEl.textContent = `$${parseFloat(data.adj_gross_contract).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }
 
+            const chargesDisplay = document.getElementById('contract-charges-display');
+            if (chargesDisplay && data.charges_deduction !== undefined) {
+                const cd = parseFloat(data.charges_deduction);
+                chargesDisplay.textContent = cd > 0
+                    ? `-$${cd.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+                    : '$0.00';
+            }
+
             const totalsRow = document.querySelector('tr[data-totals-row="true"]');
             if (totalsRow) {
                 const fmt = v => `$${parseFloat(v).toLocaleString('en-US',
@@ -1956,6 +2044,99 @@ window.financeShipmentsByClin = {
             window.openNotesPopup();
         });
     }
+
+    // Inline edit for Contract level charges
+    window.startEditCharge = function(chargeId, value) {
+        const row = document.querySelector(`tr[data-charge-id="${chargeId}"]`);
+        if (!row) return;
+        row.querySelector('.charge-display-wrapper').classList.add('d-none');
+        row.querySelector('.charge-edit-wrapper').classList.remove('d-none');
+        row.querySelector('.charge-edit-input').focus();
+    };
+
+    window.cancelChargeEdit = function(chargeId) {
+        const row = document.querySelector(`tr[data-charge-id="${chargeId}"]`);
+        if (!row) return;
+        row.querySelector('.charge-display-wrapper').classList.remove('d-none');
+        row.querySelector('.charge-edit-wrapper').classList.add('d-none');
+    };
+
+    window.saveChargeEdit = function(chargeId, btn) {
+        const row = document.querySelector(`tr[data-charge-id="${chargeId}"]`);
+        if (!row) return;
+        const input = row.querySelector('.charge-edit-input');
+        const value = input.value.trim();
+
+        input.disabled = true;
+        btn.disabled = true;
+
+        fetch(`/contracts/api/contract-level-charge/${chargeId}/update/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: JSON.stringify({
+                field: 'billed_paid_amount',
+                value: value === '' ? null : value
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Failed to update charge');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                const displayVal = data.billed_paid_amount !== null
+                    ? `$${parseFloat(data.billed_paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : '—';
+                row.querySelector('.billed-paid-value-text').textContent = displayVal;
+
+                const varianceCell = row.querySelector('.variance-value-cell');
+                if (data.variance !== null) {
+                    const varianceVal = parseFloat(data.variance);
+                    const formattedVariance = Math.abs(varianceVal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    
+                    let spanClass = '';
+                    let prefix = '';
+                    if (varianceVal > 0) {
+                        spanClass = 'text-success';
+                    } else if (varianceVal < 0) {
+                        spanClass = 'text-danger';
+                        prefix = '-';
+                    }
+                    
+                    varianceCell.innerHTML = `<span class="${spanClass}">${prefix}$${formattedVariance}</span>`;
+                } else {
+                    varianceCell.innerHTML = `<span class="text-muted">—</span>`;
+                }
+
+                row.querySelector('.charge-display-wrapper').classList.remove('d-none');
+                row.querySelector('.charge-edit-wrapper').classList.add('d-none');
+
+                input.value = data.billed_paid_amount !== null ? data.billed_paid_amount : '';
+                row.querySelector('.charge-display-wrapper').setAttribute('onclick', `startEditCharge('${chargeId}', '${data.billed_paid_amount !== null ? data.billed_paid_amount : ''}')`);
+
+                refreshContractSummary();
+            }
+        })
+        .catch(error => {
+            console.error('Error saving charge:', error);
+            if (window.notify) {
+                window.notify('error', error.message);
+            } else {
+                alert(error.message);
+            }
+        })
+        .finally(() => {
+            input.disabled = false;
+            btn.disabled = false;
+        });
+    };
 })();
 </script>
 

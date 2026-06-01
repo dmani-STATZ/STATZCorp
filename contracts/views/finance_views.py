@@ -1,8 +1,11 @@
 from collections import defaultdict
+import json
 
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_http_methods
+from django.db import transaction
 from django.db.models import Q, Sum
 from django.views.generic import DetailView
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -11,7 +14,7 @@ from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.http import JsonResponse
 from django.urls import reverse
-from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, ContractPackaging, PaymentHistory
+from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, ContractPackaging, PaymentHistory, ContractLevelCharge
 from .mixins import ActiveCompanyQuerysetMixin
 import logging
 from decimal import Decimal
@@ -56,6 +59,8 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context['adj_gross_contract'] = Decimal('0.00')
         context['packaging'] = None
         context['packaging_deduction'] = Decimal('0.00')
+        context['charges_deduction'] = Decimal('0.00')
+        context['level_charges'] = []
         context['payment_activity_rollup'] = []
         context['payment_activity_page'] = None
         context['payment_activity_total'] = 0
@@ -178,6 +183,17 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 context['packaging'] = packaging_context
                 context['packaging_deduction'] = packaging_deduction
 
+                charges_deduction = Decimal('0.00')
+                level_charges = list(self.object.level_charges.all())
+                for charge in level_charges:
+                    if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
+                        charges_deduction += Decimal(str(charge.billed_paid_amount))
+                    else:
+                        charges_deduction += Decimal(str(charge.estimated_amount))
+
+                context['level_charges'] = level_charges
+                context['charges_deduction'] = charges_deduction
+
                 ct_contract = ContentType.objects.get_for_model(Contract)
                 ct_clin = ContentType.objects.get_for_model(Clin)
                 clin_ids = list(clins_qs.values_list('id', flat=True))
@@ -261,7 +277,7 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                     ),
                     'adj_gross': clin_adj_gross_sum,
                 }
-                context['adj_gross_contract'] = clin_adj_gross_sum - context['packaging_deduction']
+                context['adj_gross_contract'] = clin_adj_gross_sum - context['packaging_deduction'] - charges_deduction
 
                 # Contract-level CLIN sum comparison
                 clin_item_value_sum = context['clin_totals']['item_value']
@@ -321,6 +337,13 @@ def finance_audit_summary_api(request, contract_id):
         except ContractPackaging.DoesNotExist:
             pass
 
+        charges_deduction = Decimal('0.00')
+        for charge in contract.level_charges.all():
+            if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
+                charges_deduction += Decimal(str(charge.billed_paid_amount))
+            else:
+                charges_deduction += Decimal(str(charge.estimated_amount))
+
         clins_list = list(Clin.objects.filter(contract=contract))
         clin_adj_gross_sum = sum(
             (c.adjusted_gross for c in clins_list),
@@ -345,7 +368,7 @@ def finance_audit_summary_api(request, contract_id):
             ),
             'adj_gross': clin_adj_gross_sum,
         }
-        adj_gross_contract = clin_adj_gross_sum - packaging_deduction
+        adj_gross_contract = clin_adj_gross_sum - packaging_deduction - charges_deduction
 
         clin_item_value_sum = clin_totals['item_value']
         contract_value = Decimal(str(contract.contract_value or 0))
@@ -377,6 +400,7 @@ def finance_audit_summary_api(request, contract_id):
             'contract_value_delta': str(contract_value_delta),
             'contract_value_balanced': contract_value_balanced,
             'payment_activity_total': total_count,
+            'charges_deduction': str(charges_deduction),
         })
     except Exception as e:
         logger.error(f"Error in finance_audit_summary_api: {str(e)}")
@@ -438,3 +462,54 @@ def finance_audit_clin_api(request, contract_id, clin_id):
     except Exception as e:
         logger.error(f"Error in finance_audit_clin_api: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def update_contract_level_charge(request, charge_id):
+    company = getattr(request, 'active_company', None)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
+
+    charge = get_object_or_404(
+        ContractLevelCharge.objects.select_related('contract'),
+        id=charge_id,
+        contract__company=company
+    )
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON payload'}, status=400)
+
+    field = data.get('field')
+    if field != 'billed_paid_amount':
+        return JsonResponse({'success': False, 'error': 'Only billed_paid_amount field can be updated.'}, status=400)
+
+    value_raw = data.get('value')
+    if value_raw in (None, '', 'null'):
+        value = None
+    else:
+        try:
+            value = Decimal(str(value_raw))
+        except (ValueError, TypeError):
+            return JsonResponse({'success': False, 'error': 'Invalid Decimal value format.'}, status=400)
+
+    try:
+        with transaction.atomic():
+            charge.billed_paid_amount = value
+            charge.modified_by = request.user
+            charge.save()
+
+        billed_paid_amount_str = str(charge.billed_paid_amount) if charge.billed_paid_amount is not None else None
+        effective_amount_str = str(charge.effective_amount)
+        variance_str = str(charge.variance) if charge.variance is not None else None
+
+        return JsonResponse({
+            'success': True,
+            'billed_paid_amount': billed_paid_amount_str,
+            'effective_amount': effective_amount_str,
+            'variance': variance_str
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

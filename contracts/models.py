@@ -186,7 +186,11 @@ class Contract(AuditModel):
         """
         Contract-level realized adjusted gross profit.
 
-        Formula: SUM(Clin.adjusted_gross) - packaging_deduction
+        Formula: SUM(Clin.adjusted_gross) - packaging_deduction - charges_deduction
+
+        where:
+        charges_deduction = SUM(COALESCE(charge.billed_paid_amount, charge.estimated_amount))
+        across all ContractLevelCharge rows for the contract.
 
         packaging_deduction = COALESCE(amount_paid, quote_amount, 0) — the full packaging
         cost is deducted from adj gross. If paid, use the actual paid amount. If not yet
@@ -205,7 +209,7 @@ class Contract(AuditModel):
         Do not call it inside loops over multiple contracts. Views that need
         contract-level adj gross in bulk must pre-aggregate (see FinanceAuditView).
         """
-        clins_qs = self.clins.all()
+        clins_qs = self.clin_set.all()
         clin_adj_gross_sum = sum(
             (c.adjusted_gross for c in clins_qs),
             Decimal('0.00')
@@ -221,7 +225,14 @@ class Contract(AuditModel):
         except ContractPackaging.DoesNotExist:
             pass
 
-        return clin_adj_gross_sum - packaging_deduction
+        charges_deduction = Decimal('0.00')
+        for charge in self.level_charges.all():
+            if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
+                charges_deduction += Decimal(str(charge.billed_paid_amount))
+            else:
+                charges_deduction += Decimal(str(charge.estimated_amount))
+
+        return clin_adj_gross_sum - packaging_deduction - charges_deduction
 
     def get_sharepoint_documents_url(self):
         """
@@ -367,6 +378,47 @@ class ContractPackaging(AuditModel):
 
     def __str__(self):
         return f"Packaging for {self.contract.contract_number} — {self.packhouse.name}"
+
+
+class ContractLevelCharge(AuditModel):
+    """
+    Contract-level misc charges known at bid time (e.g. GSI Fee, Freight).
+    Estimated amount reduces plan_gross at processing.
+    Billed/paid amount (or estimated as fallback) reduces Contract.adjusted_gross.
+    """
+    contract = models.ForeignKey(
+        'Contract',
+        on_delete=models.CASCADE,
+        related_name='level_charges',
+    )
+    label = models.CharField(max_length=100)
+    estimated_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    billed_paid_amount = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="Actual billed/paid amount. Leave blank until invoice is settled."
+    )
+
+    class Meta:
+        db_table = 'contracts_contractlevelcharge'
+        ordering = ['created_on']
+
+    def __str__(self):
+        return f"{self.label}: ${self.estimated_amount}"
+
+    @property
+    def effective_amount(self):
+        """COALESCE(billed_paid_amount, estimated_amount)  used for adj_gross deduction."""
+        if self.billed_paid_amount is not None and self.billed_paid_amount != Decimal('0.00'):
+            return self.billed_paid_amount
+        return self.estimated_amount
+
+    @property
+    def variance(self):
+        """estimated_amount - billed_paid_amount. None if not yet paid."""
+        if self.billed_paid_amount is None:
+            return None
+        return self.estimated_amount - self.billed_paid_amount
 
 
 class ContractStatus(models.Model):

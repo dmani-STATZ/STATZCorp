@@ -16,6 +16,9 @@ warnings.filterwarnings("ignore", message="urllib3.*doesn't match a supported ve
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+import sys
+IS_TESTING = 'test' in sys.argv or 'pytest' in sys.argv
+
 # Load environment variables from .env file for development (if available)
 try:
     from dotenv import load_dotenv
@@ -41,6 +44,22 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 
 # Determine if we're in production (Azure App Service)
 IS_PRODUCTION = os.environ.get("WEBSITE_SITE_NAME") is not None
+
+# Azure Application Insights
+APPLICATIONINSIGHTS_CONNECTION_STRING = os.environ.get(
+    "APPLICATIONINSIGHTS_CONNECTION_STRING", ""
+)
+APPLICATIONINSIGHTS_ENABLED = IS_PRODUCTION and bool(APPLICATIONINSIGHTS_CONNECTION_STRING)
+
+if APPLICATIONINSIGHTS_ENABLED:
+    OPENCENSUS = {
+        "TRACE": {
+            "SAMPLER": "opencensus.trace.samplers.ProbabilitySampler(rate=1.0)",
+            "EXPORTER": f"""opencensus.ext.azure.trace_exporter.AzureExporter(
+                connection_string='{APPLICATIONINSIGHTS_CONNECTION_STRING}'
+            )""",
+        }
+    }
 
 # Azure App Service configuration
 ALLOWED_HOSTS = os.environ.get(
@@ -93,6 +112,7 @@ INSTALLED_APPS = [
 
 # Middleware - Environment aware
 MIDDLEWARE = [
+    "opencensus.ext.django.middleware.OpencensusMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -185,8 +205,7 @@ if IS_PRODUCTION:
         },
     }
 else:
-    # Development: SQLite (default) or SQL Server (if environment variables are set)
-    if os.environ.get("DB_HOST") and os.environ.get("DB_NAME"):
+    if os.environ.get("DB_HOST") and os.environ.get("DB_NAME") and not IS_TESTING:
         print("Using SQL Server for development (from environment variables)")
         DATABASES = {
             "default": {
@@ -424,6 +443,21 @@ if IS_PRODUCTION:
                 "level": "INFO",
                 "propagate": True,
             },
+            "users": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": True,
+            },
+            "contracts": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": True,
+            },
+            "processing": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": True,
+            },
         },
     }
 else:
@@ -491,6 +525,16 @@ else:
             },
         },
     }
+
+if APPLICATIONINSIGHTS_ENABLED:
+    LOGGING["handlers"]["azure"] = {
+        "level": "WARNING",
+        "class": "opencensus.ext.azure.log_exporter.AzureLogHandler",
+        "connection_string": APPLICATIONINSIGHTS_CONNECTION_STRING,
+    }
+    for logger_name in ["django", "STATZWeb", "users", "contracts", "processing"]:
+        if logger_name in LOGGING.get("loggers", {}):
+            LOGGING["loggers"][logger_name]["handlers"].append("azure")
 
 # Security settings - Environment aware
 if IS_PRODUCTION:
@@ -637,6 +681,12 @@ SAM_API_KEY = os.environ.get("SAM_API_KEY", "")  # Required for awards sync
 SAM_OUR_CAGE = os.environ.get(
     "SAM_OUR_CAGE", ""
 )  # e.g. '1ABC2' — used to detect we_won
+
+# Speed up password hashing in tests (reduces test duration dramatically)
+if IS_TESTING:
+    PASSWORD_HASHERS = [
+        "django.contrib.auth.hashers.MD5PasswordHasher",
+    ]
 
 # Print environment summary
 # print(f"   Settings loaded - Environment: {'PRODUCTION' if IS_PRODUCTION else 'DEVELOPMENT'}")

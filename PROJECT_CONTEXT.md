@@ -396,9 +396,23 @@ File format and validation rules are in `release_notes/README-rn.md`.
 | `AppPermission` | `users` | Checked in every feature view via middleware |
 | `UserSettings` | `users` | `contracts` reminder window, `reports` AI model selection |
 | `QueueContract` | `processing` | Parent of `QueueClin`; finalized into `Contract` |
+| `ContractLevelCharge` | `contracts` | `Contract` FK; copied from `ProcessContractCharge` at finalization |
+| `ProcessContractCharge` | `processing` | `ProcessContract` FK; staging model |
 | `Solicitation` | `sales` | `SolicitationLine`, `SupplierRFQ`, `GovernmentBid` |
 | `ReportRequest` | `reports` | Nothing downstream |
 | `OpenRouterModelSetting` | `suppliers` | `suppliers` enrichment views, `reports` AI stream endpoint |
+
+---
+
+## Azure Telemetry & Infrastructure
+
+- **Application Insights Integration:** Integrated via `opencensus-ext-azure`.
+- **Environment & Activation:** Enabled only in production (`IS_PRODUCTION=True`) when the `APPLICATIONINSIGHTS_CONNECTION_STRING` environment variable is present.
+- **Data Captured:**
+  - HTTP Request Traces (100% sample rate via `OpencensusMiddleware`).
+  - Unhandled Exceptions.
+  - Django Log Forwarding: Forwarding of all `WARNING` level and higher logs from the major loggers (`django`, `STATZWeb`, `users`, `contracts`, `processing`).
+- **Resource Information:** Azure GCC High Application Insights resource located in USGov Virginia, resource group `StatzWeb-App`. The connection string is auto-injected by Azure under the environment variable `APPLICATIONINSIGHTS_CONNECTION_STRING`.
 
 ---
 

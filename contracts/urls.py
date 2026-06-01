@@ -657,6 +657,7 @@ urlpatterns = [
     ),
     path("api/finance-audit/<int:contract_id>/summary/", finance_audit_summary_api, name="finance_audit_summary_api"),
     path("api/finance-audit/<int:contract_id>/clin/<int:clin_id>/", finance_audit_clin_api, name="finance_audit_clin_api"),
+    path('api/contract-level-charge/<int:charge_id>/update/', views.update_contract_level_charge, name='update_contract_level_charge'),
     path("api/finance-lines/add/", add_finance_line, name="finance_line_add"),
     path(
         "api/finance-lines/clin/<int:clin_id>/",

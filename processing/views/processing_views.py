@@ -33,6 +33,7 @@ from contracts.models import (
     SalesClass,
     PaymentHistory,
     ContractStatus,
+    ContractLevelCharge,
 )
 from contracts.services import (
     ContractCreationError,
@@ -768,6 +769,17 @@ def finalize_contract(request, process_contract_id):
         contract = result.contract
         _wire_final_clin_refs(process_contract, result.clins_by_item_number)
 
+        # Copy ProcessContractCharge rows to ContractLevelCharge on the new contract
+        for charge in process_contract.charges.all():
+            ContractLevelCharge.objects.create(
+                contract=contract,
+                label=charge.label,
+                estimated_amount=charge.estimated_amount,
+                # billed_paid_amount intentionally left null at finalization  Finance fills it in later
+                created_by=request.user,
+                modified_by=request.user,
+            )
+
         # Sequence-number housekeeping: ensure the shared counter sits
         # one past the values just consumed by this contract. Processing-
         # specific, kept in the view.
@@ -1354,6 +1366,17 @@ def finalize_and_email_contract(request, process_contract_id):
 
         contract = result.contract
         _wire_final_clin_refs(process_contract, result.clins_by_item_number)
+
+        # Copy ProcessContractCharge rows to ContractLevelCharge on the new contract
+        for charge in process_contract.charges.all():
+            ContractLevelCharge.objects.create(
+                contract=contract,
+                label=charge.label,
+                estimated_amount=charge.estimated_amount,
+                # billed_paid_amount intentionally left null at finalization  Finance fills it in later
+                created_by=request.user,
+                modified_by=request.user,
+            )
 
         queue_contract = QueueContract.objects.get(id=process_contract.queue_id)
 

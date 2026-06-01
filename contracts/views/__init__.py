@@ -131,7 +131,7 @@ from .idiq_views import (
     IdiqContractDetailsDeleteView,
 )
 
-from .finance_views import FinanceAuditView
+from .finance_views import FinanceAuditView, update_contract_level_charge
 
 from .api_views import (
     get_select_options,

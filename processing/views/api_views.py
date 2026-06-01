@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods, require_POST
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from ..models import ProcessContract, ProcessClin, SpecialPaymentTerms
+from ..models import ProcessContract, ProcessClin, SpecialPaymentTerms, ProcessContractCharge
 from ..forms import ProcessContractForm, ProcessClinForm, persist_clin_splits_for_contract
 import json
 from decimal import Decimal
@@ -555,3 +555,85 @@ def update_contract_values(request, id):
             'success': False,
             'error': str(e)
         }, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+def add_contract_charge(request, process_contract_id):
+    company = getattr(request, 'active_company', None)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
+
+    process_contract = get_object_or_404(ProcessContract, id=process_contract_id, company=company)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON payload'}, status=400)
+
+    label = data.get('label')
+    if not label or not isinstance(label, str):
+        return JsonResponse({'success': False, 'error': 'Label is required'}, status=400)
+    label = label.strip()
+    if not label:
+        return JsonResponse({'success': False, 'error': 'Label cannot be empty'}, status=400)
+    if len(label) > 100:
+        return JsonResponse({'success': False, 'error': 'Label must be 100 characters or less'}, status=400)
+
+    estimated_amount_raw = data.get('estimated_amount')
+    if estimated_amount_raw is None:
+        return JsonResponse({'success': False, 'error': 'Estimated amount is required'}, status=400)
+
+    try:
+        estimated_amount = Decimal(str(estimated_amount_raw))
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid estimated amount format'}, status=400)
+
+    if estimated_amount <= Decimal('0.00'):
+        return JsonResponse({'success': False, 'error': 'Estimated amount must be greater than zero'}, status=400)
+
+    try:
+        with transaction.atomic():
+            charge = ProcessContractCharge.objects.create(
+                process_contract=process_contract,
+                label=label,
+                estimated_amount=estimated_amount
+            )
+            process_contract.update_calculated_values()
+
+        return JsonResponse({
+            'success': True,
+            'charge_id': charge.id,
+            'label': charge.label,
+            'estimated_amount': str(charge.estimated_amount),
+            'plan_gross': str(process_contract.plan_gross)
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_contract_charge(request, charge_id):
+    company = getattr(request, 'active_company', None)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
+
+    charge = get_object_or_404(
+        ProcessContractCharge.objects.select_related('process_contract'),
+        id=charge_id,
+        process_contract__company=company
+    )
+
+    try:
+        process_contract = charge.process_contract
+        with transaction.atomic():
+            charge.delete()
+            process_contract.update_calculated_values()
+
+        return JsonResponse({
+            'success': True,
+            'plan_gross': str(process_contract.plan_gross)
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
