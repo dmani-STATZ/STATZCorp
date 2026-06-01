@@ -56,6 +56,7 @@ PKG_FIELDS = {
     'packhouse_cage', 'packhouse_supplier_text', 'packhouse_supplier_id',
     'quote_amount', 'notes',
 }
+CHARGE_FIELDS = {'label', 'estimated_amount'}
 PAIR_FIELDS = {
     'nsn_text', 'nsn_id', 'nsn_description',
     'supplier_text', 'supplier_id', 'cage',
@@ -68,6 +69,7 @@ PAIR_FIELDS = {
 _ROW_KEY = re.compile(r'^(clin|pair)-(\d+)-(.+)$')
 _NESTED_ROW_KEY = re.compile(r'^clin-(\d+)-(fin|split)-(\d+)-(.+)$')
 _PKG_KEY = re.compile(r'^pkg-(.+)$')
+_CHG_KEY = re.compile(r'^chg-(\d+)-(.+)$')
 _SCALAR_KEY = re.compile(r'^f_(.+)$')
 
 _ROW_BUCKET = {
@@ -114,6 +116,7 @@ def parse_post(post) -> dict:
     # nested[clin_idx][bucket_name][sub_idx] = {field: value}
     nested: dict[int, dict[str, dict[int, dict]]] = {}
     pkg: dict = {}
+    charge_rows: dict[int, dict] = {}
 
     for key, raw in post.items():
         if key in ('csrfmiddlewaretoken', 'action'):
@@ -149,6 +152,14 @@ def parse_post(post) -> dict:
             field = m.group(1)
             if field in PKG_FIELDS:
                 pkg[field] = _coerce(raw)
+            continue
+
+        m = _CHG_KEY.match(key)
+        if m:
+            idx = int(m.group(1))
+            field = m.group(2)
+            if field in CHARGE_FIELDS:
+                charge_rows.setdefault(idx, {})[field] = _coerce(raw)
             continue
 
         m = _SCALAR_KEY.match(key)
@@ -197,5 +208,14 @@ def parse_post(post) -> dict:
 
     if any(v not in (None, '') for v in pkg.values()):
         out['packaging'] = pkg
+
+    charges = [
+        row for row in (
+            charge_rows.get(i, {}) for i in sorted(charge_rows)
+        )
+        if any(v for v in row.values())  # drop all-blank rows
+    ]
+    if charges:
+        out['level_charges'] = charges
 
     return out

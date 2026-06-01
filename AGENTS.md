@@ -53,7 +53,7 @@ Run repo-wide search before any of these changes:
 - Renaming URL names in any app namespace used outside that app (`contracts:`, `suppliers:`, `users:`, `reports:`, `inventory:`, `training:`, `tools:`).
 - Renaming template paths used by includes/extends or cross-app render calls.
 - Changing status/choice values used as raw strings in views/templates (`sales`, `processing`, `reports`, `training`).
-- Changing JSON payload keys used by JS (`processing/static/processing/js`, `td_now/static/td_now`, `reports/templates/reports/admin_dashboard.html`, `templates/suppliers/supplier_enrich.html`).
+- Changing JSON payload keys used by JS (`processing/static/processing/js`, `reports/templates/reports/admin_dashboard.html`, `templates/suppliers/supplier_enrich.html`).
 - Changing permission/setting keys (`AppRegistry`, `AppPermission`, `UserSettings` names like `reports_ai_model`, `current_company_id`).
 - Changing export/report columns or field mappings (`sales/services/bq_export.py`, `contracts` export views, `reports` SQL outputs).
 - Changing signal or middleware behavior (`transactions/signals.py`, `users/signals.py`, `STATZWeb/middleware.py`, `users/middleware.py`).

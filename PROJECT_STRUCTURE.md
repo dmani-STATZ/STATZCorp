@@ -30,7 +30,6 @@ Each app is a package with `models`, `views`, `urls`, `admin`, etc.:
 - `products` — Products
 - `tools` — Tools
 - `transactions` — Transactions
-- `td_now` — TD Now (tower defense)
 
 ## Shared assets
 

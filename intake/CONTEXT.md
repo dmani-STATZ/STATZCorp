@@ -90,6 +90,7 @@ schema:
 | `clin-<i>-split-<j>-<field>`        | `clins[i].splits[j]`            |
 | `pkg-<field>`                       | `packaging` (singleton)         |
 | `pair-<i>-<field>`                  | `approved_pairs[i]` (IDIQ only) |
+| `chg-<i>-<field>`                   | `level_charges[i]`              |
 
 > **IDIQ type-awareness:** The Contract Details card in `draft_edit.html`
 > conditionally hides fields that do not apply to IDIQ contracts
@@ -147,6 +148,15 @@ or auto-shown on load when any of `packhouse_supplier_text`,
 `packhouse_supplier_id`, `quote_amount`, or `notes` is pre-filled. The
 section sits above the CLIN stack. **Remove Packaging** clears all `pkg-*`
 inputs so the next save drops the packaging block from JSON.
+
+Contract Level Charges: hidden in the editor until the analyst clicks
++ Add Contract Level Charges, or auto-shown on load when
+level_charges is non-empty in the draft data. Each row has a label
+(free text, e.g. "GSI Fee") and estimated_amount (decimal). Rows are
+added with the + Add Line button and removed individually with .
+The entire section is removed with Remove Charges which also clears
+all rows. POST keys are chg-<i>-label and chg-<i>-estimated_amount.
+billed_paid_amount is NOT captured at intake — that is Finance Audit only.
 
 PO Number is display-only in the editor (`Assigned when submitted`). It is
 assigned post-finalization by the processing app — not a draft field.
@@ -209,6 +219,10 @@ For AWD/PO/DO/INTERNAL contract creation, among other fields:
 `data.canonical_contract_type_id` → `Contract.contract_type` (FK);
 `data.plan_gross` → `Contract.plan_gross`; `data.planned_split` →
 `Contract.planned_split`; `data.nist` → `Contract.nist`.
+
+In the **Mapping Rules** section under `AWD / PO / DO / INTERNAL`:
+- `data.level_charges[i].label` → `ContractLevelCharge.label`
+- `data.level_charges[i].estimated_amount` → `ContractLevelCharge.estimated_amount`
 
 Supported types: **AWD, PO, DO, IDIQ, INTERNAL, MOD, AMD**.
 

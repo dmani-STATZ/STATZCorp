@@ -183,6 +183,8 @@ def _editor_context(draft: DraftContract, user) -> dict:
             pkg_data.get('quote_amount'),
             pkg_data.get('notes'),
         ]),
+        'level_charges': data.get('level_charges') or [],
+        'charges_has_data': bool(data.get('level_charges')),
         'sales_classes': SalesClass.objects.all().order_by('sales_team'),
         'contract_types': ContractType.objects.all().order_by('description'),
         'approved_pairs': data.get('approved_pairs') or [],

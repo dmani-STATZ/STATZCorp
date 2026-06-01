@@ -167,8 +167,6 @@ urlpatterns = [
     # System test URLs
     path("system-test/", views.system_test, name="system_test"),
     path("api/system-test/", views.system_test_api, name="system_test_api"),
-    # Secret TD Now app (tower defense)
-    path("td-now/", include("td_now.urls")),
     path("tools/", include("tools.urls")),
     path("imports/", include("imports.urls", namespace="imports")),
 ]

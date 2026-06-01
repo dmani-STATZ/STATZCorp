@@ -87,7 +87,6 @@ INSTALLED_APPS = [
     "contracts.apps.ContractsConfig",
     "sales.apps.SalesConfig",
     "accesslog.apps.AccesslogConfig",
-    "td_now.apps.TDNowConfig",
     "crispy_forms",
     "crispy_bootstrap5",
     "django.contrib.admin",

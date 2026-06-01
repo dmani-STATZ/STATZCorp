@@ -752,6 +752,31 @@ class FinalizeViewTests(TestCase):
             Contract.objects.filter(contract_number='SPE7L1-26-P-VFIN1').exists()
         )
 
+    def test_finalize_creates_contract_level_charges(self):
+        from contracts.models import ContractLevelCharge
+        draft = self._ready_draft()
+        draft.data['level_charges'] = [
+            {'label': 'GSI Fee', 'estimated_amount': '150.00'},
+            {'label': 'Estimated Freight', 'estimated_amount': '250.50'},
+            {'label': 'Missing Amount', 'estimated_amount': None},
+            {'label': '', 'estimated_amount': '100.00'},
+        ]
+        draft.save()
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 302)
+
+        contract = Contract.objects.get(contract_number='SPE7L1-26-P-VFIN1')
+        charges = list(ContractLevelCharge.objects.filter(contract=contract).order_by('label'))
+        self.assertEqual(len(charges), 2)
+        self.assertEqual(charges[0].label, 'Estimated Freight')
+        self.assertEqual(charges[0].estimated_amount, Decimal('250.50'))
+        self.assertIsNone(charges[0].billed_paid_amount)
+        self.assertEqual(charges[1].label, 'GSI Fee')
+        self.assertEqual(charges[1].estimated_amount, Decimal('150.00'))
+        self.assertIsNone(charges[1].billed_paid_amount)
+
     def test_finalize_blocked_message_when_unmatched(self):
         draft = self._ready_draft()
         # Strip the buyer match.

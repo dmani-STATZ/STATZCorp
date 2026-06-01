@@ -493,6 +493,51 @@
             </div>
         </div>
 
+        {# ---- Contract Level Charges ---- #}
+        {% if not charges_has_data %}
+        <div class="mb-4" id="charges-add-wrap">
+            <button type="button" class="btn btn-sm btn-outline-success" id="btn-add-charges">
+                + Add Contract Level Charges
+            </button>
+        </div>
+        {% endif %}
+        <div class="card card-padded shadow-sm mb-4" id="charges-card"
+             {% if not charges_has_data %}style="display:none"{% endif %}>
+            <div class="row-between mb-3">
+                <h2 class="text-xl font-semibold">Contract Level Charges</h2>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="btn-remove-charges">
+                    Remove Charges
+                </button>
+            </div>
+            <div id="charges-tbody">
+            {% for charge in level_charges %}
+                <div class="d-flex align-items-center gap-2 mb-2 charges-row">
+                    <div style="flex: 2;">
+                        <label class="label small mb-1">Label</label>
+                        <input type="text"
+                               name="chg-{{ forloop.counter0 }}-label"
+                               value="{{ charge|get_item:'label'|default:'' }}"
+                               class="form-control form-control-sm"
+                               placeholder="e.g. GSI Fee, Estimated Freight">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="label small mb-1">Estimated Amount</label>
+                        <input type="number" step="0.01"
+                               name="chg-{{ forloop.counter0 }}-estimated_amount"
+                               value="{{ charge|get_item:'estimated_amount'|default:'' }}"
+                               class="form-control form-control-sm charge-amount">
+                    </div>
+                    <div class="d-flex align-items-end pb-1">
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-charge-row"></button>
+                    </div>
+                </div>
+            {% endfor %}
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-success mt-2" id="btn-add-charge-row">
+                + Add Line
+            </button>
+        </div>
+
         <div class="card card-padded shadow-sm mb-4">
             <div class="row-between mb-3">
                 <h2 class="text-xl font-semibold">CLINs</h2>
@@ -515,6 +560,10 @@
                 <tfoot>
                     <tr><td><strong>Sum of CLIN GPs</strong></td><td class="text-end" id="gp-sum">$0.00</td></tr>
                     <tr><td>Packaging Quote</td><td class="text-end text-danger" id="gp-packaging">−$0.00</td></tr>
+                    <tr>
+                        <td class="text-muted">Contract Level Charges</td>
+                        <td class="text-end text-danger" id="gp-charges-deduction"> $0.00</td>
+                    </tr>
                     <tr class="border-top">
                         <td><strong>Net Contract GP</strong></td>
                         <td class="text-end fw-bold" id="gp-net">$0.00</td>
@@ -866,6 +915,91 @@
         });
     }
 
+    function initChargesToggle() {
+        const chargesCard = document.getElementById('charges-card');
+        const chargesAddWrap = document.getElementById('charges-add-wrap');
+        const btnAddCharges = document.getElementById('btn-add-charges');
+        const btnRemoveCharges = document.getElementById('btn-remove-charges');
+        if (!chargesCard) return;
+
+        if (btnAddCharges) {
+            btnAddCharges.addEventListener('click', () => {
+                chargesCard.style.display = '';
+                if (chargesAddWrap) chargesAddWrap.style.display = 'none';
+            });
+        }
+
+        if (btnRemoveCharges) {
+            btnRemoveCharges.addEventListener('click', () => {
+                // Clear all charge row inputs
+                document.querySelectorAll('#charges-tbody .charges-row').forEach(row => row.remove());
+                chargesCard.style.display = 'none';
+                if (chargesAddWrap) chargesAddWrap.style.display = '';
+                recalcGpSummary();
+            });
+        }
+
+        // --- Add new charge row ---
+        let chargeRowCount = document.querySelectorAll('#charges-tbody .charges-row').length;
+        const btnAddChargeRow = document.getElementById('btn-add-charge-row');
+
+        if (btnAddChargeRow) {
+            btnAddChargeRow.addEventListener('click', () => {
+                const idx = chargeRowCount++;
+                const row = document.createElement('div');
+                row.className = 'd-flex align-items-center gap-2 mb-2 charges-row';
+                row.innerHTML = `
+                    <div style="flex: 2;">
+                        <label class="label small mb-1">Label</label>
+                        <input type="text" name="chg-${idx}-label"
+                               class="form-control form-control-sm"
+                               placeholder="e.g. GSI Fee, Estimated Freight">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="label small mb-1">Estimated Amount</label>
+                        <input type="number" step="0.01" name="chg-${idx}-estimated_amount"
+                               class="form-control form-control-sm charge-amount">
+                    </div>
+                    <div class="d-flex align-items-end pb-1">
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-charge-row"></button>
+                    </div>
+                `;
+                // Wire remove button
+                row.querySelector('.btn-remove-charge-row').addEventListener('click', () => {
+                    row.remove();
+                    reindexChargeRows();
+                    recalcGpSummary();
+                });
+                // Wire amount input to GP recalc
+                row.querySelector('.charge-amount').addEventListener('input', recalcGpSummary);
+                document.getElementById('charges-tbody').appendChild(row);
+            });
+        }
+
+        // Wire remove buttons on existing rows (pre-filled from context)
+        document.querySelectorAll('.btn-remove-charge-row').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.closest('.charges-row').remove();
+                reindexChargeRows();
+                recalcGpSummary();
+            });
+        });
+
+        // Wire amount inputs on existing rows to GP recalc
+        document.querySelectorAll('.charge-amount').forEach(input => {
+            input.addEventListener('input', recalcGpSummary);
+        });
+    }
+
+    function reindexChargeRows() {
+        document.querySelectorAll('#charges-tbody .charges-row').forEach((row, i) => {
+            const labelInput = row.querySelector('input[name$="-label"]');
+            if (labelInput) labelInput.name = `chg-${i}-label`;
+            const amtInput = row.querySelector('input[name$="-estimated_amount"]');
+            if (amtInput) amtInput.name = `chg-${i}-estimated_amount`;
+        });
+    }
+
     function addClinSplit(card) {
         const tbody = card.querySelector('.clin-split-tbody');
         if (!tbody) return;
@@ -980,7 +1114,22 @@
         const pkgEl = document.getElementById('gp-packaging');
         const pkgDisplay = pkgAmt === 0 ? '$0.00' : money(-pkgAmt);
         if (pkgEl) pkgEl.textContent = pkgDisplay;
-        const net = total - pkgAmt;
+
+        let chargesDeduction = 0;
+        document.querySelectorAll('.charge-amount').forEach(input => {
+            const v = parseFloat(input.value);
+            if (!isNaN(v)) chargesDeduction += v;
+        });
+
+        // Update the charges deduction display cell
+        const chargesCell = document.getElementById('gp-charges-deduction');
+        if (chargesCell) {
+            chargesCell.textContent = chargesDeduction > 0
+                ? ` $${chargesDeduction.toFixed(2)}`
+                : ' $0.00';
+        }
+
+        const net = total - pkgAmt - chargesDeduction;
         const netEl = document.getElementById('gp-net');
         if (netEl) {
             netEl.textContent = money(net);
@@ -1196,12 +1345,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             init();
             initPackagingToggle();
+            initChargesToggle();
             bootRecalc();
             restoreOpenClins();
         });
     } else {
         init();
         initPackagingToggle();
+        initChargesToggle();
         bootRecalc();
         restoreOpenClins();
     }

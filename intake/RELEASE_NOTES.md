@@ -1,5 +1,31 @@
 # intake — Release Notes
 
+## Contract Level Charges at Intake (2026-06-01)
+
+**User-visible changes:**
+- New **Contract Level Charges** section in the AWD/PO/DO/INTERNAL editor,
+  positioned between Packaging and the CLIN stack.
+- Analysts can add one or more named charges (e.g. GSI Fee, Estimated Freight)
+  with an estimated dollar amount using the **+ Add Line** button.
+- Section is hidden by default; click **+ Add Contract Level Charges** to open.
+  Auto-expands on load when a draft already has charges saved.
+- **Remove Charges** button clears all rows and collapses the section.
+- GP Summary now deducts the sum of all contract level charge estimated amounts
+  from Net Contract GP alongside the packaging deduction.
+
+**Behind-the-scenes:**
+- Draft JSON key: `level_charges` — list of `{label, estimated_amount}` dicts
+  on `AwdPoData`, `DoData`, and `InternalData` schemas.
+- POST key convention: `chg-<i>-label` and `chg-<i>-estimated_amount`.
+  Parsed in `forms_parse.parse_post` via `_CHG_KEY` regex.
+- On finalization, each charge row creates a `contracts.ContractLevelCharge`
+  row with `billed_paid_amount=None`. Finance Audit fills `billed_paid_amount`
+  later once invoices are settled.
+- Rows missing either `label` or `estimated_amount` are silently skipped at
+  finalization.
+- `billed_paid_amount` is intentionally NOT a draft field — intake only knows
+  the estimate.
+
 ## IDIQ Parser: Auto-Extract Approved Supplier from PDF (2026-05-29)
 
 User-visible changes:

@@ -510,23 +510,6 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'js/theme_toggle.js' %}"></script>
-    <script>
-        // Secret entry: click the build number 5 times to open TD Now
-        (function(){
-            const el = document.getElementById('build-number');
-            if (!el) return;
-            let clicks = 0;
-            let timer = null;
-            el.addEventListener('click', function(){
-                clicks += 1;
-                if (timer) clearTimeout(timer);
-                timer = setTimeout(() => { clicks = 0; }, 4000);
-                if (clicks >= 5) {
-                    window.location.href = '/td-now/';
-                }
-            });
-        })();
-    </script>
     {% if user.is_authenticated %}
     <script>
         window.CURRENT_USER_ID = "{{ user.id }}";

@@ -332,19 +332,6 @@ File format and validation rules are in `release_notes/README-rn.md`.
 
 ---
 
-### `td_now` — Tower Defense Game
-**Purpose:** Self-contained tower-defense game with map/campaign editors for staff content curation.
-
-**Owns:** `Map`, `TowerType`, `EnemyType`, `Wave`, `Campaign`, `CampaignStage`, `StageWave`
-
-**Consumes from other apps:** Django auth decorators only
-
-**Other apps consume from it:** Nothing — fully isolated
-
-**URL prefix:** `/td-now/`
-
----
-
 ## Cross-App Data Flow
 
 ```
@@ -365,7 +352,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
                                                     Solicitation/RFQ/Award → terminal
 
 [reports] ── read-only SQL across contracts/suppliers schema
-[training], [accesslog], [inventory], [tools], [td_now] ── fully isolated
+[training], [accesslog], [inventory], [tools] ── fully isolated
 ```
 
 ---

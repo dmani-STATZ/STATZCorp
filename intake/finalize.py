@@ -36,6 +36,8 @@ AWD / PO / DO / INTERNAL
   clins[i].splits            → ClinSplit (per-CLIN; split_value computed
                                 from percentage × planned_gp / 100)
   packaging.*                → ContractPackaging (only if packhouse_supplier_id)
+  data.level_charges[i].label           → ContractLevelCharge.label
+  data.level_charges[i].estimated_amount  → ContractLevelCharge.estimated_amount
   data.finance_lines         → LEGACY: pre-redesign drafts only. Attached to
                                 the first CLIN as a compat shim.
 
@@ -65,6 +67,7 @@ from django.contrib.contenttypes.models import ContentType
 from contracts.models import (
     Contract,
     ContractFinanceLine,
+    ContractLevelCharge,
     IdiqContract,
     Note,
     SalesClass,
@@ -170,6 +173,7 @@ def _draft_to_service_payload(draft: DraftContract, kind: str) -> dict:
         'files_url': files_url_value,
         'clins': [_draft_clin_to_payload(c) for c in (data.get('clins') or [])],
         'packaging': data.get('packaging'),
+        'level_charges': data.get('level_charges') or [],
         'seed_payment_history': False,
         # INTERNAL: intake stores `notes` as a single string; pass through.
         'notes': data.get('notes') if kind == 'INTERNAL' else None,
@@ -227,6 +231,7 @@ def _resolve_sales_class(data: dict):
 def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
     result = _call_service(_draft_to_service_payload(draft, 'AWD'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
+    _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
     return result.contract
 
 
@@ -249,6 +254,7 @@ def _finalize_do(draft: DraftContract, user: User) -> Contract:
         )
     result = _call_service(payload, user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
+    _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
     return result.contract
 
 
@@ -267,6 +273,7 @@ def _finalize_internal(draft: DraftContract, user: User) -> Contract:
     """
     result = _call_service(_draft_to_service_payload(draft, 'INTERNAL'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
+    _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
     return result.contract
 
 
@@ -373,4 +380,38 @@ def _apply_legacy_root_finance_lines(
             amount_billed=row['amount'],
             created_by=user,
             modified_by=user,
+        )
+
+
+def _apply_level_charges(
+    contract: Contract, level_charges: list
+) -> None:
+    """Create ContractLevelCharge rows from the intake draft payload.
+
+    Called after the Contract row exists (inside the same transaction).
+    Only rows with both label and estimated_amount present are created;
+    rows missing either field are silently skipped.
+    billed_paid_amount is always None at intake time — it is filled later
+    via the Finance Audit page.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    for row in level_charges:
+        label = (row.get('label') or '').strip()
+        raw_amount = row.get('estimated_amount')
+        if not label or raw_amount is None:
+            continue
+        try:
+            amount = Decimal(str(raw_amount))
+        except InvalidOperation:
+            logger.warning(
+                'Skipping level charge with invalid amount %r on contract %s',
+                raw_amount, contract.contract_number,
+            )
+            continue
+        ContractLevelCharge.objects.create(
+            contract=contract,
+            label=label,
+            estimated_amount=amount,
+            # billed_paid_amount intentionally omitted (null) — Finance Audit fills this
         )

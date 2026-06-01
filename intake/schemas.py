@@ -59,6 +59,17 @@ class Packaging(BaseModel):
     notes: Optional[str] = None
 
 
+class ContractLevelChargeDraft(BaseModel):
+    """Contract-level misc charge known at bid time (e.g. GSI Fee, Freight).
+    Only label + estimated_amount are captured during intake.
+    billed_paid_amount is filled later via Finance Audit."""
+
+    model_config = ConfigDict(extra='forbid')
+
+    label: Optional[str] = None
+    estimated_amount: Optional[Decimal] = None
+
+
 # ---------------------------------------------------------------------------
 # CLIN row (used by AWD / PO / DO)
 # ---------------------------------------------------------------------------
@@ -152,6 +163,7 @@ class AwdPoData(_CommonContractFields):
     clins: List[DraftClin] = Field(default_factory=list)
     finance_lines: List[FinanceLine] = Field(default_factory=list)
     packaging: Optional[Packaging] = None
+    level_charges: List[ContractLevelChargeDraft] = Field(default_factory=list)
 
 
 class DoData(AwdPoData):
@@ -185,6 +197,7 @@ class InternalData(_CommonContractFields):
 
     notes: Optional[str] = None
     clins: List[DraftClin] = Field(default_factory=list)
+    level_charges: List[ContractLevelChargeDraft] = Field(default_factory=list)
 
 
 # Map contract_type → schema. Kept here so views / admin / tests can reuse.
