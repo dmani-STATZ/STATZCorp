@@ -12,6 +12,8 @@
 
 ### Fixed
 
+- **[2026-06-01] Bug Fix — CLIN Fix partial shipment Quote/Item Value not persisting on re-render.** Manually entered Quote Value and Item Value on partial shipment conversions now persist correctly when interacting with the parent CLIN dropdown or switching between rows.
+
 - **[2026-05-21] Bug Fix — Add Split button on CLIN detail page** — The "Add Split" button on the CLIN detail page was not responding to clicks. This has been fixed.
 
 ### Changed

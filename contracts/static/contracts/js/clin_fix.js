@@ -470,6 +470,9 @@
     }
 
     function activateRow(clinId) {
+        // Persist any in-progress edits on the currently active row before switching
+        if (activeClinId && activeClinId !== String(clinId)) syncPaneToState();
+
         if (!clinId) {
             activeClinId = null;
             setActiveRow(null);
@@ -619,6 +622,9 @@
         var data = getRowData(clinId);
         if (!data) return;
 
+        // Flush any in-progress edits before re-rendering the pane
+        if (activeClinId) syncPaneToState();
+
         // Activate the row no matter what so the pane swaps immediately
         activateRow(clinId);
 
@@ -689,6 +695,7 @@
         }
         // Pane parent-CLIN dropdown — refresh mismatch warning
         if (e.target && e.target.id === 'ps-parent-clin' && activeClinId) {
+            syncPaneToState();
             var data = getRowData(activeClinId);
             if (data) refreshPartialMismatchWarning(data, e.target.value);
         }
