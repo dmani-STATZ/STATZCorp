@@ -385,7 +385,7 @@ def _convert_to_partial_shipment(clin, contract, staged_data, parent_clin_id, us
     shipment = ClinShipment.objects.create(
         clin=parent_clin,
         ship_qty=clin.ship_qty,
-        uom=clin.uom or parent_clin.uom or '',
+        uom=staged_data.get('uom') or clin.uom or parent_clin.uom or '',
         ship_date=clin.ship_date,
         pod_date=clin.pod_date,
         quote_value=_staged_decimal('quote_value', clin.quote_value),
