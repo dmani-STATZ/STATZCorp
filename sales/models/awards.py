@@ -9,9 +9,11 @@ class AwardImportBatch(models.Model):
 
     SOURCE_FILE_UPLOAD = "FILE_UPLOAD"
     SOURCE_AUTO_SCRAPE = "AUTO_SCRAPE"
+    SOURCE_HOT_POLL = "hot_poll"
     SOURCE_CHOICES = [
         (SOURCE_FILE_UPLOAD, "Manual File Upload"),
         (SOURCE_AUTO_SCRAPE, "Automated Scraper"),
+        (SOURCE_HOT_POLL, "Daytime we-won poll"),
     ]
 
     SCRAPE_PENDING = "PENDING"

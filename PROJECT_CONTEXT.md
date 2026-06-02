@@ -208,7 +208,15 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 - Three match tiers: T1 (`dibbs_supplier_nsn_scored` view — indexed `match_count` column, refreshed nightly), T2 (approved sources from `tbl_ApprovedSource`), T3 (FSC match).
 - DIBBS PDFs fetched via Playwright in batches of 10 sessions.
 - `NsnProcurementHistory` keyed on `(nsn, contract_number)` — `save_procurement_history` updates `last_seen_sol`/`extracted_at` only for existing keys; never overwrites price/quantity.
-- Background task entry via `core/management/commands/run_background_tasks.py` → `sales/tasks/send_queued_rfqs.py`.
+- Background tasks registered via `core/management/commands/run_background_tasks.py`:
+  1. `send_queued_rfqs` (Task #1): Sends queued RFQs.
+  2. `poll_we_won_today` (Task #2): Daytime we-won award detection.
+     - Service: `sales/services/poll_we_won_today.py` (wrapped in `sales/tasks/poll_we_won_today.py`).
+     - Activation: Controlled by `WE_WON_POLL_ENABLED=true` environment variable (feature is off by default).
+     - Session: Uses `make_www_session()` from `sales/services/dibbs_session.py` (requests-only, no Playwright).
+     - Storage & Reconciliation: Inserts batches into `AwardImportBatch` with source `SOURCE_HOT_POLL` (`"hot_poll"`). This batch source is never touched by the nightly `scrape_awards` reconciliation.
+     - Schedule Window: Runs every 15 minutes, between 6 AM and 5 PM CT (inherited from background_tasks WebJob cron schedule `0 */15 11-22 * * *`).
+     - Backstop: The nightly `scrape_awards` continues unchanged as the full-day backstop for all contractors, and naturally dedupes hot-poll captured awards by award number.
 
 ---
 

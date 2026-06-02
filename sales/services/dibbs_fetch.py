@@ -28,6 +28,8 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from sales.services.dibbs_session import make_www_session as _make_www_session_impl
+
 logger = logging.getLogger(__name__)
 
 DIBBS_MAIN = "https://www.dibbs.bsm.dla.mil"
@@ -53,24 +55,8 @@ class DibbsFetchError(Exception):
 # ---------------------------------------------------------------------------
 
 def _make_www_session() -> requests.Session:
-    s = requests.Session()
-    s.headers["User-Agent"] = _BROWSER_UA
-    resp = s.get(
-        f"{DIBBS_MAIN}/dodwarning.aspx?goto=/RFQ/RFQDates.aspx?category=recent",
-        timeout=DEFAULT_TIMEOUT,
-    )
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
-    form = soup.find("form")
-    if form:
-        action = form.get("action", "")
-        if not action.startswith("http"):
-            action = urljoin(DIBBS_MAIN + "/", action)
-        data = {i["name"]: i.get("value", "") for i in form.find_all("input") if i.get("name")}
-        if "butAgree" not in data:
-            data["butAgree"] = "OK"
-        s.post(action, data=data, timeout=DEFAULT_TIMEOUT)
-    return s
+    """Backward-compatible alias — delegates to sales.services.dibbs_session.make_www_session()."""
+    return _make_www_session_impl()
 
 
 def _scrape_rfq_hrefs(session: requests.Session) -> dict[str, dict[str, str]]:
