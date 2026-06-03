@@ -337,6 +337,9 @@ defeat the supplier-matching prefill flow.
 
 (`processing/templates/processing/process_contract_form.html` and related layout)
 
+- **Two-column top section:** Contract Details (~65%, `col-lg-8`) on the left; Processing Status + Contract Actions (~30%, `col-lg-4`) stacked in the right sidebar with `align-items-start` so cards do not stretch to match left-card height.
+- **Field labels:** Contract Details and Processing Status sidebar fields use `text-uppercase text-muted small fw-semibold` (plus `.process-form-label` letter-spacing in the template).
+- **Cancel action:** "Cancel and Return to Queue" is plain centered muted text (`text-muted fw-bold text-center d-block`), not a styled button.
 - Sidebar buttons standardized for centering (removed `.row`).
 - Vertical density optimized in CLIN detail blocks.
 - CLIN rows load collapsed by default. After a successful NSN or Supplier match (`location.reload()`), `sessionStorage` keys `matchedClinId` and `matchedClinToast` restore the matched CLIN (via `data-clin-id` on the toggle button) and show a success toast; keys are cleared on read.
@@ -353,6 +356,8 @@ This project does not use Tailwind in any form. All styling uses Bootstrap 5 plu
 - `static/css/utilities.css` — utility and helper classes
 
 **When editing templates:** Note that `process_contract_form.html` is now fully Tailwind-free (Bootstrap 5 only). If you encounter Tailwind utility classes in other templates, replace them with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind classes in place.
+
+**Processing form field labels:** In `process_contract_form.html`, Contract Details and Processing Status field labels use the `text-uppercase text-muted small fw-semibold` pattern (with optional `.process-form-label` for letter-spacing).
 
 **Button pattern:** `.btn-outline-brand` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for pill-style with `#eff6ff` background tint.
 
