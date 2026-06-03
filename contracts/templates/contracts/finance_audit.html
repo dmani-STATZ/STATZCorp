@@ -508,7 +508,17 @@
                                 {% endif %}
                             </td>
                             <td>{{ clin.get_item_type_display }}</td>
-                            <td>{{ clin.supplier.name|default:"—" }}</td>
+                            <td>
+                                {% if clin.supplier %}
+                                    {% if clin.supplier.probation %}
+                                        <span class="supplier-flag-probation">{{ clin.supplier.name }}</span>
+                                    {% elif clin.supplier.conditional %}
+                                        <span class="supplier-flag-conditional">{{ clin.supplier.name }}</span>
+                                    {% else %}
+                                        {{ clin.supplier.name }}
+                                    {% endif %}
+                                {% else %}{% endif %}
+                            </td>
                             <td class="text-end">{{ clin.due_date|date:"m/d/Y"|default:"—" }}</td>
                             <td class="text-end">{{ clin.order_qty|default:"—" }}</td>
                             <td class="text-end">{{ clin.ship_date|date:"m/d/Y"|default:"—" }}</td>

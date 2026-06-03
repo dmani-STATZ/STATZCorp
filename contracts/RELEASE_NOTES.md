@@ -4,6 +4,8 @@
 
 ### Added
 
+- **[2026-06-03] Contract Management & Dashboard  Supplier flag highlighting.** Supplier names on the Contract Management CLIN table, CLIN detail card, and Dashboard Recent Contracts table are now highlighted when a supplier is flagged. Probation = red chip. Conditional = yellow chip. Probation takes priority if both flags are set.
+
 - **[2026-05-27] Add CLIN — "Copy From" defaults.** When adding a new CLIN to a contract that already has CLINs, a "Copy from existing CLIN" dropdown appears at the top of the form. Selecting a source CLIN automatically populates Supplier, NSN, I&A, FOB, UOM, Unit Price, Price Per Unit, Payment Terms, PO #, Tab #, and Due Dates — no manual matching required. Item Number, Quantity, and financial totals are intentionally left blank for the new CLIN. Entering a Quantity now also auto-calculates Total Value and Quote Total without needing to click ReCalc. Match buttons on the NSN and Supplier fields now turn green with a checkmark once a value is selected (whether via the picker or copy-from), and revert to blue if cleared. CLIN PO Number is now also copied when using Copy From.
 
 - **[2026-05-27] Document Browser Improvements** — Files and folders can now be selected using checkboxes. A new **Actions** dropdown menu replaces the Save Path button — all document browser actions live in one place. **Save Path** — same behavior as before. **Open in SharePoint** — opens the current folder in SharePoint; if a folder row is selected, opens that folder instead. **Download** — appears when files are selected; downloads files directly to your computer. **Delete** — appears for staff users when files are selected; permanently removes files from SharePoint after confirmation.

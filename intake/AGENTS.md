@@ -101,6 +101,7 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   the soft lock and MUST call `assert_holds` before writing. The
   `test_save_rejects_when_user_lost_lock` test exists specifically to catch
   regressions here — don't disable it without thinking.
+- **Supplier flag display rule (intake):** Intake is JSON-backed — there are no live Supplier ORM objects in the template. `_editor_context` builds `supplier_flags` (one DB query, `only('id','probation','conditional')`) and passes it to the template. Templates use `supplier_flags|get_item:sid` to look up flags. Apply `.supplier-flag-probation` for probation, `.supplier-flag-conditional` for conditional-only, no class for neither. Only apply when `supplier_id` is non-null. Never query Supplier inside a template — always use the pre-built `supplier_flags` context variable.
 
 ### Matcher changes (Phase 2b/2c)
 - `intake/matchers.py` is the single source of truth for what target_paths

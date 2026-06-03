@@ -796,3 +796,21 @@ html {
 [data-bs-theme="dark"] .ql-editor.ql-blank::before {
     color: var(--bs-secondary-color);
 }
+
+/* Supplier status flag chips */
+.supplier-flag-probation {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+.supplier-flag-conditional {
+    background-color: #FEF9C3;
+    color: #713F12;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+

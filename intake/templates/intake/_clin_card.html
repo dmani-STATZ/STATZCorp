@@ -27,7 +27,21 @@
                         {% with nd=clin|get_item:'nsn_description' %}{% if nd %} — {{ nd }}{% endif %}{% endwith %}
                     </span>
                     &nbsp;·&nbsp;
-                    <span class="clin-header-supplier">{{ clin|get_item:'supplier_text'|default:'Supplier: Not Set' }}</span>
+                    {% with sid=clin|get_item:'supplier_id' %}
+                        {% if sid %}
+                            {% with flags=supplier_flags|get_item:sid %}
+                                {% if flags.probation %}
+                                    <span class="clin-header-supplier supplier-flag-probation">{{ clin|get_item:'supplier_text'|default:'Supplier: Not Set' }}</span>
+                                {% elif flags.conditional %}
+                                    <span class="clin-header-supplier supplier-flag-conditional">{{ clin|get_item:'supplier_text'|default:'Supplier: Not Set' }}</span>
+                                {% else %}
+                                    <span class="clin-header-supplier">{{ clin|get_item:'supplier_text'|default:'Supplier: Not Set' }}</span>
+                                {% endif %}
+                            {% endwith %}
+                        {% else %}
+                            <span class="clin-header-supplier">{{ clin|get_item:'supplier_text'|default:'Supplier: Not Set' }}</span>
+                        {% endif %}
+                    {% endwith %}
                 </div>
             </div>
         </div>
@@ -170,7 +184,17 @@
                 <input type="hidden" name="clin-{{ idx }}-supplier_id"
                        value="{{ clin|get_item:'supplier_id'|default:'' }}">
                 {% with sid=clin|get_item:'supplier_id' %}
-                    {% if sid %}<span class="badge bg-success mt-1">matched #{{ sid }}</span>{% endif %}
+                    {% if sid %}
+                        {% with flags=supplier_flags|get_item:sid %}
+                            {% if flags.probation %}
+                                <span class="badge bg-success mt-1 supplier-flag-probation">matched #{{ sid }}</span>
+                            {% elif flags.conditional %}
+                                <span class="badge bg-success mt-1 supplier-flag-conditional">matched #{{ sid }}</span>
+                            {% else %}
+                                <span class="badge bg-success mt-1">matched #{{ sid }}</span>
+                            {% endif %}
+                        {% endwith %}
+                    {% endif %}
                 {% endwith %}
             </div>
             <div>

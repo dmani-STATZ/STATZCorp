@@ -578,7 +578,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                 {{ clin_form.nsn.as_hidden }}
                             </td>
                             <td class="px-3 py-2">
-                                <span class="small">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
+                                {% if clin_form.instance.supplier %}
+                                    {% if clin_form.instance.supplier.probation %}
+                                        <span class="small supplier-flag-probation">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
+                                    {% elif clin_form.instance.supplier.conditional %}
+                                        <span class="small supplier-flag-conditional">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
+                                    {% else %}
+                                        <span class="small">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="small">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
+                                {% endif %}
                                 {{ clin_form.supplier.as_hidden }}
                             </td>
                             <!-- <td class="px-3 py-2 text-end">
@@ -786,6 +796,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                                 </svg>
                                             </span>
+                                            {% if clin_form.instance.supplier.probation %}
+                                                <span class="badge bg-success supplier-flag-probation ms-2 align-self-center">
+                                                     {{ clin_form.instance.supplier.name }} ({{ clin_form.instance.supplier.cage_code|default:'' }})
+                                                </span>
+                                            {% elif clin_form.instance.supplier.conditional %}
+                                                <span class="badge bg-success supplier-flag-conditional ms-2 align-self-center">
+                                                     {{ clin_form.instance.supplier.name }} ({{ clin_form.instance.supplier.cage_code|default:'' }})
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-success ms-2 align-self-center">
+                                                     {{ clin_form.instance.supplier.name }} ({{ clin_form.instance.supplier.cage_code|default:'' }})
+                                                </span>
+                                            {% endif %}
                                             {% else %}
                                             <span class="input-group-text border-0 bg-transparent p-1">
                                                 <svg class="text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">

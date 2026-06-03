@@ -312,7 +312,7 @@ function refreshClinShipQty() {
                                     SUPPLIER
                                 </button>
                                 <p class="font-medium text-sm mt-1">
-                                    <span id="clin-supplier-value">{% if clin.supplier %}<a href="{% url 'suppliers:supplier_detail' clin.supplier.id %}" class="text-blue-600 hover:text-blue-800">{{ clin.supplier.name }}</a> <span class="text-gray-500 text-sm">({{ clin.supplier.cage_code|default:"" }})</span>{% else %}N/A{% endif %}</span>
+                                    <span id="clin-supplier-value">{% if clin.supplier %}<a href="{% url 'suppliers:supplier_detail' clin.supplier.id %}" class="text-blue-600 hover:text-blue-800">{% if clin.supplier.probation %}<span class="supplier-flag-probation">{{ clin.supplier.name }}</span>{% elif clin.supplier.conditional %}<span class="supplier-flag-conditional">{{ clin.supplier.name }}</span>{% else %}{{ clin.supplier.name }}{% endif %}</a> <span class="text-gray-500 text-sm">({{ clin.supplier.cage_code|default:"" }})</span>{% else %}N/A{% endif %}</span>
                                 </p>
                             </div>
                         </div>

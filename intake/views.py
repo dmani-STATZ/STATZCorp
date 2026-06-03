@@ -167,12 +167,39 @@ def delete_draft(request, pk: int):
 def _editor_context(draft: DraftContract, user) -> dict:
     """Shared context for the editor — bound to current draft state."""
     from contracts.models import ContractType, SalesClass, SpecialPaymentTerms
+    from suppliers.models import Supplier as SupplierModel
 
     data = draft.data or {}
+    
+    # Collect all matched supplier IDs from JSON data
+    _supplier_ids = set()
+    for _clin in data.get('clins') or []:
+        _sid = _clin.get('supplier_id')
+        if _sid:
+            _supplier_ids.add(int(_sid))
+    _pkg_sid = (data.get('packaging') or {}).get('packhouse_supplier_id')
+    if _pkg_sid:
+        _supplier_ids.add(int(_pkg_sid))
+    for _pair in data.get('approved_pairs') or []:
+        _sid = _pair.get('supplier_id')
+        if _sid:
+            _supplier_ids.add(int(_sid))
+
+    supplier_flags = {}
+    if _supplier_ids:
+        for _sup in SupplierModel.objects.filter(pk__in=_supplier_ids).only('id', 'probation', 'conditional'):
+            flags = {
+                'probation': bool(_sup.probation),
+                'conditional': bool(_sup.conditional),
+            }
+            supplier_flags[_sup.pk] = flags
+            supplier_flags[str(_sup.pk)] = flags
+
     pkg_data = data.get('packaging') or {}
     return {
         'draft': draft,
         'data': data,
+        'supplier_flags': supplier_flags,
         # Pre-extracted lists keep the template loop-friendly without filters.
         'clins': data.get('clins') or [],
         'finance_lines': data.get('finance_lines') or [],

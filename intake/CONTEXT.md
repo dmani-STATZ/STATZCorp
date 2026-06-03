@@ -125,6 +125,8 @@ set by the parser and drives schema routing. CONTRACT TYPE
 `contracts.ContractType` and is written to `Contract.contract_type` at
 finalization.
 
+> **Supplier flag chips (2026-06-03):** _editor_context pre-fetches a supplier_flags dict {supplier_id (int or str): {'probation': bool, 'conditional': bool}} for all matched supplier IDs found in CLIN, packaging, and approved_pairs JSON. Templates apply .supplier-flag-probation (red) or .supplier-flag-conditional (yellow) from components.css wherever matched supplier badges appear. Unmatched suppliers (no supplier_id) show plain text  no chip. Probation wins over conditional. Key type must be consistent between supplier_flags dict and template get_item filter calls.
+
 CLIN data shape (per-CLIN JSON keys, see `DraftClin` in `schemas.py`):
 
 - Contract data: `item_number`, `item_type` (P/G/C/L/M/Q/D; defaults to

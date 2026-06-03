@@ -39,6 +39,8 @@ def get_clin_details(request, clin_id):
             'tab_num': clin.tab_num or '—',
             'supplier_name': clin.supplier.name if clin.supplier else 'N/A',
             'supplier_id': clin.supplier_id or None,
+            'supplier_probation': bool(clin.supplier.probation) if clin.supplier else False,
+            'supplier_conditional': bool(clin.supplier.conditional) if clin.supplier else False,
             'nsn': ((f"{clin.nsn.nsn_code or ''}" + (f" ({clin.nsn.description})" if clin.nsn.description else "")).strip() or 'N/A') if clin.nsn else 'N/A',
             'nsn_id': clin.nsn_id if clin.nsn else None,
             'ia': clin.get_ia_display() if clin.ia else '—',

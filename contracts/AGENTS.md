@@ -192,6 +192,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `suppliers/models.py` (source model — read-only from contracts)
 - `contracts/templates/contracts/supplier_detail.html`, `supplier_list.html`
 - `contracts/static/contracts/js/supplier_modal.js`
+- **Supplier flag display rule:** When rendering a supplier name anywhere in the contracts app, check `supplier.probation` and `supplier.conditional`. Apply `.supplier-flag-probation` if probation is true (takes priority). Apply `.supplier-flag-conditional` if conditional is true and probation is false. Plain text if neither. Do not add inline styles — use these CSS classes only.
 
 ### Dynamic Contract Tracker — API inventory (`contracts/views/dynamic_tracker_views.py`, `contracts/urls.py`)
 Authenticated, company-scoped (match `TrackerSchema.company` to `request.active_company` when set). Main UI: `contracts/templates/contracts/dynamic_tracker.html`.

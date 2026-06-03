@@ -410,7 +410,15 @@
                                         {{ clin.get_item_type_display|default:"—" }}
                                     </td>
                                     <td class="px-3 py-1 text-sm text-gray-900">
-                                        {% if clin.supplier %}{{ clin.supplier.name }}{% else %}N/A{% endif %}
+                                        {% if clin.supplier %}
+                                            {% if clin.supplier.probation %}
+                                                <span class="supplier-flag-probation">{{ clin.supplier.name }}</span>
+                                            {% elif clin.supplier.conditional %}
+                                                <span class="supplier-flag-conditional">{{ clin.supplier.name }}</span>
+                                            {% else %}
+                                                {{ clin.supplier.name }}
+                                            {% endif %}
+                                        {% else %}N/A{% endif %}
                                     </td>
                                 </tr>
                                 {% empty %}
@@ -467,7 +475,21 @@
                                 </tr>
                                 <tr>
                                     <td style="font-size:12px; color:var(--bs-secondary-color); padding:3px 0; width:46%;"><button type="button" onclick="openTransactionsEditModalForClin('supplier')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Supplier:</button></td>
-                                    <td style="font-size:13px; font-weight:500; padding:3px 0;">{% if selected_clin.supplier %}<a href="{% url 'suppliers:supplier_detail' selected_clin.supplier.id %}" target="_blank" id="cd-supplier-name">{{ selected_clin.supplier.name|default:"N/A" }}</a>{% else %}<span id="cd-supplier">N/A</span>{% endif %}</td>
+                                    <td style="font-size:13px; font-weight:500; padding:3px 0;">
+                                        {% if selected_clin.supplier %}
+                                            <a href="{% url 'suppliers:supplier_detail' selected_clin.supplier.id %}" target="_blank" id="cd-supplier-name">
+                                                {% if selected_clin.supplier.probation %}
+                                                    <span class="supplier-flag-probation">{{ selected_clin.supplier.name }}</span>
+                                                {% elif selected_clin.supplier.conditional %}
+                                                    <span class="supplier-flag-conditional">{{ selected_clin.supplier.name }}</span>
+                                                {% else %}
+                                                    {{ selected_clin.supplier.name|default:"N/A" }}
+                                                {% endif %}
+                                            </a>
+                                        {% else %}
+                                            <span id="cd-supplier">N/A</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td style="font-size:12px; color:var(--bs-secondary-color); padding:3px 0; width:46%;"><button type="button" onclick="openTransactionsEditModalForClin('ia')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">I&amp;A:</button></td>
@@ -1889,6 +1911,17 @@ function deleteGovAction(id) {
     });
 }
 
+// Helper  call this wherever supplier name is rendered in the JS card template
+function supplierNameHtml(name, probation, conditional) {
+    if (!name || name === 'N/A') return name || 'N/A';
+    if (probation) {
+        return `<span class="supplier-flag-probation">${name}</span>`;
+    } else if (conditional) {
+        return `<span class="supplier-flag-conditional">${name}</span>`;
+    }
+    return name;
+}
+
 function fetchClinDetails(clinId) {
     const panel = document.getElementById('clin-details-content');
     if (!panel) return;
@@ -1919,7 +1952,7 @@ function fetchClinDetails(clinId) {
                 : '<span id="cd-partial-pill" class="badge ms-1" style="display:none;background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>';
             const supplierUrl = d.supplier_id ? "{% url 'suppliers:supplier_detail' 0 %}".replace('/0/', `/${d.supplier_id}/`) : null;
             const supplierHtml = supplierUrl
-                ? `<a href="${supplierUrl}" target="_blank" id="cd-supplier-name">${fmt(d.supplier_name)}</a>`
+                ? `<a href="${supplierUrl}" target="_blank" id="cd-supplier-name">${supplierNameHtml(d.supplier_name, d.supplier_probation, d.supplier_conditional)}</a>`
                 : '<span id="cd-supplier">N/A</span>';
             const nsnUrl = d.nsn_id ? "{% url 'contracts:nsn_edit' 0 %}".replace('/0/', `/${d.nsn_id}/`) : null;
             const nsnHtml = nsnUrl

@@ -452,6 +452,7 @@ class ProcessContractUpdateView(LoginRequiredMixin, UpdateView):
         process_contract = self.object
         clin_qs = (
             ProcessClin.objects.filter(process_contract=process_contract)
+            .select_related('supplier')
             .prefetch_related('splits')
             .order_by('item_number')
         )

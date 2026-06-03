@@ -66,6 +66,8 @@ They remain visible for all other contract types (AWD, PO, DO, etc.).
 
 ## [Unreleased]
 
+- **[2026-06-03] Draft Editor — Supplier flag highlighting.** Matched supplier badges on CLIN cards (collapsed header + Supplier field), the Packaging packhouse field, and IDIQ approved-pairs rows now show a red chip when the supplier is on Probation, and a yellow chip when Conditional. Unmatched CLINs (no supplier ID) are unaffected.
+
 ### Added
 
 Supplier name now auto-populated on each CLIN at PDF ingest. The parser

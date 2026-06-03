@@ -222,6 +222,7 @@ defeat the supplier-matching prefill flow.
 - **`process_contract_form.html`** is large and loads all five modal templates via `{% include %}`. When editing the main form template, verify modal `id` attributes that JS references by name have not drifted.
 - **`ProcessContractUpdateView`** injects `ProcessClinFormSet` into context — the template iterates it. If you add or remove formset fields, update the template CLIN table and the JS that reads those fields.
 - **`save_contract`** at `/processing/save_contract/` is a duplicate alias for `/processing/contract/<id>/save/`. Both exist in `urls.py`. If you deprecate one, check JS for which URL it uses.
+- **Supplier flag display rule (processing):** Same rule as contracts app — apply `.supplier-flag-probation` for probation (takes priority), and `.supplier-flag-conditional` for conditional-only, and plain text for neither or unmatched. Only apply when `ProcessClin.supplier` FK is non-null. Never apply to raw `supplier_text` alone.
 
 ---
 

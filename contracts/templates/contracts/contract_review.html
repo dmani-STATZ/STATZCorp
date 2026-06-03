@@ -485,7 +485,17 @@ window.onTransactionSaved = function(data) {
                 {% for clin in clins %}
                 <tr>
                   <td>{{ clin.item_number|default:"0000" }}</td>
-                  <td>{{ clin.supplier.name|default:"N/A" }}</td>
+                  <td>
+                    {% if clin.supplier %}
+                      {% if clin.supplier.probation %}
+                        <span class="supplier-flag-probation">{{ clin.supplier.name }}</span>
+                      {% elif clin.supplier.conditional %}
+                        <span class="supplier-flag-conditional">{{ clin.supplier.name }}</span>
+                      {% else %}
+                        {{ clin.supplier.name }}
+                      {% endif %}
+                    {% else %}N/A{% endif %}
+                  </td>
                   <td>{{ clin.nsn.nsn_code|default:"N/A" }}</td>
                   <td>{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
                   <td class="{% if clin.due_date_late %}review-late{% endif %}">

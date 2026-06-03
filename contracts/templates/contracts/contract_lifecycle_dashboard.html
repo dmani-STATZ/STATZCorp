@@ -303,14 +303,12 @@
                                 </a>
                             </td>
                             <td class="small text-body">
-                                {% if contract.supplier_id %}
-                                    <a class="text-primary supplier-name-cell text-decoration-none"
-                                       href="{% url 'suppliers:supplier_detail' contract.supplier_id %}"
-                                       title="{{ contract.supplier_name|upper }}">
-                                        {{ contract.supplier_name|upper }}
-                                    </a>
+                                {% if contract.supplier_probation %}
+                                    <span class="supplier-flag-probation">{{ contract.supplier_name }}</span>
+                                {% elif contract.supplier_conditional %}
+                                    <span class="supplier-flag-conditional">{{ contract.supplier_name }}</span>
                                 {% else %}
-                                    <span class="supplier-name-cell" title="{{ contract.supplier_name|upper }}">{{ contract.supplier_name|upper }}</span>
+                                    {{ contract.supplier_name|default:"N/A" }}
                                 {% endif %}
                             </td>
                             <td class="text-nowrap small text-body-tertiary">

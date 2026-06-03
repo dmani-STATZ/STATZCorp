@@ -357,7 +357,13 @@
                     <td class="px-1.5 py-1">
                         <a href="{% url 'suppliers:supplier_detail' clin.supplier.id %}"
                            class="text-blue-600 hover:text-blue-800">
-                            {{ clin.supplier.name }}
+                            {% if clin.supplier.probation %}
+                                <span class="supplier-flag-probation">{{ clin.supplier.name }}</span>
+                            {% elif clin.supplier.conditional %}
+                                <span class="supplier-flag-conditional">{{ clin.supplier.name }}</span>
+                            {% else %}
+                                {{ clin.supplier.name }}
+                            {% endif %}
                         </a>
                     </td>
                     <td class="px-1.5 py-1">{{ clin.supplier.cage_code|default:"" }}</td>

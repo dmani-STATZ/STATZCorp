@@ -357,7 +357,17 @@
                             <input type="hidden" name="pair-{{ forloop.counter0 }}-cage"
                                 value="{{ pair|get_item:'cage'|default:'' }}">
                             {% with sid=pair|get_item:'supplier_id' %}
-                                {% if sid %}<span class="badge bg-success mt-1">matched #{{ sid }}</span>{% endif %}
+                                {% if sid %}
+                                    {% with flags=supplier_flags|get_item:sid %}
+                                        {% if flags.probation %}
+                                            <span class="badge bg-success mt-1 supplier-flag-probation">matched #{{ sid }}</span>
+                                        {% elif flags.conditional %}
+                                            <span class="badge bg-success mt-1 supplier-flag-conditional">matched #{{ sid }}</span>
+                                        {% else %}
+                                            <span class="badge bg-success mt-1">matched #{{ sid }}</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
                             {% endwith %}
                         </td>
                         <td class="p-1">
@@ -475,7 +485,17 @@
                     <input type="hidden" name="pkg-packhouse_supplier_id"
                            value="{{ packaging|get_item:'packhouse_supplier_id'|default:'' }}">
                     {% with sid=packaging|get_item:'packhouse_supplier_id' %}
-                        {% if sid %}<span class="badge bg-success mt-1">matched #{{ sid }}</span>{% endif %}
+                        {% if sid %}
+                            {% with flags=supplier_flags|get_item:sid %}
+                                {% if flags.probation %}
+                                    <span class="badge bg-success mt-1 supplier-flag-probation">matched #{{ sid }}</span>
+                                {% elif flags.conditional %}
+                                    <span class="badge bg-success mt-1 supplier-flag-conditional">matched #{{ sid }}</span>
+                                {% else %}
+                                    <span class="badge bg-success mt-1">matched #{{ sid }}</span>
+                                {% endif %}
+                            {% endwith %}
+                        {% endif %}
                     {% endwith %}
                 </div>
                 <div>

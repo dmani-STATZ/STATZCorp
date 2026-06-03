@@ -143,7 +143,15 @@
                     {% if clin.item_type %}{{ clin.get_item_type_display }}{% else %}—{% endif %}
                   </td>
                   <td class="text-start">
-                    {% if clin.supplier %}{{ clin.supplier.name }}{% else %}—{% endif %}
+                    {% if clin.supplier %}
+                      {% if clin.supplier.probation %}
+                        <span class="supplier-flag-probation">{{ clin.supplier.name }}</span>
+                      {% elif clin.supplier.conditional %}
+                        <span class="supplier-flag-conditional">{{ clin.supplier.name }}</span>
+                      {% else %}
+                        {{ clin.supplier.name }}
+                      {% endif %}
+                    {% else %}—{% endif %}
                   </td>
                   <td class="text-end">
                     {% if clin.order_qty is not None %}

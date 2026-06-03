@@ -144,7 +144,7 @@ class ContractLifecycleDashboardView(TemplateView):
         contracts_data = []
         for contract in last_20_contracts:
             # Get the first CLIN with clin_type_id=1 for this contract
-            first_clin = contract.clin_set.filter().first()
+            first_clin = contract.clin_set.select_related('supplier').first()
             
             contract_data = {
                 'id': contract.id,
@@ -161,9 +161,13 @@ class ContractLifecycleDashboardView(TemplateView):
             if first_clin and first_clin.supplier:
                 contract_data['supplier_name'] = first_clin.supplier.name
                 contract_data['supplier_id'] = first_clin.supplier.id
+                contract_data['supplier_probation'] = bool(first_clin.supplier.probation)
+                contract_data['supplier_conditional'] = bool(first_clin.supplier.conditional)
             else:
                 contract_data['supplier_name'] = 'N/A'
                 contract_data['supplier_id'] = None
+                contract_data['supplier_probation'] = False
+                contract_data['supplier_conditional'] = False
             
             contracts_data.append(contract_data)
 
