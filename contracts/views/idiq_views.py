@@ -1,4 +1,4 @@
-from django.views.generic import DetailView
+from django.views.generic import DetailView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views import View
 from django.views.generic.edit import UpdateView
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.contenttypes.models import ContentType
@@ -14,6 +14,49 @@ from django.contrib.contenttypes.models import ContentType
 from contracts.models import IdiqContract, IdiqContractDetails, Contract, Note
 from products.models import Nsn
 from suppliers.models import Supplier
+
+class IdiqContractListView(LoginRequiredMixin, ListView):
+    model = IdiqContract
+    template_name = 'contracts/idiq_list.html'
+    context_object_name = 'idiq_contracts'
+
+    def get_queryset(self):
+        show_closed = self.request.GET.get('show_closed') == '1'
+        sort_by = self.request.GET.get('sort', 'contract_number')
+        
+        allowed_sorts = ['contract_number', '-contract_number', 'award_date', '-award_date']
+        if sort_by not in allowed_sorts:
+            sort_by = 'contract_number'
+
+        qs = IdiqContract.objects.annotate(
+            contract_count=Count('contract')
+        ).select_related('buyer')
+
+        if sort_by == 'contract_number':
+            qs = qs.order_by('contract_number')
+        elif sort_by == '-contract_number':
+            qs = qs.order_by('-contract_number')
+        elif sort_by == 'award_date':
+            qs = qs.order_by('award_date', 'contract_number')
+        elif sort_by == '-award_date':
+            qs = qs.order_by('-award_date', 'contract_number')
+
+        if not show_closed:
+            qs = qs.filter(
+                Q(closed=False) | Q(closed__isnull=True)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['show_closed'] = self.request.GET.get('show_closed') == '1'
+        
+        sort_by = self.request.GET.get('sort', 'contract_number')
+        allowed_sorts = ['contract_number', '-contract_number', 'award_date', '-award_date']
+        if sort_by not in allowed_sorts:
+            sort_by = 'contract_number'
+        context['sort_by'] = sort_by
+        return context
 
 class IdiqContractDetailView(LoginRequiredMixin, DetailView):
     model = IdiqContract

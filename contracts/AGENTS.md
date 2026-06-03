@@ -476,6 +476,8 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 17. **`window.__someBoundGuard` guards in scripts that run on page reload will prevent all listeners from registering after the first load.** The `window.__guard = true` pattern is only safe when scripts are injected into an existing DOM via `innerHTML` (where they could run multiple times in one page lifetime without a full reload). For standalone pages that reload normally (like `reminders_popup.html`), this guard causes the entire IIFE to exit on every reload after the first, silently removing all click handlers. Only use `window.__bound` guards in partials that are injected via `innerHTML` — i.e. `notes_popup_tab_panel.html` via `activateScriptsInNotesTabPanel`. Do not copy this pattern into standalone page scripts.
 
+18. **`idiq_list` is a global (non-company-scoped) list view by design.** Do not add `ActiveCompanyQuerysetMixin` to it because `IdiqContract` has no company FK.
+
 ---
 
 ## 14. Safe Change Workflow

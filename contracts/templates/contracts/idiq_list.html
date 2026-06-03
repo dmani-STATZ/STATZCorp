@@ -1,0 +1,97 @@
+{% extends 'contracts/contract_base.html' %}
+{% load static %}
+
+{% block title %}IDIQ Contracts{% endblock %}
+
+{% block contract_content %}
+<div class="container py-4">
+    <!-- Page header area above the table -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">IDIQ Contracts</h4>
+        <span class="text-muted">{{ idiq_contracts|length }} records</span>
+    </div>
+
+    <!-- Toggle & Filters -->
+    <div class="card mb-4 border-0 shadow-sm bg-body-tertiary">
+        <div class="card-body p-3">
+            <form method="get" class="d-flex align-items-center">
+                {% if sort_by %}
+                    <input type="hidden" name="sort" value="{{ sort_by }}">
+                {% endif %}
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="showClosedToggle" name="show_closed" value="1" onchange="this.form.submit()" {% if show_closed %}checked{% endif %}>
+                    <label class="form-check-label text-body" for="showClosedToggle">Show Closed</label>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>
+                            <a href="?sort={% if sort_by == 'contract_number' %}-contract_number{% else %}contract_number{% endif %}{% if show_closed %}&show_closed=1{% endif %}" class="text-decoration-none text-body">
+                                Contract Number
+                                {% if sort_by == 'contract_number' %} &uarr;{% elif sort_by == '-contract_number' %} &darr;{% endif %}
+                            </a>
+                        </th>
+                        <th>Buyer</th>
+                        <th>
+                            <a href="?sort={% if sort_by == 'award_date' %}-award_date{% else %}award_date{% endif %}{% if show_closed %}&show_closed=1{% endif %}" class="text-decoration-none text-body">
+                                Award Date
+                                {% if sort_by == 'award_date' %} &uarr;{% elif sort_by == '-award_date' %} &darr;{% endif %}
+                            </a>
+                        </th>
+                        <th class="text-center">Contracts</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for idiq in idiq_contracts %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'contracts:idiq_contract_detail' idiq.id %}" class="text-decoration-none fw-semibold">
+                                    {{ idiq.contract_number }}
+                                </a>
+                            </td>
+                            <td>
+                                {% if idiq.buyer %}
+                                    {{ idiq.buyer }}
+                                {% else %}
+                                    
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if idiq.award_date %}
+                                    {{ idiq.award_date|date:"m/d/Y" }}
+                                {% else %}
+                                    
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {{ idiq.contract_count }}
+                            </td>
+                            <td>
+                                {% if idiq.closed %}
+                                    <span class="badge bg-secondary">Closed</span>
+                                {% else %}
+                                    <span class="badge bg-success">Open</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <p class="text-muted">No IDIQ contracts found.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock contract_content %}

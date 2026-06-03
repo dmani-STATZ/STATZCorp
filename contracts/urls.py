@@ -147,6 +147,7 @@ from .views.api_views import (
     contract_day_counts,
 )
 from .views.idiq_views import (
+    IdiqContractListView,
     IdiqContractDetailView,
     IdiqContractUpdateView,
     IdiqContractDetailsCreateView,
@@ -613,6 +614,11 @@ urlpatterns = [
         name="update_folder_field",
     ),
     # IDIQ Contract URLs
+    path(
+        "idiq/",
+        IdiqContractListView.as_view(),
+        name="idiq_list",
+    ),
     path(
         "idiq/<int:pk>/", IdiqContractDetailView.as_view(), name="idiq_contract_detail"
     ),
