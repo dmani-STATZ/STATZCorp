@@ -926,6 +926,8 @@
             btnAddCharges.addEventListener('click', () => {
                 chargesCard.style.display = '';
                 if (chargesAddWrap) chargesAddWrap.style.display = 'none';
+                // Auto-inject one blank row so the user can start typing immediately
+                document.getElementById('btn-add-charge-row').click();
             });
         }
 

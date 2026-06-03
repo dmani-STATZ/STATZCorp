@@ -18,6 +18,10 @@
 
 ### Changed
 
+- Processing contract form: Packhouse and Contract Charges are now independent 
+  side-by-side sections (50/50 layout). Each section has its own collapsed/expanded 
+  toggle. Removed "+ Add Contract Charge" button from the Contract Actions sidebar.
+
 - **[2026-05-27] Contract Management — CLIN card Ship Qty now read-only on converted CLINs.** The Ship Qty field on the contract management CLIN detail card is now shown as a read-only value (not an edit button) when the CLIN has shipments, matching the same rule on the CLIN detail page. Ship Qty is always the sum of individual shipment quantities on converted CLINs.
 
 - **[2026-05-27] CLIN Detail — Shipment and value displays stay in sync.** Ship Qty on the CLIN detail page now updates automatically after any shipment is added, edited, or deleted — no page reload needed. On CLINs with shipments, Ship Qty is shown as a read-only rollup (∑) since it is always the sum of individual shipment quantities. Total Value and Quote Total also refresh immediately when Order Qty, Unit Price, or Price Per Unit are changed.

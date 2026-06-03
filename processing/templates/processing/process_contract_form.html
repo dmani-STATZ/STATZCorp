@@ -24,19 +24,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 {% block content %}
 <!-- Add this right after the opening body tag or as the first element in your template -->
-<div id="custom-messages-container" class="fixed top-0 left-0 right-0 flex justify-center items-start pt-20 z-[2000] pointer-events-none">
-    <div id="custom-messages" class="pointer-events-auto"></div>
+<div id="custom-messages-container" class="position-fixed top-0 start-0 end-0 d-flex justify-content-center align-items-start pt-5 pe-none" style="z-index: 2000;">
+    <div id="custom-messages" class="pe-auto"></div>
 </div>
 
 <!-- System Messages Section - Fixed Position -->
-<div id="system-messages" class="fixed top-20 left-0 right-0 z-50 px-4">
+<div id="system-messages" class="position-fixed start-0 end-0 px-3" style="top: 5rem; z-index: 50;">
     {% if messages %}
-    <div class="messages max-w-4xl mx-auto">
+    <div class="messages mx-auto" style="max-width: 56rem;">
         {% for message in messages %}
-        <div class="bg-{{ message.tags }}-100 border border-{{ message.tags }}-400 text-{{ message.tags }}-700 px-4 py-3 rounded relative mb-2 shadow-lg" role="alert">
-            <span class="block sm:inline">{{ message }}</span>
-            <button type="button" class="absolute top-0 right-0 px-4 py-3" onclick="this.parentElement.remove()">
-                <svg class="h-6 w-6 text-{{ message.tags }}-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+        <div class="bg-{{ message.tags }}-100 border border-{{ message.tags }}-400 text-{{ message.tags }}-700 p-3 rounded position-relative mb-2 shadow-sm" role="alert">
+            <span class="d-block d-sm-inline">{{ message }}</span>
+            <button type="button" class="position-absolute top-0 end-0 p-3" onclick="this.parentElement.remove()">
+                <svg class="text-{{ message.tags }}-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" style="width:1.5rem;height:1.5rem;">
                     <title>Close</title>
                     <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
                 </svg>
@@ -48,18 +48,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 </div>
 
 <!-- Main Content Container -->
-<div class="w-[90%] mx-auto px-4 py-6">
+<div class="mx-auto px-3 py-4" style="width: 90%;">
     <!-- Header Section -->
-    <div class="row-between mb-6">
+    <div class="row-between mb-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800">
+            <h1 class="fs-4 fw-bold text-body">
                 Edit Processing Contract: {{ process_contract.contract_number }}
             </h1>
-            <p class="text-sm text-gray-600 mt-1">Started processing on {{ process_contract.created_at|date:"M d, Y H:i" }}</p>
+            <p class="small text-muted mt-1">Started processing on {{ process_contract.created_at|date:"M d, Y H:i" }}</p>
             {% if pdf_parse_status == 'partial' %}
             <div class="mt-3">
                 <button type="button"
-                        class="text-sm px-3 py-1.5 bg-yellow-100 text-yellow-900 border border-yellow-300 rounded-md hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                        class="btn btn-warning btn-sm"
                         data-contract-number="{{ process_contract.contract_number|default:'' }}"
                         data-parse-notes="{{ pdf_parse_notes|escapejs }}"
                         onclick="openPdfParseNotesModalFromTrigger(this)">
@@ -76,28 +76,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <input type="hidden" name="contract_id" value="{{ process_contract.id }}">
 
         <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="row g-4">
             <!-- Contract Details Card -->
-            <div class="lg:col-span-2">
-                <div class="card card-padded shadow-md mb-6">
-                    <h2 class="text-xl font-semibold mb-4">Contract Details</h2>
-                    <div class="grid grid-cols-2 gap-6">
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Contract Number</label>
-                            <input type="text" name="cont_contract_number" value="{{ process_contract.contract_number }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" readonly>
+            <div class="col-12 col-lg-8">
+                <div class="card card-padded shadow-sm mb-4">
+                    <h2 class="fs-5 fw-semibold mb-3">Contract Details</h2>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Contract Number</label>
+                            <input type="text" name="cont_contract_number" value="{{ process_contract.contract_number }}" class="form-control bg-light" readonly>
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">IDIQ Contract</label>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">IDIQ Contract</label>
                             <div class="input-group input-group-sm">
                                 <input type="text"
                                        name="cont_idiq_contract_number"
                                        value="{{ process_contract.idiq_contract.contract_number|default:queue_contract.idiq_number|default:'' }}"
-                                       class="form-control bg-gray-50"
+                                       class="form-control bg-light"
                                        readonly>
                                 <button type="button"
                                         data-action="open-idiq"
                                         data-idiq="{{ process_contract.idiq_contract.contract_number|default:queue_contract.idiq_number|default:'' }}"
-                                        class="btn btn-primary btn-sm whitespace-nowrap">
+                                        class="btn btn-primary btn-sm text-nowrap">
                                     Match
                                 </button>
                                 {% if process_contract.idiq_contract %}
@@ -107,114 +107,114 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                     Remove
                                 </button>
                                 <span class="input-group-text border-0 bg-transparent p-1">
-                                    <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg class="text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                     </svg>
                                 </span>
                                 {% else %}
                                 <span class="input-group-text border-0 bg-transparent p-1">
-                                    <svg class="h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg class="text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
                                 </span>
                                 {% endif %}
                             </div>
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">PO Number</label>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">PO Number</label>
                             <input type="text"
                                    name="cont_po_number"
                                    {% if process_contract.po_number %}value="{{ process_contract.po_number }}"{% endif %}
                                    placeholder="Assigned when submitted"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed{% if not process_contract.po_number %} text-gray-400 italic{% endif %}"
+                                   class="form-control bg-light cursor-not-allowed{% if not process_contract.po_number %} text-muted fst-italic{% endif %}"
                                    disabled>
                         </div>
 
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Buyer</label>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Buyer</label>
                             <div class="input-group input-group-sm">
                                 <input type="text" name="cont_buyer_text" value="{{ process_contract.buyer_text|default:'' }}"
-                                       class="form-control bg-gray-50"
+                                       class="form-control bg-light"
                                        readonly>
                                 <button type="button"
                                         data-action="open-buyer"
                                         data-buyer="{{ process_contract.buyer_text|default:'' }}"
-                                        class="btn btn-primary btn-sm whitespace-nowrap">
+                                        class="btn btn-primary btn-sm text-nowrap">
                                     Match
                                 </button>
                                 {% if process_contract.buyer %}
                                 <span class="input-group-text border-0 bg-transparent p-1">
-                                    <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg class="text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                     </svg>
                                 </span>
                                 {% else %}
                                 <span class="input-group-text border-0 bg-transparent p-1">
-                                    <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg class="text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
                                 </span>
                                 {% endif %}
                             </div>
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Contract Type ({{ process_contract.contract_type_text }})</label>
-                            <select name="cont_contract_type" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Contract Type ({{ process_contract.contract_type_text }})</label>
+                            <select name="cont_contract_type" onchange="saveContract()" class="form-select">
                                 <option value="">-------</option>
                                 {% for type in contract_types %}
                                     <option value="{{ type.id }}" {% if process_contract.contract_type_id == type.id %}selected{% endif %}>{{ type.description }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Award Date</label>
-                            <input type="date" name="cont_award_date" value="{{ process_contract.award_date|date:'Y-m-d' }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Award Date</label>
+                            <input type="date" name="cont_award_date" value="{{ process_contract.award_date|date:'Y-m-d' }}" onchange="saveContract()" class="form-control">
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Due Date</label>
-                            <input type="date" name="cont_due_date" value="{{ process_contract.due_date|date:'Y-m-d' }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Due Date</label>
+                            <input type="date" name="cont_due_date" value="{{ process_contract.due_date|date:'Y-m-d' }}" onchange="saveContract()" class="form-control">
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Solicitation Type</label>
-                            <input type="text" name="cont_solicitation_type" value="{{ process_contract.solicitation_type }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Solicitation Type</label>
+                            <input type="text" name="cont_solicitation_type" value="{{ process_contract.solicitation_type }}" onchange="saveContract()" class="form-control">
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">PR Number</label>
-                            <input type="text" name="cont_pr_number" value="{{ process_contract.pr_number|default:'' }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">PR Number</label>
+                            <input type="text" name="cont_pr_number" value="{{ process_contract.pr_number|default:'' }}" onchange="saveContract()" class="form-control">
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Sales Class ({{ process_contract.sales_class_text }})</label>
-                            <select name="cont_sales_class" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Sales Class ({{ process_contract.sales_class_text }})</label>
+                            <select name="cont_sales_class" onchange="saveContract()" class="form-select">
                                 <option value="">-------</option>
                                 {% for sales_class in sales_classes %}
                                     <option value="{{ sales_class.id }}" {% if process_contract.sales_class_id == sales_class.id %}selected{% endif %}>{{ sales_class.sales_team }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Contract Value</label>
-                            <input type="number" step="0.01" name="cont_contract_value" value="{{ process_contract.contract_value }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Contract Value</label>
+                            <input type="number" step="0.01" name="cont_contract_value" value="{{ process_contract.contract_value }}" onchange="saveContract()" class="form-control">
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Plan Gross</label>
-                            <input type="number" step="0.01" name="cont_plan_gross" value="{{ process_contract.plan_gross }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Plan Gross</label>
+                            <input type="number" step="0.01" name="cont_plan_gross" value="{{ process_contract.plan_gross }}" onchange="saveContract()" class="form-control">
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Planned Split</label>
-                            <input type="text" name="cont_planned_split" value="{{ process_contract.planned_split }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Planned Split</label>
+                            <input type="text" name="cont_planned_split" value="{{ process_contract.planned_split }}" onchange="saveContract()" class="form-control">
                         </div>
-                        <div>
+                        <div class="col-12 col-md-6">
 
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">Files URL</label>
-                            <input type="text" name="cont_files_url" value="{{ process_contract.files_url }}" onchange="saveContract()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">Files URL</label>
+                            <input type="text" name="cont_files_url" value="{{ process_contract.files_url }}" onchange="saveContract()" class="form-control">
                         </div>
-                        <div>
-                            <label class="label block text-gray-700 mb-1">NIST</label>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label mb-1">NIST</label>
                             <select name="cont_nist"
                                     onchange="saveContract()"
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="form-select"
                                     data-previous-value="{{ process_contract.nist|yesno:'Yes,No' }}">
                                 <option value="Yes" {% if process_contract.nist %}selected{% endif %}>Yes</option>
                                 <option value="No" {% if not process_contract.nist %}selected{% endif %}>No</option>
@@ -223,11 +223,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                     </div>
 
                     <!-- Save Contract Button -->
-                    <div class="mt-4">
+                    <div class="mt-3">
                         <button type="button"
                                 id="save-contract-btn"
                                 onclick="saveContract()"
-                                class="px-6 py-2 btn btn-save rounded-md focus:outline-none focus:ring-2 flex items-center gap-2">
+                                class="btn btn-save d-flex align-items-center gap-2">
                             <svg fill="#000000" width="20px" height="20px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
                                 <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
                             </svg>
@@ -236,7 +236,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                         <button type="button"
                                 id="update-values-button"
                                 onclick="updateContractValues()"
-                                class="mt-2 w-full px-6 py-2 btn btn-outline-secondary rounded-md focus:outline-none focus:ring-2">
+                                class="mt-2 w-100 btn btn-outline-secondary">
                             Recalculate Totals
                         </button>
                     </div>
@@ -244,250 +244,276 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             </div>
 
             <!-- Status Card -->
-            <div class="lg:col-span-1">
-                <div class="card card-padded shadow-md mb-6">
+            <div class="col-12 col-lg-4">
+                <div class="card card-padded shadow-sm mb-4">
                     <div class="row-between mb-4">
-                        <h2 class="text-xl font-semibold">Processing Status</h2>
+                        <h2 class="fs-5 fw-semibold">Processing Status</h2>
                         <a href="{% url 'processing:queue' %}"
-                           class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                           class="btn btn-secondary">
                             Return to Queue
                         </a>
                     </div>
-                    <div class="grid grid-cols-1 gap-4">
+                    <div class="d-flex flex-column gap-3">
                         <div>
-                            <label class="label block text-gray-700 mb-1">Current Status</label>
-                            <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="statusChange(this.value)">
+                            <label class="form-label mb-1">Current Status</label>
+                            <select name="status" class="form-select" onchange="statusChange(this.value)">
                             {% for choice in form.fields.status.choices %}
                                 <option value="{{ choice.0 }}"
-                                    {% if process_contract.status == choice.0 %}selected{% endif %}
-                                    class="{% if choice.0 == 'draft' %}text-gray-700
-                                           {% elif choice.0 == 'in_progress' %}text-blue-700
-                                           {% elif choice.0 == 'ready_for_review' %}text-green-700
-                                           {% elif choice.0 == 'completed' %}text-purple-700
-                                           {% elif choice.0 == 'cancelled' %}text-red-700{% endif %}">
+                                    {% if process_contract.status == choice.0 %}selected{% endif %}>
                                     {{ choice.1 }}
                                 </option>
                             {% endfor %}
                             </select>
-                            <div class="mt-2 flex flex-wrap text-xs">
-                                <div class="flex items-center gap-2 mr-4">
-                                    <span class="inline-block w-3 h-3 bg-gray-200 rounded-full"></span>
-                                    <span class="text-gray-600">Draft</span>
-                                </div>
-                                <div class="flex items-center gap-2 mr-4">
-                                    <span class="inline-block w-3 h-3 bg-blue-200 rounded-full"></span>
-                                    <span class="text-gray-600">In Progress</span>
-                                </div>
-                                <div class="flex items-center gap-2 mr-4">
-                                    <span class="inline-block w-3 h-3 bg-green-200 rounded-full"></span>
-                                    <span class="text-gray-600">Ready for Review</span>
-                                </div>
-                                <div class="flex items-center gap-2 mr-4">
-                                    <span class="inline-block w-3 h-3 bg-purple-200 rounded-full"></span>
-                                    <span class="text-gray-600">Completed</span>
-                                </div>
-                                <div class="flex items-center gap-2 mr-4">
-                                    <span class="inline-block w-3 h-3 bg-red-200 rounded-full"></span>
-                                    <span class="text-gray-600">Cancelled</span>
-                                </div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <span class="badge rounded-pill bg-secondary">Draft</span>
+                                <span class="badge rounded-pill bg-primary">In Progress</span>
+                                <span class="badge rounded-pill bg-success">Ready for Review</span>
+                                <span class="badge rounded-pill bg-purple" style="background-color:#6f42c1;">Completed</span>
+                                <span class="badge rounded-pill bg-danger">Cancelled</span>
                             </div>
                         </div>
                         <div>
-                            <label class="label block text-gray-700 mb-1">Created By</label>
-                            <input type="text" value="{{ process_contract.created_by }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                            <label class="form-label mb-1">Created By</label>
+                            <input type="text" value="{{ process_contract.created_by }}" class="form-control bg-light" readonly>
                         </div>
                         <div>
-                            <label class="label block text-gray-700 mb-1">Last Modified</label>
-                            <input type="text" value="{{ process_contract.modified_at }}" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly>
+                            <label class="form-label mb-1">Last Modified</label>
+                            <input type="text" value="{{ process_contract.modified_at }}" class="form-control bg-light" readonly>
                         </div>
                     </div>
                 </div>
 
                 <!-- Contract Calculations Card -->
-                <div class="card card-padded shadow-md">
-                    <h2 class="text-xl font-semibold mb-4">Contract Actions</h2>
-                    <div class="flex flex-col gap-3 w-full">
+                <div class="card card-padded shadow-sm mb-4">
+                    <h2 class="fs-5 fw-semibold mb-3">Contract Actions</h2>
+                    <div class="d-flex flex-column gap-3 w-100">
                         <button type="button"
                                 onclick="confirmCancel()"
-                                class="btn btn-caution w-full d-flex align-items-center justify-content-center gap-2 py-2">
+                                class="btn btn-caution w-100 d-flex align-items-center justify-content-center gap-2 py-2">
                             Cancel and Return to Queue
                         </button>
                         <button type="button"
-                                onclick="handleAddChargeClick()"
-                                class="btn btn-outline-secondary w-full d-flex align-items-center justify-content-center gap-2 py-2">
-                            + Add Contract Charge
-                        </button>
-                        <button type="button"
                             onclick="finalizeContract()"
-                            class="btn bg-green-400 text-black w-full d-flex align-items-center justify-content-center gap-2 py-2">
+                            class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2 py-2">
                             Submit Contract and Create Email
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div class="lg:col-span-3">
-                <div id="packhouse_compact_root"
-                     class="packhouse-compact-section mb-3 px-2 py-1 rounded border-top border-bottom"
-                     data-process-contract-id="{{ process_contract.id }}"
-                     data-ph-name="{% if process_contract.packhouse %}{{ process_contract.packhouse.name }}{% endif %}"
-                     data-ph-cage="{% if process_contract.packhouse %}{{ process_contract.packhouse.cage_code|default:'' }}{% endif %}"
-                     data-ph-is="{% if process_contract.packhouse and process_contract.packhouse.is_packhouse %}1{% else %}0{% endif %}">
-                    <div class="visually-hidden">{{ form.packhouse }}</div>
-                    <div id="packhouse_compact_inner">
-                        {% if process_contract.packhouse %}
-                        <div class="d-flex align-items-center justify-content-between gap-2 py-1 flex-wrap">
-                            <div class="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
-                                <span class="flex-shrink-0" aria-hidden="true">📦</span>
-                                <span class="fw-semibold text-truncate">{{ process_contract.packhouse.name }}</span>
-                                {% if process_contract.packhouse.cage_code %}
-                                <span class="text-muted small flex-shrink-0">({{ process_contract.packhouse.cage_code }})</span>
-                                {% endif %}
-                                {% if process_contract.packhouse.is_packhouse %}
-                                <span class="badge bg-success ms-1 flex-shrink-0">Packhouse</span>
-                                {% endif %}
-                            </div>
-                            <div class="d-flex align-items-center gap-1 flex-shrink-0">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" data-packhouse-action="edit">Edit</button>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-packhouse-action="clear">Clear</button>
-                            </div>
-                        </div>
-                        <div class="d-flex flex-wrap align-items-center gap-2 py-1">
-                            <label class="small text-muted mb-0 flex-shrink-0" for="cont_packhouse_quote_amount">Quote:</label>
-                            <input type="number" step="0.01" class="form-control form-control-sm packhouse-quote-input" style="width:7rem;max-width:40%"
-                                   id="cont_packhouse_quote_amount" name="cont_packhouse_quote_amount"
-                                   value="{{ process_contract.packhouse_quote_amount|default_if_none:'' }}">
-                            <label class="small text-muted mb-0 flex-shrink-0" for="cont_packhouse_notes">Notes:</label>
-                            <textarea class="form-control form-control-sm packhouse-notes-compact flex-grow-1" rows="1"
-                                      id="cont_packhouse_notes" name="cont_packhouse_notes">{{ process_contract.packhouse_notes|default_if_none:'' }}</textarea>
-                        </div>
-                        {% else %}
-                        {% if process_contract.packhouse_cage and not process_contract.packhouse %}
-                            {% with first_clin=process_contract.clins.first %}
-                            <div class="text-muted small mt-1">
-                                Parsed CAGE: <span class="fw-medium font-monospace">{{ process_contract.packhouse_cage }}</span>
-                                {% if first_clin and first_clin.supplier_text == process_contract.packhouse_cage %}
-                                    <span class="badge bg-secondary ms-1">Same as supplier — packhouse may not be needed</span>
-                                {% else %}
-                                    — use this to find the packhouse below
-                                {% endif %}
-                            </div>
-                            {% endwith %}
-                        {% endif %}
-                        <div class="d-flex align-items-center justify-content-between gap-2 py-1">
-                            <div class="d-flex align-items-center gap-2 min-w-0">
-                                <span class="flex-shrink-0" aria-hidden="true">📦</span>
-                                <span class="text-muted small text-truncate">No packhouse assigned</span>
-                            </div>
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-primary flex-shrink-0"
-                                    data-packhouse-action="assign"
-                                    data-prefill-cage="{{ process_contract.packhouse_cage|default:'' }}">Assign Packhouse</button>
-                        </div>
-                        {% endif %}
-                </div>
-            </div>
+            <div class="col-12">
+                <!-- Packhouse + Charges Row -->
+                <div class="row g-3 mb-3" id="packhouse_charges_row">
 
-            <!-- Contract Charges Section -->
-            <div class="lg:col-span-3" id="contract_charges_container" {% with charges=process_contract.charges.all %}{% if not charges %}style="display: none;"{% endif %}{% endwith %}>
-                <div id="contract_charges_root"
-                     class="contract-charges-section mb-3 px-2 py-1 rounded border-top border-bottom bg-light">
-                    <div class="p-2">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <div>
-                                <h3 class="text-sm font-semibold mb-0 text-gray-800">Contract Charges</h3>
-                                <div class="text-xs text-muted">Known costs at bid time (e.g. GSI Fee, Freight)</div>
-                            </div>
+                  <!-- LEFT COL: Packhouse -->
+                  <div class="col-12 col-md-6" id="packhouse_col">
+
+                    <!-- Collapsed state: shown when NO packhouse assigned AND section not manually opened -->
+                    <div id="packhouse_collapsed_btn" {% if process_contract.packhouse %}style="display:none;"{% endif %}>
+                      <button type="button"
+                              class="btn btn-outline-secondary w-100"
+                              id="show_packhouse_btn">
+                        + Add Packaging
+                      </button>
+                    </div>
+
+                    <!-- Expanded state: the existing packhouse card markup goes here -->
+                    <div id="packhouse_expanded_card" {% if not process_contract.packhouse %}style="display:none;"{% endif %}>
+                      <div id="packhouse_compact_root"
+                           class="card h-100"
+                           data-process-contract-id="{{ process_contract.id }}"
+                           data-ph-name="{% if process_contract.packhouse %}{{ process_contract.packhouse.name }}{% endif %}"
+                           data-ph-cage="{% if process_contract.packhouse %}{{ process_contract.packhouse.cage_code|default:'' }}{% endif %}"
+                           data-ph-is="{% if process_contract.packhouse and process_contract.packhouse.is_packhouse %}1{% else %}0{% endif %}">
+                        <div class="card-body p-3">
+                          <div class="visually-hidden">{{ form.packhouse }}</div>
+                          <div id="packhouse_compact_inner">
+                              {% if process_contract.packhouse %}
+                              <div class="d-flex align-items-center justify-content-between gap-2 py-1 flex-wrap">
+                                  <div class="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
+                                      <span class="flex-shrink-0" aria-hidden="true">📦</span>
+                                      <span class="fw-semibold text-truncate">{{ process_contract.packhouse.name }}</span>
+                                      {% if process_contract.packhouse.cage_code %}
+                                      <span class="text-muted small flex-shrink-0">({{ process_contract.packhouse.cage_code }})</span>
+                                      {% endif %}
+                                      {% if process_contract.packhouse.is_packhouse %}
+                                      <span class="badge bg-success ms-1 flex-shrink-0">Packhouse</span>
+                                      {% endif %}
+                                  </div>
+                                  <div class="d-flex align-items-center gap-1 flex-shrink-0">
+                                      <button type="button" class="btn btn-sm btn-outline-secondary" data-packhouse-action="edit">Edit</button>
+                                      <button type="button" class="btn btn-sm btn-outline-danger" data-packhouse-action="clear">Clear</button>
+                                  </div>
+                              </div>
+                              <div class="d-flex flex-wrap align-items-center gap-2 py-1">
+                                  <label class="small text-muted mb-0 flex-shrink-0" for="cont_packhouse_quote_amount">Quote:</label>
+                                  <input type="number" step="0.01" class="form-control form-control-sm packhouse-quote-input" style="width:7rem;max-width:40%"
+                                         id="cont_packhouse_quote_amount" name="cont_packhouse_quote_amount"
+                                         value="{{ process_contract.packhouse_quote_amount|default_if_none:'' }}">
+                                  <label class="small text-muted mb-0 flex-shrink-0" for="cont_packhouse_notes">Notes:</label>
+                                  <textarea class="form-control form-control-sm packhouse-notes-compact flex-grow-1" rows="1"
+                                            id="cont_packhouse_notes" name="cont_packhouse_notes">{{ process_contract.packhouse_notes|default_if_none:'' }}</textarea>
+                              </div>
+                              {% else %}
+                              {% if process_contract.packhouse_cage and not process_contract.packhouse %}
+                                  {% with first_clin=process_contract.clins.first %}
+                                  <div class="text-muted small mt-1">
+                                      Parsed CAGE: <span class="fw-medium font-monospace">{{ process_contract.packhouse_cage }}</span>
+                                      {% if first_clin and first_clin.supplier_text == process_contract.packhouse_cage %}
+                                          <span class="badge bg-secondary ms-1">Same as supplier — packhouse may not be needed</span>
+                                      {% else %}
+                                          — use this to find the packhouse below
+                                      {% endif %}
+                                  </div>
+                                  {% endwith %}
+                              {% endif %}
+                              <div class="d-flex align-items-center justify-content-between gap-2 py-1">
+                                  <div class="d-flex align-items-center gap-2 min-w-0">
+                                      <span class="flex-shrink-0" aria-hidden="true">📦</span>
+                                      <span class="text-muted small text-truncate">No packhouse assigned</span>
+                                  </div>
+                                  <button type="button"
+                                          class="btn btn-sm btn-outline-primary flex-shrink-0"
+                                          data-packhouse-action="assign"
+                                          data-prefill-cage="{{ process_contract.packhouse_cage|default:'' }}">Assign Packhouse</button>
+                              </div>
+                              {% endif %}
+                          </div>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-borderless mb-2 align-middle" id="contract_charges_table">
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <!-- RIGHT COL: Contract Charges -->
+                  <div class="col-12 col-md-6" id="charges_col">
+
+                    <!-- Collapsed state: shown when no charges exist AND section not manually opened -->
+                    <div id="charges_collapsed_btn" {% if process_contract.charges.exists %}style="display:none;"{% endif %}>
+                      <button type="button"
+                              class="btn btn-outline-secondary w-100"
+                              id="show_charges_btn">
+                        + Add Contract Level Charges
+                      </button>
+                    </div>
+
+                    <!-- Expanded state -->
+                    <div id="charges_expanded_card" {% if not process_contract.charges.exists %}style="display:none;"{% endif %}>
+                      <div id="contract_charges_root"
+                           class="card h-100">
+                        <div class="card-body p-3">
+                          <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="card-title mb-0">Contract Charges</h6>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    id="hide_charges_btn">
+                              Remove
+                            </button>
+                          </div>
+                          <div class="text-muted small mb-2">Known costs at bid time (e.g. GSI Fee, Estimated Freight)</div>
+                          <div id="charges_list">
+                            <div class="table-responsive">
+                              <table class="table table-sm table-borderless mb-1 align-middle"
+                                     id="contract_charges_table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 60%;" class="text-muted small pb-1">Label</th>
-                                        <th style="width: 30%;" class="text-muted small pb-1">Estimated Amount</th>
-                                        <th style="width: 10%;" class="pb-1"></th>
+                                        <th style="width:60%;" class="text-muted small pb-1">Label</th>
+                                        <th style="width:30%;" class="text-muted small pb-1">Estimated Amount</th>
+                                        <th style="width:10%;" class="pb-1"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="contract_charges_tbody">
                                     {% with charges=process_contract.charges.all %}
-                                    {% if charges %}
-                                        {% for charge in charges %}
-                                        <tr data-charge-id="{{ charge.id }}" class="charge-row">
-                                            <td class="pe-2 pb-2">
-                                                <input type="text" class="form-control form-control-sm charge-label" placeholder="e.g. GSI Fee" maxlength="100" value="{{ charge.label }}" readonly>
-                                            </td>
-                                            <td class="pe-2 pb-2">
-                                                <div class="input-group input-group-sm">
-                                                    <span class="input-group-text bg-transparent border-end-0">$</span>
-                                                    <input type="number" step="0.01" class="form-control form-control-sm charge-amount ps-1 border-start-0" placeholder="0.00" value="{{ charge.estimated_amount|floatformat:2 }}" readonly>
-                                                </div>
-                                            </td>
-                                            <td class="text-end pb-2">
-                                                <button type="button" class="btn btn-sm btn-outline-danger delete-charge-btn" aria-label="Delete charge">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
-                                                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
-                                                    </svg>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    {% endif %}
+                                    {% for charge in charges %}
+                                    <tr data-charge-id="{{ charge.id }}" class="charge-row">
+                                        <td class="pe-2 pb-1">
+                                            <input type="text"
+                                                   class="form-control form-control-sm charge-label"
+                                                   value="{{ charge.label }}"
+                                                   placeholder="e.g. GSI Fee"
+                                                   maxlength="100"
+                                                   readonly>
+                                        </td>
+                                        <td class="pe-2 pb-1">
+                                            <div class="input-group input-group-sm" style="width:8rem;">
+                                                <span class="input-group-text">$</span>
+                                                <input type="number"
+                                                       class="form-control form-control-sm charge-amount"
+                                                       value="{{ charge.estimated_amount }}"
+                                                       step="0.01" min="0"
+                                                       readonly>
+                                            </div>
+                                        </td>
+                                        <td class="pb-1 text-end">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger delete-charge-btn"
+                                                    data-charge-id="{{ charge.id }}">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                                                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
                                     {% endwith %}
                                 </tbody>
-                            </table>
+                              </table>
+                            </div>
+                          </div>
+                          <button type="button"
+                                  class="btn btn-sm btn-outline-secondary w-100 mt-2"
+                                  onclick="handleAddChargeClick()">
+                            + Add Charge
+                          </button>
                         </div>
-                        <div class="d-flex justify-content-start py-1">
-                            <button type="button" id="add_charge_btn" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-plus-lg" viewBox="0 0 16 16">
-                                    <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z"/>
-                                </svg>
-                                Add Charge
-                            </button>
-                        </div>
+                      </div>
                     </div>
+
+                  </div>
+
                 </div>
             </div>
 
     <!-- CLIN Items Card -->
-    <div class="lg:col-span-3">
-        <div class="card card-padded shadow-md">
+    <div class="col-12">
+        <div class="card card-padded shadow-sm mb-4">
             <div class="row-between mb-4">
-                <h2 class="text-xl font-semibold text-gray-800">CLIN Items</h2>
+                <h2 class="fs-5 fw-semibold text-body">CLIN Items</h2>
                 <button type="button"
                         onclick="addNewClin()"
-                        class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        class="btn btn-success">
                     Add New CLIN
                 </button>
             </div>
             {{ clin_formset.management_form }}
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
                         <tr>
-                            <th class="px-4 py-3 text-left label">Actions</th>
-                            <th class="px-4 py-3 text-left label">CLIN</th>
-                            <th class="px-4 py-3 text-left label">Item Type</th>
-                            <th class="px-4 py-3 text-left label">NSN</th>
-                            <th class="px-4 py-3 text-left label">Supplier</th>
-                            <!-- <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th> -->
+                            <th class="px-3 py-2 label text-start">Actions</th>
+                            <th class="px-3 py-2 label text-start">CLIN</th>
+                            <th class="px-3 py-2 label text-start">Item Type</th>
+                            <th class="px-3 py-2 label text-start">NSN</th>
+                            <th class="px-3 py-2 label text-start">Supplier</th>
+                            <!-- <th class="px-3 py-2 text-end text-xs font-medium text-muted uppercase tracking-wider">Quantity</th>
+                            <th class="px-3 py-2 text-end text-xs font-medium text-muted uppercase tracking-wider">Unit Price</th>
+                            <th class="px-3 py-2 text-end text-xs font-medium text-muted uppercase tracking-wider">Total Price</th> -->
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody>
                         {% for clin_form in clin_formset %}
-                        <tr class="hover:bg-gray-50">
+                        <tr>
                             <!-- Actions Column -->
-                            <td class="px-4 py-3 text-sm font-medium">
-                                <div class="row space-x-2">
+                            <td class="px-3 py-2 small fw-medium">
+                                <div class="d-flex gap-2">
                                     <button type="button"
                                             data-action="toggle-clin"
                                             data-index="{{ forloop.counter0 }}"
                                             data-clin-id="{{ clin_form.instance.id }}"
                                             class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1">
                                             <span class="clin-expand-icon-{{ forloop.counter0 }} d-flex align-items-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 clin-icon-{{ forloop.counter0 }}" viewBox="0 0 20 20" fill="currentColor">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:1rem;height:1rem">
                                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                                             </svg>
                                             <span class="clin-text-{{ forloop.counter0 }}">Expand</span>
@@ -496,55 +522,55 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                 </div>
                             </td>
                             <!-- Basic Info Columns -->
-                            <td class="px-4 py-3">
-                                <span class="text-sm font-medium text-gray-900">{{ clin_form.item_number.value|default:'' }}</span>
+                            <td class="px-3 py-2">
+                                <span class="small fw-medium">{{ clin_form.item_number.value|default:'' }}</span>
                                 {{ clin_form.id }}
                                 {{ clin_form.item_number.as_hidden }}
                             </td>
-                            <td class="px-4 py-3">
-                                <span class="text-sm text-gray-900">{{ clin_form.item_type.value|default:'---' }}</span>
+                            <td class="px-3 py-2">
+                                <span class="small">{{ clin_form.item_type.value|default:'---' }}</span>
                                 {{ clin_form.item_type.as_hidden }}
                             </td>
-                            <td class="px-4 py-3">
-                                <div class="text-sm">
-                                    <div class="font-medium text-gray-900">{{ clin_form.instance.nsn_text|default:'Not Set' }}</div>
-                                    <div class="text-gray-500 text-xs">{{ clin_form.instance.nsn_description_text|default:'' }}</div>
+                            <td class="px-3 py-2">
+                                <div class="small">
+                                    <div class="fw-medium">{{ clin_form.instance.nsn_text|default:'Not Set' }}</div>
+                                    <div class="text-muted small">{{ clin_form.instance.nsn_description_text|default:'' }}</div>
                                 </div>
                                 {{ clin_form.nsn.as_hidden }}
                             </td>
-                            <td class="px-4 py-3">
-                                <span class="text-sm text-gray-900">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
+                            <td class="px-3 py-2">
+                                <span class="small">{{ clin_form.instance.supplier_text|default:'Not Set' }}</span>
                                 {{ clin_form.supplier.as_hidden }}
                             </td>
-                            <!-- <td class="px-4 py-3 text-right">
-                                <span class="text-sm font-medium text-gray-900" data-field="order_qty">{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}</span>
+                            <!-- <td class="px-3 py-2 text-end">
+                                <span class="small fw-medium" data-field="order_qty">{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}</span>
                             </td>
-                            <td class="px-4 py-3 text-right">
-                                <span class="text-sm font-medium text-gray-900" data-field="unit_price">${{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}</span>
+                            <td class="px-3 py-2 text-end">
+                                <span class="small fw-medium" data-field="unit_price">${{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}</span>
                             </td>
-                            <td class="px-4 py-3 text-right">
-                                <span class="text-sm font-medium text-gray-900" data-field="item_value">${{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}</span>
+                            <td class="px-3 py-2 text-end">
+                                <span class="small fw-medium" data-field="item_value">${{ clin_form.item_value.value|floatformat:'2'|default:'0.00' }}</span>
                             </td> -->
                         </tr>
                         <!-- Detailed Edit Row (Initially Hidden) -->
-                        <tr class="clin-details-{{ forloop.counter0 }} hidden">
-                            <td colspan="8" class="px-4 py-4 bg-gray-50">
+                        <tr class="clin-details-{{ forloop.counter0 }} d-none">
+                            <td colspan="8" class="px-3 py-3 bg-light">
                                 <!-- ITEM LINE -->
-                                <div class="grid grid-cols-4 gap-4 mb-2">
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="item_number_{{ clin_form.instance.id }}">Item Number</label>
+                                <div class="row g-3 mb-2">
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label mb-1" for="item_number_{{ clin_form.instance.id }}">Item Number</label>
                                         <input type="text"
                                                id="item_number_{{ clin_form.instance.id }}"
                                                name="item_number_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.item_number.value|default:'' }}"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               class="form-control"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="item_type_{{ clin_form.instance.id }}">Item Type</label>
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label mb-1" for="item_type_{{ clin_form.instance.id }}">Item Type</label>
                                         <select id="item_type_{{ clin_form.instance.id }}"
                                                 name="item_type_{{ clin_form.instance.id }}"
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                class="form-select"
                                                 data-clin-id="{{ clin_form.instance.id }}">
                                             <option value="">-------</option>
                                             {% for choice in clin_form.item_type.field.choices %}
@@ -552,33 +578,33 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="clin_po_num_{{ clin_form.instance.id }}">CLIN PO Number</label>
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label mb-1" for="clin_po_num_{{ clin_form.instance.id }}">CLIN PO Number</label>
                                         <input type="text"
                                                id="clin_po_num_{{ clin_form.instance.id }}"
                                                name="clin_po_num_{{ clin_form.instance.id }}"
                                                {% if clin_form.instance.clin_po_num %}value="{{ clin_form.instance.clin_po_num }}"{% endif %}
                                                placeholder="Assigned when submitted"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed{% if not clin_form.instance.clin_po_num %} text-gray-400 italic{% endif %}"
+                                               class="form-control bg-light cursor-not-allowed{% if not clin_form.instance.clin_po_num %} text-muted fst-italic{% endif %}"
                                                data-clin-id="{{ clin_form.instance.id }}"
                                                disabled>
                                     </div>
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="ia_{{ clin_form.instance.id }}">IA</label>
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label mb-1" for="ia_{{ clin_form.instance.id }}">IA</label>
                                         <select id="ia_{{ clin_form.instance.id }}"
                                                 name="ia_{{ clin_form.instance.id }}"
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                class="form-select"
                                                 data-clin-id="{{ clin_form.instance.id }}">
                                                 <option value="">-------</option>
                                                 <option value="O" {% if clin_form.instance.ia == 'O' %}selected{% endif %}>Origin</option>
                                                 <option value="D" {% if clin_form.instance.ia == 'D' %}selected{% endif %}>Destination</option>
                                         </select>
                                     </div>
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="fob_{{ clin_form.instance.id }}">FOB</label>
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label mb-1" for="fob_{{ clin_form.instance.id }}">FOB</label>
                                         <select id="fob_{{ clin_form.instance.id }}"
                                                 name="fob_{{ clin_form.instance.id }}"
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                class="form-select"
                                                 data-clin-id="{{ clin_form.instance.id }}">
                                                 <option value="">-------</option>
                                                 <option value="O" {% if clin_form.instance.fob == 'O' %}selected{% endif %}>Origin</option>
@@ -589,20 +615,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                             </div>
 
 
-                                <div class="grid grid-cols-1 gap-4 my-2">
+                                <div class="my-2">
                                     <hr />
                                 </div>
                                 <!-- NSN and Due date Line -->
-                                <div class="grid grid-cols-2 gap-4 mb-2">
+                                <div class="row g-3 mb-2">
                                     <!-- NSN Selection Box -->
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="nsn_{{ clin_form.instance.id }}">NSN*</label>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label mb-1" for="nsn_{{ clin_form.instance.id }}">NSN*</label>
                                         <div class="input-group input-group-sm">
                                             <input type="text"
                                                    id="nsn_{{ clin_form.instance.id }}"
                                                    name="nsn_{{ clin_form.instance.id }}"
                                                    value="{{ clin_form.instance.nsn_text|default:'' }}"
-                                                   class="form-control bg-gray-50"
+                                                   class="form-control bg-light"
                                                    readonly
                                                    data-clin-id="{{ clin_form.instance.id }}">
                                             <button type="button"
@@ -611,70 +637,70 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                                     data-nsn="{{ clin_form.instance.nsn_text|default:'' }}"
                                                     data-description="{{ clin_form.instance.nsn_description_text|default:'' }}"
                                                     onclick="saveAndOpenNsnMatch(this)"
-                                                    class="btn btn-primary btn-sm whitespace-nowrap">
+                                                    class="btn btn-primary btn-sm text-nowrap">
                                                 Match
                                             </button>
                                             {% if clin_form.instance.nsn %}
                                             <span class="input-group-text border-0 bg-transparent p-1">
-                                                <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <svg class="text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                                 </svg>
                                             </span>
                                             {% else %}
                                             <span class="input-group-text border-0 bg-transparent p-1">
-                                                <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <svg class="text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                                 </svg>
                                             </span>
                                             {% endif %}
                                         </div>
                                         {% if clin_form.instance.nsn_description_text %}
-                                        <p id="nsn_description_{{ clin_form.instance.id }}" class="mt-1 text-sm text-gray-500">{{ clin_form.instance.nsn_description_text }}</p>
+                                        <p id="nsn_description_{{ clin_form.instance.id }}" class="mt-1 small text-muted">{{ clin_form.instance.nsn_description_text }}</p>
                                         {% endif %}
                                     </div>
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="status_{{ clin_form.instance.id }}">CLIN Due Date</label>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label mb-1" for="status_{{ clin_form.instance.id }}">CLIN Due Date</label>
                                         <input type="date"
                                                id="due_date_{{ clin_form.instance.id }}"
                                                name="due_date_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.due_date.value|date:'Y-m-d' }}"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               class="form-control"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                      </div>
                                 </div>
                                 <!--  CLIN Section     -->
-                                <div class="grid grid-cols-9 gap-4 mb-2">
-                                    <div class="col-span-2">
-                                        <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="order_qty_{{ clin_form.instance.id }}">Quantity</label>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-12 col-md-3">
+                                        <label class="form-label small fw-medium mb-1" for="order_qty_{{ clin_form.instance.id }}">Quantity</label>
                                         <input type="number"
                                                id="order_qty_{{ clin_form.instance.id }}"
                                                name="order_qty_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.order_qty.value|floatformat:'1'|default:'0.0' }}"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               class="form-control"
                                                onchange="updateTotalValue(this)"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
-                                    <div class="col-span-1">
-                                        <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="uom_{{ clin_form.instance.id }}">UOM</label>
+                                    <div class="col-12 col-md-1">
+                                        <label class="form-label small fw-medium mb-1" for="uom_{{ clin_form.instance.id }}">UOM</label>
                                         <input type="text"
                                                id="uom_{{ clin_form.instance.id }}"
                                                name="uom_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.uom.value }}"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               class="form-control"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
-                                    <div class="col-span-3">
-                                        <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="unit_price_{{ clin_form.instance.id }}">Unit Price</label>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small fw-medium mb-1" for="unit_price_{{ clin_form.instance.id }}">Unit Price</label>
                                         <input type="number"
                                                id="unit_price_{{ clin_form.instance.id }}"
                                                name="unit_price_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.unit_price.value|floatformat:'2'|default:'0.00' }}"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               class="form-control"
                                                onchange="updateTotalValue(this)"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
-                                    <div class="col-span-3">
-                                        <label class="col-span-3 block text-sm font-medium text-gray-700 mb-1" for="item_value_{{ clin_form.instance.id }}">Total Value</label>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label small fw-medium mb-1" for="item_value_{{ clin_form.instance.id }}">Total Value</label>
                                         <div class="input-group input-group-sm">
                                             <input type="number"
                                                    id="item_value_{{ clin_form.instance.id }}"
@@ -686,25 +712,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                             <button type="button"
                                                     onclick="recalculateTotal(this)"
                                                     data-clin-id="{{ clin_form.instance.id }}"
-                                                    class="btn btn-success btn-sm whitespace-nowrap">
+                                                    class="btn btn-success btn-sm text-nowrap">
                                                 ReCalc
                                             </button>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="grid grid-cols-1 gap-4 my-2">
+                                <div class="my-2">
                                     <hr />
                                 </div>
                                 <!-- Supplier Selection Box -->
-                                <div class="grid grid-cols-2 gap-4 mb-2">
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="supplier_{{ clin_form.instance.id }}">Supplier*</label>
+                                <div class="row g-3 mb-2">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label mb-1" for="supplier_{{ clin_form.instance.id }}">Supplier*</label>
                                         <div class="input-group input-group-sm">
                                             <input type="text"
                                                    id="supplier_{{ clin_form.instance.id }}"
                                                    name="supplier_{{ clin_form.instance.id }}"
                                                    value="{{ clin_form.instance.supplier_text|default:'' }}"
-                                                   class="form-control bg-gray-50"
+                                                   class="form-control bg-light"
                                                    readonly
                                                    data-clin-id="{{ clin_form.instance.id }}">
                                             <button type="button"
@@ -712,41 +738,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                                     data-id="{{ clin_form.instance.id }}"
                                                     data-supplier="{{ clin_form.instance.supplier_text|default:'' }}"
                                                     onclick="saveAndOpenSupplierMatch(this)"
-                                                    class="btn btn-primary btn-sm whitespace-nowrap">
+                                                    class="btn btn-primary btn-sm text-nowrap">
                                                 Match
                                             </button>
                                             {% if clin_form.instance.supplier %}
                                             <span class="input-group-text border-0 bg-transparent p-1">
-                                                <svg class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <svg class="text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                                 </svg>
                                             </span>
                                             {% else %}
                                             <span class="input-group-text border-0 bg-transparent p-1">
-                                                <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <svg class="text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:1.5rem;height:1.5rem">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                                 </svg>
                                             </span>
                                             {% endif %}
                                         </div>
                                     </div>
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="supplier_due_date_{{ clin_form.instance.id }}">Supplier Due Date</label>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label mb-1" for="supplier_due_date_{{ clin_form.instance.id }}">Supplier Due Date</label>
                                         <input type="date"
                                                id="supplier_due_date_{{ clin_form.instance.id }}"
                                                name="supplier_due_date_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.supplier_due_date.value|date:'Y-m-d' }}"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               class="form-control"
                                                data-clin-id="{{ clin_form.instance.id }}">
                                     </div>
                                 </div>
 
-                                <div class="grid grid-cols-3 gap-4 mb-2">
-                                    <div>
-                                            <label class="label block text-gray-700 mb-1" for="special_payment_terms_{{ clin_form.instance.id }}">Special Payment Terms ({{ clin_form.instance.special_payment_terms_text|default:'' }})</label>
+                                <div class="row g-3 mb-2">
+                                    <div class="col-12 col-md-4">
+                                            <label class="form-label mb-1" for="special_payment_terms_{{ clin_form.instance.id }}">Special Payment Terms ({{ clin_form.instance.special_payment_terms_text|default:'' }})</label>
                                             <select id="special_payment_terms_{{ clin_form.instance.id }}"
                                                     name="special_payment_terms_{{ clin_form.instance.id }}"
-                                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    class="form-select"
                                                     data-clin-id="{{ clin_form.instance.id }}">
                                                 <option value="">-------</option>
                                                 {% for term in special_payment_terms %}
@@ -754,20 +780,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                                 {% endfor %}
                                             </select>
                                     </div>
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Quote Price</label>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label mb-1" for="price_per_unit_{{ clin_form.instance.id }}">Quote Price</label>
                                         <input type="number"
                                                id="price_per_unit_{{ clin_form.instance.id }}"
                                                name="price_per_unit_{{ clin_form.instance.id }}"
                                                value="{{ clin_form.price_per_unit.value|default:'0' }}"
                                                step="any"
                                                min="0"
-                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                               class="form-control"
                                                data-clin-id="{{ clin_form.instance.id }}"
                                                onchange="updateQuoteValue(this)">
                                     </div>
-                                    <div>
-                                        <label class="label block text-gray-700 mb-1" for="quote_value_{{ clin_form.instance.id }}">Quote Total</label>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label mb-1" for="quote_value_{{ clin_form.instance.id }}">Quote Total</label>
                                         <div class="input-group input-group-sm">
                                             <input type="number"
                                                    id="quote_value_{{ clin_form.instance.id }}"
@@ -780,7 +806,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                             <button type="button"
                                                     onclick="recalculateQuote(this)"
                                                     data-clin-id="{{ clin_form.instance.id }}"
-                                                    class="btn btn-success btn-sm whitespace-nowrap">
+                                                    class="btn btn-success btn-sm text-nowrap">
                                                 ReCalc
                                             </button>
                                         </div>
@@ -850,13 +876,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                         </table>
                                     </div>
                                 </div>
-                                <div class="grid grid-cols-8 gap-4 mb-2">
+                                <div class="row g-2 mb-2">
 
-                                <div class="mt-2 flex justify-start space-x-4">
+                                <div class="mt-2 d-flex justify-content-start gap-3">
                                     <button type="button"
                                             onclick="saveClinDetails(this)"
                                             data-clin-id="{{ clin_form.instance.id }}"
-                                            class="bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded d-flex align-items-center gap-2">
+                                            class="btn btn-success d-flex align-items-center gap-2">
                                         <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-name="Layer 1">
                                             <path d="M20.71,9.29l-6-6a1,1,0,0,0-.32-.21A1.09,1.09,0,0,0,14,3H6A3,3,0,0,0,3,6V18a3,3,0,0,0,3,3H18a3,3,0,0,0,3-3V10A1,1,0,0,0,20.71,9.29ZM9,5h4V7H9Zm6,14H9V16a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1Zm4-1a1,1,0,0,1-1,1H17V16a3,3,0,0,0-3-3H10a3,3,0,0,0-3,3v3H6a1,1,0,0,1-1-1V6A1,1,0,0,1,6,5H7V8A1,1,0,0,0,8,9h6a1,1,0,0,0,1-1V6.41l4,4Z"/>
                                         </svg>
@@ -865,8 +891,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                                     <button type="button"
                                             onclick="showDeleteModal(this)"
                                             data-clin-id="{{ clin_form.instance.id }}"
-                                            class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded d-flex align-items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            class="btn btn-danger d-flex align-items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor" fill="none" style="width:1.25rem;height:1.25rem">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                         </svg>
                                         Delete
@@ -886,21 +912,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 </div>
 
 <!-- Cancel Processing Confirmation Modal -->
-<div id="cancelModal" class="fixed inset-0 modal-backdrop-overlay hidden z-50">
-    <div class="relative top-20 mx-auto card card-padded border w-96 shadow-lg">
+<div id="cancelModal" class="position-fixed inset-0 modal-backdrop-overlay d-none" style="z-index: 50;">
+    <div class="position-relative mx-auto card card-padded border shadow" style="top: 5rem; width: 24rem;">
         <div class="mt-3 text-center">
-            <h3 class="text-lg leading-6 font-medium btn btn-caution">Cancel Processing</h3>
-            <div class="mt-2 px-7 py-3">
-                <p class="text-sm text-gray-500">Are you sure you want to cancel processing this contract?</p>
-                <p class="text-sm text-red-500 mt-2">This action cannot be undone and all progress will be lost.</p>
+            <h3 class="fs-5 fw-medium btn btn-caution">Cancel Processing</h3>
+            <div class="mt-2 p-3">
+                <p class="small text-muted">Are you sure you want to cancel processing this contract?</p>
+                <p class="small text-danger mt-2">This action cannot be undone and all progress will be lost.</p>
             </div>
-            <div class="mt-4 flex justify-center space-x-4">
+            <div class="mt-3 d-flex justify-content-center gap-3">
                 <button onclick="closeModal()"
-                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                        class="btn btn-secondary">
                     No, Keep Processing
                 </button>
                 <button onclick="cancelProcessing()"
-                        class="btn btn-caution font-bold py-2 px-4 rounded">
+                        class="btn btn-caution">
                     Yes, Cancel Processing
                 </button>
             </div>
@@ -909,25 +935,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 </div>
 
 <!-- Add the delete confirmation modal -->
-<div id="deleteClinModal" class="fixed inset-0 modal-backdrop-overlay hidden z-[2000]">
-    <div class="relative top-20 mx-auto card card-padded border w-96 shadow-lg">
+<div id="deleteClinModal" class="position-fixed inset-0 modal-backdrop-overlay d-none" style="z-index: 2000;">
+    <div class="position-relative mx-auto card card-padded border shadow" style="top: 5rem; width: 24rem;">
         <div class="mt-3 text-center">
-            <div class="mx-auto row justify-center h-12 w-12 rounded-full bg-red-100">
-                <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="mx-auto d-flex justify-content-center align-items-center rounded-circle bg-danger-subtle" style="width: 3rem; height: 3rem;">
+                <svg class="text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width: 1.5rem; height: 1.5rem;">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
             </div>
-            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Delete CLIN</h3>
-            <div class="mt-2 px-7 py-3">
-                <p class="text-sm text-gray-500">Are you sure you want to delete this CLIN? This action cannot be undone.</p>
+            <h3 class="fs-5 fw-medium text-body mt-2">Delete CLIN</h3>
+            <div class="mt-2 p-3">
+                <p class="small text-muted">Are you sure you want to delete this CLIN? This action cannot be undone.</p>
             </div>
-            <div class="mt-4 flex justify-center space-x-4">
+            <div class="mt-3 d-flex justify-content-center gap-3">
                 <button id="cancelDeleteClin"
-                        class="btn btn-caution font-bold px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1">
+                        class="btn btn-caution">
                     Cancel
                 </button>
                 <button id="confirmDeleteClin"
-                        class="btn btn-delete font-bold px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1">
+                        class="btn btn-danger">
                     Delete CLIN
                 </button>
             </div>
@@ -971,7 +997,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         const saveBtn = form.querySelector('button[onclick="saveContract()"]');
         if (saveBtn) {
             saveBtn.disabled = true;
-            saveBtn.innerHTML = '<svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24"><!-- Loading spinner --></svg> Saving...';
+            saveBtn.innerHTML = '<svg class="animate-spin me-3 d-inline-block" style="width:1.25rem;height:1.25rem;" viewBox="0 0 24 24"><!-- Loading spinner --></svg> Saving...';
         }
 
         // Log what we're sending
@@ -1015,7 +1041,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
                 // Show success message
                 const toast = document.createElement('div');
-                toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded shadow-lg';
+                toast.className = 'position-fixed bottom-0 end-0 m-3 bg-success text-white p-3 rounded shadow';
                 toast.textContent = data.message || "Contract saved successfully!";
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 3000);
@@ -1069,7 +1095,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
             // Show error message
             const toast = document.createElement('div');
-            toast.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded shadow-lg';
+            toast.className = 'position-fixed bottom-0 end-0 m-3 bg-danger text-white p-3 rounded shadow';
             toast.textContent = error.message || "Failed to save contract";
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 5000);
@@ -1153,11 +1179,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     });
 
     function confirmCancel() {
-        document.getElementById('cancelModal').classList.remove('hidden');
+        document.getElementById('cancelModal').classList.remove('d-none');
     }
 
     function closeModal() {
-        document.getElementById('cancelModal').classList.add('hidden');
+        document.getElementById('cancelModal').classList.add('d-none');
     }
 
     async function cancelProcessing() {
@@ -1246,19 +1272,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         const detailsRow = document.querySelector(`.clin-details-${index}`);
         const expandIcon = document.querySelector(`.clin-expand-icon-${index}`);
 
-        if (detailsRow.classList.contains('hidden')) {
-            detailsRow.classList.remove('hidden');
+        if (detailsRow.classList.contains('d-none')) {
+            detailsRow.classList.remove('d-none');
             expandIcon.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" style="width:1rem;height:1rem;" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
                 </svg>
                 <span class="clin-text-${index}">Collapse</span>
             `;
             localStorage.setItem('expandedClinIndex', index);
         } else {
-            detailsRow.classList.add('hidden');
+            detailsRow.classList.add('d-none');
             expandIcon.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" style="width:1rem;height:1rem;" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                 </svg>
                 <span class="clin-text-${index}">Expand</span>
@@ -1300,11 +1326,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             return;
         }
 
-        document.getElementById('deleteClinModal').classList.remove('hidden');
+        document.getElementById('deleteClinModal').classList.remove('d-none');
     }
 
     document.getElementById('cancelDeleteClin').addEventListener('click', function() {
-        document.getElementById('deleteClinModal').classList.add('hidden');
+        document.getElementById('deleteClinModal').classList.add('d-none');
         clinToDelete = null;
         clinRowToDelete = null;
         detailsRowToDelete = null;
@@ -1316,7 +1342,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             // This shouldn't happen as we handle it in showDeleteModal, but just in case
             clinRowToDelete.remove();
             detailsRowToDelete.remove();
-            document.getElementById('deleteClinModal').classList.add('hidden');
+            document.getElementById('deleteClinModal').classList.add('d-none');
             updateContractCalculations();
             return;
         }
@@ -1336,7 +1362,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 showMessage('CLIN deleted successfully', 'success');
                 clinRowToDelete.remove();
                 detailsRowToDelete.remove();
-                document.getElementById('deleteClinModal').classList.add('hidden');
+                document.getElementById('deleteClinModal').classList.add('d-none');
                 clinToDelete = null;
                 clinRowToDelete = null;
                 detailsRowToDelete = null;
@@ -1346,7 +1372,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             }
         } catch (error) {
             showMessage('Error deleting CLIN: ' + error.message, 'error');
-            document.getElementById('deleteClinModal').classList.remove('hidden');
+            document.getElementById('deleteClinModal').classList.remove('d-none');
         }
     });
 
@@ -1393,23 +1419,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         const messageDiv = document.createElement('div');
 
         // Set message styles based on type
-        const baseClasses = 'px-4 py-3 rounded relative mb-2 shadow-lg transition-all duration-500';
+        const baseClasses = 'alert rounded position-relative mb-2 shadow transition-all';
         const typeClasses = {
-            'success': 'bg-green-100 border border-green-400 text-green-700',
-            'error': 'bg-red-100 border border-red-400 text-red-700',
-            'info': 'bg-blue-100 border border-blue-400 text-blue-700',
-            'warning': 'bg-yellow-100 border border-yellow-400 text-yellow-700'
+            'success': 'alert-success',
+            'error': 'alert-danger',
+            'info': 'alert-info',
+            'warning': 'alert-warning'
         };
 
         messageDiv.className = `${baseClasses} ${typeClasses[type] || typeClasses.info}`;
         messageDiv.innerHTML = `
-            <span class="block sm:inline message-text">${message}</span>
-            <button type="button" class="absolute top-0 right-0 px-4 py-3" onclick="this.parentElement.remove()">
-                <svg class="h-4 w-4" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <title>Close</title>
-                    <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
-                </svg>
-            </button>
+            <span class="d-block d-sm-inline message-text">${message}</span>
+            <button type="button" class="btn-close position-absolute top-0 end-0 p-3" onclick="this.parentElement.remove()" aria-label="Close"></button>
         `;
 
         container.appendChild(messageDiv);
@@ -1503,10 +1524,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         if (!document.getElementById('custom-messages-container')) {
             const container = document.createElement('div');
             container.id = 'custom-messages-container';
-            container.className = 'fixed top-0 left-0 right-0 flex justify-center items-start pt-20 z-[2000] pointer-events-none';
+            container.className = 'position-fixed top-0 start-0 end-0 d-flex justify-content-center align-items-start pt-5 pe-none';
+            container.style.zIndex = '2000';
             const messages = document.createElement('div');
             messages.id = 'custom-messages';
-            messages.className = 'pointer-events-auto';
+            messages.className = 'pe-auto';
             container.appendChild(messages);
             document.body.insertBefore(container, document.body.firstChild);
         }
@@ -1521,6 +1543,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         }
         .animate-pulse {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
         }
         .unsaved-split {
             position: relative;
@@ -1546,7 +1575,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 const originalText = addButton.innerHTML;
                 addButton.disabled = true;
                 addButton.innerHTML = `
-                    <svg class="animate-spin h-5 w-5 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg class="animate-spin me-2 d-inline-block" style="width:1.25rem;height:1.25rem;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -1714,12 +1743,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 if (!_popWin || _popWin.closed || typeof _popWin.closed === 'undefined') {
                     const _container = document.getElementById('custom-messages');
                     const _fallbackDiv = document.createElement('div');
-                    _fallbackDiv.className = 'px-4 py-3 rounded relative mb-2 shadow-lg bg-yellow-100 border border-yellow-400 text-yellow-700';
+                    _fallbackDiv.className = 'alert alert-warning rounded position-relative mb-2 shadow';
                     _fallbackDiv.innerHTML = `Popup blocked — <a href="${data.compose_url}"
-                        target="_blank" class="font-bold underline">click here to open
+                        target="_blank" class="fw-bold text-decoration-underline">click here to open
                         the email composer</a>.
-                        <button type="button" class="absolute top-0 right-0 px-4 py-3"
-                        onclick="this.parentElement.remove()">✕</button>`;
+                        <button type="button" class="btn-close position-absolute top-0 end-0 p-3"
+                        onclick="this.parentElement.remove()" aria-label="Close"></button>`;
                     _container.appendChild(_fallbackDiv);
                 }
                 // Redirect main window to queue immediately
@@ -1872,7 +1901,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         button.disabled = true;
         const originalText = button.innerHTML;
         button.innerHTML = `
-            <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg class="animate-spin me-2 d-inline-block" style="width:1.25rem;height:1.25rem;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -2052,7 +2081,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             if (updateButton) {
                 updateButton.disabled = true;
                 updateButton.innerHTML = `
-                    <svg class="animate-spin h-5 w-5 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg class="animate-spin me-2 d-inline-block" style="width:1.25rem;height:1.25rem;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -2108,9 +2137,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     // Contract level charges JS functions
     function handleAddChargeClick() {
-        const container = document.getElementById('contract_charges_container');
-        if (container) {
-            container.style.display = '';
+        const expanded = document.getElementById('charges_expanded_card');
+        if (expanded) {
+            expanded.style.display = '';
         }
         addNewChargeRow();
     }
@@ -2285,9 +2314,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     function checkAndHideChargesSection() {
         const tbody = document.getElementById('contract_charges_tbody');
         if (tbody && tbody.children.length === 0) {
-            const container = document.getElementById('contract_charges_container');
-            if (container) {
-                container.style.display = 'none';
+            const expanded = document.getElementById('charges_expanded_card');
+            if (expanded) {
+                expanded.style.display = 'none';
+            }
+            const collapsedBtn = document.getElementById('charges_collapsed_btn');
+            if (collapsedBtn) {
+                collapsedBtn.style.display = '';
             }
         }
     }
@@ -2303,11 +2336,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                 });
             }
         });
-
-        const addBtn = document.getElementById('add_charge_btn');
-        if (addBtn) {
-            addBtn.addEventListener('click', addNewChargeRow);
-        }
     });
 
     // ... existing code ...

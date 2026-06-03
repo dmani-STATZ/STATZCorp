@@ -753,6 +753,42 @@ document.head.appendChild(style);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        // --- Packhouse / Charges section toggle ---
+
+        // Packhouse: show card when "+ Add Packaging" clicked
+        const showPackhouseBtn = document.getElementById('show_packhouse_btn');
+        if (showPackhouseBtn) {
+            showPackhouseBtn.addEventListener('click', function () {
+                document.getElementById('packhouse_collapsed_btn').style.display = 'none';
+                document.getElementById('packhouse_expanded_card').style.display = '';
+            });
+        }
+
+        // Charges: show card when "+ Add Contract Level Charges" clicked
+        const showChargesBtn = document.getElementById('show_charges_btn');
+        if (showChargesBtn) {
+            showChargesBtn.addEventListener('click', function () {
+                document.getElementById('charges_collapsed_btn').style.display = 'none';
+                document.getElementById('charges_expanded_card').style.display = '';
+                // Trigger adding the first charge row immediately
+                handleAddChargeClick();
+            });
+        }
+
+        // Charges: hide card when "Remove" clicked (only if no saved charges exist)
+        const hideChargesBtn = document.getElementById('hide_charges_btn');
+        if (hideChargesBtn) {
+            hideChargesBtn.addEventListener('click', function () {
+                const chargeRows = document.querySelectorAll('#charges_list [data-charge-id]');
+                if (chargeRows.length > 0) {
+                    // Has persisted rows — don't allow collapsing, just ignore
+                    return;
+                }
+                document.getElementById('charges_expanded_card').style.display = 'none';
+                document.getElementById('charges_collapsed_btn').style.display = '';
+            });
+        }
+
         document.querySelectorAll('[id^="clin-splits-table-"]').forEach((t) => {
             updateClinSplitTotals(t);
         });

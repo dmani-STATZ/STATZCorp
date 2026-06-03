@@ -81,6 +81,7 @@ Defines safe-edit guidance for the `processing` Django app. Every rule below is 
 - **Business logic lives in `views/processing_views.py`**, not in a services layer. There is no `services.py`. All finalization, sequencing, and queue management is inline in view functions.
 - **Validation is split across three places:** Django form `clean()` methods, API endpoint parsing in `api_views.py`, and the finalization pre-checks in `processing_views.py`. All three must stay consistent.
 - **The JS layer does not trust the server state** — `process_contract.js` continuously fires AJAX saves. The server must handle idempotent partial saves gracefully. Do not add server-side side effects to the `save_contract`, `update_clin_field`, or `update_process_contract_field` endpoints without understanding the call frequency.
+- **Packhouse and Charges 50/50 side-by-side layout:** Restructured the layout in `process_contract_form.html` to a 50/50 split row (`#packhouse_charges_row`). Packhouse resides in `#packhouse_col` and toggles between `#packhouse_collapsed_btn` (button `#show_packhouse_btn`) and `#packhouse_expanded_card`. Charges resides in `#charges_col` and toggles between `#charges_collapsed_btn` (button `#show_charges_btn`) and `#charges_expanded_card` (with `#hide_charges_btn` and `#charges_list`). Toggle logic is initialized in the `DOMContentLoaded` block of `process_contract.js`.
 - **Protected fields exist by convention, not framework enforcement.** `update_clin_field` and `update_process_contract_field` reject writes to `nsn`, `supplier`, `buyer`, and **`packhouse`** and require the match endpoints instead (`packhouse` → `/processing/match-packhouse/<process_contract_id>/`). If you add new protected fields, update these guards explicitly.
 - **Admin is intentionally read-only** for `QueueContract`. The only writable admin action is `force_delete_contracts`. Do not add `has_add_permission=True` or `has_change_permission=True` without understanding the cascade implications.
 - **No background tasks or signals are in use.** Everything is synchronous HTTP. This means long CSV uploads block the request.
@@ -351,7 +352,7 @@ This project does not use Tailwind in any form. All styling uses Bootstrap 5 plu
 - `static/css/app-core.css` — all component, layout, and button styles
 - `static/css/utilities.css` — utility and helper classes
 
-**When editing templates:** if you encounter Tailwind utility classes, replace them with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind classes in place.
+**When editing templates:** Note that `process_contract_form.html` is now fully Tailwind-free (Bootstrap 5 only). If you encounter Tailwind utility classes in other templates, replace them with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind classes in place.
 
 **Button pattern:** `.btn-outline-brand` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for pill-style with `#eff6ff` background tint.
 
