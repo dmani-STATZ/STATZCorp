@@ -300,13 +300,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="col-12">
-                <!-- Packhouse + Charges Row -->
-                <div class="row g-3 mb-3" id="packhouse_charges_row">
+        <!-- Packhouse + Charges Row -->
+        <div class="d-flex gap-3 mb-3 align-items-start" id="packhouse_charges_row">
 
-                  <!-- LEFT COL: Packhouse -->
-                  <div class="col-12 col-md-6" id="packhouse_col">
+          <!-- LEFT COL: Packhouse -->
+          <div style="flex: 0 0 calc(50% - 0.5rem); min-width: 0;" id="packhouse_col">
 
                     <!-- Collapsed state: shown when NO packhouse assigned AND section not manually opened -->
                     <div id="packhouse_collapsed_btn" {% if process_contract.packhouse %}style="display:none;"{% endif %}>
@@ -386,7 +386,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                   </div>
 
                   <!-- RIGHT COL: Contract Charges -->
-                  <div class="col-12 col-md-6" id="charges_col">
+                  <div style="flex: 0 0 calc(50% - 0.5rem); min-width: 0;" id="charges_col">
 
                     <!-- Collapsed state: shown when no charges exist AND section not manually opened -->
                     <div id="charges_collapsed_btn" {% if process_contract.charges.exists %}style="display:none;"{% endif %}>
@@ -473,10 +473,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                   </div>
 
                 </div>
-            </div>
 
     <!-- CLIN Items Card -->
-    <div class="col-12">
+    <div class="mb-4" id="clin_section">
         <div class="card card-padded shadow-sm mb-4">
             <div class="row-between mb-4">
                 <h2 class="fs-5 fw-semibold text-body">CLIN Items</h2>
@@ -906,7 +905,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             </div>
         </div>
     </div>
-</div>
 
 </form>
 </div>
