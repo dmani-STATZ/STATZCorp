@@ -33,6 +33,7 @@ The app stores report library items, immutable versions, sharing state, and requ
 - `reports/urls.py`: hub, user actions, admin queue actions, builder actions.
 - `reports/admin.py`: admin registrations for all reporting models.
 - `reports/utils.py`: SQL safety and execution helpers plus `get_next_version_number`.
+- `reports/services/notifications.py`: outbound Graph mail notifications for request submitted and request completed lifecycle events.
 - `contracts/utils/contracts_schema.py`: schema snapshot filter/wrapper consumed by reports AI.
 - `templates/base_template.html`: global Reports nav now points to `reports:hub`.
 
@@ -100,6 +101,9 @@ All templates are production-quality Bootstrap 5 (Spacelab theme) UIs. No placeh
 ## 11. Integrations and Cross-App Dependencies
 - Depends on `users` auth model for ownership and sharing FKs.
 - Depends on `contracts.utils.contracts_schema.generate_db_schema_snapshot` for AI schema context.
+- Optionally depends on `sales.services.graph_mail.send_mail_via_graph` for outbound email
+  notifications (fail-soft; silently skipped when `GRAPH_MAIL_ENABLED=False`).
+  Notification logic lives in `reports/services/notifications.py`.
 - Mounted through existing `include("reports.urls")` in project URL conf.
 
 ## 12. URL Surface / API Surface

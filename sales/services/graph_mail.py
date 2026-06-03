@@ -79,6 +79,7 @@ def send_mail_via_graph(
     body: str,
     reply_to: str | None = None,
     attachments: list[dict] | None = None,
+    cc_addresses: list[str] | None = None,
 ) -> bool:
     """
     Send a single email via Microsoft Graph API.
@@ -92,6 +93,7 @@ def send_mail_via_graph(
                         'name'         (str)  — filename shown to recipient
                         'content_type' (str)  — MIME type e.g. 'application/pdf'
                         'data'         (bytes) — raw file bytes
+        cc_addresses: Optional list of CC email address strings.
 
     Returns:
         True if Graph accepted the send (HTTP 202), False otherwise.
@@ -129,6 +131,11 @@ def send_mail_via_graph(
             "emailAddress": {"address": sender}
         },
     }
+
+    if cc_addresses:
+        message["ccRecipients"] = [
+            {"emailAddress": {"address": addr}} for addr in cc_addresses if addr
+        ]
 
     # Attach PDFs if provided
     if attachments:

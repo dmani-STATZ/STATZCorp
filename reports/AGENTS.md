@@ -10,6 +10,7 @@ Safe-edit guidance for the rebuilt reports backend (ticket flow + report library
 - SQL safety execution (`reports/utils.py`)
 - Superuser AI generation endpoint (`admin_ai_generate`)
 - Staff builder flow (`draft_builder`, `draft_iterate`, `draft_promote`, `draft_discard`)
+- `reports/services/notifications.py` (Graph mail notification helpers)
 
 **Does not own:**
 - Underlying `contracts_*`, `suppliers_*`, `products_*` schema
@@ -59,6 +60,7 @@ All seven templates are production-built Bootstrap 5 UIs. Current template files
 | Change request flow modification | `models.py` + migration + `views.py` (`request_change`) + `admin_queue.html` (parent version context card) + `admin_ai_generate` (`existing_sql` parameter) |
 | Change URL names | `urls.py` + template `{% url %}` usage + `reverse(...)` call sites |
 | Admin direct report edit | `views.py` (`admin_report_editor`, `admin_report_save_edit`) + `forms.py` (`AdminReportEditForm`) + `admin_report_editor.html` + `urls.py` |
+| Email notification content or timing | `reports/services/notifications.py` + `reports/views.py` (`submit_request`, `admin_save_version`) |
 
 ## 6. Cross-App Dependency Warnings
 - Depends on `AUTH_USER_MODEL` for all ownership/share relations.

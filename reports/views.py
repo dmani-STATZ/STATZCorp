@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 
@@ -27,6 +28,8 @@ from .forms import (
 )
 from .models import Report, ReportDraft, ReportRequest, ReportShare, ReportVersion
 from .utils import get_next_version_number, rows_to_csv, run_select
+
+logger = logging.getLogger("reports.views")
 
 User = get_user_model()
 
@@ -161,11 +164,16 @@ def reports_hub(request):
 def submit_request(request):
     form = ReportRequestForm(request.POST)
     if form.is_valid():
-        ReportRequest.objects.create(
+        report_request = ReportRequest.objects.create(
             requester=request.user,
             status=ReportRequest.STATUS_PENDING,
             description=form.cleaned_data["description"],
         )
+        try:
+            from reports.services.notifications import notify_request_submitted
+            notify_request_submitted(report_request)
+        except Exception:
+            logger.exception("submit_request: notification failed for request %s", report_request.pk)
         messages.success(request, "Report request submitted.")
     else:
         messages.error(request, "Could not submit report request.")
@@ -406,6 +414,13 @@ def admin_save_version(request, pk):
         request_obj.status = ReportRequest.STATUS_COMPLETED
         request_obj.linked_report = report
         request_obj.save(update_fields=["status", "linked_report", "updated_at"])
+
+    # Transaction committed  now safe to send notification
+    try:
+        from reports.services.notifications import notify_request_completed
+        notify_request_completed(request_obj, report)
+    except Exception:
+        logger.exception("admin_save_version: notification failed for request %s", request_obj.pk)
 
     messages.success(request, "Report version saved.")
     return redirect("reports:admin_queue")
