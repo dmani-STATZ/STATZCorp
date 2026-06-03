@@ -158,7 +158,7 @@ def recalc_splits(request, contract_pk):
     # Step 1: Load all CLINs with prefetch to avoid N+1
     clins = list(
         Clin.objects.filter(contract=contract).prefetch_related(
-            Prefetch('splits', queryset=ClinSplit.objects.all()),
+            Prefetch('splits', queryset=ClinSplit.objects.select_related('clin').all()),
             'finance_lines',
         )
     )
@@ -167,11 +167,13 @@ def recalc_splits(request, contract_pk):
     # (same pattern as existing code  avoids property N+1)
     total_clin_adj_gross = Decimal('0.00')
     for clin in clins:
+        wawf_val = Decimal(str(clin.wawf_payment or 0))
         item_val = Decimal(str(clin.item_value or 0))
+        income = wawf_val if wawf_val != Decimal('0') else item_val
         quote_val = Decimal(str(clin.quote_value or 0))
         paid_val = Decimal(str(clin.paid_amount or 0))
         cost = paid_val if paid_val != Decimal('0') else quote_val
-        gross = item_val - cost
+        gross = income - cost
         finance_costs = sum(
             Decimal(str(fl.amount_billed or 0))
             for fl in clin.finance_lines.all()
@@ -246,14 +248,43 @@ def recalc_splits(request, contract_pk):
             'skipped_clins': [],
         })
 
-    # Step 8: Compute split_value per company and write to ALL that company's
-    # ClinSplit rows (each gets the same value  company's share of contract total)
+    # Step 8: Compute split_value per company and distribute proportionally
+    # across that company's ClinSplit rows by each CLIN's item_value.
+    # Last row absorbs rounding remainder so the sum is exact.
     updated_count = 0
     for company, splits in splits_by_company.items():
         pct = company_percentages[company]
-        company_split_value = (pct / Decimal('100.0')) * contract_adj_gross
-        for split in splits:
-            split.split_value = company_split_value
+        company_total = (pct / Decimal('100.0')) * contract_adj_gross
+
+        # Build weights from parent CLIN item_value.
+        # splits is already a list of ClinSplit objects with .clin prefetched.
+        weights = [
+            Decimal(str(split.clin.item_value or 0))
+            for split in splits
+        ]
+        total_weight = sum(weights)
+
+        if total_weight == Decimal('0'):
+            # No item_values set  distribute equally across CLINs.
+            n = len(splits)
+            base = (company_total / Decimal(n)).quantize(Decimal('0.01'))
+            allocated = [base] * n
+            # Last row absorbs rounding remainder.
+            allocated[-1] += company_total - sum(allocated)
+        else:
+            allocated = []
+            running = Decimal('0')
+            for i, weight in enumerate(weights):
+                if i == len(weights) - 1:
+                    # Last row: give it the exact remainder to avoid rounding drift.
+                    allocated.append(company_total - running)
+                else:
+                    share = (weight / total_weight * company_total).quantize(Decimal('0.01'))
+                    allocated.append(share)
+                    running += share
+
+        for split, split_value in zip(splits, allocated):
+            split.split_value = split_value
             split.save(update_fields=['split_value', 'modified_at'])
             updated_count += 1
 

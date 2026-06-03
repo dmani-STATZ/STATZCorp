@@ -12,6 +12,10 @@
 
 ### Fixed
 
+- **[2026-06-03] Finance Audit  Recalc Split now distributes correctly across CLINs.** Previously, each CLIN row for a company was stamped with the full company split total, causing the Split Summary to show multiples of the correct amount. The company's share is now distributed proportionally across CLINs by item value, so the per-CLIN rows add up to  rather than multiply  the company total.
+
+- **[2026-06-03] Finance Audit — Adjusted Gross now reflects actual government payment including interest.** When the government pays more than the contracted item value (e.g. late-payment interest under the Prompt Payment Act), the extra amount now correctly flows into Adjusted Gross. Previously, Adj Gross was anchored to Item Value regardless of what was actually received. The fix: income uses the actual Customer Pay amount when recorded, and falls back to Item Value only when no payment has been entered yet. This affects the CLIN-level Adj Gross column, the contract summary Adj Gross, and the Split recalculation. No data migration required — the fix is purely in the calculation logic.
+
 - **[2026-06-01] Bug Fix — CLIN Fix partial shipment Quote/Item Value not persisting on re-render.** Manually entered Quote Value and Item Value on partial shipment conversions now persist correctly when interacting with the parent CLIN dropdown or switching between rows.
 
 - **[2026-05-21] Bug Fix — Add Split button on CLIN detail page** — The "Add Split" button on the CLIN detail page was not responding to clicks. This has been fixed.

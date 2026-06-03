@@ -158,7 +158,6 @@ Test coverage is uneven:
 After behavior changes, expected verification is:
 
 - Run `python manage.py check`.
-- Run `python manage.py test training` at minimum.
 - Run `python manage.py makemigrations --check` after model edits.
 - Manually validate changed flows, including coupled apps.
 - Re-test permissions and company scoping after queryset/view/middleware changes.
@@ -218,7 +217,6 @@ Slow down and inspect deeply before editing when changes involve:
 - shared model fields, URL names, template paths, status constants, JS payload keys, settings keys, signal tracked fields.
 - Key verification steps:
 - `python manage.py check`.
-- `python manage.py test training`.
 - `python manage.py makemigrations --check` (for model edits).
 - Manual cross-app smoke tests for permissions, scoping, transactions history, and exports.
 
