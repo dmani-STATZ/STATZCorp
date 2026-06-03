@@ -1,7 +1,7 @@
 ---
 id: 2026-06-01-session-timeout
 title: Session Timeout Warning and Auto Lock Screen
-published: false
+published: true
 publish_date: 2026-06-01
 tags: [new, system]
 critical: false

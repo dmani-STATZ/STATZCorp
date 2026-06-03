@@ -1,7 +1,7 @@
 ---
 id: 2026-05-27-document-browser-improvements
 title: Document Browser Improvements
-published: false
+published: true
 publish_date: 2026-05-27
 tags: [improved, contracts]
 critical: false

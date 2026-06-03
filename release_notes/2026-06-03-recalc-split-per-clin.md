@@ -1,7 +1,7 @@
 ---
 id: 2026-06-03-recalc-split-per-clin
 title: Finance Audit — Recalc Split now distributes correctly across CLINs
-published: false
+published: true
 publish_date: 2026-06-03
 tags: [fixed, finance]
 critical: false

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-27-add-clin-copy-from-defaults
 title: Add CLIN — "Copy From" defaults
-published: false
+published: true
 publish_date: 2026-05-27
 tags: [new, contracts]
 critical: false

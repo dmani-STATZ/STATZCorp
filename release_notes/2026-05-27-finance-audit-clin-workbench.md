@@ -1,7 +1,7 @@
 ---
 id: 2026-05-27-finance-audit-clin-workbench
 title: Finance Audit — One workbench on the CLIN table
-published: false
+published: true
 publish_date: 2026-05-27
 tags: [improved, finance]
 critical: false

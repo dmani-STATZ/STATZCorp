@@ -4,7 +4,7 @@ version: "1.0.1"
 date: 2026-06-02
 title: "Anthropic API Budget Tracker"
 visible_to: superuser
-published: false
+published: true
 publish_date: 2026-06-02
 tags: [new, system]
 critical: false

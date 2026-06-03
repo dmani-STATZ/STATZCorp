@@ -1,7 +1,7 @@
 ---
 id: 2026-05-27-contract-mgmt-ship-qty-readonly
 title: Contract Management — CLIN card Ship Qty now read-only on converted CLINs
-published: false
+published: true
 publish_date: 2026-05-27
 tags: [improved, contracts]
 critical: false

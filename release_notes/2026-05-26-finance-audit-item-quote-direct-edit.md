@@ -1,7 +1,7 @@
 ---
 id: 2026-05-26-finance-audit-item-quote-direct-edit
 title: Finance Audit — Item Value & Quote Value are now direct-edit
-published: false
+published: true
 publish_date: 2026-05-26
 tags: [improved, finance]
 critical: false

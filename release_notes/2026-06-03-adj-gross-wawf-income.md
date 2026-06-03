@@ -1,7 +1,7 @@
 ---
 id: 2026-06-03-adj-gross-wawf-income
 title: Finance Audit — Adjusted Gross now reflects actual government payment including interest
-published: false
+published: true
 publish_date: 2026-06-03
 tags: [fixed, finance]
 critical: false

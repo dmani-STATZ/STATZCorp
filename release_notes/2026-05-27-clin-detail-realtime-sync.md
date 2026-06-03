@@ -1,7 +1,7 @@
 ---
 id: 2026-05-27-clin-detail-realtime-sync
 title: CLIN Detail — Shipment and value displays stay in sync
-published: false
+published: true
 publish_date: 2026-05-27
 tags: [improved, contracts]
 critical: false

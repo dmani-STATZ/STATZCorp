@@ -1,7 +1,7 @@
 ---
 id: 2026-05-27-finance-audit-payment-rollup
 title: Finance Audit — Paid & Customer Pay roll up from shipments
-published: false
+published: true
 publish_date: 2026-05-27
 tags: [improved, finance]
 critical: false

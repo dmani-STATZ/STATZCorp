@@ -1,7 +1,7 @@
 ---
 id: 2026-05-27-finance-audit-shipment-auto-values
 title: Finance Audit — Shipment values now calculate automatically
-published: false
+published: true
 publish_date: 2026-05-27
 tags: [improved, finance]
 critical: false

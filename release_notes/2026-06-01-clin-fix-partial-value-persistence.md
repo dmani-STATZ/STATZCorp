@@ -1,7 +1,7 @@
 ---
 id: 2026-06-01-clin-fix-partial-value-persistence
 title: Bug Fix — CLIN Fix partial shipment Quote/Item Value not persisting on re-render
-published: false
+published: true
 publish_date: 2026-06-01
 tags: [fixed, contracts]
 critical: false
