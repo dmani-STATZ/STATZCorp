@@ -1,0 +1,142 @@
+{% if api_budget %}
+<div class="card border rounded-3 p-0 {% if api_budget.balance_usd > 5 %}border-success{% elif api_budget.balance_usd > 1 %}border-warning{% else %}border-danger{% endif %}" id="apiBudgetCard" style="min-width:260px; max-width:320px;">
+
+  <div class="px-3 pt-2 pb-1">
+
+    {# Row 1: label + status badge #}
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <span class="text-muted" style="font-size:11px;">Anthropic API Budget</span>
+      {% if api_budget.balance_usd > 5 %}
+        <span class="badge text-bg-success" style="font-size:10px;">Healthy</span>
+      {% elif api_budget.balance_usd > 1 %}
+        <span class="badge text-bg-warning text-dark" style="font-size:10px;">Low</span>
+      {% else %}
+        <span class="badge text-bg-danger" style="font-size:10px;">Critical</span>
+      {% endif %}
+    </div>
+
+    {# Row 2: balance (clickable) + Adjust balance link (superuser only) #}
+    <div class="d-flex justify-content-between align-items-center">
+      <span
+        id="apiBudgetBalanceToggle"
+        role="button"
+        title="Click for details"
+        style="font-size:20px; font-weight:500; cursor:pointer; user-select:none;"
+        {% if api_budget.balance_usd > 5 %}class="text-success"
+        {% elif api_budget.balance_usd > 1 %}class="text-warning"
+        {% else %}class="text-danger"{% endif %}
+      >
+        ${{ api_budget.balance_usd|floatformat:2 }}
+      </span>
+      {% if request.user.is_superuser %}
+        <a href="#"
+           class="text-muted text-decoration-none"
+           style="font-size:11px;"
+           data-bs-toggle="modal"
+           data-bs-target="#apibudgetSyncModal">
+          Adjust balance
+        </a>
+      {% endif %}
+    </div>
+
+    {# Expandable detail  hidden by default, toggled by clicking balance #}
+    <div id="apiBudgetDetail" style="display:none; margin-top:10px; padding-top:10px; border-top: 0.5px solid rgba(0,0,0,0.1);">
+      <div class="row row-cols-3 g-2">
+        <div class="col">
+          <p class="text-muted mb-0" style="font-size:10px;">Last synced</p>
+          <p class="mb-0" style="font-size:12px; font-weight:500;">
+            {% if api_budget.last_sync_at %}{{ api_budget.last_sync_at|date:"M j" }}{% else %}Never{% endif %}
+          </p>
+        </div>
+        <div class="col">
+          <p class="text-muted mb-0" style="font-size:10px;">Synced to</p>
+          <p class="mb-0" style="font-size:12px; font-weight:500;">${{ api_budget.last_sync_amount|floatformat:2 }}</p>
+        </div>
+        <div class="col">
+          <p class="text-muted mb-0" style="font-size:10px;">Calls today</p>
+          <p class="mb-0" style="font-size:12px; font-weight:500;">{{ api_budget_calls_today }}</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# Modal  superuser only #}
+{% if request.user.is_superuser %}
+<div class="modal fade" id="apibudgetSyncModal" tabindex="-1" aria-labelledby="apibudgetSyncModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="apibudgetSyncModalLabel">Sync API Balance</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-2" style="font-size:13px;">
+          Enter the current balance shown in the Anthropic console.
+        </p>
+        {% if api_budget.last_sync_at %}
+        <p class="text-muted mb-3" style="font-size:12px;">
+          Previous value: ${{ api_budget.last_sync_amount|floatformat:2 }}
+          (synced {{ api_budget.last_sync_at|date:"M j, Y" }})
+        </p>
+        {% endif %}
+        <input type="number"
+               id="apibudgetNewBalance"
+               class="form-control form-control-sm"
+               step="0.01"
+               min="0"
+               placeholder="0.00" />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success btn-sm" id="apibudgetSyncSave">Update Balance</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# JS  toggle expand and modal save #}
+<script>
+(function () {
+  var toggle = document.getElementById('apiBudgetBalanceToggle');
+  var detail = document.getElementById('apiBudgetDetail');
+  if (toggle && detail) {
+    toggle.addEventListener('click', function () {
+      detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+    });
+  }
+
+  {% if request.user.is_superuser %}
+  var saveBtn = document.getElementById('apibudgetSyncSave');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', function () {
+      var val = document.getElementById('apibudgetNewBalance').value;
+      if (!val || isNaN(parseFloat(val)) || parseFloat(val) < 0) {
+        alert('Please enter a valid balance.');
+        return;
+      }
+      fetch("{% url 'core:sync_api_budget' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: 'new_balance=' + encodeURIComponent(val),
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success) {
+          location.reload();
+        } else {
+          alert('Error: ' + (data.error || 'Unknown error'));
+        }
+      });
+    });
+  }
+  {% endif %}
+}());
+</script>
+
+{% endif %}

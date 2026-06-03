@@ -46,6 +46,9 @@
                     Drafts in flight. Finalize one to land it in the contracts system.
                 </p>
             </div>
+            {% if request.user.is_superuser %}
+                {% include 'core/partials/api_budget_card.html' %}
+            {% endif %}
         </div>
 
         {% if messages %}

@@ -137,6 +137,7 @@ urlpatterns = [
     path("api/azure-health/", core_views.azure_health, name="azure_health"),
     path("reports/", include("reports.urls")),
     path("transactions/", include("transactions.urls")),
+    path("core/", include("core.urls")),
     # Announcement URLs
     path("announcement/add/", views.add_announcement, name="add_announcement"),
     path(

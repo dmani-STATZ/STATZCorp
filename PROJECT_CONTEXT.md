@@ -491,3 +491,14 @@ The `tags` array will fail validation if it does not contain exactly two items:
 *(Do not invent new tags. Unknown tags cause the file to be skipped.)*
 
 ```
+
+---
+
+## Anthropic API Budget Tracker
+- Model: `core.APIBudget` (singleton, pk=1) tracks estimated running balance. `core.APIUsageLog` logs every call with model, tokens, cost, and call site.
+- Central wrapper: `core.anthropic_client.call_anthropic(payload, call_site)` — all Anthropic API calls must route through this.
+- Pricing constants in `core/anthropic_client.py` — update `MODEL_PRICING` when adding new models.
+- Context processor `core.context_processors.api_budget` injects `api_budget` and `api_budget_calls_today` into superuser requests only.
+- Budget card partial: `core/templates/core/partials/api_budget_card.html` — included on Intake Queue, Processing Queue, Reports hub, and Index pages inside `{% if request.user.is_superuser %}`.
+- Sync URL: `core:sync_api_budget` (POST) — superuser only, sets balance to match Anthropic console.
+

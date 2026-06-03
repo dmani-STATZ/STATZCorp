@@ -167,6 +167,7 @@ TEMPLATES = [
                 "sales.context_processors.rfq_counts",
                 "sales.context_processors.solicitation_nav_tools",
                 "users.context_processors.release_notes_context",
+                "core.context_processors.api_budget",
             ],
         },
     },
