@@ -24,7 +24,7 @@ def _refresh_batch_counts(batch: DfasImportBatch) -> None:
     """Set aggregate counters from current row status histogram."""
     rows = batch.rows
     tallies = dict(
-        rows.values('status').annotate(c=Count('id')).values_list('status', 'c')
+        rows.order_by().values('status').annotate(c=Count('id')).values_list('status', 'c')
     )
     batch.row_count = sum(tallies.values())
     batch.imported_count = tallies.get('imported', 0)
