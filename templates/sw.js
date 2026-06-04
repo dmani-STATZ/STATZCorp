@@ -63,6 +63,18 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    // Handle navigation requests  keep them in the PWA window
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request).catch(() => {
+                // Network failure during navigation  do not serve offline fallback,
+                // just let it fail naturally (no offline support by design)
+                return fetch(event.request);
+            })
+        );
+        return;
+    }
+
     // Only apply caching for static assets
     const url = new URL(event.request.url);
     const isStaticAsset = STATIC_ASSETS.some(asset => url.pathname.endsWith(asset)) || 

@@ -502,3 +502,13 @@ The `tags` array will fail validation if it does not contain exactly two items:
 - Budget card partial: `core/templates/core/partials/api_budget_card.html` — included on Intake Queue, Processing Queue, Reports hub, and Index pages inside `{% if request.user.is_superuser %}`.
 - Sync URL: `core:sync_api_budget` (POST) — superuser only, sets balance to match Anthropic console.
 
+---
+
+## Progressive Web App (PWA)
+- **Edge PWA Compatibility:**
+  - Added `display_override` configuration (`["window-controls-overlay", "standalone", "minimal-ui"]`) in `static/manifest.json` to keep internal navigations in the standalone Edge PWA window.
+  - Corrected navigation links in `contract_lifecycle_dashboard.html` by removing `target="_blank"` and `rel="noopener"` from metrics links, ensuring they navigate within the same PWA window.
+  - Updated the service worker in `templates/sw.js` to explicitly claim and handle navigation fetch events (`event.request.mode === 'navigate'`), preventing the browser from opening new window tabs for page navigations.
+  - PWA users must reinstall the application after manifest updates for the changes to take full effect.
+
+
