@@ -101,6 +101,17 @@
         const rowRefEl = document.getElementById('dfasResolveRowRef');
         if (rowRefEl) rowRefEl.textContent = resolveState.rowRef;
 
+        // Populate amount + date meta line
+        const amount = btn.dataset.amount || '';
+        const date   = btn.dataset.date   || '';
+        const fmtAmount = amount
+            ? '$' + parseFloat(amount).toLocaleString('en-US',
+                { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '';
+        const metaParts = [fmtAmount, date].filter(Boolean);
+        const metaEl = document.getElementById('dfasResolveRowMeta');
+        if (metaEl) metaEl.textContent = metaParts.join('    ');
+
         // Render step breadcrumb
         renderStepNav();
 

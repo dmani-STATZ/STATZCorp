@@ -116,7 +116,9 @@
                 data-start-step="shipment"
                 data-contract-id="{{ row.matched_contract_id }}"
                 data-clin-id="{{ row.matched_clin_id }}"
-                data-row-ref="{{ row.raw_contract_no|default:'' }}">Assign Shipment</button>
+                data-row-ref="{{ row.raw_contract_no|default:'' }}"
+                data-amount="{{ row.raw_check_eft_amount|default:'' }}"
+                data-date="{{ row.raw_payment_date|date:'Y-m-d'|default:'' }}">Assign Shipment</button>
         <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="skip">Skip</button>
 
       {% elif row.status == 'clin_missing' %}
@@ -124,14 +126,18 @@
                 data-action="open_resolve_modal"
                 data-start-step="clin"
                 data-contract-id="{{ row.matched_contract_id }}"
-                data-row-ref="{{ row.raw_contract_no|default:'' }}">Assign CLIN</button>
+                data-row-ref="{{ row.raw_contract_no|default:'' }}"
+                data-amount="{{ row.raw_check_eft_amount|default:'' }}"
+                data-date="{{ row.raw_payment_date|date:'Y-m-d'|default:'' }}">Assign CLIN</button>
         <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="skip">Skip</button>
 
       {% elif row.status == 'contract_missing' %}
         <button type="button" class="btn btn-sm btn-primary"
                 data-action="open_resolve_modal"
                 data-start-step="contract"
-                data-row-ref="{{ row.raw_contract_no|default:'' }}">Find Contract</button>
+                data-row-ref="{{ row.raw_contract_no|default:'' }}"
+                data-amount="{{ row.raw_check_eft_amount|default:'' }}"
+                data-date="{{ row.raw_payment_date|date:'Y-m-d'|default:'' }}">Find Contract</button>
         <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="skip">Skip</button>
 
       {% elif row.status == 'duplicate' %}
