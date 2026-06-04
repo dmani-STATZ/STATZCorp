@@ -121,45 +121,32 @@ def match_dfas_row(
     norm_call_no_raw = normalize_contract_number(parsed_row.call_no or '')
     norm_do_number = strip_delivery_order_suffix(norm_call_no_raw)
 
-    idiq: Optional[IdiqContract] = None
     matched_contract: Optional[Contract] = None
+    idiq: Optional[IdiqContract] = None
 
     call_nonempty = bool(norm_call_no_raw)
 
     if call_nonempty:
-        # Match IDIQ by normalized contract_number
-        idiq = _norm_qs(IdiqContract.objects).filter(
-            norm_num=norm_contract_no,
-        ).first()
-        if not idiq:
-            return MatchResult(
-                status='contract_missing',
-                notes=f'No IDIQ found for "{parsed_row.contract_no}"',
-            )
-
-        # Try DO with suffix stripped first, then raw normalized call_no
+        # Direct Contract lookup by stripped Call No.
         matched_contract = (
-            _norm_qs(Contract.objects.filter(company=company, idiq_contract=idiq))
+            _norm_qs(Contract.objects.filter(company=company))
             .filter(norm_num=norm_do_number)
             .first()
         )
+        # If suffix-stripping changed the value and first lookup failed, try raw
         if not matched_contract and norm_do_number != norm_call_no_raw:
             matched_contract = (
-                _norm_qs(Contract.objects.filter(company=company, idiq_contract=idiq))
+                _norm_qs(Contract.objects.filter(company=company))
                 .filter(norm_num=norm_call_no_raw)
                 .first()
             )
         if not matched_contract:
             return MatchResult(
                 status='contract_missing',
-                idiq=idiq,
-                notes=(
-                    f'IDIQ matched ({idiq.contract_number}); no DO found for '
-                    f'"{parsed_row.call_no}"'
-                ),
+                notes=f'No contract found for Call No. "{parsed_row.call_no}"',
             )
     else:
-        # Standalone contract (no call_no) — match by normalized contract_number
+        # No Call No.  match by Contract No. directly
         matched_contract = (
             _norm_qs(Contract.objects.filter(company=company))
             .filter(norm_num=norm_contract_no)
@@ -168,8 +155,11 @@ def match_dfas_row(
         if not matched_contract:
             return MatchResult(
                 status='contract_missing',
-                notes=f'No contract found for "{parsed_row.contract_no}"',
+                notes=f'No contract found for Contract No. "{parsed_row.contract_no}"',
             )
+
+    # Populate IDIQ from matched contract (informational only)
+    idiq = getattr(matched_contract, 'idiq_contract', None)
 
     # --- CLIN matching (unchanged logic) ---
     clin: Optional[Clin] = None

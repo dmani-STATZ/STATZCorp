@@ -97,65 +97,114 @@ def dfas_import_review_view(request, batch_id):
         company=ac,
     )
 
-    rows_qs = (
-        batch.rows.select_related('matched_idiq', 'matched_contract', 'matched_clin')
+    from contracts.models import ClinShipment
+
+    STATUS_SORT_KEY = {
+        'error': 0,
+        'contract_missing': 1,
+        'clin_missing': 2,
+        'shipment_missing': 3,
+        'matched': 4,
+        'duplicate': 5,
+        'pending': 6,
+        'skipped': 7,
+        'imported': 8,
+    }
+
+    show_skipped = request.GET.get('show_skipped') == '1'
+    show_imported = request.GET.get('show_imported') == '1'
+
+    all_rows = list(
+        batch.rows
+        .select_related(
+            'matched_contract', 'matched_clin', 'matched_shipment',
+            'matched_idiq', 'payment_history', 'resolved_by',
+        )
         .order_by('id')
     )
-    rows_list = list(rows_qs)
 
-    status_order = [
-        'contract_missing',
-        'clin_missing',
-        'duplicate',
-        'error',
-        'matched',
-        'skipped',
-        'imported',
-        'pending',
+    visible_rows = [
+        r for r in all_rows
+        if not (r.status == 'skipped' and not show_skipped)
+        and not (r.status == 'imported' and not show_imported)
     ]
-    grouped = {s: [] for s in status_order}
-    for row in rows_list:
-        if row.status in grouped:
-            grouped[row.status].append(row)
-        else:
-            grouped.setdefault('other', []).append(row)
+    visible_rows.sort(key=lambda r: STATUS_SORT_KEY.get(r.status, 99))
+
+    # Shipment options cache for shipment_missing rows
+    shipment_options_cache = {}
+    def _get_shipment_opts(clin_id):
+        if clin_id not in shipment_options_cache:
+            ships = list(
+                ClinShipment.objects.filter(clin_id=clin_id).order_by('id')
+            )
+            shipment_options_cache[clin_id] = [
+                {
+                    'id': s.id,
+                    'display': s.name or f'Shipment {i + 1}',
+                    'item_value': s.item_value,
+                    'wawf_payment': s.wawf_payment,
+                }
+                for i, s in enumerate(ships)
+            ]
+        return shipment_options_cache[clin_id]
+
+    rows_for_template = []
+    for row in visible_rows:
+        cust_pay = None
+        if row.status in ('matched', 'shipment_missing'):
+            if row.matched_shipment_id and row.matched_shipment:
+                cust_pay = row.matched_shipment.wawf_payment
+            elif row.matched_clin_id and row.matched_clin:
+                cust_pay = row.matched_clin.wawf_payment
+
+        shipment_options = []
+        if row.status == 'shipment_missing' and row.matched_clin_id:
+            shipment_options = _get_shipment_opts(row.matched_clin_id)
+
+        rows_for_template.append({
+            'row': row,
+            'cust_pay': cust_pay,
+            'shipment_options': shipment_options,
+        })
+
+    matched_count = sum(1 for r in all_rows if r.status == 'matched')
+
+    # Status counters for badge bar
+    status_counts: dict[str, int] = {}
+    for r in all_rows:
+        status_counts[r.status] = status_counts.get(r.status, 0) + 1
 
     clin_options_by_contract = {}
     type_labels = dict(Clin.ITEM_TYPE_CHOICES)
-    for row in grouped.get('clin_missing', []):
-        cid = row.matched_contract_id
-        if cid and cid not in clin_options_by_contract:
-            clin_options_by_contract[cid] = [
-                {
-                    'id': c.id,
-                    'item_number': c.item_number or '',
-                    'item_type_display': type_labels.get(c.item_type, c.item_type or '—'),
-                }
-                for c in Clin.objects.filter(
-                    contract_id=cid,
-                    company=ac,
-                ).order_by('item_number')
-            ]
-
-    ready_count = sum(1 for r in rows_list if r.status == 'matched')
-    status_counts = {}
-    for r in rows_list:
-        status_counts[r.status] = status_counts.get(r.status, 0) + 1
+    for row in all_rows:
+        if row.status == 'clin_missing':
+            cid = row.matched_contract_id
+            if cid and cid not in clin_options_by_contract:
+                clin_options_by_contract[cid] = [
+                    {
+                        'id': c.id,
+                        'item_number': c.item_number or '',
+                        'item_type_display': type_labels.get(c.item_type, c.item_type or '—'),
+                    }
+                    for c in Clin.objects.filter(
+                        contract_id=cid,
+                        company=ac,
+                    ).order_by('item_number')
+                ]
 
     can_finalize = batch.status == 'uploaded'
 
-    return render(
-        request,
-        'contracts/dfas_import_review.html',
-        {
-            'batch': batch,
-            'grouped_rows': grouped,
-            'clin_options_by_contract': clin_options_by_contract,
-            'can_finalize': can_finalize,
-            'ready_count': ready_count,
-            'status_counts': status_counts,
-        },
-    )
+    context = {
+        'batch': batch,
+        'rows_for_template': rows_for_template,
+        'clin_options_by_contract': clin_options_by_contract,
+        'can_finalize': can_finalize,
+        'show_skipped': show_skipped,
+        'show_imported': show_imported,
+        'matched_count': matched_count,
+        'status_counts': status_counts,
+    }
+    return render(request, 'contracts/dfas_import_review.html', context)
 
 
 @login_required
@@ -343,6 +392,34 @@ def dfas_import_resolve_row_view(request, batch_id, row_id):
                 status=400,
             )
 
+    elif action == 'assign_shipment':
+        shipment_id = payload.get('shipment_id')
+        if not shipment_id:
+            return JsonResponse(
+                {'success': False, 'message': 'shipment_id is required.'},
+                status=400,
+            )
+        from contracts.models import ClinShipment
+        try:
+            shipment = ClinShipment.objects.get(
+                pk=shipment_id,
+                clin=row.matched_clin,
+            )
+        except ClinShipment.DoesNotExist:
+            return JsonResponse(
+                {'success': False, 'message': 'Shipment not found on this CLIN.'},
+                status=400,
+            )
+        row.matched_shipment = shipment
+        row.status = 'matched'
+        row.match_notes = (
+            (row.match_notes or '')
+            + f'\nUser assigned shipment #{shipment.pk}.'
+        ).strip()
+        row.resolved_by = request.user
+        row.resolved_on = timezone.now()
+        row.save()
+
     else:
         return JsonResponse(
             {'success': False, 'message': f'Unknown action: {action}'},
@@ -363,6 +440,27 @@ def dfas_import_resolve_row_view(request, batch_id, row_id):
             'match_notes': row.match_notes,
         }
     )
+
+
+@login_required
+@require_POST
+def dfas_import_rematch_view(request, batch_id):
+    ac = _active_company(request)
+    if not ac:
+        return _no_company_response(request)
+
+    batch = get_object_or_404(DfasImportBatch, pk=batch_id, company=ac)
+    if batch.status != 'uploaded':
+        messages.error(request, 'Cannot re-match a finalized or cancelled batch.')
+        return redirect('contracts:dfas_import_review', batch_id=batch.id)
+
+    from contracts.services.dfas_import import rematch_import_batch
+    result = rematch_import_batch(batch=batch, company=ac)
+    messages.success(
+        request,
+        f"Re-matching complete  {result['updated']} row(s) re-processed.",
+    )
+    return redirect('contracts:dfas_import_review', batch_id=batch.id)
 
 
 @login_required

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-11-dfas-payment-import
 title: Import DFAS Payments from a File
-published: false
+published: true
 publish_date: 2026-05-11
 tags: [new, finance]
 critical: false

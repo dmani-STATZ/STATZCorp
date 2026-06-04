@@ -15,6 +15,22 @@ from sales.services.graph_mail import send_mail_via_graph
 
 _CHROMIUM_ARGS = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
 
+# Retry config for per-date scrapes  connection-level errors only
+_MAX_SCRAPE_RETRIES = 3
+_SCRAPE_BACKOFF_SECONDS = [90, 180, 360]   # wait before attempt 2, 3, 4
+
+# Playwright/Chromium network error prefixes that are worth retrying.
+# Parse errors, 404s, and assertion failures are NOT retryable.
+_RETRYABLE_ERROR_FRAGMENTS = [
+    "net::ERR_",
+    "ERR_CONNECTION_RESET",
+    "ERR_CONNECTION_REFUSED",
+    "ERR_NAME_NOT_RESOLVED",
+    "ERR_INTERNET_DISCONNECTED",
+    "ERR_TIMED_OUT",
+    "TargetClosedError",
+]
+
 
 class Command(BaseCommand):
     help = (
@@ -27,6 +43,10 @@ class Command(BaseCommand):
         ts = timezone.now().strftime("%Y-%m-%dT%H:%M:%SZ")
         self.stdout.write(f"[{ts}] [scrape_awards] {message}")
         sys.stdout.flush()
+
+    def _is_retryable_error(self, error_str: str) -> bool:
+        """Returns True if the error string looks like a transient network failure."""
+        return any(frag in error_str for frag in _RETRYABLE_ERROR_FRAGMENTS)
 
     def _send_job_failure_email(self, subject_detail: str, body: str) -> None:
         """
@@ -272,7 +292,27 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
 
         failed_dates: list[tuple[date, str]] = []
         for idx, batch in enumerate(queue):
-            ok, fail_reason = self._scrape_single_date_from_batch(batch)
+            ok = False
+            fail_reason = None
+            for retry_num in range(1 + _MAX_SCRAPE_RETRIES):
+                if retry_num > 0:
+                    batch.scrape_status = AwardImportBatch.SCRAPE_MISSING
+                    batch.save(update_fields=["scrape_status"])
+                    wait = _SCRAPE_BACKOFF_SECONDS[retry_num - 1]
+                    self._activity(
+                        f"Retry {retry_num}/{_MAX_SCRAPE_RETRIES} for {batch.scrape_date} after {wait}s (error: {fail_reason})."
+                    )
+                    time.sleep(wait)
+
+                ok, fail_reason = self._scrape_single_date_from_batch(batch)
+                if ok:
+                    break
+                else:
+                    if retry_num < _MAX_SCRAPE_RETRIES and self._is_retryable_error(fail_reason or ""):
+                        continue
+                    else:
+                        break
+
             if not ok:
                 failed_dates.append(
                     (
@@ -281,8 +321,8 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                     )
                 )
             if idx < len(queue) - 1:
-                self._activity("Sleeping 15s before next scrape to avoid DIBBS rate limiting.")
-                time.sleep(15)
+                self._activity("Sleeping 30s before next scrape to avoid DIBBS rate limiting.")
+                time.sleep(30)
 
         self._check_and_notify_expiring_dates()
 

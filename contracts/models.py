@@ -570,6 +570,7 @@ class DfasImportRow(models.Model):
         ('matched', 'Matched (ready to import)'),
         ('clin_missing', 'Contract matched, CLIN not found'),
         ('contract_missing', 'No contract match'),
+        ('shipment_missing', 'Shipment selection needed'),
         ('duplicate', 'Duplicate (previously imported)'),
         ('skipped', 'Skipped by user'),
         ('imported', 'Imported'),
@@ -598,6 +599,17 @@ class DfasImportRow(models.Model):
         null=True, blank=True,
         on_delete=models.SET_NULL,
         related_name='+',
+    )
+
+    matched_shipment = models.ForeignKey(
+        'ClinShipment',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        help_text=(
+            "The ClinShipment this DFAS payment is applied to. "
+            "Auto-assigned when possible. Null for legacy CLINs without shipments."
+        ),
     )
     payment_history = models.ForeignKey(
         'PaymentHistory',

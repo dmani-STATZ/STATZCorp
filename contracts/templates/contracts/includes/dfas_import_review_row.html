@@ -1,32 +1,67 @@
-{% comment %} row, section, clin_options (list of dicts or None), can_finalize {% endcomment %}
+{% comment %}
+  Context:
+    row              — DfasImportRow instance
+    cust_pay         — Decimal|None (wawf_payment on matched shipment or clin)
+    shipment_options — list of {id, display, item_value, wawf_payment} (for shipment_missing rows)
+    clin_options     — list of {id, item_number, item_type_display} | None (for clin_missing rows)
+    can_finalize     — bool
+{% endcomment %}
 <tr data-row-id="{{ row.id }}"
     data-raw-contract-no="{{ row.raw_contract_no|default:'' }}"
     data-raw-call-no="{{ row.raw_call_no|default:'' }}"
     data-raw-clin="{{ row.raw_clin|default:'' }}"
     class="dfas-row dfas-row-{{ row.status }}">
-  <td class="text-muted small">{{ row.id }}</td>
+
+  {# Status badge #}
   <td>
-    <div class="small text-body-secondary">Contract:</div>
-    <div class="font-monospace">{{ row.raw_contract_no|default:"—" }}</div>
-    {% if row.raw_call_no %}
-      <div class="small text-body-secondary mt-1">Call No.:</div>
-      <div class="font-monospace small">{{ row.raw_call_no }}</div>
+    {% if row.status == 'matched' %}
+      <span class="badge bg-success">Matched</span>
+    {% elif row.status == 'clin_missing' %}
+      <span class="badge bg-warning text-dark">Need CLIN</span>
+    {% elif row.status == 'shipment_missing' %}
+      <span class="badge bg-warning text-dark">Need Shipment</span>
+    {% elif row.status == 'contract_missing' %}
+      <span class="badge bg-danger">No Contract</span>
+    {% elif row.status == 'duplicate' %}
+      <span class="badge bg-secondary">Duplicate</span>
+    {% elif row.status == 'error' %}
+      <span class="badge bg-danger">Error</span>
+    {% elif row.status == 'skipped' %}
+      <span class="badge bg-secondary">Skipped</span>
+    {% elif row.status == 'imported' %}
+      <span class="badge bg-success">Imported</span>
+    {% elif row.status == 'pending' %}
+      <span class="badge bg-light text-dark border">Pending</span>
+    {% else %}
+      <span class="badge bg-light text-dark border">{{ row.status }}</span>
     {% endif %}
-    <div class="small text-body-secondary mt-1">CLIN:</div>
-    <div class="font-monospace small">{{ row.raw_clin|default:"—" }}</div>
   </td>
+
+  {# Contract / CLIN (DFAS raw values) #}
+  <td>
+    <div class="font-monospace small">{{ row.raw_contract_no|default:"—" }}</div>
+    {% if row.raw_call_no %}
+      <div class="text-body-secondary" style="font-size:.75rem">Call: {{ row.raw_call_no }}</div>
+    {% endif %}
+    <div class="text-body-secondary" style="font-size:.75rem">CLIN: {{ row.raw_clin|default:"—" }}</div>
+  </td>
+
+  {# Resolved To (matched contract / clin / shipment) #}
   <td>
     {% if row.matched_contract %}
-      <div class="small text-body-secondary">→</div>
-      <div class="font-monospace">{{ row.matched_contract.contract_number }}</div>
+      <div class="font-monospace small">{{ row.matched_contract.contract_number }}</div>
       {% if row.matched_clin %}
-        <div class="small text-body-secondary mt-1">CLIN:</div>
-        <div class="font-monospace small">{{ row.matched_clin.item_number }}</div>
+        <div class="text-body-secondary" style="font-size:.75rem">CLIN: {{ row.matched_clin.item_number }}</div>
+      {% endif %}
+      {% if row.matched_shipment %}
+        <div class="text-body-secondary" style="font-size:.75rem">Shipment: {{ row.matched_shipment.name|default:row.matched_shipment.id }}</div>
       {% endif %}
     {% else %}
       <span class="text-body-secondary">—</span>
     {% endif %}
   </td>
+
+  {# Amount (DFAS check/EFT) #}
   <td class="text-end font-monospace {% if row.raw_check_eft_amount != None and row.raw_check_eft_amount < 0 %}text-danger{% endif %}">
     {% if row.raw_check_eft_amount != None %}
       ${{ row.raw_check_eft_amount|floatformat:2 }}
@@ -37,63 +72,104 @@
       —
     {% endif %}
   </td>
-  <td class="small">{{ row.raw_payment_date|date:"Y-m-d"|default:"—" }}</td>
+
+  {# Cust. Pay (wawf_payment on resolved target) #}
+  <td class="text-end font-monospace text-body-secondary">
+    {% if cust_pay != None %}
+      ${{ cust_pay|floatformat:2 }}
+    {% else %}
+      —
+    {% endif %}
+  </td>
+
+  {# Date #}
+  <td class="small text-nowrap">{{ row.raw_payment_date|date:"Y-m-d"|default:"—" }}</td>
+
+  {# Voucher / Invoice #}
   <td class="small font-monospace">
     {{ row.raw_voucher_no|default:"—" }}<br>
     <span class="text-body-secondary">{{ row.raw_invoice_no|default:"—" }}</span>
   </td>
+
+  {# Notes / errors #}
   <td class="small">
-    {% if section == 'error' and row.error_message %}
+    {% if row.status == 'error' and row.error_message %}
       <span class="text-danger">{{ row.error_message }}</span>
     {% else %}
       {{ row.match_notes|linebreaksbr }}
     {% endif %}
   </td>
+
+  {# Actions #}
   <td class="text-nowrap">
     {% if can_finalize %}
-      {% if section == 'matched' %}
-        <div class="form-check form-check-inline mb-0 me-2 align-middle">
+      {% if row.status == 'matched' %}
+        <div class="form-check form-check-inline mb-0 me-1 align-middle">
           <input class="form-check-input" type="checkbox" checked disabled title="Included when you confirm import" id="im-{{ row.id }}">
           <label class="form-check-label small" for="im-{{ row.id }}">Import</label>
         </div>
         <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
-      {% elif section == 'clin_missing' %}
-        {% if clin_options %}
-        <select class="form-select form-select-sm dfas-clin-select mb-1" aria-label="CLIN for row {{ row.id }}">
-          <option value="">—</option>
-          {% for opt in clin_options %}
-            <option value="{{ opt.id }}">{{ opt.item_number }} — {{ opt.item_type_display }}</option>
-          {% endfor %}
-        </select>
+
+      {% elif row.status == 'shipment_missing' %}
+        {% if shipment_options %}
+          <select class="form-select form-select-sm dfas-shipment-select mb-1" aria-label="Shipment for row {{ row.id }}">
+            <option value="">— choose —</option>
+            {% for opt in shipment_options %}
+              <option value="{{ opt.id }}">
+                {{ opt.display }}{% if opt.item_value %} · ${{ opt.item_value|floatformat:2 }}{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <div class="d-flex flex-wrap gap-1">
+            <button type="button" class="btn btn-sm btn-primary" data-action="assign_shipment">Assign</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
+          </div>
         {% else %}
-        <p class="small text-danger mb-1">No CLINs on contract.</p>
-        {% endif %}
-        <div class="d-flex flex-wrap gap-1">
-          {% if clin_options %}
-          <button type="button" class="btn btn-sm btn-primary" data-action="assign_clin">Assign</button>
-          {% endif %}
+          <p class="small text-danger mb-1">No shipments on CLIN.</p>
           <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
-        </div>
-      {% elif section == 'contract_missing' %}
+        {% endif %}
+
+      {% elif row.status == 'clin_missing' %}
+        {% if clin_options %}
+          <select class="form-select form-select-sm dfas-clin-select mb-1" aria-label="CLIN for row {{ row.id }}">
+            <option value="">—</option>
+            {% for opt in clin_options %}
+              <option value="{{ opt.id }}">{{ opt.item_number }} — {{ opt.item_type_display }}</option>
+            {% endfor %}
+          </select>
+          <div class="d-flex flex-wrap gap-1">
+            <button type="button" class="btn btn-sm btn-primary" data-action="assign_clin">Assign</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
+          </div>
+        {% else %}
+          <p class="small text-danger mb-1">No CLINs on contract.</p>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
+        {% endif %}
+
+      {% elif row.status == 'contract_missing' %}
         <button type="button" class="btn btn-sm btn-primary" data-action="find_contract">Find Contract</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
-      {% elif section == 'duplicate' %}
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="skip">Skip</button>
+
+      {% elif row.status == 'duplicate' %}
         <button type="button" class="btn btn-sm btn-outline-primary" data-action="import_anyway">Import Anyway</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
-      {% elif section == 'skipped' %}
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="skip">Skip</button>
+
+      {% elif row.status == 'skipped' %}
         <button type="button" class="btn btn-sm btn-outline-secondary" data-action="unskip">Undo Skip</button>
-      {% elif section == 'imported' %}
+
+      {% elif row.status == 'imported' %}
         <span class="text-success" title="Imported">✓</span>
         {% if row.payment_history_id %}
           <span class="small text-body-secondary ms-1">PH #{{ row.payment_history_id }}</span>
         {% endif %}
-      {% elif section == 'error' %}
-        <span class="text-body-secondary small">—</span>
-      {% elif section == 'pending' %}
+
+      {% else %}
         <span class="text-body-secondary small">—</span>
       {% endif %}
+
     {% else %}
-      {% if section == 'imported' %}
+      {# batch already finalized / cancelled — read-only #}
+      {% if row.status == 'imported' %}
         <span class="text-success">✓</span>
         {% if row.payment_history_id %}
           <span class="small text-body-secondary ms-1">PH #{{ row.payment_history_id }}</span>

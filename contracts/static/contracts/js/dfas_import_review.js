@@ -189,6 +189,15 @@
             payload.clin_id = parseInt(select.value, 10);
         }
 
+        if (action === 'assign_shipment') {
+            const select = rowEl.querySelector('.dfas-shipment-select');
+            if (!select || !select.value) {
+                alert('Please choose a shipment first.');
+                return;
+            }
+            payload.shipment_id = parseInt(select.value, 10);
+        }
+
         await sendResolution(rowId, payload);
     });
 

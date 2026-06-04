@@ -11,6 +11,7 @@
   <input type="hidden" id="dfasReviewBatchId" value="{{ batch.id }}">
   <input type="hidden" id="dfasResolveRowUrlZero" value="{% url 'contracts:dfas_import_resolve_row' batch_id=batch.id row_id=0 %}">
 
+  {# ── Header ── #}
   <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
     <div>
       <nav aria-label="breadcrumb">
@@ -29,9 +30,11 @@
     <a href="{% url 'contracts:dfas_import_list' %}" class="btn btn-outline-secondary btn-sm">Back to imports</a>
   </div>
 
+  {# ── Status counters ── #}
   <div class="d-flex flex-wrap gap-2 mb-3">
     <span class="badge bg-success">Matched: {{ status_counts.matched|default:0 }}</span>
     <span class="badge bg-warning text-dark">Need CLIN: {{ status_counts.clin_missing|default:0 }}</span>
+    <span class="badge bg-warning text-dark">Need Shipment: {{ status_counts.shipment_missing|default:0 }}</span>
     <span class="badge bg-danger">No contract: {{ status_counts.contract_missing|default:0 }}</span>
     <span class="badge bg-secondary">Duplicates: {{ status_counts.duplicate|default:0 }}</span>
     <span class="badge bg-danger">Errors: {{ status_counts.error|default:0 }}</span>
@@ -41,17 +44,18 @@
     {% endif %}
   </div>
 
+  {# ── Sticky action bar ── #}
   <div class="position-sticky py-3 mb-3 border-bottom bg-body shadow-sm dfas-import-sticky-bar" style="top: 0; z-index: 1020;">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
       <div class="fw-semibold">
-        {{ ready_count }} row{{ ready_count|pluralize }} ready to import
+        {{ matched_count }} row{{ matched_count|pluralize }} ready to import
       </div>
       <div class="d-flex flex-wrap gap-2">
         <form method="post" action="{% url 'contracts:dfas_import_finalize' batch_id=batch.id %}" class="d-inline">
           {% csrf_token %}
           <button type="submit" class="btn btn-success"
-            {% if ready_count == 0 or not can_finalize %}disabled{% endif %}>
-            Confirm Import ({{ ready_count }})
+            {% if matched_count == 0 or not can_finalize %}disabled{% endif %}>
+            Confirm Import ({{ matched_count }})
           </button>
         </form>
         <form method="post" action="{% url 'contracts:dfas_import_cancel' batch_id=batch.id %}" class="d-inline"
@@ -65,171 +69,49 @@
     </div>
   </div>
 
-  {% if grouped_rows.other %}
-    <div class="alert alert-warning border mb-3">
-      <strong>Other status rows</strong> ({{ grouped_rows.other|length }}) — review in admin if unexpected.
-    </div>
-  {% endif %}
-
-  {% with g=grouped_rows %}
-  {% if g.contract_missing %}
-  <div class="card mb-4">
-    <div class="card-header bg-danger-subtle text-danger-emphasis">
-      <span class="me-1">❌</span> No Contract Match
-    </div>
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-sm table-hover mb-0 align-middle">
-        <thead class="table-light"><tr>
-          <th>Line</th><th>Contract / CLIN (DFAS)</th><th>Resolved To</th><th class="text-end">Amount</th><th>Date</th><th>Voucher / Invoice</th><th>Notes</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {% for row in g.contract_missing %}
-            {% include "contracts/includes/dfas_import_review_row.html" with row=row section="contract_missing" clin_options=None can_finalize=can_finalize %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+  {# ── Toggle filters ── #}
+  <div class="d-flex gap-3 mb-2 small">
+    {% if show_skipped %}
+      <a href="?{% if show_imported %}show_imported=1&{% endif %}">Hide skipped</a>
+    {% else %}
+      <a href="?show_skipped=1{% if show_imported %}&show_imported=1{% endif %}">Show skipped</a>
+    {% endif %}
+    {% if show_imported %}
+      <a href="?{% if show_skipped %}show_skipped=1{% endif %}">Hide imported</a>
+    {% else %}
+      <a href="?{% if show_skipped %}show_skipped=1&{% endif %}show_imported=1">Show imported</a>
+    {% endif %}
   </div>
-  {% endif %}
 
-  {% if g.clin_missing %}
-  <div class="card mb-4">
-    <div class="card-header bg-warning-subtle text-warning-emphasis">
-      <span class="me-1">⚠️</span> CLIN Not Found
-    </div>
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-sm table-hover mb-0 align-middle">
-        <thead class="table-light"><tr>
-          <th>Line</th><th>Contract / CLIN (DFAS)</th><th>Resolved To</th><th class="text-end">Amount</th><th>Date</th><th>Voucher / Invoice</th><th>Notes</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {% for row in g.clin_missing %}
-            {% include "contracts/includes/dfas_import_review_row.html" with row=row section="clin_missing" clin_options=clin_options_by_contract|get_item:row.matched_contract_id can_finalize=can_finalize %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+  {# ── Main flat table ── #}
+  {% if rows_for_template %}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="width:5rem">Status</th>
+          <th>Contract / CLIN (DFAS)</th>
+          <th>Resolved To</th>
+          <th class="text-end">Amount</th>
+          <th class="text-end">Cust. Pay</th>
+          <th>Date</th>
+          <th>Voucher / Invoice</th>
+          <th>Notes</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in rows_for_template %}
+          {% with row=entry.row cust_pay=entry.cust_pay shipment_options=entry.shipment_options %}
+          {% include "contracts/includes/dfas_import_review_row.html" with row=row cust_pay=cust_pay shipment_options=shipment_options clin_options=clin_options_by_contract|get_item:row.matched_contract_id can_finalize=can_finalize %}
+          {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+  {% else %}
+  <div class="alert alert-info">No rows to display.</div>
   {% endif %}
-
-  {% if g.duplicate %}
-  <div class="card mb-4">
-    <div class="card-header bg-secondary-subtle text-secondary-emphasis">
-      <span class="me-1">🔁</span> Duplicates
-    </div>
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-sm table-hover mb-0 align-middle">
-        <thead class="table-light"><tr>
-          <th>Line</th><th>Contract / CLIN (DFAS)</th><th>Resolved To</th><th class="text-end">Amount</th><th>Date</th><th>Voucher / Invoice</th><th>Notes</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {% for row in g.duplicate %}
-            {% include "contracts/includes/dfas_import_review_row.html" with row=row section="duplicate" clin_options=None can_finalize=can_finalize %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if g.error %}
-  <div class="card mb-4">
-    <div class="card-header bg-danger-subtle text-danger-emphasis">
-      <span class="me-1">⚙️</span> Errors
-    </div>
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-sm table-hover mb-0 align-middle">
-        <thead class="table-light"><tr>
-          <th>Line</th><th>Contract / CLIN (DFAS)</th><th>Resolved To</th><th class="text-end">Amount</th><th>Date</th><th>Voucher / Invoice</th><th>Notes</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {% for row in g.error %}
-            {% include "contracts/includes/dfas_import_review_row.html" with row=row section="error" clin_options=None can_finalize=can_finalize %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if g.matched %}
-  <div class="card mb-4">
-    <div class="card-header bg-success-subtle text-success-emphasis">
-      <span class="me-1">✅</span> Matched
-    </div>
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-sm table-hover mb-0 align-middle">
-        <thead class="table-light"><tr>
-          <th>Line</th><th>Contract / CLIN (DFAS)</th><th>Resolved To</th><th class="text-end">Amount</th><th>Date</th><th>Voucher / Invoice</th><th>Notes</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {% for row in g.matched %}
-            {% include "contracts/includes/dfas_import_review_row.html" with row=row section="matched" clin_options=None can_finalize=can_finalize %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if g.skipped %}
-  <div class="card mb-4">
-    <div class="card-header bg-secondary-subtle">
-      <span class="me-1">⏭️</span> Skipped
-    </div>
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-sm table-hover mb-0 align-middle">
-        <thead class="table-light"><tr>
-          <th>Line</th><th>Contract / CLIN (DFAS)</th><th>Resolved To</th><th class="text-end">Amount</th><th>Date</th><th>Voucher / Invoice</th><th>Notes</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {% for row in g.skipped %}
-            {% include "contracts/includes/dfas_import_review_row.html" with row=row section="skipped" clin_options=None can_finalize=can_finalize %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if g.imported %}
-  <div class="card mb-4">
-    <div class="card-header bg-success-subtle text-success-emphasis">
-      <span class="me-1">✓</span> Already Imported
-    </div>
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-sm table-hover mb-0 align-middle">
-        <thead class="table-light"><tr>
-          <th>Line</th><th>Contract / CLIN (DFAS)</th><th>Resolved To</th><th class="text-end">Amount</th><th>Date</th><th>Voucher / Invoice</th><th>Notes</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {% for row in g.imported %}
-            {% include "contracts/includes/dfas_import_review_row.html" with row=row section="imported" clin_options=None can_finalize=can_finalize %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if g.pending %}
-  <div class="card mb-4">
-    <div class="card-header">Pending review</div>
-    <div class="card-body p-0 table-responsive">
-      <table class="table table-sm table-hover mb-0 align-middle">
-        <thead class="table-light"><tr>
-          <th>Line</th><th>Contract / CLIN (DFAS)</th><th>Resolved To</th><th class="text-end">Amount</th><th>Date</th><th>Voucher / Invoice</th><th>Notes</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          {% for row in g.pending %}
-            {% include "contracts/includes/dfas_import_review_row.html" with row=row section="pending" clin_options=None can_finalize=can_finalize %}
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-  {% endwith %}
 
   {% include "contracts/dfas_contract_matcher_modal.html" %}
 </div>

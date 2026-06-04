@@ -222,6 +222,7 @@ from .views.dfas_import_views import (
     dfas_import_cancel_view,
     dfas_import_finalize_view,
     dfas_import_list_view,
+    dfas_import_rematch_view,
     dfas_import_resolve_row_view,
     dfas_import_review_view,
     dfas_import_upload_view,
@@ -278,6 +279,11 @@ urlpatterns = [
         "dfas-imports/<int:batch_id>/review/",
         dfas_import_review_view,
         name="dfas_import_review",
+    ),
+    path(
+        "dfas-imports/<int:batch_id>/rematch/",
+        dfas_import_rematch_view,
+        name="dfas_import_rematch",
     ),
     path(
         "dfas-imports/<int:batch_id>/finalize/",

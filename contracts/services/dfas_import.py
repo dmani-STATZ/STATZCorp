@@ -11,7 +11,7 @@ from django.db.models import Count, Sum
 from django.utils import timezone
 
 from contracts.models import Clin, DfasImportBatch, DfasImportRow, PaymentHistory
-from contracts.services.dfas_matcher import match_dfas_row
+from contracts.services.dfas_matcher import MatchResult, match_dfas_row
 from contracts.services.dfas_parser import parse_dfas_file
 
 
@@ -22,20 +22,57 @@ class DfasImportError(Exception):
 
 def _refresh_batch_counts(batch: DfasImportBatch) -> None:
     """Set aggregate counters from current row status histogram."""
+    rows = batch.rows
     tallies = dict(
-        batch.rows.values('status').annotate(c=Count('id')).values_list('status', 'c')
+        rows.values('status').annotate(c=Count('id')).values_list('status', 'c')
     )
     batch.row_count = sum(tallies.values())
     batch.imported_count = tallies.get('imported', 0)
     batch.skipped_count = tallies.get('skipped', 0)
     batch.duplicate_count = tallies.get('duplicate', 0)
     batch.error_count = tallies.get('error', 0)
-    batch.unmatched_count = (
-        tallies.get('pending', 0)
-        + tallies.get('contract_missing', 0)
-        + tallies.get('clin_missing', 0)
-        + tallies.get('matched', 0)
-    )
+    batch.unmatched_count = rows.filter(
+        status__in=['contract_missing', 'clin_missing', 'shipment_missing']
+    ).count()
+
+
+def auto_assign_shipment(clin, check_eft_amount):
+    """
+    Attempt to auto-assign a ClinShipment to a matched DFAS row.
+
+    Returns (shipment_or_None, new_status_or_None):
+      (None, None)               CLIN has no shipments  legacy path, stays 'matched'
+      (shipment, None)           Single shipment or unique item_value hit  stays 'matched'
+      (None, 'shipment_missing') Multiple shipments, no clean auto-match  user must pick
+
+    Args:
+        clin: the matched Clin instance
+        check_eft_amount: Decimal or None from the parsed DFAS row
+    """
+    from contracts.models import ClinShipment
+    from decimal import Decimal
+
+    shipments = list(ClinShipment.objects.filter(clin=clin).order_by('id'))
+
+    if not shipments:
+        return None, None  # Legacy CLIN  pay directly on CLIN
+
+    if len(shipments) == 1:
+        return shipments[0], None  # Only one  auto-assign
+
+    # Multiple shipments  try item_value match within $0.01
+    if check_eft_amount is not None:
+        TOLERANCE = Decimal('0.01')
+        amount = Decimal(str(check_eft_amount))
+        matches = [
+            s for s in shipments
+            if s.item_value is not None
+            and abs(Decimal(str(s.item_value)) - amount) <= TOLERANCE
+        ]
+        if len(matches) == 1:
+            return matches[0], None
+
+    return None, 'shipment_missing'
 
 
 def create_import_batch(
@@ -82,6 +119,24 @@ def create_import_batch(
         to_create: list[DfasImportRow] = []
         for parsed in parse_result.rows:
             m = match_dfas_row(parsed, company=company)
+
+            matched_shipment = None
+            if m.status == 'matched' and m.clin is not None:
+                matched_shipment, shipment_status = auto_assign_shipment(
+                    m.clin, parsed.check_eft_amount
+                )
+                if shipment_status == 'shipment_missing':
+                    m = MatchResult(
+                        status='shipment_missing',
+                        idiq=m.idiq,
+                        contract=m.contract,
+                        clin=m.clin,
+                        notes=(
+                            m.notes + '\nMultiple shipments on CLIN; user must select one.'
+                        ).strip(),
+                        error=m.error,
+                    )
+
             to_create.append(
                 DfasImportRow(
                     batch=batch,
@@ -97,6 +152,7 @@ def create_import_batch(
                     matched_idiq=m.idiq,
                     matched_contract=m.contract,
                     matched_clin=m.clin,
+                    matched_shipment=matched_shipment,
                     match_notes=m.notes,
                     error_message=m.error,
                 )
@@ -158,50 +214,85 @@ def finalize_import_batch(
                     f'Row {row.pk} is matched but raw_check_eft_amount is missing; cannot create PaymentHistory.',
                 )
 
+            from contracts.models import ClinShipment
+
+            clin_ct = ContentType.objects.get_for_model(Clin)
+            shipment_ct = ContentType.objects.get_for_model(ClinShipment)
+
             ref = (row.raw_invoice_no or '')[:50]
             payment_info = (
                 f'DFAS Invoice {row.raw_invoice_no}'
                 if (row.raw_invoice_no or '').strip()
                 else 'DFAS'
             )
-            ph = PaymentHistory(
-                content_type=clin_ct,
-                object_id=row.matched_clin_id,
-                payment_type='paid_amount',
-                payment_amount=row.raw_check_eft_amount,
-                payment_date=row.raw_payment_date,
-                payment_info=payment_info,
-                reference_number=ref or None,
-                created_by=user,
-                modified_by=user,
-            )
-            ph.save()
 
-            row.payment_history = ph
-            row.status = 'imported'
-            row.resolved_by = user
-            row.resolved_on = timezone.now()
-            row.save(
-                update_fields=[
-                    'payment_history',
-                    'status',
-                    'resolved_by',
-                    'resolved_on',
-                ],
-            )
+            if row.matched_shipment_id:
+                #  Shipment path 
+                ph = PaymentHistory(
+                    content_type=shipment_ct,
+                    object_id=row.matched_shipment_id,
+                    payment_type='partial_paid_amount',
+                    payment_amount=row.raw_check_eft_amount,
+                    payment_date=row.raw_payment_date,
+                    payment_info=payment_info,
+                    reference_number=ref or None,
+                    created_by=user,
+                    modified_by=user,
+                )
+                ph.save()
 
-            clin = row.matched_clin
-            new_total = (
-                PaymentHistory.objects.filter(
+                # Update shipment.paid_amount stored column
+                shipment = row.matched_shipment
+                existing_total = (
+                    PaymentHistory.objects.filter(
+                        content_type=shipment_ct,
+                        object_id=shipment.pk,
+                        payment_type='partial_paid_amount',
+                    ).aggregate(total=Sum('payment_amount'))['total']
+                    or Decimal('0')
+                )
+                shipment.paid_amount = existing_total
+                shipment.modified_by = user
+                shipment.save(update_fields=['paid_amount', 'modified_by', 'modified_on'])
+
+                # Roll up to CLIN  mirrors _recompute_clin_payment_rollup in shipment_views.py
+                clin = row.matched_clin
+                agg = clin.shipments.aggregate(
+                    paid=Sum('paid_amount'),
+                    wawf=Sum('wawf_payment'),
+                )
+                clin.paid_amount = agg['paid'] or Decimal('0.00')
+                clin.wawf_payment = agg['wawf'] or Decimal('0.00')
+                clin.modified_by = user
+                clin.save(update_fields=['paid_amount', 'wawf_payment', 'modified_by', 'modified_on'])
+
+            else:
+                #  Legacy path: write directly to CLIN 
+                ph = PaymentHistory(
                     content_type=clin_ct,
-                    object_id=clin.pk,
+                    object_id=row.matched_clin_id,
                     payment_type='paid_amount',
-                ).aggregate(total=Sum('payment_amount'))['total']
-                or Decimal('0')
-            )
-            clin.paid_amount = new_total
-            clin.modified_by = user
-            clin.save()
+                    payment_amount=row.raw_check_eft_amount,
+                    payment_date=row.raw_payment_date,
+                    payment_info=payment_info,
+                    reference_number=ref or None,
+                    created_by=user,
+                    modified_by=user,
+                )
+                ph.save()
+
+                clin = row.matched_clin
+                new_total = (
+                    PaymentHistory.objects.filter(
+                        content_type=clin_ct,
+                        object_id=clin.pk,
+                        payment_type='paid_amount',
+                    ).aggregate(total=Sum('payment_amount'))['total']
+                    or Decimal('0')
+                )
+                clin.paid_amount = new_total
+                clin.modified_by = user
+                clin.save()
 
         locked.status = 'completed'
         locked.completed_at = timezone.now()
@@ -220,3 +311,73 @@ def finalize_import_batch(
         )
 
     return DfasImportBatch.objects.prefetch_related('rows').get(pk=batch.pk)
+
+
+def rematch_import_batch(*, batch, company):
+    """
+    Re-run the matcher on all unresolved rows in a batch.
+    Safe to call multiple times on the same batch.
+    Returns {'updated': int}.
+    """
+    from contracts.services.dfas_parser import ParsedDfasRow
+
+    REMATCH_STATUSES = [
+        'contract_missing', 'clin_missing', 'shipment_missing', 'pending', 'error',
+    ]
+    rows = list(
+        batch.rows.filter(status__in=REMATCH_STATUSES)
+        .select_related('matched_contract', 'matched_clin', 'matched_shipment')
+    )
+
+    updated = 0
+    for row in rows:
+        parsed = ParsedDfasRow(
+            line_number=0,
+            contract_no=row.raw_contract_no or '',
+            call_no=row.raw_call_no or '',
+            clin=row.raw_clin or '',
+            voucher_no=row.raw_voucher_no or '',
+            invoice_no=row.raw_invoice_no or '',
+            payment_date=row.raw_payment_date,
+            check_eft_amount=row.raw_check_eft_amount,
+            raw=row.raw_data or {},
+        )
+        m = match_dfas_row(parsed, company=company)
+
+        matched_shipment = None
+        if m.status == 'matched' and m.clin is not None:
+            matched_shipment, shipment_status = auto_assign_shipment(
+                m.clin, parsed.check_eft_amount
+            )
+            if shipment_status == 'shipment_missing':
+                m = MatchResult(
+                    status='shipment_missing',
+                    idiq=m.idiq,
+                    contract=m.contract,
+                    clin=m.clin,
+                    notes=(
+                        m.notes + '\nMultiple shipments on CLIN; user must select one.'
+                    ).strip(),
+                    error=m.error,
+                )
+
+        row.status = m.status
+        row.matched_idiq = m.idiq
+        row.matched_contract = m.contract
+        row.matched_clin = m.clin
+        row.matched_shipment = matched_shipment
+        row.match_notes = m.notes
+        row.error_message = m.error or ''
+        row.save(update_fields=[
+            'status', 'matched_idiq', 'matched_contract',
+            'matched_clin', 'matched_shipment',
+            'match_notes', 'error_message',
+        ])
+        updated += 1
+
+    _refresh_batch_counts(batch)
+    batch.save(update_fields=[
+        'row_count', 'imported_count', 'skipped_count',
+        'duplicate_count', 'unmatched_count', 'error_count',
+    ])
+    return {'updated': updated}

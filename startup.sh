@@ -9,6 +9,9 @@ fi
 
 echo "[startup] Using Python: $PYTHON_EXE"
 
+echo "[startup] Installing Playwright system dependencies (idempotent)"
+$PYTHON_EXE -m playwright install-deps chromium 2>/dev/null || true
+
 if [ -d "/home/site/repository/sales/temp" ]; then
   echo "[startup] Pruning /home/site/repository/sales/temp/*"
   rm -rf /home/site/repository/sales/temp/* 2>/dev/null || true
