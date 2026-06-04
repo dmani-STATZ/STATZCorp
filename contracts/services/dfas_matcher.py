@@ -146,12 +146,23 @@ def match_dfas_row(
                 notes=f'No contract found for Call No. "{parsed_row.call_no}"',
             )
     else:
-        # No Call No.  match by Contract No. directly
+        # No Call No.  match by Contract No. directly.
+        # Also apply P-suffix stripping in case the DFAS contract number
+        # carries a delivery-order modifier (e.g. SPE4A624PAR82P00003  SPE4A624PAR82).
+        norm_contract_no_stripped = strip_delivery_order_suffix(norm_contract_no)
+
         matched_contract = (
             _norm_qs(Contract.objects.filter(company=company))
-            .filter(norm_num=norm_contract_no)
+            .filter(norm_num=norm_contract_no_stripped)
             .first()
         )
+        # If suffix-stripping changed the number and still no match, try the raw value
+        if not matched_contract and norm_contract_no_stripped != norm_contract_no:
+            matched_contract = (
+                _norm_qs(Contract.objects.filter(company=company))
+                .filter(norm_num=norm_contract_no)
+                .first()
+            )
         if not matched_contract:
             return MatchResult(
                 status='contract_missing',
