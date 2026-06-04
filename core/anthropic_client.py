@@ -39,9 +39,6 @@ def record_api_usage(model: str, input_tokens: int, output_tokens: int, call_sit
         pass
 
 def call_anthropic(payload: dict, call_site: str) -> dict:
-    # Import guards inside the function body to avoid Django app-registry issues
-    from core.models import APIBudget, APIUsageLog
-
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     headers = {
         "Content-Type": "application/json",

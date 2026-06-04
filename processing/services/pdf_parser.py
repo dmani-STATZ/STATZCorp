@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import BinaryIO, List, Optional, Union
+from core.anthropic_client import call_anthropic
 
 import pdfplumber
 from django.db import transaction
@@ -801,8 +802,6 @@ def _extract_clins_via_claude_api(section_text: str) -> Optional[List[dict]]:
     Returns None if the API call fails or returns unparseable JSON.
     """
     try:
-        import urllib.request
-
         prompt = f"""You are extracting CLIN (Contract Line Item Number) data from a US Government DD Form 1155 purchase order document.
 
 Below is the complete text of Section B of the document. Extract every CLIN row and return ONLY a JSON array with no other text, no markdown, no code fences.
@@ -852,27 +851,12 @@ Return ONLY the JSON array. No explanation. No markdown.
 SECTION B TEXT:
 {section_text}"""
 
-        payload = json.dumps(
-            {
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1000,
-                "messages": [{"role": "user", "content": prompt}],
-            }
-        ).encode("utf-8")
-
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "anthropic-version": "2023-06-01",
-                "x-api-key": os.environ.get("ANTHROPIC_API_KEY", ""),
-            },
-            method="POST",
-        )
-
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
+        payload = {
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 1000,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        body = call_anthropic(payload, "processing.pdf_parser._extract_clins_via_claude_api")
 
         raw_text = ""
         for block in body.get("content", []):

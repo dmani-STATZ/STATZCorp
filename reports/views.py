@@ -2,9 +2,8 @@ import json
 import logging
 import os
 import re
-
-import requests as http_requests
 from django.contrib import messages
+from core.anthropic_client import call_anthropic
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction
@@ -99,20 +98,7 @@ def _call_ai_sql_builder(prompt, admin_notes="", existing_sql=""):
         "system": system_prompt,
         "messages": [{"role": "user", "content": prompt}],
     }
-    headers = {
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-
-    response = http_requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers=headers,
-        json=payload,
-        timeout=30,
-    )
-    response.raise_for_status()
-    data = response.json()
+    data = call_anthropic(payload, "reports.views.admin_ai_generate")
     blocks = data.get("content") or []
     text_content = ""
     for block in blocks:
