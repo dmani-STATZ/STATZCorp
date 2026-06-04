@@ -814,3 +814,44 @@ html {
     font-weight: 500;
 }
 
+/* ── DFAS Unified Resolve Modal ─────────────────────────────── */
+.dfas-resolve-card {
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+}
+.dfas-resolve-card:hover {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.15rem rgba(var(--bs-primary-rgb), 0.15);
+}
+.dfas-resolve-card.is-selected {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+}
+[data-bs-theme="dark"] .dfas-resolve-card:hover {
+    box-shadow: 0 0 0 0.15rem rgba(var(--bs-primary-rgb), 0.25);
+}
+[data-bs-theme="dark"] .dfas-resolve-card.is-selected {
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.35);
+}
+
+/* Step breadcrumb nav */
+#dfasResolveStepNav {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+.dfas-step-item {
+    font-size: 0.8rem;
+    color: var(--bs-secondary-color);
+    font-weight: 500;
+}
+.dfas-step-item.dfas-step-active {
+    color: var(--bs-primary);
+    font-weight: 700;
+}
+.dfas-step-item.dfas-step-done {
+    color: var(--bs-success);
+}
+
+

@@ -111,43 +111,27 @@
         <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
 
       {% elif row.status == 'shipment_missing' %}
-        {% if shipment_options %}
-          <select class="form-select form-select-sm dfas-shipment-select mb-1" aria-label="Shipment for row {{ row.id }}">
-            <option value="">— choose —</option>
-            {% for opt in shipment_options %}
-              <option value="{{ opt.id }}">
-                {{ opt.display }}{% if opt.item_value %} · ${{ opt.item_value|floatformat:2 }}{% endif %}
-              </option>
-            {% endfor %}
-          </select>
-          <div class="d-flex flex-wrap gap-1">
-            <button type="button" class="btn btn-sm btn-primary" data-action="assign_shipment">Assign</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
-          </div>
-        {% else %}
-          <p class="small text-danger mb-1">No shipments on CLIN.</p>
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
-        {% endif %}
+        <button type="button" class="btn btn-sm btn-primary"
+                data-action="open_resolve_modal"
+                data-start-step="shipment"
+                data-contract-id="{{ row.matched_contract_id }}"
+                data-clin-id="{{ row.matched_clin_id }}"
+                data-row-ref="{{ row.raw_contract_no|default:'' }}">Assign Shipment</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="skip">Skip</button>
 
       {% elif row.status == 'clin_missing' %}
-        {% if clin_options %}
-          <select class="form-select form-select-sm dfas-clin-select mb-1" aria-label="CLIN for row {{ row.id }}">
-            <option value="">—</option>
-            {% for opt in clin_options %}
-              <option value="{{ opt.id }}">{{ opt.item_number }} — {{ opt.item_type_display }}</option>
-            {% endfor %}
-          </select>
-          <div class="d-flex flex-wrap gap-1">
-            <button type="button" class="btn btn-sm btn-primary" data-action="assign_clin">Assign</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
-          </div>
-        {% else %}
-          <p class="small text-danger mb-1">No CLINs on contract.</p>
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-action="skip">Skip</button>
-        {% endif %}
+        <button type="button" class="btn btn-sm btn-primary"
+                data-action="open_resolve_modal"
+                data-start-step="clin"
+                data-contract-id="{{ row.matched_contract_id }}"
+                data-row-ref="{{ row.raw_contract_no|default:'' }}">Assign CLIN</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="skip">Skip</button>
 
       {% elif row.status == 'contract_missing' %}
-        <button type="button" class="btn btn-sm btn-primary" data-action="find_contract">Find Contract</button>
+        <button type="button" class="btn btn-sm btn-primary"
+                data-action="open_resolve_modal"
+                data-start-step="contract"
+                data-row-ref="{{ row.raw_contract_no|default:'' }}">Find Contract</button>
         <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="skip">Skip</button>
 
       {% elif row.status == 'duplicate' %}

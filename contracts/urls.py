@@ -219,6 +219,7 @@ from .views.packaging_views import (
     update_packaging_finance,
 )
 from .views.dfas_import_views import (
+    dfas_clins_api,
     dfas_import_cancel_view,
     dfas_import_finalize_view,
     dfas_import_list_view,
@@ -226,6 +227,7 @@ from .views.dfas_import_views import (
     dfas_import_resolve_row_view,
     dfas_import_review_view,
     dfas_import_upload_view,
+    dfas_shipments_api,
 )
 from .views import clin_fix_views
 
@@ -299,6 +301,16 @@ urlpatterns = [
         "dfas-imports/<int:batch_id>/rows/<int:row_id>/resolve/",
         dfas_import_resolve_row_view,
         name="dfas_import_resolve_row",
+    ),
+    path(
+        "dfas-imports/api/clins/",
+        dfas_clins_api,
+        name="dfas_clins_api",
+    ),
+    path(
+        "dfas-imports/api/shipments/",
+        dfas_shipments_api,
+        name="dfas_shipments_api",
     ),
     path("log/", ContractLogView.as_view(), name="contract_log_view"),
     path("log/export/", export_contract_log, name="export_contract_log"),

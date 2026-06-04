@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from contracts.models import Clin, Contract, DfasImportBatch, DfasImportRow
 from contracts.services.dfas_import import (
@@ -420,6 +420,77 @@ def dfas_import_resolve_row_view(request, batch_id, row_id):
         row.resolved_on = timezone.now()
         row.save()
 
+    elif action == 'resolve_unified':
+        data = payload
+        contract_id  = data.get('contract_id')   # required only for contract_missing
+        clin_id      = data.get('clin_id')        # always required
+        shipment_id  = data.get('shipment_id')    # optional
+
+        if not clin_id:
+            return JsonResponse(
+                {'success': False, 'message': 'clin_id is required.'},
+                status=400,
+            )
+
+        #  Contract assignment (contract_missing rows only) 
+        if row.status == 'contract_missing':
+            if not contract_id:
+                return JsonResponse(
+                    {'success': False, 'message': 'contract_id required for contract_missing row.'},
+                    status=400,
+                )
+            try:
+                contract = Contract.objects.get(pk=contract_id, company=ac)
+            except Contract.DoesNotExist:
+                return JsonResponse(
+                    {'success': False, 'message': 'Contract not found.'},
+                    status=400,
+                )
+            row.matched_contract = contract
+
+        #  CLIN assignment 
+        try:
+            clin = Clin.objects.get(pk=clin_id, contract=row.matched_contract)
+        except Clin.DoesNotExist:
+            return JsonResponse(
+                {'success': False, 'message': 'CLIN not found on this contract.'},
+                status=400,
+            )
+        row.matched_clin = clin
+
+        #  Shipment assignment (optional) 
+        if shipment_id:
+            from contracts.models import ClinShipment
+            try:
+                shipment = ClinShipment.objects.get(pk=shipment_id, clin=clin)
+            except ClinShipment.DoesNotExist:
+                return JsonResponse(
+                    {'success': False, 'message': 'Shipment not found on this CLIN.'},
+                    status=400,
+                )
+            row.matched_shipment = shipment
+        else:
+            row.matched_shipment = None
+
+        #  Determine final status 
+        if row.matched_shipment_id:
+            row.status = 'matched'
+        elif clin.shipments.exists():
+            # CLIN has shipments but none selected  should not reach here
+            # via the modal, but handle defensively.
+            row.status = 'shipment_missing'
+        else:
+            row.status = 'matched'
+
+        row.match_notes = (
+            f'Manually resolved: contract {row.matched_contract.contract_number}, '
+            f'CLIN {clin.item_number}'
+            + (f', shipment #{row.matched_shipment_id}' if row.matched_shipment_id else '')
+        )
+        row.resolved_by = request.user
+        row.resolved_on = timezone.now()
+        row.save()
+
     else:
         return JsonResponse(
             {'success': False, 'message': f'Unknown action: {action}'},
@@ -520,3 +591,103 @@ def dfas_import_cancel_view(request, batch_id):
         f"Import '{batch.filename}' cancelled. No payments were written.",
     )
     return redirect('contracts:dfas_import_list')
+
+
+@login_required
+@require_GET
+def dfas_clins_api(request):
+    ac = _active_company(request)
+    if not ac:
+        return JsonResponse(
+            {'success': False, 'message': 'No active company selected.'},
+            status=403,
+        )
+
+    contract_id = request.GET.get('contract_id')
+    if not contract_id:
+        return JsonResponse(
+            {'success': False, 'message': 'contract_id parameter is missing.'},
+            status=400,
+        )
+
+    contract = get_object_or_404(Contract, pk=contract_id, company=ac)
+    clins = Clin.objects.filter(contract=contract).order_by('item_number')
+
+    clin_list = []
+    for clin in clins:
+        item_type_display = ""
+        if hasattr(clin, 'get_item_type_display'):
+            item_type_display = clin.get_item_type_display()
+        if not item_type_display:
+            item_type_display = clin.item_type or ""
+
+        item_value = f"{clin.item_value:.2f}" if clin.item_value is not None else None
+        quote_value = f"{clin.quote_value:.2f}" if clin.quote_value is not None else None
+
+        clin_list.append({
+            "id": clin.id,
+            "item_number": clin.item_number or "",
+            "item_type_display": item_type_display,
+            "item_value": item_value,
+            "quote_value": quote_value,
+            "has_shipments": clin.shipments.exists(),
+            "shipment_count": clin.shipments.count(),
+        })
+
+    return JsonResponse({"clins": clin_list})
+
+
+@login_required
+@require_GET
+def dfas_shipments_api(request):
+    ac = _active_company(request)
+    if not ac:
+        return JsonResponse(
+            {'success': False, 'message': 'No active company selected.'},
+            status=403,
+        )
+
+    clin_id = request.GET.get('clin_id')
+    if not clin_id:
+        return JsonResponse(
+            {'success': False, 'message': 'clin_id parameter is missing.'},
+            status=400,
+        )
+
+    try:
+        clin = Clin.objects.select_related('contract').get(pk=clin_id)
+        if clin.contract.company != ac:
+            return JsonResponse(
+                {'success': False, 'message': 'CLIN not found for company.'},
+                status=400,
+            )
+    except Clin.DoesNotExist:
+        return JsonResponse(
+            {'success': False, 'message': 'CLIN not found for company.'},
+            status=400,
+        )
+
+    shipments = clin.shipments.all().order_by('id')
+
+    shipment_list = []
+    for i, s in enumerate(shipments):
+        display_name = s.name.strip() if (s.name and s.name.strip()) else f"Shipment {i + 1}"
+
+        item_value = f"{s.item_value:.2f}" if s.item_value is not None else None
+        quote_value = f"{s.quote_value:.2f}" if s.quote_value is not None else None
+        paid_amount = f"{s.paid_amount:.2f}" if s.paid_amount is not None else None
+        ship_date = s.ship_date.isoformat() if s.ship_date else None
+
+        shipment_list.append({
+            "id": s.id,
+            "display_name": display_name,
+            "item_value": item_value,
+            "quote_value": quote_value,
+            "paid_amount": paid_amount,
+            "ship_date": ship_date,
+        })
+
+    return JsonResponse({
+        "has_shipments": shipments.exists(),
+        "shipments": shipment_list,
+    })
