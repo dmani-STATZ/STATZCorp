@@ -1,7 +1,7 @@
 ---
 id: 2026-06-03-report-request-email-notifications
 title: Report Request Email Notifications
-published: false
+published: true
 publish_date: 2026-06-03
 tags: [new, system]
 critical: false

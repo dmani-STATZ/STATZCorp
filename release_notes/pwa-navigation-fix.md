@@ -1,8 +1,10 @@
 ---
-version: pwa-navigation-fix
-publish_date: 2026-06-03
+id: pwa-navigation-fix
 title: PWA Navigation Fix
-severity: fix
+published: true
+publish_date: 2026-06-03
+tags: [fixed]
+critical: false
 ---
 
 ## What Changed
