@@ -367,13 +367,14 @@ The Supplier Payment Forecast page provides a read-derived forecast of outstandi
 - **`ShipmentPaymentPlan`**: A lazy planning overlay model that stores the planned pay date, note, and hold status for actual shipments. It is not tracked in the audit trail (`transactions.signals.TRACKED`).
 
 ### Forecast Engine (`payment_forecast.py`)
-- **Open Contracts**: Filters out `Canceled` contract statuses.
-- **Actual Rows**: Represent shipments with a valid `ship_date` and an outstanding balance (`quote_value - paid_amount > 0`).
+- **Open Contracts**: Whitelists only live/payable contracts (using `LIVE_STATUSES = ["Open"]` status whitelist).
+- **Date-Sanity Floor**: Ship dates or target dates before `MIN_REAL_DATE = date(2015, 1, 1)` are treated as missing/sentinels. Actual shipments with these sentinel dates are skipped from actual rows (remaining projected). Projected rows with these sentinel target dates are treated as missing a target date, landing them in the "Needs Attention" bucket.
+- **Actual Rows**: Represent shipments with a valid `ship_date` (post-sanity floor) and an outstanding balance (`quote_value - paid_amount > 0`).
   - Due Date is calculated as `ship_date + net_days`.
   - If `net_days` is NULL, the row is placed in the "Needs Attention" bucket.
 - **Projected Rows**: Represent the un-shipped remainder of a CLIN (`order_qty - shipped_qty`).
-  - Due Date is calculated as `supplier_due_date + net_days`.
-  - Flags are appended if the amount is unknown, target date is missing, or terms are undefined.
+  - Due Date is calculated as `target + net_days` (where `target` is the sanitized `supplier_due_date`).
+  - Flags are appended if the amount is unknown, target date is missing (or sentinel), or terms are undefined.
 - **Buckets**: Rows are grouped into `overdue`, `upcoming` (within the horizon), `projected`, or `needs_attention` (always returned regardless of horizon).
 
 ### Views and Integrations

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -7,7 +7,9 @@ from django.utils import timezone
 
 from ..models import Clin
 
-CANCELED_STATUS = "Canceled"  # one L  matches contracts_contractstatus
+LIVE_STATUSES = ["Open"]          # only Open contracts are live/payable
+MIN_REAL_DATE = date(2015, 1, 1)  # dates before this are migration sentinels (e.g. 0001-01-01), not real
+
 
 
 @dataclass
@@ -62,10 +64,10 @@ def build_forecast(company, days: int = 60):
     horizon = today + timedelta(days=days)
 
     clins = (
-        Clin.objects.filter(contract__company=company)
-        # Exclude Canceled. If ContractStatus has an existing is_closed/is_open
-        # flag, ALSO exclude closed statuses by reusing it  check the model.
-        .exclude(contract__status__description__iexact=CANCELED_STATUS)
+        Clin.objects.filter(
+            contract__company=company,
+            contract__status__description__in=LIVE_STATUSES
+        )
         .select_related(
             "contract", "contract__status",
             "supplier", "supplier__special_terms",
@@ -90,8 +92,8 @@ def build_forecast(company, days: int = 60):
 
         # ---- ACTUAL rows: one per shipment that has a ship_date ----
         for sh in clin.shipments.all():
-            if not sh.ship_date:
-                continue  # undated -> stays on the projected side (counted in remainder via NOT adding here)
+            if not sh.ship_date or sh.ship_date < MIN_REAL_DATE:
+                continue  # undated or sentinel -> stays on the projected side (counted in remainder via NOT adding here)
             dated_shipped_qty += Decimal(str(sh.ship_qty or 0))
             amount = sh.quote_value
             paid = sh.paid_amount or Decimal("0.00")
@@ -141,11 +143,16 @@ def build_forecast(company, days: int = 60):
                 flags.append("amount_unknown")
             if net_days is None:
                 flags.append("no_terms")
-            if not clin.supplier_due_date:
+
+            target = clin.supplier_due_date
+            if target and target < MIN_REAL_DATE:
+                target = None
+
+            if not target:
                 flags.append("no_target_date")
 
-            if net_days is not None and clin.supplier_due_date:
-                due = clin.supplier_due_date + timedelta(days=net_days)
+            if net_days is not None and target:
+                due = target + timedelta(days=net_days)
                 if due < today:
                     bucket = "overdue"      # a projected payment whose target date already lapsed
                 elif due <= horizon:
@@ -166,7 +173,7 @@ def build_forecast(company, days: int = 60):
                 supplier_id=clin.supplier_id, supplier_name=supplier_name,
                 shipment_id=None, term_id=term_id, term_label=term_label, net_days=net_days,
                 qty=remaining, amount=amount, paid=None, outstanding=amount,
-                anchor_date=clin.supplier_due_date, due_date=due, flags=flags, plan=None,
+                anchor_date=target, due_date=due, flags=flags, plan=None,
             ))
 
     buckets = {"overdue": [], "upcoming": [], "projected": [], "needs_attention": []}
