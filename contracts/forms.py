@@ -758,7 +758,8 @@ class IdiqContractForm(BaseModelForm):
             'term_length',
             'option_length',
             'closed',
-            'tab_num'
+            'tab_num',
+            'alert_note',
         ]
         widgets = {
             'contract_number': forms.TextInput(),
@@ -773,7 +774,11 @@ class IdiqContractForm(BaseModelForm):
                 'min': 0
             }),
             'closed': forms.Select(),
-            'tab_num': forms.TextInput()
+            'tab_num': forms.TextInput(),
+            'alert_note': forms.Textarea(attrs={
+                'rows': 3,
+                'placeholder': 'Optional notice shown to analysts when this IDIQ is matched in Processing or Intake',
+            }),
         }
 
     def __init__(self, *args, **kwargs):

@@ -105,6 +105,7 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 - `start_processing` routes IDIQ contracts to `idiq_processing_edit` via `redirect_url` in JSON response.
 - Finalization (`finalize_contract`, `finalize_idiq_contract`) is the **only** write path into `contracts`. Runs inside `transaction.atomic`. Never write `Contract`/`Clin` from processing views outside finalization functions.
 - Orphaned `QueueContract` rows (no contract number) can be reconciled via `match_contract_number` — uses `select_for_update()` to prevent race conditions.
+- `IdiqContract` now has an `alert_note` TextField. When non-blank, both Processing (`ProcessContractUpdateView`) and Intake (DO draft editor) display a Bootstrap modal popup when the IDIQ is matched or when the edit page loads with an IDIQ already linked. The field is writable from the IDIQ processing editor, Intake IDIQ draft editor, and the contracts IDIQ edit page.
 
 ---
 

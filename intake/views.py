@@ -20,7 +20,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
-from contracts.models import Contract
+from contracts.models import Contract, IdiqContract
 
 from .finalize import FinalizationError, finalize_draft
 from .forms_parse import parse_post
@@ -196,10 +196,18 @@ def _editor_context(draft: DraftContract, user) -> dict:
             supplier_flags[str(_sup.pk)] = flags
 
     pkg_data = data.get('packaging') or {}
+    idiq_alert_note = ''
+    if draft.contract_type == 'DO':
+        parent_idiq_id = (draft.data or {}).get('parent_idiq_id')
+        if parent_idiq_id:
+            idiq = IdiqContract.objects.filter(pk=parent_idiq_id).first()
+            idiq_alert_note = (idiq.alert_note or '') if idiq else ''
+
     return {
         'draft': draft,
         'data': data,
         'supplier_flags': supplier_flags,
+        'idiq_alert_note': idiq_alert_note,
         # Pre-extracted lists keep the template loop-friendly without filters.
         'clins': data.get('clins') or [],
         'finance_lines': data.get('finance_lines') or [],
@@ -396,7 +404,19 @@ def match_endpoint(request, pk: int):
                 status=400,
             )
 
-    return JsonResponse({'ok': True, 'data': draft.data})
+    response_payload = {'ok': True, 'data': draft.data}
+    if action == 'apply':
+        # If this was an IDIQ match, include alert_note in the response
+        if match_type == 'idiq' or target_path in ('parent_idiq',):
+            idiq_alert = (
+                IdiqContract.objects
+                .filter(pk=record_id)
+                .values_list('alert_note', flat=True)
+                .first()
+            ) or ''
+            response_payload['alert_note'] = idiq_alert
+
+    return JsonResponse(response_payload)
 
 
 @login_required

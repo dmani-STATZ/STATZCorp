@@ -2401,4 +2401,46 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     // ... existing code ...
 </script>
+
+<!-- IDIQ Alert Note Modal -->
+<div class="modal fade" id="idiqAlertModal" tabindex="-1"
+     aria-labelledby="idiqAlertModalLabel" aria-modal="true" role="dialog">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="idiqAlertModalLabel">
+          IDIQ Notice &mdash; <span id="idiqAlertContractNumber"></span>
+        </h5>
+        <button type="button" class="btn-close"
+                data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="idiqAlertBody" class="mb-0"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary"
+                data-bs-dismiss="modal">Got It</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showIdiqAlertModal(contractNumber, alertNote) {
+    if (!alertNote || !alertNote.trim()) return;
+    document.getElementById('idiqAlertContractNumber').textContent = contractNumber || '';
+    document.getElementById('idiqAlertBody').textContent = alertNote;
+    var modal = new bootstrap.Modal(document.getElementById('idiqAlertModal'));
+    modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    {% if idiq_alert_note %}
+    showIdiqAlertModal(
+        '{{ process_contract.idiq_contract.contract_number|escapejs }}',
+        '{{ idiq_alert_note|escapejs }}'
+    );
+    {% endif %}
+});
+</script>
 {% endblock %}

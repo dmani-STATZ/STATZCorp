@@ -94,6 +94,16 @@
             </div>
 
         </div>
+
+        <!-- Alert Note -->
+        <div class="mt-4">
+            <label class="label mb-1 block" for="alert_note_input">Alert Note</label>
+            <textarea name="alert_note"
+                      id="alert_note_input"
+                      class="form-control"
+                      rows="3"
+                      placeholder="Optional notice shown to analysts when this IDIQ is matched">{{ idiq_alert_note }}</textarea>
+        </div>
     </div>
 
     <!-- CLIN Table -->
@@ -696,6 +706,8 @@ function finalizeIdiq() {
     if (optionMonths !== '') form.append('option_months', optionMonths);
     if (maxValue) form.append('max_value', maxValue);
     if (minGuarantee) form.append('min_guarantee', minGuarantee);
+    const alertNoteEl = document.getElementById('alert_note_input');
+    if (alertNoteEl) form.append('alert_note', alertNoteEl.value);
 
     document.querySelectorAll('input[name^="min_order_qty_"]').forEach(el => {
         form.append(el.name, el.value);

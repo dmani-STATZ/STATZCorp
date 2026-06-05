@@ -118,6 +118,7 @@
                 matchType: state.matchType,
                 action: 'apply',
                 data: json.data,
+                alertNote: json.alert_note || '',   //  add this line only
             },
         }));
         close();

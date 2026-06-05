@@ -162,6 +162,7 @@ def create_idiq_from_payload(payload: dict, user: User) -> IdiqContract:
         option_length=payload.get('option_length'),
         max_value=payload.get('max_value'),
         min_guarantee=payload.get('min_guarantee'),
+        alert_note=payload.get('alert_note') or None,
         files_url=payload.get('files_url'),
         closed=False,
         created_by=user,

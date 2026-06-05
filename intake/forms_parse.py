@@ -38,7 +38,7 @@ SCALAR_FIELDS = {
     # AwdPoData / DoData
     'parent_idiq_contract_number', 'parent_idiq_id',
     # IDIQ
-    'term_months', 'option_months', 'max_value', 'min_guarantee',
+    'term_months', 'option_months', 'max_value', 'min_guarantee', 'alert_note',
     # MOD / AMD
     'parent_contract_number', 'parent_contract_id', 'mod_number', 'summary',
     # Internal

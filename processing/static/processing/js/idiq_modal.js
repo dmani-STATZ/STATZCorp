@@ -129,7 +129,20 @@ function selectIdiq(id, text) {
     .then(data => {
         console.log('Success response:', data);
         if (data.success) {
-            location.reload();
+            if (data.alert_note) {
+                showIdiqAlertModal(data.contract_number, data.alert_note);
+                // Reload the page when the modal is dismissed
+                var alertModalEl = document.getElementById('idiqAlertModal');
+                if (alertModalEl) {
+                    alertModalEl.addEventListener('hidden.bs.modal', function () {
+                        location.reload();
+                    }, { once: true });
+                } else {
+                    location.reload();
+                }
+            } else {
+                location.reload();
+            }
         } else {
             alert(data.error || 'Error selecting IDIQ contract');
         }

@@ -503,6 +503,8 @@ class ProcessContractUpdateView(LoginRequiredMixin, UpdateView):
         context['pdf_parse_notes'] = (
             (queue_contract.pdf_parse_notes or "") if queue_contract else ""
         )
+        idiq = self.object.idiq_contract if self.object else None
+        context['idiq_alert_note'] = (idiq.alert_note or '') if idiq else ''
         
         return context
     
@@ -854,7 +856,8 @@ def match_idiq(request, process_contract_id):
         return JsonResponse({
             'success': True,
             'idiq_id': idiq_contract.id,
-            'contract_number': idiq_contract.contract_number
+            'contract_number': idiq_contract.contract_number,
+            'alert_note': idiq_contract.alert_note or '',
         })
     except ProcessContract.DoesNotExist:
         return JsonResponse({
@@ -2948,6 +2951,7 @@ def idiq_processing_edit(request, process_contract_id):
         'idiq_min_guarantee': meta['min_guarantee'],
         'idiq_option_months': option_months,
         'idiq_option_years': (option_months / 12) if option_months is not None else None,
+        'idiq_alert_note': '',
     }
     return render(request, 'processing/idiq_processing_edit.html', context)
 
@@ -2990,6 +2994,8 @@ def finalize_idiq_contract(request, process_contract_id):
         except (ValueError, TypeError):
             option_months = None
 
+        alert_note = request.POST.get('alert_note', '').strip() or None
+
         # Build the explicit (nsn, supplier, min_order_qty) pairs from the
         # per-CLIN form inputs so the service can create one IdiqContractDetails
         # row per CLIN (Processing's direct-mapping style — not Intake's
@@ -3015,6 +3021,7 @@ def finalize_idiq_contract(request, process_contract_id):
                     'max_value': max_value,
                     'min_guarantee': min_guarantee,
                     'approved_pairs': idiq_details,
+                    'alert_note': alert_note,
                 },
                 request.user,
             )

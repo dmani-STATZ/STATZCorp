@@ -266,6 +266,15 @@ For IDIQ CLINs, `QueueClin.nsn_description` is set to the min delivery order qua
 - `IdiqContract.max_value`, `IdiqContract.min_guarantee` (DecimalField, null=True) — `contracts/0038`
 - `IdiqContractDetails.min_order_qty` (CharField max_length=50, null=True) — same migration
 
+**IDIQ Alert Note flow:**
+- `IdiqContract.alert_note` — `TextField(null=True, blank=True)`. Non-blank values surface in:
+  - `match_idiq` JSON response key `alert_note`
+  - Intake `match` endpoint `apply` response key `alert_note` (only when `match_type='idiq'` or `target_path='parent_idiq'`)
+  - Template context key `idiq_alert_note` in `ProcessContractUpdateView` and the intake draft editor view
+- `IdiqData.alert_note` maps to `IdiqContract.alert_note` on finalization via `_finalize_idiq`. Draft key: `data['alert_note']`, POST key: `f_alert_note`.
+- `finalize_idiq_contract` (Processing) reads `alert_note` from POST and passes it to `create_idiq_from_payload`.
+- `intake:match-applied` custom event `detail` now includes `alertNote` (string, empty if none). Populated by `match_modal.js` when the server returns `alert_note` on an IDIQ apply.
+
 ### Queue Merge — Match Orphaned Contract Number
 
 Orphaned `QueueContract` rows (`contract_number` empty) can be reconciled via **Match Contract** (`processing:match_contract_number`, POST `target_contract_number`). Handler runs in `transaction.atomic()` with `select_for_update()` on both rows.

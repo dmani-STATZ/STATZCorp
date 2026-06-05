@@ -1119,6 +1119,7 @@ class IdiqContract(AuditModel):
     tab_num = models.CharField(max_length=10, null=True, blank=True)
     max_value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     min_guarantee = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    alert_note = models.TextField(null=True, blank=True)
     files_url = models.CharField(max_length=200, null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='idiq_contract')
 

@@ -180,6 +180,7 @@ class IdiqData(_CommonContractFields):
     option_months: Optional[int] = None
     max_value: Optional[Decimal] = None
     min_guarantee: Optional[int] = None
+    alert_note: Optional[str] = None
     approved_pairs: List[IdiqPair] = Field(default_factory=list)
 
 

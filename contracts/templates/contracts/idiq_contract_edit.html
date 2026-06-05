@@ -85,6 +85,16 @@
                 </div>
             </div>
 
+            <!-- Alert Note -->
+            <div class="form-group mt-4">
+                <label for="{{ form.alert_note.id_for_label }}" class="form-label">Alert Note</label>
+                {{ form.alert_note }}
+                {% if form.alert_note.errors %}
+                <div class="field-error">{{ form.alert_note.errors|join:", " }}</div>
+                {% endif %}
+                <small class="text-muted">Optional notice shown to analysts when this IDIQ is matched in Processing or Intake.</small>
+            </div>
+
             <!-- Form Actions -->
             <div class="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
                 <a href="{% url 'contracts:idiq_contract_detail' object.pk %}" class="btn btn-caution">Cancel</a>

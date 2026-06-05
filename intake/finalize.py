@@ -341,6 +341,7 @@ def _finalize_idiq(draft: DraftContract, user: User) -> IdiqContract:
         'min_guarantee': data.get('min_guarantee'),
         'files_url': files_url_value,
         'approved_pairs': data.get('approved_pairs') or [],
+        'alert_note': data.get('alert_note') or None,
     }
     try:
         return create_idiq_from_payload(payload, user)

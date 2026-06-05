@@ -83,7 +83,7 @@ class IdiqContractDetailView(LoginRequiredMixin, DetailView):
 class IdiqContractUpdateView(LoginRequiredMixin, UpdateView):
     model = IdiqContract
     fields = ['contract_number', 'buyer', 'award_date', 'term_length', 
-              'option_length', 'closed', 'tab_num']
+              'option_length', 'closed', 'tab_num', 'alert_note']
     template_name = 'contracts/idiq_contract_edit.html'
     
     def get_success_url(self):

@@ -305,6 +305,17 @@
                            class="form-control">
                 </div>
             </div>
+
+            {% if draft.contract_type == 'IDIQ' %}
+            <div class="mt-4">
+                <label class="label block mb-1" for="f_alert_note_field">ALERT NOTE</label>
+                <textarea name="f_alert_note"
+                          id="f_alert_note_field"
+                          class="form-control"
+                          rows="3"
+                          placeholder="Optional notice shown to analysts when this IDIQ is matched">{{ draft.data.alert_note|default:'' }}</textarea>
+            </div>
+            {% endif %}
         </div>
 
         <div class="card card-padded shadow-sm mb-4">
@@ -1379,5 +1390,60 @@
         restoreOpenClins();
     }
 })();
+</script>
+
+<!-- IDIQ Alert Note Modal (Intake) -->
+<div class="modal fade" id="intakeIdiqAlertModal" tabindex="-1"
+     aria-labelledby="intakeIdiqAlertModalLabel" aria-modal="true" role="dialog">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="intakeIdiqAlertModalLabel">
+          IDIQ Notice &mdash; <span id="intakeIdiqAlertContractNumber"></span>
+        </h5>
+        <button type="button" class="btn-close"
+                data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="intakeIdiqAlertBody" class="mb-0"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary"
+                data-bs-dismiss="modal">Got It</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showIntakeIdiqAlertModal(contractNumber, alertNote) {
+    if (!alertNote || !alertNote.trim()) return;
+    document.getElementById('intakeIdiqAlertContractNumber').textContent = contractNumber || '';
+    document.getElementById('intakeIdiqAlertBody').textContent = alertNote;
+    var modal = new bootstrap.Modal(document.getElementById('intakeIdiqAlertModal'));
+    modal.show();
+}
+
+// Page load: fire if a parent IDIQ is already matched and has an alert_note
+// Only fires for DO contracts; IDIQ drafts are creation-only (no popup there)
+document.addEventListener('DOMContentLoaded', function () {
+    {% if idiq_alert_note %}
+    showIntakeIdiqAlertModal(
+        '{{ draft.data.parent_idiq_contract_number|default:''|escapejs }}',
+        '{{ idiq_alert_note|escapejs }}'
+    );
+    {% endif %}
+});
+
+// Live match: fire when the analyst selects a parent IDIQ via the match modal
+document.addEventListener('intake:match-applied', function (e) {
+    if (
+        (e.detail.matchType === 'idiq' || e.detail.targetPath === 'parent_idiq') &&
+        e.detail.alertNote
+    ) {
+        var contractNumber = (e.detail.data && e.detail.data.parent_idiq_contract_number) || '';
+        showIntakeIdiqAlertModal(contractNumber, e.detail.alertNote);
+    }
+});
 </script>
 {% endblock %}
