@@ -3,7 +3,7 @@ id: 2026-05-22-email-clin-type
 title: CLIN Type Added to Contract Notification Email
 published: true
 publish_date: 2026-05-22
-tags: [improved]
+tags: [improved, contracts]
 critical: false
 ---
 

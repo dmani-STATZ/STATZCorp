@@ -3,7 +3,7 @@ id: 2026-05-19-closed-contract-lavender-header
 title: Closed Contracts Now Display a Lavender Header
 published: true
 publish_date: 2026-05-19
-tags: [improved, contracts, finance]
+tags: [improved, finance]
 critical: false
 ---
 

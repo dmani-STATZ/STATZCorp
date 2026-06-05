@@ -1,7 +1,7 @@
 ---
 id: 2026-05-28-admin-report-editor
 title: Admin Report Editor — Direct SQL Edits
-published: falsse
+published: true
 publish_date: 2026-05-28
 tags: [new, system]
 critical: false

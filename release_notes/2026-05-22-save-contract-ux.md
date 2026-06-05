@@ -3,7 +3,7 @@ id: 2026-05-22-save-contract-ux
 title: Save Contract Button — Visibility and Dirty State Indicator
 published: true
 publish_date: 2026-05-22
-tags: [improved]
+tags: [improved, contracts]
 critical: false
 ---
 

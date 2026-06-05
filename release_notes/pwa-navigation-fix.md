@@ -3,7 +3,7 @@ id: pwa-navigation-fix
 title: PWA Navigation Fix
 published: true
 publish_date: 2026-06-03
-tags: [fixed]
+tags: [fixed, system]
 critical: false
 ---
 

@@ -3,7 +3,7 @@ id: contract-level-charges
 title: Contract-Level Charges
 published: true
 publish_date: 2026-06-01
-tags: [new-feature, processing, finance]
+tags: [new, finance]
 critical: false
 ---
 

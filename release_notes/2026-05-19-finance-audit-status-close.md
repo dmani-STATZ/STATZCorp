@@ -3,7 +3,7 @@ id: 2026-05-19-finance-audit-status-close
 title: Finance Audit — Contract Status and Close Contract Link
 published: true
 publish_date: 2026-05-19
-tags: [improved, finance, contracts]
+tags: [improved, finance]
 critical: false
 ---
 
