@@ -589,4 +589,16 @@ The `tags` array will fail validation if it does not contain exactly two items:
 2. **One Area:** `contracts`, `finance`, `sales`, `training`, OR `system`
 *(Do not invent new tags. Unknown tags cause the file to be skipped.)*
 
+---
+
+## 17. Supplier Payment Forecast Rules & Safety Constraints
+
+- **Read-derived Planning Window**: The forecast page is purely a planning overlay window, not a system of financial record. All cash and formal payment data must continue to reside in and derive from `quote_value` / `paid_amount`.
+- **Single Payment Recording Path**: Never create a new or secondary payment-recording path. Supplier payments are recorded exclusively through the existing `payment_history_api` and `_recompute_clin_payment_rollup` flow by reusing the `partial-value-cell` component.
+- **No Fabricated Due Dates**: A payment term with `net_days = NULL`, or a missing target date, must always produce a flagged row in the "Needs Attention" bucket. Do not invent due dates or assume a default (e.g. Net 30) when terms or dates are missing.
+- **No Data Migration for Code Tables**: Never populate `net_days` values in a data migration. Code table values (like COS=0, Net 30=30, etc.) are developer-managed directly via the code-table admin interface.
+- **Audit Exclusion for Planning Metadata**: The fields of the `ShipmentPaymentPlan` model store planning intentions, not financial state. They must never be added to `transactions.signals.TRACKED`.
+- **No `queryset.update()` on Audited Fields**: For any audited data mutations (such as changing the payment term `<select>`), perform instance-level `.save(update_fields=[...])` so that the `transactions` signals capture and record the history change.
+
+
 ```

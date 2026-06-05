@@ -810,7 +810,7 @@ class SalesClassForm(BaseModelForm):
 class SpecialPaymentTermsForm(BaseModelForm):
     class Meta:
         model = SpecialPaymentTerms
-        fields = ['code', 'terms']
+        fields = ['code', 'terms', 'net_days']
 
 
 class ClinTypeForm(BaseModelForm):

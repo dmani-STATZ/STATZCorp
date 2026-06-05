@@ -26,12 +26,13 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - `contracts/views/folder_tracking_views.py`: folder-stack UI, pagination toggle, Excel export helpers (`contracts/utils/excel_utils.py`), stack colors, search, add/close/highlight actions.
 - `contracts/views/supplier_views.py`: supplier list/detail/edit (reusing `suppliers.models`), inline updates (headers, addresses, notes, compliance), and supplier search/views tied into contract data for quick navigation.
 - `contracts/views/contract_log_views.py`: paginated CLIN list used for exports, annotated with split totals and acknowledgement helper text.
+- `contracts/views/payment_forecast_views.py`: handles the main forecast view and updates to the lazy planning overlay (`ShipmentPaymentPlan`).
 - `contracts/views/api_views.py`: JSON APIs powering dropdowns, CLIN quick updates, NSN/buyer/supplier creation, contract day counts, and select-option pagination that feed the front-end modals and HTMX widgets.
   - `get_select_options` NSN search (`field_name == 'nsn'`) normalizes incoming search terms via `normalize_nsn` from `processing.services.contract_utils` before filtering, so users can search with or without dashes. The dashless variant is also checked to handle edge cases with inconsistently stored data.
 - `contracts/context_processors.py`: reminder aggregates and lists scoped by `request.active_company` for the footer pill and any templates that still consume `reminders_processor` keys (`contracts/templates/contracts/contract_base.html` no longer renders a sidebar list). **`active_users_processor`** adds `active_users_json` (JSON array of `{id, username}` for active users) on every authenticated request; `contract_base.html` and `notes_popup_base.html` expose it on a hidden `#activeUsersList` element (`data-users` / `data-current-user-id`) for client-side **Assigned To** and **Reminder For** dropdowns in note modals.
 - `contracts/utils/contracts_schema.py`: schema generator (used for documentation/query tooling) that enumerates tables, fields, and foreign keys.
 - `contracts/utils/*`: helper modules for Excel exports (`excel_utils.py`) and lazy image/PDF tooling (`image_processing.py`).
-- `contracts/services/`: SharePoint integration (`sharepoint_paths.py`, `sharepoint_service.py`) and **DFAS payment import** (`dfas_parser.py`, `dfas_matcher.py`, `dfas_import.py`) — see §5 **DFAS Payment Import**.
+- `contracts/services/`: SharePoint integration (`sharepoint_paths.py`, `sharepoint_service.py`), **DFAS payment import** (`dfas_parser.py`, `dfas_matcher.py`, `dfas_import.py`) — see §5 **DFAS Payment Import**, and **Supplier Payment Forecast engine** (`payment_forecast.py`) which builds forecast rows for open contracts.
 - `contracts/management/commands/initialize_sequence_numbers.py`: seeds the shared PO/TAB sequence numbers from existing contracts; `refresh_nsn_view.py` now only reports the legacy `nsn_view` database view.
 - `contracts/CONTRACTS_APP_CURRENT_STATE.md` & `Contracts Application.md`: living documentation summarizing current features (dashboard, notes split, reminders, GovActions) that future changes should keep in sync.
 - `contracts/templates/contracts/`: main user-facing templates (`contract_management.html`, `clin_form.html`, `clin_detail.html`, `contract_lifecycle_dashboard.html`, `folder_tracking.html`, `contract_log_view.html`) plus reusable partials/includes (`notes_list.html`, `note_modal.html`, `clin_shipments.html`, `payment_history_popup.html`). The stub `partials/contract_splits.html` documents that contract-level splits were replaced by `ClinSplit` on the CLIN detail page. The CLIN create form (`clin_form.html`, create-only) loads NSN and Supplier picker modals from `contracts/templates/contracts/modals/nsn_modal.html` and `supplier_modal.html` (included templates), not inline modal markup. CLIN detail (`clin_detail.html`) wires tracked fields to the Transactions edit modal and change-history panel, and provides CLIN split CRUD via `contract_splits.js`.
@@ -350,8 +351,34 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 - Keep `contracts/CONTRACTS_APP_CURRENT_STATE.md` (and `Contracts Application.md`) in sync with code changes to preserve the documented expectations for this app’s UX.
 
 ## 19. Quick Reference
-- **Primary models:** `Contract`, `Clin`, `Company`, `PaymentHistory`, `ClinShipment`, `ClinSplit`, `FolderTracking`, `FolderStack`, `Note`, `Reminder`, `GovAction`, `AcknowledgementLetter` (`contracts/models.py`).
-- **Main URLs:** dashboard `/contracts/`, contract management `<pk>/`, CLIN CRUD `/contracts/clin/*`, folder tracking `/contracts/folder-tracking/`, contract log `/contracts/log/`, finance audit `/contracts/finance-audit/`, supplier management `/contracts/suppliers/`, and APIs under `/contracts/api/*` (`contracts/urls.py`).
-- **Key templates:** `contracts/templates/contracts/contract_management.html`, `contract_lifecycle_dashboard.html`, `folder_tracking.html`, `contract_log_view.html`, `clin_detail.html`, `clin_form.html` (create-only), plus partials `notes_list.html`, `payment_history_popup.html`, `clin_shipments.html`.
+- **Primary models:** `Contract`, `Clin`, `Company`, `PaymentHistory`, `ClinShipment`, `ClinSplit`, `FolderTracking`, `FolderStack`, `Note`, `Reminder`, `GovAction`, `AcknowledgementLetter`, `ShipmentPaymentPlan` (`contracts/models.py`).
+- **Main URLs:** dashboard `/contracts/`, contract management `<pk>/`, CLIN CRUD `/contracts/clin/*`, folder tracking `/contracts/folder-tracking/`, contract log `/contracts/log/`, finance audit `/contracts/finance-audit/`, supplier payment forecast `/contracts/payment-forecast/`, supplier management `/contracts/suppliers/`, and APIs under `/contracts/api/*` (`contracts/urls.py`).
+- **Key templates:** `contracts/templates/contracts/contract_management.html`, `contract_lifecycle_dashboard.html`, `folder_tracking.html`, `contract_log_view.html`, `clin_detail.html`, `clin_form.html` (create-only), `payment_forecast.html`, plus partials `notes_list.html`, `payment_history_popup.html`, `clin_shipments.html`.
 - **Key dependencies:** `products.models.Nsn`, `suppliers.models.Supplier` (and related contacts/certifications), `processing.models.SequenceNumber`, `users.user_settings.UserSettings`, `STATZWeb.decorators.conditional_login_required`, and `openpyxl`/`webcolors` for exports.
 - **Risky files to review first:** `contracts/models.py`, `contracts/views/contract_views.py`, `contracts/forms.py`, `contracts/views/api_views.py`, `contracts/views/folder_tracking_views.py` (Excel export + pagination logic).
+
+## 20. Supplier Payment Forecast (Backend & Planning Overlay)
+
+### Overview
+The Supplier Payment Forecast page provides a read-derived forecast of outstanding payments owed to suppliers. It is designed as a planning window, not an authoritative ledger. QuickBooks remains the source of truth, and payments can only be recorded via the existing `payment_history_api` ledger popup (by reusing `partial-value-cell`).
+
+### Domain Objects and Models
+- **`SpecialPaymentTerms.net_days`**: An optional field specifying the number of days after the supplier ship date that payment is due. A value of `0` denotes cash/delivery (COS/COD). If `net_days` is `None` (NULL), it signifies the terms have no fixed day count; payments will be flagged as "no terms" rather than fabricating a due date.
+- **`ShipmentPaymentPlan`**: A lazy planning overlay model that stores the planned pay date, note, and hold status for actual shipments. It is not tracked in the audit trail (`transactions.signals.TRACKED`).
+
+### Forecast Engine (`payment_forecast.py`)
+- **Open Contracts**: Filters out `Canceled` contract statuses.
+- **Actual Rows**: Represent shipments with a valid `ship_date` and an outstanding balance (`quote_value - paid_amount > 0`).
+  - Due Date is calculated as `ship_date + net_days`.
+  - If `net_days` is NULL, the row is placed in the "Needs Attention" bucket.
+- **Projected Rows**: Represent the un-shipped remainder of a CLIN (`order_qty - shipped_qty`).
+  - Due Date is calculated as `supplier_due_date + net_days`.
+  - Flags are appended if the amount is unknown, target date is missing, or terms are undefined.
+- **Buckets**: Rows are grouped into `overdue`, `upcoming` (within the horizon), `projected`, or `needs_attention` (always returned regardless of horizon).
+
+### Views and Integrations
+- **`PaymentForecastView`**: Renders `contracts/payment_forecast.html` showing the forecast lists.
+- **`upsert_payment_plan`**: Receives POST/PATCH requests to plan payments, setting `planned_pay_date`, `note`, and `on_hold` properties per-shipment.
+- **Reused API Endpoints**:
+  - `update_clin_field` updates the CLIN's payment terms dropdown inline and registers in the audit log.
+  - `payment_history_api` ledger manages payments via the `partial-value-cell` component.

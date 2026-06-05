@@ -1,0 +1,116 @@
+{% extends "base_template.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Supplier Payment Forecast{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Minimal functional styling to make spacing clear */
+    .forecast-section {
+        margin-bottom: 2.5rem;
+    }
+    .forecast-section h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.25rem;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.25em 0.5em;
+    }
+    .table-responsive {
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">Supplier Payment Forecast</h1>
+            <p class="text-muted mb-0">Window planning overlay — QuickBooks remains the system of record</p>
+        </div>
+        <div>
+            <!-- Horizon Filter -->
+            <form method="get" class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <label for="days" class="col-form-label">Forecast Horizon (Days):</label>
+                </div>
+                <div class="col-auto">
+                    <input type="number" id="days" name="days" class="form-control form-control-sm" style="width: 80px;" value="{{ days }}" min="1" max="365">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-primary">Update Horizon</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% csrf_token %}
+
+    <!-- Overdue Section -->
+    <div class="forecast-section" id="section-overdue">
+        <h2>1. Overdue Payments</h2>
+        {% with rows=buckets.overdue %}
+            {% if rows %}
+                {% include "contracts/partials/forecast_table.html" with rows=rows show_plan=True %}
+            {% else %}
+                <div class="alert alert-light text-muted py-2 border">No overdue payments.</div>
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Upcoming Section -->
+    <div class="forecast-section" id="section-upcoming">
+        <h2>2. Upcoming Payments (Next {{ days }} Days)</h2>
+        {% with rows=buckets.upcoming %}
+            {% if rows %}
+                {% include "contracts/partials/forecast_table.html" with rows=rows show_plan=True %}
+            {% else %}
+                <div class="alert alert-light text-muted py-2 border">No upcoming actual shipments due.</div>
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Projected Section -->
+    <div class="forecast-section" id="section-projected">
+        <h2>3. Projected Payments (Next {{ days }} Days)</h2>
+        {% with rows=buckets.projected %}
+            {% if rows %}
+                {% include "contracts/partials/forecast_table.html" with rows=rows show_plan=False %}
+            {% else %}
+                <div class="alert alert-light text-muted py-2 border">No projected CLIN payments.</div>
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Needs Attention Section -->
+    <div class="forecast-section" id="section-attention">
+        <h2>4. Needs Attention (Missing Terms or Target Dates)</h2>
+        {% with rows=buckets.needs_attention %}
+            {% if rows %}
+                {% include "contracts/partials/forecast_table.html" with rows=rows show_plan=True is_attention=True %}
+            {% else %}
+                <div class="alert alert-light text-muted py-2 border">No rows require attention.</div>
+            {% endif %}
+        {% endwith %}
+    </div>
+</div>
+
+<!-- Reusable Payment History Modals -->
+{% include "contracts/includes/payment_history_popup.html" %}
+
+<script>
+    window.clinshipmentContentTypeId = {{ clinshipment_content_type_id }};
+    window.updateClinFieldUrlTemplate = "{% url 'contracts:update_clin_field' 0 %}";
+    window.upsertPaymentPlanUrlTemplate = "{% url 'contracts:payment_forecast_plan' 0 %}";
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'contracts/js/payment_forecast.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

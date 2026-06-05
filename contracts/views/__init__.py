@@ -206,5 +206,13 @@ __all__ = [
     'update_acknowledgment_letter',
     'code_table_admin',
     'supplier_admin_tools',
+    'PaymentForecastView',
+    'upsert_payment_plan',
 ]
+
+
+from .payment_forecast_views import (
+    PaymentForecastView,
+    upsert_payment_plan,
+)
 

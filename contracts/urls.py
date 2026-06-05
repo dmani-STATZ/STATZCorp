@@ -2,6 +2,7 @@ from django.urls import path, re_path
 from django.views.generic import TemplateView
 from users.views import test_app_name
 from . import views
+from .views.payment_forecast_views import PaymentForecastView, upsert_payment_plan
 from .views.finance_views import FinanceAuditView, finance_audit_summary_api, finance_audit_clin_api
 from .views.finance_line_views import (
     add_finance_line,
@@ -672,6 +673,9 @@ urlpatterns = [
     ),
     path("nsn/search/", NsnSearchView.as_view(), name="nsn_search"),
     path("supplier/search/", SupplierSearchView.as_view(), name="supplier_search"),
+    # Supplier Payment Forecast URLs
+    path("payment-forecast/", PaymentForecastView.as_view(), name="payment_forecast"),
+    path("api/payment-forecast/plan/<int:shipment_id>/", upsert_payment_plan, name="payment_forecast_plan"),
     # Finance Audit URLs
     path("finance-audit/", FinanceAuditView.as_view(), name="finance_audit"),
     path(

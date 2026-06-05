@@ -6,6 +6,13 @@
     </svg>
     Finance Audit
 </a>
+<a href="{% url 'contracts:payment_forecast' %}" 
+   class="menu-item {% if request.resolver_match.url_name == 'payment_forecast' %}active{% endif %}">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+    Payment Forecast
+</a>
 <a href="{% url 'contracts:contract_log_view' %}" 
    class="menu-item {% if request.resolver_match.url_name == 'contract_log_view' %}active{% endif %}">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

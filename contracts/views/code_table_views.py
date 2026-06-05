@@ -138,6 +138,7 @@ TABLE_CONFIG = [
         "columns": [
             {"header": "Code", "attr": "code"},
             {"header": "Terms", "attr": "terms"},
+            {"header": "Net Days", "attr": "net_days"},
         ],
         "usage_checks": [
             {

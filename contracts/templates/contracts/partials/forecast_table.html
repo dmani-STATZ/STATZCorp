@@ -1,0 +1,141 @@
+<div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle table-sm" style="font-size: 0.875rem;">
+        <thead class="table-light">
+            <tr>
+                <th>Contract #</th>
+                <th>CLIN Item</th>
+                <th>Supplier</th>
+                <th class="text-end">Qty</th>
+                <th class="text-end">Amount</th>
+                <th class="text-end">Paid</th>
+                <th class="text-end">Outstanding</th>
+                <th>Anchor Date</th>
+                <th>Due Date</th>
+                <th style="min-width: 150px;">Term</th>
+                {% if show_plan %}
+                    <th style="min-width: 130px;">Planned Pay Date</th>
+                    <th class="text-center">On Hold</th>
+                    <th>Note</th>
+                {% endif %}
+                <th>Flags</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+                <tr {% if row.outstanding and row.outstanding <= 0 %}class="table-success text-decoration-line-through" style="opacity: 0.6;"{% endif %}>
+                    <td>
+                        <a href="{% url 'contracts:contract_detail' row.contract_id %}" target="_blank">
+                            {{ row.contract_number }}
+                        </a>
+                    </td>
+                    <td>
+                        <a href="{% url 'contracts:clin_detail' row.clin_id %}" target="_blank">
+                            {{ row.clin_item_number }}
+                        </a>
+                    </td>
+                    <td>
+                        {% if row.supplier_id %}
+                            <a href="{% url 'suppliers:supplier_detail' row.supplier_id %}" target="_blank">
+                                {{ row.supplier_name }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ row.qty|floatformat:0 }}</td>
+                    <td class="text-end js-amount-cell" data-amount="{{ row.amount|default:'0.00' }}">
+                        ${{ row.amount|floatformat:2|default:"0.00" }}
+                    </td>
+                    <td class="text-end">
+                        {% if row.shipment_id %}
+                            <span role="button" tabindex="0"
+                                  class="text-primary text-decoration-underline partial-value-cell"
+                                  data-entity-type="clinshipment"
+                                  data-entity-id="{{ row.shipment_id }}"
+                                  data-payment-type="partial_paid_amount"
+                                  data-current-value="{{ row.paid|default:'0.00' }}"
+                                  title="Supplier payment ledger — click to manage">
+                                ${{ row.paid|floatformat:2|default:"0.00" }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end js-outstanding-cell" data-outstanding="{{ row.outstanding|default:'0.00' }}">
+                        ${{ row.outstanding|floatformat:2|default:"0.00" }}
+                    </td>
+                    <td>
+                        {% if row.kind == 'actual' %}
+                            {{ row.anchor_date|date:"M j, Y" }} <span class="text-muted small d-block">(Shipped)</span>
+                        {% else %}
+                            {{ row.anchor_date|date:"M j, Y"|default:"—" }} <span class="text-muted small d-block">(Target)</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.due_date %}
+                            {{ row.due_date|date:"M j, Y" }}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm js-forecast-term-select" data-clin-id="{{ row.clin_id }}">
+                            <option value="">-- No Terms --</option>
+                            {% for term in terms %}
+                                <option value="{{ term.id }}" {% if row.term_id == term.id %}selected{% endif %}>
+                                    {{ term.terms }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    {% if show_plan %}
+                        <td>
+                            {% if row.shipment_id %}
+                                <input type="date" class="form-control form-control-sm js-plan-date"
+                                       data-shipment-id="{{ row.shipment_id }}"
+                                       value="{{ row.plan.planned_pay_date|date:'Y-m-d' }}">
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if row.shipment_id %}
+                                <input type="checkbox" class="form-check-input js-plan-hold"
+                                       data-shipment-id="{{ row.shipment_id }}"
+                                       {% if row.plan.on_hold %}checked{% endif %}>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.shipment_id %}
+                                <input type="text" class="form-control form-control-sm js-plan-note"
+                                       data-shipment-id="{{ row.shipment_id }}"
+                                       value="{{ row.plan.note|default:'' }}"
+                                       placeholder="Add note..."
+                                       style="max-width: 180px;">
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    {% endif %}
+                    <td>
+                        {% for flag in row.flags %}
+                            {% if flag == 'no_terms' %}
+                                <span class="badge bg-warning text-dark" title="No payment terms resolved">No Terms</span>
+                            {% elif flag == 'amount_unknown' %}
+                                <span class="badge bg-danger" title="Could not resolve price/value">Amount Unknown</span>
+                            {% elif flag == 'no_target_date' %}
+                                <span class="badge bg-secondary" title="Missing supplier target due date">No Target Date</span>
+                            {% else %}
+                                <span class="badge bg-info">{{ flag }}</span>
+                            {% endif %}
+                        {% empty %}
+                            <span class="text-muted small">—</span>
+                        {% endfor %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

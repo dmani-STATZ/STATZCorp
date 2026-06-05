@@ -880,6 +880,24 @@ class ClinShipment(AuditModel):
         return f"Shipment of {self.ship_qty} {self.uom} on {self.ship_date} for CLIN {self.clin.id}"
 
 
+class ShipmentPaymentPlan(AuditModel):
+    """Lazy planning overlay for a ClinShipment in the Supplier Payment Forecast.
+    Stores Jenny's intentions only  never money, never 'paid' state (those derive
+    from quote_value/paid_amount). Created on first action against a shipment."""
+    shipment = models.OneToOneField(
+        ClinShipment,
+        on_delete=models.CASCADE,
+        related_name="payment_plan",
+    )
+    planned_pay_date = models.DateField(null=True, blank=True)
+    note = models.TextField(blank=True, default="")
+    on_hold = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"PaymentPlan(shipment={self.shipment_id})"
+
+
+
 class ClinSplit(models.Model):
     clin = models.ForeignKey(
         'Clin',
@@ -1208,6 +1226,16 @@ class IdiqContractDetails(models.Model):
 class SpecialPaymentTerms(models.Model):
     code = models.CharField(max_length=5, null=True, blank=True)
     terms = models.CharField(max_length=30)
+    net_days = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Number of days after the supplier ship date that payment is due. "
+            "0 = due on ship (COD/COS). Leave blank if this term has no fixed "
+            "day count  rows using it will be flagged 'no terms' in the "
+            "payment forecast rather than given a fabricated due date."
+        ),
+    )
 
     def __str__(self):
         return self.terms
