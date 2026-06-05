@@ -320,15 +320,13 @@ Company column — Draft queue table shows company badge per row.
 
 PDF upload creates folder — `upload_pdfs` calls `create_draft_sharepoint_folder` after successful ingestion. Non-blocking.
 
-Draft documents browser — `contracts:intake_draft_documents_browser` at `/contracts/documents/draft/?draft_id=N`. Opens the shared documents browser popup in draft mode. Save Path writes to `draft.data['sharepoint_folder_path']` via `contracts:set_draft_file_path_api`. "Docs" button appears on each queue row. At finalization, `sharepoint_folder_path` is carried through to `Contract.files_url` (or `IdiqContract.files_url`) automatically.
+- Draft documents browser — `contracts:intake_draft_documents_browser` at `/contracts/documents/draft/?draft_id=N`. Opens the shared documents browser popup in draft mode. Save Path writes to `draft.data['sharepoint_folder_path']` via `contracts:set_draft_file_path_api`. "Docs" button appears on each queue row. At finalization, `sharepoint_folder_path` is carried through to `Contract.files_url` (or `IdiqContract.files_url`) automatically.
+- **DIBBS PDF Fetch** — `fetch_and_apply_dibbs_pdf` service + `fetch_dibbs_pdf` view. `DraftContract.is_dibbs_draft` property. Downloads award PDF from DIBBS via predictable URL pattern (`Downloads/Awards/{DDMONYY}/{contract_number}.PDF`), parses with intake parser, merges into draft, uploads to SharePoint. URL stored at injection time in `data['award_pdf_url']`; `DibbsAward` ORM fallback for older skeletons.
 
 ## Not Yet Built (explicitly out of scope)
 - CSV ingestion path — depends on an external group that has not delivered
   the CSV feed; deferred indefinitely
 - "Add new" inline creation from the matcher modal
-- Fetching the actual award PDF for a DIBBS-scraped row (the DIBBS site
-  doesn't expose a direct award-PDF URL in the scraped table; analysts
-  drop the PDF on the queue manually after the skeleton lands)
 - "Add new" inline creation from the matcher modal (parity with processing's
   "Add as new Buyer/NSN/Supplier" buttons)
 

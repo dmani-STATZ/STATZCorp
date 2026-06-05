@@ -83,76 +83,8 @@ def _make_dibbs2_session() -> list[dict]:
     This keeps Chromium away from the cold warning-page hit that F5 ASM resets
     intermittently from Azure datacenter IPs.
     """
-    s = requests.Session()
-    s.headers.update({
-        "User-Agent": _BROWSER_UA,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-    })
-
-    logger.info("dibbs2 consent bootstrap: GET %s", DIBBS2_WARNING_URL)
-    resp = s.get(DIBBS2_WARNING_URL, timeout=DEFAULT_TIMEOUT)
-    resp.raise_for_status()
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-    form = soup.find("form")
-    if not form:
-        raise RuntimeError(
-            "dibbs2 warning page has no form — site layout may have changed."
-        )
-
-    action = form.get("action", "")
-    if not action.startswith("http"):
-        action = urljoin(DIBBS2_MAIN + "/", action)
-
-    data = {}
-    for inp in form.find_all("input"):
-        name = inp.get("name")
-        if not name:
-            continue
-        itype = inp.get("type", "text").lower()
-        if itype == "submit" and inp.get("name") == "butAgree":
-            data[name] = inp.get("value", "OK")
-        elif itype != "submit":
-            data[name] = inp.get("value", "")
-
-    logger.info("dibbs2 consent bootstrap: POST %s", action)
-    post_resp = s.post(
-        action,
-        data=data,
-        timeout=DEFAULT_TIMEOUT,
-        headers={"Referer": DIBBS2_WARNING_URL},
-    )
-    post_resp.raise_for_status()
-
-    playwright_cookies = []
-    for cookie in s.cookies:
-        c: dict = {
-            "name": cookie.name,
-            "value": cookie.value,
-            "domain": cookie.domain or ".dibbs2.bsm.dla.mil",
-            "path": cookie.path or "/",
-            "secure": cookie.secure,
-            "httpOnly": True,
-            "sameSite": "Strict",
-        }
-        playwright_cookies.append(c)
-
-    if not playwright_cookies:
-        raise RuntimeError(
-            "dibbs2 consent bootstrap returned no cookies — POST may have failed or "
-            "site rejected the session. Check VIEWSTATE parsing."
-        )
-
-    logger.info(
-        "dibbs2 consent bootstrap complete — %d cookie(s): %s",
-        len(playwright_cookies),
-        [c["name"] for c in playwright_cookies],
-    )
-    return playwright_cookies
+    from sales.services.dibbs_session import make_dibbs2_session
+    return make_dibbs2_session()
 
 
 # ---------------------------------------------------------------------------

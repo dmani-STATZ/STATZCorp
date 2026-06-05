@@ -153,3 +153,28 @@ class DraftContract(models.Model):
         if self.locked_at is None:
             return None
         return self.locked_at + LOCK_DURATION
+
+    @property
+    def is_dibbs_draft(self) -> bool:
+        """True if this draft originated from the DIBBS awards scraper."""
+        return (self.data or {}).get('parser', {}).get('source') == 'dibbs'
+
+    @property
+    def lock_active(self) -> bool:
+        """True if the edit lock is currently active."""
+        return self.is_locked
+
+    @property
+    def lock_expired(self) -> bool:
+        """True if the edit lock has expired."""
+        return self.locked_by_id is not None and is_expired(self.locked_at)
+
+    def acquire_lock(self, user) -> None:
+        """Acquire lock for this user."""
+        from .locks import acquire
+        acquire(self, user)
+
+    def release_lock(self, user) -> None:
+        """Release lock for this user."""
+        from .locks import release
+        release(self, user)

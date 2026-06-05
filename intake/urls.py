@@ -22,4 +22,5 @@ urlpatterns = [
     path('upload/', views.upload_pdfs, name='upload_pdfs'),
     # SharePoint scan API
     path('api/scan-sharepoint/', views.scan_sharepoint_drafts, name='scan_sharepoint_drafts'),
+    path('drafts/<int:pk>/fetch-dibbs-pdf/', views.fetch_dibbs_pdf, name='fetch_dibbs_pdf'),
 ]

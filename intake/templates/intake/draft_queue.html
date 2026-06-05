@@ -196,7 +196,20 @@
                             {% elif draft.pdf_parse_status == 'parseable' %}
                                 <span class="badge bg-info-subtle text-info-emphasis" title="PDF found and ready to parse">Parseable</span>
                             {% elif draft.pdf_parse_status == 'no_pdf' %}
-                                <span class="badge bg-light text-muted" title="No PDF available">No PDF</span>
+                                {% if draft.is_dibbs_draft %}
+                                    <div class="d-flex flex-column align-items-center gap-1" id="pdf-fetch-container-{{ draft.id }}">
+                                        <span class="badge bg-light text-muted" title="No PDF available">No PDF</span>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary py-0 px-1 fetch-pdf-btn"
+                                                style="font-size: 0.7rem; line-height: 1.2;"
+                                                id="fetch-pdf-btn-{{ draft.id }}"
+                                                onclick="fetchDibbsPdf({{ draft.id }})">
+                                            Fetch PDF
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <span class="badge bg-light text-muted" title="No PDF available">No PDF</span>
+                                {% endif %}
                             {% else %}
                                 <span class="badge bg-secondary-subtle text-secondary-emphasis" title="Pending">Pending</span>
                             {% endif %}
@@ -493,6 +506,55 @@
         const draftId = parseInt(btn.dataset.draftId, 10);
         if (draftId) btn.addEventListener('click', () => scanRowSP(draftId));
     });
+
+    // ── Fetch DIBBS PDF ──────────────────────────────────────────────────────
+    window.fetchDibbsPdf = function (draftId) {
+        const btn = document.getElementById('fetch-pdf-btn-' + draftId);
+        if (!btn) return;
+
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = SPIN_SVG + ' <span class="ms-1">Fetching...</span>';
+        const icon = btn.querySelector('svg');
+        if (icon) {
+            icon.style.animation = 'spin 1s linear infinite';
+        }
+
+        const url = "{% url 'intake:fetch_dibbs_pdf' pk=0 %}".replace('/0/', '/' + draftId + '/');
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN()
+            },
+            body: JSON.stringify({})
+        })
+        .then(r => {
+            if (!r.ok) {
+                return r.json().then(data => {
+                    throw new Error(data.error || 'Fetch failed');
+                }).catch(() => {
+                    throw new Error('Fetch failed with HTTP status ' + r.status);
+                });
+            }
+            return r.json();
+        })
+        .then(data => {
+            if (data.ok) {
+                btn.innerHTML = '<span class="text-success">✓ Success</span>';
+                showToast('PDF fetched successfully for draft #' + draftId, 'success');
+                setTimeout(() => window.location.reload(), 800);
+            } else {
+                throw new Error(data.error || 'Fetch failed');
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            showToast(err.message || 'Fetch error', 'error');
+        });
+    };
 })();
 </script>
 <script>

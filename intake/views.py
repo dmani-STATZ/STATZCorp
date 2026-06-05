@@ -98,13 +98,6 @@ class DraftQueueView(ListView):
             row['contract_number']: row['id'] for row in finalized
         }
 
-        for draft in ctx['drafts']:
-            draft.lock_active = (
-                draft.locked_by_id is not None and not is_expired(draft.locked_at)
-            )
-            draft.lock_expired = (
-                draft.locked_by_id is not None and is_expired(draft.locked_at)
-            )
         return ctx
 
 
@@ -669,3 +662,76 @@ def cancel_draft(request, pk: int):
         draft.save(update_fields=['status', 'locked_by', 'locked_at', 'modified_at'])
     messages.success(request, f'{draft.contract_number} cancelled.')
     return redirect('intake:queue')
+
+
+@login_required
+@require_POST
+def fetch_dibbs_pdf(request, pk):
+    """
+    On-demand: download the DIBBS award PDF for a skeleton DraftContract, parse it,
+    merge the result into the draft, and upload to SharePoint.
+
+    Guards:
+      - Draft must belong to a company the user has membership in (or superuser).
+      - Draft must be a DIBBS-sourced skeleton (is_dibbs_draft=True).
+      - Draft must still be unparsed (pdf_parse_status='no_pdf').
+      - Draft must not be locked by another user.
+
+    Acquires the soft lock, performs the fetch, then releases the lock.
+    Returns JSON: {"ok": bool, "pdf_parse_status": str|null, "sp_uploaded": bool,
+                   "error": str|null}
+    """
+    from intake.services.dibbs_pdf_fetcher import fetch_and_apply_dibbs_pdf
+
+    # Company scoping  same pattern used throughout intake views.
+    if request.user.is_superuser:
+        qs = DraftContract.objects.all()
+    else:
+        from contracts.models import Company
+        user_companies = Company.objects.filter(user_memberships__user=request.user)
+        qs = DraftContract.objects.filter(company__in=user_companies)
+
+    draft = get_object_or_404(qs, pk=pk)
+
+    # Guard: only DIBBS skeletons that haven't been parsed yet.
+    if not draft.is_dibbs_draft:
+        return JsonResponse(
+            {'ok': False, 'error': 'Draft is not a DIBBS skeleton.'},
+            status=400,
+        )
+    if draft.pdf_parse_status != DraftContract.PdfParseStatus.NO_PDF:
+        return JsonResponse(
+            {'ok': False, 'error': 'Draft PDF has already been fetched or parsed.'},
+            status=400,
+        )
+
+    # Guard: lock check.
+    if draft.lock_active and draft.locked_by_id != request.user.id:
+        return JsonResponse(
+            {
+                'ok': False,
+                'error': (
+                    f'Draft is currently locked by {draft.locked_by.username}. '
+                    'Try again when the lock is released.'
+                ),
+            },
+            status=409,
+        )
+
+    # Acquire lock for this operation.
+    try:
+        draft.acquire_lock(request.user)
+    except Exception:
+        pass  # If lock acquisition fails, proceed anyway  fetch is still safe.
+
+    try:
+        fetch_result = fetch_and_apply_dibbs_pdf(draft)
+    finally:
+        # Always release the lock so the analyst can continue editing.
+        try:
+            draft.release_lock(request.user)
+        except Exception:
+            pass
+
+    status_code = 200 if fetch_result.get('ok') else 500
+    return JsonResponse(fetch_result, status=status_code)

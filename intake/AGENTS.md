@@ -256,6 +256,30 @@ canonical `Contract.contract_number`.
   `queue_we_won_awards`. Do not add a separate scrape path; the daily job
   already owns Playwright and batch-scoped we-won filtering.
 
+### DIBBS PDF Fetch (On-Demand)
+
+intake/services/dibbs_pdf_fetcher.py::fetch_and_apply_dibbs_pdf(draft) is the
+single entry point for fetching, parsing, and merging a DIBBS PDF. Call only from
+fetch_dibbs_pdf view  never from the nightly scraper.
+DIBBS award PDF URL pattern: Award/IDIQ/PO  dibbs2.bsm.dla.mil/Downloads/Awards/ {DDMONYY}/{contract_number}.PDF; DO  {award_basic_number}{do_number}.PDF.
+Date folder = Award Date (not Posted Date), formatted as zero-padded DD + 3-letter
+month + 2-digit year (e.g., 28MAY26).
+draft.data['award_pdf_url'] is stored at DIBBS injection time for all new
+skeletons. Old skeletons fall back to DibbsAward ORM lookup in _resolve_pdf_url.
+draft.data['award_basic_number'] is stored at injection time for DO/IDIQ drafts.
+Download uses make_dibbs2_session() from sales.services.dibbs_session  this
+handles the DOD Computer Use Notice cookie for dibbs2.bsm.dla.mil. DO NOT use
+make_www_session() (wrong domain). DO NOT import from processing.*.
+After fetch: merge_parsed_pdf_into_draft(draft, parse_result) in intake/ingest.py
+replaces all draft.data keys with the parsed result (parsed data wins). The
+award_pdf_url key is re-seeded from the original skeleton data after merge so it
+survives for audit.
+SharePoint upload is non-blocking: SP failure does not mark the overall operation
+as failed.
+DraftContract.is_dibbs_draft property: True when data['parser']['source'] == 'dibbs'.
+After a successful fetch and merge, parser.source becomes 'pdf', so the button
+naturally disappears on next page load.
+
 ## Tests
 `intake/tests.py` covers:
 - Unique constraint on `contract_number` (dedup against re-injection)

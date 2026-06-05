@@ -228,3 +228,58 @@ def _save_draft_sp_status(draft: 'DraftContract', status: str, folder_path: str 
         logger.error(
             'Failed to save SharePoint status on draft %s: %s', draft.pk, exc
         )
+
+
+def upload_pdf_to_draft_folder(
+    draft: 'DraftContract',
+    filename: str,
+    pdf_bytes: bytes,
+) -> dict:
+    """
+    Upload PDF bytes to the SharePoint folder for this DraftContract.
+
+    Ensures the folder exists (create_draft_sharepoint_folder), then uploads
+    the file using send_pdf_bytes_to_folder with overwrite semantics.
+
+    Returns:
+        {'uploaded': True, 'folder_path': str}
+        {'uploaded': False, 'error': str}
+
+    Never raises. Logs all errors.
+    """
+    from contracts.services.sharepoint_service import (
+        SharePointError,
+        send_pdf_bytes_to_folder,
+    )
+
+    result = {'uploaded': False, 'folder_path': None, 'error': None}
+    try:
+        folder_result = create_draft_sharepoint_folder(draft)
+        folder_path = folder_result.get('folder_path') or build_draft_folder_path(draft)
+        if not folder_path:
+            result['error'] = 'Could not resolve SharePoint folder path for draft.'
+            logger.warning(
+                'upload_pdf_to_draft_folder: no folder path for draft %s', draft.pk
+            )
+            return result
+
+        # Strip trailing slash; send_pdf_bytes_to_folder handles path join internally.
+        folder_path = folder_path.rstrip('/')
+        send_pdf_bytes_to_folder(folder_path, filename, pdf_bytes)
+        result['uploaded'] = True
+        result['folder_path'] = folder_path
+        logger.info(
+            'Uploaded %s to SharePoint folder %s for draft %s',
+            filename, folder_path, draft.pk,
+        )
+    except SharePointError as exc:
+        result['error'] = str(exc)
+        logger.warning(
+            'SP upload error for draft %s (%s): %s', draft.pk, draft.contract_number, exc
+        )
+    except Exception as exc:
+        result['error'] = f'Unexpected error: {exc}'
+        logger.exception(
+            'Unexpected SP upload error for draft %s (%s)', draft.pk, draft.contract_number
+        )
+    return result

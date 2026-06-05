@@ -129,6 +129,7 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 - DIBBS piggyback (`queue_we_won_drafts`) probes SharePoint only when `company` resolves; never creates folders at injection time
 - Draft documents browser at `/contracts/documents/draft/` (owned by contracts URL space, intake-authorized)
 - SharePoint folder path carried to `Contract.files_url` at finalization
+- DIBBS PDF fetch: fetch_and_apply_dibbs_pdf in intake/services/dibbs_pdf_fetcher.py. URL pattern confirmed: Award/IDIQ/PO  dibbs2.bsm.dla.mil/Downloads/Awards/{DDMONYY}/{contract_number}.PDF; DO  {idiq}{do}.PDF. Requires make_dibbs2_session() (DOD cookie). Stored in data['award_pdf_url'] at injection time.
 
 ---
 

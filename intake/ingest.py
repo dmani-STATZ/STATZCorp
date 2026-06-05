@@ -273,6 +273,46 @@ def ingest_pdf(pdf_file, *, original_filename: str = '', company=None) -> DraftC
 # ---------------------------------------------------------------------------
 
 
+_DIBBS_MONTH_ABBR = [
+    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+]
+
+
+def _build_dibbs_award_pdf_url(
+    award_basic_number: str,
+    delivery_order_number: str,
+    award_date_iso: str,
+) -> str | None:
+    """
+    Construct the direct DIBBS award PDF URL from the contract identifiers and
+    the award date.
+
+    URL pattern:
+      Award/IDIQ/PO: https://dibbs2.bsm.dla.mil/Downloads/Awards/{DDMONYY}/{basic}.PDF
+      Delivery Order: https://dibbs2.bsm.dla.mil/Downloads/Awards/{DDMONYY}/{basic}{do}.PDF
+
+    The date folder uses the AWARD date (not the posted date), formatted as
+    zero-padded 2-digit day + 3-letter uppercase month + 2-digit year.
+    Example: 2026-05-28  28MAY26.
+
+    Returns None if required data is missing.
+    """
+    from datetime import datetime
+    basic = (award_basic_number or '').strip().upper()
+    do_num = (delivery_order_number or '').strip().upper()
+    if not basic or not award_date_iso:
+        return None
+    try:
+        d = datetime.strptime(award_date_iso.strip()[:10], '%Y-%m-%d').date()
+    except (ValueError, AttributeError):
+        return None
+    folder = f"{d.day:02d}{_DIBBS_MONTH_ABBR[d.month - 1]}{str(d.year)[2:]}"
+    if do_num:
+        return f"https://dibbs2.bsm.dla.mil/Downloads/Awards/{folder}/{basic}{do_num}.PDF"
+    return f"https://dibbs2.bsm.dla.mil/Downloads/Awards/{folder}/{basic}.PDF"
+
+
 def _dibbs_to_data(record: dict) -> dict:
     """Project a normalized DIBBS award record onto the intake JSON shape.
 
@@ -316,6 +356,16 @@ def _dibbs_to_data(record: dict) -> dict:
             'nsn_text': nsn,
             'nsn_description': nomenclature,
         }]
+
+    award_basic = (record.get('Award_Basic_Number') or '').strip()
+    do_number   = (record.get('Delivery_Order_Number') or '').strip()
+    award_date  = data.get('award_date')  # already ISO string or None
+    pdf_url = _build_dibbs_award_pdf_url(award_basic, do_number, award_date)
+    if pdf_url:
+        data['award_pdf_url'] = pdf_url
+    if award_basic:
+        data['award_basic_number'] = award_basic
+
     return data
 
 
@@ -386,3 +436,40 @@ def ingest_dibbs_record(record: dict, company=None) -> DraftContract:
         draft.contract_number, draft.contract_type,
     )
     return draft
+
+
+def merge_parsed_pdf_into_draft(draft: DraftContract, result: AwardParseResult) -> None:
+    """
+    Merge a freshly-parsed AwardParseResult into an existing DIBBS skeleton DraftContract.
+
+    Converts the result to the intake JSON shape via _result_to_data, then performs a
+    deep merge where parsed values win on all keys (including replacing the original
+    'parser' dict so it reflects the PDF parser, not the DIBBS scraper). The only
+    preserved key from the original draft.data is 'award_pdf_url'  we keep it so the
+    fetcher can still reference the origin URL after the merge.
+
+    Updates draft.pdf_parse_status to the parsed result's status.
+    Saves the draft (full save, not update_fields  data is JSON and needs full validation).
+
+    Raises DraftDataValidationError if the merged data fails schema validation.
+    Never called from the nightly scraper  only from the on-demand fetch endpoint.
+    """
+    parsed_data = _result_to_data(result)
+
+    # Preserve the stored DIBBS PDF URL from the original skeleton so it
+    # survives the merge and can be logged/audited.
+    existing = dict(draft.data or {})
+    stored_url = existing.get('award_pdf_url')
+    if stored_url:
+        parsed_data.setdefault('award_pdf_url', stored_url)
+
+    draft.data = parsed_data
+    draft.pdf_parse_status = result.pdf_parse_status or DraftContract.PdfParseStatus.PARTIAL
+    draft.save()
+
+    logger.info(
+        'Merged PDF parse result into DraftContract %s (status=%s)',
+        draft.contract_number,
+        draft.pdf_parse_status,
+    )
+

@@ -1525,3 +1525,136 @@ class MatcherCreateEndpointTests(TestCase):
         nsn = Nsn.objects.get(nsn_code='7777-77-777-7777')
         self.assertEqual(draft.data['clins'][0]['nsn_id'], nsn.id)
         self.assertEqual(draft.data['clins'][0]['nsn_description'], 'New Widget')
+
+
+class FetchDibbsPdfTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_superuser('alice', 'a@x.com', 'pw')
+        cls.bob = User.objects.create_superuser('bob', 'b@x.com', 'pw')
+
+    def test_is_dibbs_draft(self):
+        draft_dibbs = DraftContract.objects.create(
+            contract_number='SPE7L126P7383',
+            contract_type='AWD',
+            data={'parser': {'source': 'dibbs'}}
+        )
+        draft_other = DraftContract.objects.create(
+            contract_number='SPE7L126P7384',
+            contract_type='AWD',
+            data={'parser': {'source': 'pdf'}}
+        )
+        self.assertTrue(draft_dibbs.is_dibbs_draft)
+        self.assertFalse(draft_other.is_dibbs_draft)
+
+    def test_build_dibbs_award_pdf_url(self):
+        from intake.ingest import _build_dibbs_award_pdf_url
+        url1 = _build_dibbs_award_pdf_url('SPE7L126P7383', '', '2026-05-28')
+        self.assertEqual(url1, 'https://dibbs2.bsm.dla.mil/Downloads/Awards/28MAY26/SPE7L126P7383.PDF')
+        url2 = _build_dibbs_award_pdf_url('SPE7L325D62AM', 'SPE7L026F4266', '2026-05-28')
+        self.assertEqual(url2, 'https://dibbs2.bsm.dla.mil/Downloads/Awards/28MAY26/SPE7L325D62AMSPE7L026F4266.PDF')
+
+    def test_fetch_dibbs_pdf_guard_non_dibbs(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L126P7385',
+            contract_type='AWD',
+            data={'parser': {'source': 'pdf'}}
+        )
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:fetch_dibbs_pdf', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('not a DIBBS skeleton', resp.json()['error'])
+
+    def test_fetch_dibbs_pdf_guard_already_parsed(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L126P7386',
+            contract_type='AWD',
+            pdf_parse_status=DraftContract.PdfParseStatus.SUCCESS,
+            data={'parser': {'source': 'dibbs'}}
+        )
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:fetch_dibbs_pdf', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('already been fetched or parsed', resp.json()['error'])
+
+    def test_fetch_dibbs_pdf_guard_locked_by_other(self):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L126P7387',
+            contract_type='AWD',
+            pdf_parse_status=DraftContract.PdfParseStatus.NO_PDF,
+            data={'parser': {'source': 'dibbs'}}
+        )
+        acquire(draft, self.bob)
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:fetch_dibbs_pdf', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 409)
+        self.assertIn('currently locked by bob', resp.json()['error'])
+
+    @patch('sales.services.dibbs_session.make_dibbs2_session')
+    @patch('intake.pdf_parser.parse_award_pdf')
+    @patch('intake.services.sharepoint_intake.upload_pdf_to_draft_folder')
+    def test_fetch_dibbs_pdf_success(self, mock_upload, mock_parse, mock_session):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L126P7388',
+            contract_type='AWD',
+            pdf_parse_status=DraftContract.PdfParseStatus.NO_PDF,
+            data={
+                'award_date': '2026-05-28',
+                'award_basic_number': 'SPE7L126P7388',
+                'award_pdf_url': 'https://dibbs2.bsm.dla.mil/Downloads/Awards/28MAY26/SPE7L126P7388.PDF',
+                'parser': {'source': 'dibbs'}
+            }
+        )
+
+        # Mocking session download
+        mock_resp = mock_session.return_value.get.return_value
+        mock_resp.content = b'%PDF-1.4 dummy content'
+        mock_resp.headers = {'Content-Type': 'application/pdf'}
+
+        # Mocking PDF parse result with all required fields
+        mock_parse.return_value = AwardParseResult(
+            contract_number='SPE7L126P7388',
+            contract_type='AWD',
+            idiq_contract_number=None,
+            buyer_text='DLA LAND AND MARITIME',
+            award_date=None,
+            contractor_name=None,
+            contractor_cage=None,
+            contract_value=None,
+            solicitation_type=None,
+            pr_number=None,
+            pdf_parse_status='success',
+            pdf_parse_notes=None,
+            ado_days=None,
+            clins=[],
+            idiq_max_value=None,
+            idiq_min_guarantee=None,
+            idiq_term_months=None,
+            idiq_option_months=None,
+            contract_supplier_cage=None,
+            contract_supplier_name=None,
+            packhouse_cage=None,
+            idiq_supplier_name=None,
+            idiq_supplier_cage=None,
+            idiq_supplier_part_number=None,
+            contract_packhouse_name=None,
+        )
+
+        # Mocking SharePoint upload
+        mock_upload.return_value = {'uploaded': True, 'folder_path': '/mock/sp/path'}
+
+        self.client.force_login(self.alice)
+        resp = self.client.post(reverse('intake:fetch_dibbs_pdf', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['pdf_parse_status'], 'success')
+        self.assertTrue(data['sp_uploaded'])
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.pdf_parse_status, 'success')
+        self.assertEqual(draft.data['buyer_text'], 'DLA LAND AND MARITIME')
+        # Original award_pdf_url and parser source should be updated/preserved
+        self.assertEqual(draft.data['award_pdf_url'], 'https://dibbs2.bsm.dla.mil/Downloads/Awards/28MAY26/SPE7L126P7388.PDF')
+
