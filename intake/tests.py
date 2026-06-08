@@ -1319,6 +1319,25 @@ class DibbsIngestTests(TestCase):
         with self.assertRaises(IngestionError):
             ingest_dibbs_record({'NSN_Part_Number': '9999'})
 
+    def test_dibbs_contract_number_normalization_basic(self):
+        from intake.ingest import _dibbs_contract_number
+        res = _dibbs_contract_number({'Award_Basic_Number': 'SPE7L126P7653'})
+        self.assertEqual(res, 'SPE7L1-26-P-7653')
+
+    def test_dibbs_contract_number_normalization_do_priority(self):
+        from intake.ingest import _dibbs_contract_number
+        res = _dibbs_contract_number({
+            'Delivery_Order_Number': 'SPE7L126D62RA',
+            'Award_Basic_Number': 'SPE4A725F5210'
+        })
+        self.assertEqual(res, 'SPE7L1-26-D-62RA')
+
+    def test_build_draft_folder_path_normalization(self):
+        from intake.services.sharepoint_intake import build_draft_folder_path
+        draft = DraftContract(contract_number='SPE7L126P7653')
+        path = build_draft_folder_path(draft)
+        self.assertIn('Contract SPE7L1-26-P-7653', path)
+
 
 class FinalizeEmailRedirectTests(TestCase):
     @classmethod

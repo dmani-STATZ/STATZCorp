@@ -308,9 +308,10 @@ drafts with `company=None`). DIBBS injection resolves company via
 `dibbs_company_cage` CAGE lookup (`sales.CompanyCAGE`).
 
 **SharePoint folder status** — `DraftContract.sharepoint_folder_status` column
-(`pending` / `exists` / `not_found` / `created` / `error`). Path stored in
-`data['sharepoint_folder_path']`. Probe runs after DIBBS injection when company
-is known; folder creation is reserved for PDF upload (next phase UI).
+  (`pending` / `exists` / `not_found` / `created` / `error` — folder probe/create state).
+  Path stored in `data['sharepoint_folder_path']`. Probe runs after DIBBS injection when company
+  is known; folder creation is reserved for PDF upload (next phase UI).
+  Contract numbers are always normalized to dashed DLA format (e.g. SPE7L1-26-P-7653) before SharePoint folder paths are built. DIBBS-injected drafts previously stored undashed numbers; existing rows were corrected via scripts/fix_undashed_draft_contract_numbers.sql.
 
 SharePoint scan API — POST /intake/api/scan-sharepoint/ (`intake:scan_sharepoint_drafts`). Accepts `draft_id` or `all=true`. Probes SharePoint and updates `sharepoint_folder_status` + `data['sharepoint_folder_path']` on each draft. Company-scoped: non-superusers only see their companies' drafts.
 

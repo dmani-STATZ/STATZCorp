@@ -33,12 +33,19 @@ def build_draft_folder_path(draft: 'DraftContract') -> str | None:
     settings.SHAREPOINT_PATH_PREFIX, then the hardcoded default.
 
     Returns None if draft.contract_number is blank.
+
+    Contract number is normalized to dashed DLA format before path construction.
     """
     from contracts.services.sharepoint_paths import get_sharepoint_prefix
 
     contract_number = (draft.contract_number or '').strip()
     if not contract_number:
         return None
+
+    # Defensive: normalize to dashed format so SP paths always match DB format.
+    # Handles any undashed legacy drafts that pre-date the DIBBS normalization fix.
+    from intake.pdf_parser import normalize_contract_number
+    contract_number = normalize_contract_number(contract_number) or contract_number
 
     company = getattr(draft, 'company', None)
     prefix = get_sharepoint_prefix(company=company)

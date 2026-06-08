@@ -215,7 +215,8 @@ canonical `Contract.contract_number`.
   Do **NOT** import SharePoint helpers from `processing.*`.
 - `build_draft_folder_path(draft)` is the single source of truth for draft folder
   paths. Drafts are always open-contract paths — no Closed/Cancelled routing at
-  draft time.
+  draft time. Contract number is normalized to dashed format inside this function as a
+  defensive measure before the path is assembled.
 - `probe_draft_sharepoint_folder(draft)` — probe only, no create.
 - `create_draft_sharepoint_folder(draft)` — probe first, create if missing. Called
   at PDF upload time only.
@@ -247,6 +248,11 @@ canonical `Contract.contract_number`.
   scraped DIBBS row to a `DraftContract`. Row data is supplied by
   `intake/services/queue_we_won_drafts.py`, which maps `DibbsAward` ORM
   fields to the scraper dict shape — do not fork conversion logic elsewhere.
+- `_dibbs_contract_number(record)` always returns a normalized (dashed) DLA
+  contract number by calling `normalize_contract_number()` before returning.
+  The raw DIBBS field values (`Award_Basic_Number`, `Delivery_Order_Number`) are
+  NOT modified — they are used separately by `_build_dibbs_award_pdf_url()`
+  for HTTP URL construction and must remain undashed.
 - Drafts from DIBBS have `pdf_parse_status='no_pdf'` deliberately —
   analysts must either edit by hand OR delete the skeleton and re-ingest
   the actual award PDF. Don't change this status default; it's how the

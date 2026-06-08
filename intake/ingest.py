@@ -20,6 +20,8 @@ from .pdf_parser import (
     AwardParseResult,
     ClinParseResult,
     parse_award_pdf,
+    detect_contract_type,
+    normalize_contract_number,
 )
 
 from .models import DraftContract
@@ -370,17 +372,24 @@ def _dibbs_to_data(record: dict) -> dict:
 
 
 def _dibbs_contract_number(record: dict) -> Optional[str]:
-    """Build the canonical contract number from a DIBBS row.
+    """Build the canonical (dashed) contract number from a DIBBS row.
 
     DIBBS exposes Award_Basic_Number; for delivery orders it also has
     Delivery_Order_Number. When present, the DO number is the actual
-    contract identity (an AWD+DO pair points to two distinct rows in our
-    world: the parent IDIQ and the DO derived from it). For intake we
-    take the DO number when present, otherwise the basic number.
+    contract identity. The raw value is passed through
+    normalize_contract_number() so all stored contract numbers use the
+    standard dashed DLA format (e.g. SPE7L1-26-P-7653), matching the
+    format used in contracts.Contract and in SharePoint folder names.
+
+    NOTE: Do NOT use this value for DIBBS HTTP URLs. The raw field values
+    from the DIBBS record (Award_Basic_Number, Delivery_Order_Number) are
+    used separately by _build_dibbs_award_pdf_url() and must remain
+    untouched.
     """
     do = (record.get('Delivery_Order_Number') or '').strip()
     basic = (record.get('Award_Basic_Number') or '').strip()
-    return do or basic or None
+    raw = do or basic or None
+    return normalize_contract_number(raw) if raw else None
 
 
 def ingest_dibbs_record(record: dict, company=None) -> DraftContract:
@@ -391,8 +400,6 @@ def ingest_dibbs_record(record: dict, company=None) -> DraftContract:
     DuplicateContractNumber if the row collides with an existing draft
     or canonical Contract.
     """
-    from .pdf_parser import detect_contract_type
-
     contract_number = _dibbs_contract_number(record)
     if not contract_number:
         raise IngestionError(
