@@ -1,13 +1,180 @@
-/* Scaffold styling for Purchase Order page */
+/* ============================================================
+   purchase_order.css — PO Editor page layout
+   Two-panel hybrid layout. Adjust --po-body-offset if the
+   navbar or footer pill height changes in contract_base.html.
+   Navbar = 4rem, reminders pill ≈ 3.5rem → total 7.5rem.
+   ============================================================ */
 
-.po-page {
-    position: relative;
+/* ── 1. Escape the 75% container from contract_base.html ── */
+.po-editor-page main > div.mx-auto {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
 }
+
+/* ── 2. Root page wrapper ── */
+.po-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 7.5rem); /* navbar (4rem) + footer pill (3.5rem) */
+    overflow: hidden;
+    padding-top: 0.5rem;
+}
+
+/* ── 3. Page Header Bar ── */
+.po-header-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    margin-bottom: 0.625rem;
+    flex-shrink: 0;
+}
+
+.po-header-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 auto 0 0;        /* push actions to the right */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.po-header-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* ── 4. Top Row (A · B · C · F) ── */
+.po-top-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 0.625rem;
+    align-items: stretch;
+    margin-bottom: 0.625rem;
+    flex-shrink: 0;
+}
+
+.po-zone-card {
+    min-width: 0; /* prevent grid column blowout */
+    font-size: 0.8125rem;
+}
+
+.po-zone-header {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.625rem;
+    background-color: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+    color: var(--bs-secondary-color);
+}
+
+.po-field-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.2rem;
+}
+
+/* Read-only display fields (contract #, IDIQ #, supplier) */
+.po-readonly-field {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: 0.25rem;
+    min-height: 1.9rem;
+    line-height: 1.4;
+    word-break: break-all;
+    color: var(--bs-body-color);
+}
+
+/* ── 5. Main Body (two independent panels) ── */
+.po-body {
+    display: flex;
+    gap: 0.625rem;
+    flex: 1;
+    min-height: 0;      /* critical: allows flex child to shrink below content height */
+    overflow: hidden;
+}
+
+/* ── 6. Left Panel (D + E) — scrolls as one unit ── */
+.po-left-panel {
+    width: 65%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    overflow-y: auto;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bs-border-color) transparent;
+}
+
+.po-left-panel::-webkit-scrollbar { width: 5px; }
+.po-left-panel::-webkit-scrollbar-thumb {
+    background: var(--bs-border-color);
+    border-radius: 3px;
+}
+
+/* ── 7. Right Panel (G) — fixed height, internal scroll only ── */
+.po-right-panel {
+    width: 35%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── 8. Zone sections (D, E) ── */
+.po-zone-section {
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-card-border-radius, 0.375rem);
+    background-color: var(--bs-body-bg);
+    overflow: hidden;          /* keeps rounded corners on children */
+}
+
+.po-zone-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+    background-color: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+/* table-responsive inside Zone D: no overflow-x rounding clash */
+.po-table-wrap {
+    border-radius: 0;
+}
+
+/* ── 9. Line-items table ── */
+.po-lines-table-fixed {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.po-col-activity { width: 60%; }
+.po-col-numeric  { width: 10%; }
+.po-col-amount   { width: 13%; }
+.po-col-actions  { width: 7%;  }
 
 .po-page textarea.po-line-activity {
     resize: vertical;
-    min-height: 70px;
+    min-height: 60px;
     font-family: inherit;
+    font-size: 0.8125rem;
 }
 
 .po-page input.po-line-qty,
@@ -16,20 +183,94 @@
     text-align: right;
 }
 
-.po-page #po-snippet-preview {
-    max-height: 150px;
-    overflow-y: auto;
-    border-radius: 0.25rem;
+/* ── 10. Zone G (Snippet Library) ── */
+.po-zone-g {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-card-border-radius, 0.375rem);
+    background-color: var(--bs-body-bg);
+    overflow: hidden;
 }
 
-/* Dark mode overrides (only using attribute selector) */
-[data-bs-theme="dark"] .po-page .card {
-    background-color: var(--bs-card-bg, #212529);
-    border-color: var(--bs-border-color, #495057);
+.po-zone-g-label {
+    /* inherits .po-zone-section-header styles; add rounded top */
+    border-radius: calc(var(--bs-card-border-radius, 0.375rem) - 1px)
+                   calc(var(--bs-card-border-radius, 0.375rem) - 1px) 0 0;
+}
+
+.po-zone-g-inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 0.75rem;
+    overflow: hidden;
+}
+
+/* Snippet preview: grows to fill remaining height in right panel */
+.po-snippet-preview-box {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    padding: 0.5rem 0.625rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.25rem;
+    color: var(--bs-body-color);
+    scrollbar-width: thin;
+    scrollbar-color: var(--bs-border-color) transparent;
+}
+
+.po-snippet-preview-box::-webkit-scrollbar { width: 5px; }
+.po-snippet-preview-box::-webkit-scrollbar-thumb {
+    background: var(--bs-border-color);
+    border-radius: 3px;
+}
+
+/* ── 11. Dark-mode overrides ── */
+[data-bs-theme="dark"] .po-zone-header,
+[data-bs-theme="dark"] .po-zone-section-header {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+}
+
+[data-bs-theme="dark"] .po-zone-card.card {
+    background-color: var(--bs-card-bg);
+    border-color: var(--bs-border-color);
+}
+
+[data-bs-theme="dark"] .po-zone-section {
+    background-color: var(--bs-card-bg);
+    border-color: var(--bs-border-color);
+}
+
+[data-bs-theme="dark"] .po-zone-g {
+    background-color: var(--bs-card-bg);
+    border-color: var(--bs-border-color);
+}
+
+[data-bs-theme="dark"] .po-snippet-preview-box {
+    background-color: var(--bs-secondary-bg);
+    border-color: var(--bs-border-color);
+}
+
+[data-bs-theme="dark"] .po-readonly-field {
+    background-color: var(--bs-secondary-bg);
+    border-color: var(--bs-border-color);
+}
+
+[data-bs-theme="dark"] .po-header-bar {
+    border-bottom-color: var(--bs-border-color);
 }
 
 [data-bs-theme="dark"] .po-page .table-light {
     --bs-table-color: var(--bs-body-color);
-    --bs-table-bg: #2b3035;
+    --bs-table-bg: var(--bs-tertiary-bg);
     --bs-table-border-color: var(--bs-border-color);
 }

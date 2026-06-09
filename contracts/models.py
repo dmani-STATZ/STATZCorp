@@ -1954,6 +1954,13 @@ class PurchaseOrder(AuditModel):
     )
     po_date = models.DateField(null=True, blank=True)
     footer = models.TextField(blank=True, default='')
+    vendor_name = models.CharField(max_length=200, blank=True, default='')
+    vendor_address = models.TextField(blank=True, default='')
+    ship_to_name = models.CharField(max_length=200, blank=True, default='')
+    ship_to_contact = models.TextField(
+        blank=True, default='',
+        help_text="Multi-line contact block: attn, title, note, phone, email.",
+    )
 
     class Meta:
         ordering = ['-modified_on']

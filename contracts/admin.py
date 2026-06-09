@@ -238,6 +238,10 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     inlines = [POLineItemInline]
     autocomplete_fields = ()
     raw_id_fields = ('contract', 'supplier', 'company')
+    fields = (
+        'company', 'contract', 'supplier', 'po_number', 'po_date',
+        'vendor_name', 'vendor_address', 'ship_to_name', 'ship_to_contact', 'footer'
+    )
 
 
 @admin.register(CompanyPOProfile)

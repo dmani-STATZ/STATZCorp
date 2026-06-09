@@ -339,10 +339,19 @@
                 const poDate = document.getElementById('po-date-input').value;
                 const footer = document.getElementById('po-footer-input').value;
 
+                const vendorName = document.getElementById('po-vendor-name-input')?.value ?? '';
+                const vendorAddress = document.getElementById('po-vendor-address-input')?.value ?? '';
+                const shipToName = document.getElementById('po-ship-to-name-input')?.value ?? '';
+                const shipToContact = document.getElementById('po-ship-to-contact-input')?.value ?? '';
+
                 const formData = new FormData();
                 formData.append('po_number', poNumber);
                 formData.append('po_date', poDate);
                 formData.append('footer', footer);
+                formData.append('vendor_name', vendorName);
+                formData.append('vendor_address', vendorAddress);
+                formData.append('ship_to_name', shipToName);
+                formData.append('ship_to_contact', shipToContact);
 
                 const supplierSelect = document.getElementById('po-supplier-select');
                 if (supplierSelect) {
@@ -370,6 +379,7 @@
                 });
             });
         }
+
 
         // Delegated row listeners
         const tbody = document.getElementById('po-lines-tbody');

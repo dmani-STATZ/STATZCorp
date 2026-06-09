@@ -93,6 +93,41 @@ def _get_or_create_po(contract, request):
             po_date=timezone.now().date(),
             created_by=request.user, modified_by=request.user,
         )
+
+        # --- Vendor snapshot (from resolved supplier) ---
+        if supplier:
+            po.vendor_name = supplier.name or ''
+            addr = getattr(supplier, 'physical_address', None)
+            if addr:
+                addr_parts = [
+                    p for p in [
+                        getattr(addr, 'address_line_1', ''),
+                        getattr(addr, 'address_line_2', ''),
+                        ' '.join(filter(None, [
+                            getattr(addr, 'city', ''),
+                            getattr(addr, 'state', ''),
+                            getattr(addr, 'zip', ''),
+                        ])),
+                    ] if p.strip()
+                ]
+                po.vendor_address = '\n'.join(addr_parts)
+
+        # --- Ship-To snapshot (from CompanyPOProfile) ---
+        company = contract.company
+        profile = getattr(company, 'po_profile', None)
+        if profile:
+            po.ship_to_name = profile.ship_to_name or ''
+            contact_parts = [
+                p for p in [
+                    profile.ship_to_attn,
+                    profile.ship_to_title,
+                    profile.contact_note,
+                    profile.phone,
+                    profile.email,
+                ] if p and p.strip()
+            ]
+            po.ship_to_contact = '\n'.join(contact_parts)
+
         po.save()
         _seed_po_lines_from_clins(po, contract)
         return po, True
@@ -132,6 +167,10 @@ def update_purchase_order(request, po_id):
     date_str = (request.POST.get('po_date') or '').strip()
     po.po_date = parse_date(date_str) if date_str else None
     po.footer = request.POST.get('footer') or ''
+    po.vendor_name = (request.POST.get('vendor_name') or '').strip()
+    po.vendor_address = request.POST.get('vendor_address') or ''
+    po.ship_to_name = (request.POST.get('ship_to_name') or '').strip()
+    po.ship_to_contact = request.POST.get('ship_to_contact') or ''
     supplier_id = request.POST.get('supplier_id')
     if supplier_id:
         po.supplier = get_object_or_404(Supplier, id=supplier_id)

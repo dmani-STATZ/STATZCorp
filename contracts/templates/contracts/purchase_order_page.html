@@ -8,158 +8,243 @@
 
 {% block title %}Purchase Order — {{ contract.contract_number }}{% endblock %}
 
-{% block body_class %}purchase-order-page-body{% endblock %}
+{% block body_class %}po-editor-page{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4 py-4">
-  <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
-    <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-outline-secondary">Back to Contract</a>
-    <h1 class="h4 mb-0">Generate Purchase Order</h1>
+<div class="po-page container-fluid px-3"
+     id="po-page"
+     data-po-id="{{ po.id }}"
+     data-contract-id="{{ contract.id }}">
+  {% csrf_token %}
+
+  {# ── Zone 0: Page Header Bar (full-width, normal flow, does not scroll) ── #}
+  <div class="po-header-bar">
+    <a href="{% url 'contracts:contract_management' contract.pk %}"
+       class="btn btn-outline-secondary btn-sm">&#8592; Back to Contract</a>
+    <h1 class="po-header-title">Purchase Order {{ contract.contract_number }}</h1>
+    <div class="po-header-actions">
+      <a href="{% url 'contracts:purchase-order-print' po.id %}"
+         target="_blank" rel="noopener"
+         class="btn btn-outline-secondary btn-sm">Print / Preview PO</a>
+      <button type="button" id="po-save-header-btn"
+              class="btn btn-primary btn-sm px-4">Save</button>
+    </div>
   </div>
 
-  <div class="po-page" id="po-page" data-po-id="{{ po.id }}" data-contract-id="{{ contract.id }}">
-    {% csrf_token %}
-    
-    <div class="card shadow-sm mb-4">
-      <div class="card-header bg-light">
-        <h5 class="card-title mb-0">Header Details</h5>
+  {# ── Top Row: A · B · C · F  (4 equal columns, flex-shrink:0, does not scroll) ── #}
+  <div class="po-top-row">
+
+    {# Zone A – Vendor #}
+    <div class="card po-zone-card">
+      <div class="card-header po-zone-header">VENDOR</div>
+      <div class="card-body py-2 px-2">
+        <input type="text"
+               id="po-vendor-name-input"
+               class="form-control form-control-sm mb-2"
+               placeholder="Vendor name"
+               value="{{ po.vendor_name }}">
+        <textarea id="po-vendor-address-input"
+                  class="form-control form-control-sm"
+                  rows="3"
+                  placeholder="Vendor address">{{ po.vendor_address }}</textarea>
       </div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-3">
-            <label class="form-label fw-bold">Contract Number</label>
-            <div id="po-contract-number" class="form-control-plaintext">{{ contract.contract_number }}</div>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label fw-bold">IDIQ Number</label>
-            <div id="po-idiq-number" class="form-control-plaintext">{{ idiq_number|default:"—" }}</div>
-          </div>
-          <div class="col-md-3">
-            <label for="po-number-input" class="form-label fw-bold">PO Number</label>
-            <input type="text" id="po-number-input" class="form-control form-control-sm" value="{{ po.po_number }}">
-          </div>
-          <div class="col-md-3">
-            <label for="po-date-input" class="form-label fw-bold">PO Date</label>
-            <input type="date" id="po-date-input" class="form-control form-control-sm" value="{{ po.po_date|date:'Y-m-d' }}">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label fw-bold">Supplier</label>
-            {% if needs_supplier_picker %}
-              <select id="po-supplier-select" class="form-select form-select-sm">
-                <option value="">-- Select Supplier --</option>
-                {% for supplier in clin_suppliers %}
-                  <option value="{{ supplier.id }}" {% if supplier.id == po.supplier_id %}selected{% endif %}>
-                    {{ supplier.name }} {% if supplier.cage_code %}({{ supplier.cage_code }}){% endif %}
-                  </option>
-                {% endfor %}
-              </select>
-            {% else %}
-              <div id="po-supplier-display" class="form-control-plaintext">{{ po.supplier.name|default:"—" }}</div>
-            {% endif %}
-          </div>
-          <div class="col-md-6 d-flex align-items-end justify-content-end gap-2">
-            <a href="{% url 'contracts:purchase-order-print' po.id %}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">Print / Preview PO</a>
-            <button type="button" id="po-save-header-btn" class="btn btn-primary btn-sm px-4">Save Header</button>
-          </div>
+    </div>
+
+    {# Zone B – Ship To #}
+    <div class="card po-zone-card">
+      <div class="card-header po-zone-header">SHIP TO</div>
+      <div class="card-body py-2 px-2">
+        <input type="text"
+               id="po-ship-to-name-input"
+               class="form-control form-control-sm mb-2"
+               placeholder="Ship-to name"
+               value="{{ po.ship_to_name }}">
+        <textarea id="po-ship-to-contact-input"
+                  class="form-control form-control-sm"
+                  rows="3"
+                  placeholder="Attn / title / phone / email">{{ po.ship_to_contact }}</textarea>
+      </div>
+    </div>
+
+    {# Zone C – PO Number / Date #}
+    <div class="card po-zone-card">
+      <div class="card-header po-zone-header">PURCHASE ORDER</div>
+      <div class="card-body py-2 px-2">
+        <div class="mb-2">
+          <label for="po-number-input" class="po-field-label">P.O. NO.</label>
+          <input type="text" id="po-number-input"
+                 class="form-control form-control-sm"
+                 value="{{ po.po_number }}">
+        </div>
+        <div>
+          <label for="po-date-input" class="po-field-label">DATE</label>
+          <input type="date" id="po-date-input"
+                 class="form-control form-control-sm"
+                 value="{{ po.po_date|date:'Y-m-d' }}">
         </div>
       </div>
     </div>
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-header bg-light d-flex justify-content-between align-items-center">
-        <h5 class="card-title mb-0">Line Items</h5>
-        <button type="button" id="po-add-line-btn" class="btn btn-success btn-sm">Add Line Item</button>
+    {# Zone F – Contract Context #}
+    <div class="card po-zone-card">
+      <div class="card-header po-zone-header">CONTRACT</div>
+      <div class="card-body py-2 px-2">
+        <div class="mb-2">
+          <div class="po-field-label">Contract #</div>
+          <div id="po-contract-number" class="po-readonly-field">{{ contract.contract_number }}</div>
+        </div>
+        <div class="mb-2">
+          <div class="po-field-label">IDIQ #</div>
+          <div id="po-idiq-number" class="po-readonly-field">{{ idiq_number|default:"—" }}</div>
+        </div>
+        <div>
+          <div class="po-field-label">Supplier</div>
+          {% if needs_supplier_picker %}
+            <select id="po-supplier-select" class="form-select form-select-sm">
+              <option value="">-- Select Supplier --</option>
+              {% for supplier in clin_suppliers %}
+                <option value="{{ supplier.id }}"
+                  {% if supplier.id == po.supplier_id %}selected{% endif %}>
+                  {{ supplier.name }}{% if supplier.cage_code %} ({{ supplier.cage_code }}){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <div id="po-supplier-display" class="po-readonly-field">{{ po.supplier.name|default:"—" }}</div>
+          {% endif %}
+        </div>
       </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-bordered mb-0" id="po-lines-table">
+    </div>
+
+  </div>{# /.po-top-row #}
+
+  {# ── Main Body: Left panel (D + E) | Right panel (G) ── #}
+  <div class="po-body">
+
+    {# ── Left Panel: Zone D (Line Items) then Zone E (Footer) ── #}
+    <div class="po-left-panel">
+
+      {# Zone D – Line Items #}
+      <div class="po-zone-section">
+        <div class="po-zone-section-header">
+          <span>LINE ITEMS</span>
+          <button type="button" id="po-add-line-btn"
+                  class="btn btn-success btn-sm">+ Add Line</button>
+        </div>
+        <div class="table-responsive po-table-wrap">
+          <table class="table table-bordered table-sm mb-0 po-lines-table-fixed"
+                 id="po-lines-table">
+            <colgroup>
+              <col class="po-col-activity">
+              <col class="po-col-numeric">
+              <col class="po-col-numeric">
+              <col class="po-col-amount">
+              <col class="po-col-actions">
+            </colgroup>
             <thead class="table-light">
               <tr>
-                <th style="width: 50%;">Activity (NSN / Description / PN)</th>
-                <th style="width: 12%;">Qty</th>
-                <th style="width: 12%;">Rate</th>
-                <th style="width: 14%;">Amount</th>
-                <th style="width: 12%; text-align: center;">Actions</th>
+                <th>ACTIVITY (NSN / Description / P/N)</th>
+                <th class="text-end">QTY</th>
+                <th class="text-end">RATE</th>
+                <th class="text-end">AMOUNT</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="po-lines-tbody">
               {% for line in line_items %}
                 <tr data-line-id="{{ line.id }}">
                   <td>
-                    <textarea class="form-control form-control-sm po-line-activity" rows="3">{{ line.activity }}</textarea>
+                    <textarea class="form-control form-control-sm po-line-activity"
+                              rows="3">{{ line.activity }}</textarea>
                   </td>
                   <td>
-                    <input type="number" step="any" class="form-control form-control-sm po-line-qty" value="{{ line.qty|default_if_none:'' }}">
+                    <input type="number" step="any"
+                           class="form-control form-control-sm po-line-qty"
+                           value="{{ line.qty|default_if_none:'' }}">
                   </td>
                   <td>
-                    <input type="number" step="any" class="form-control form-control-sm po-line-rate" value="{{ line.rate|default_if_none:'' }}">
+                    <input type="number" step="any"
+                           class="form-control form-control-sm po-line-rate"
+                           value="{{ line.rate|default_if_none:'' }}">
                   </td>
                   <td>
-                    <input type="number" step="any" class="form-control form-control-sm po-line-amount" value="{{ line.amount|default_if_none:'' }}">
+                    <input type="number" step="any"
+                           class="form-control form-control-sm po-line-amount"
+                           value="{{ line.amount|default_if_none:'' }}">
                   </td>
                   <td class="text-nowrap text-center">
-                    <button type="button" class="btn btn-outline-secondary btn-sm po-line-up">▲</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm po-line-down">▼</button>
-                    <button type="button" class="btn btn-outline-danger btn-sm po-line-delete">✕</button>
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm po-line-up"
+                            title="Move up">&#9650;</button>
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm po-line-down"
+                            title="Move down">&#9660;</button>
+                    <button type="button"
+                            class="btn btn-outline-danger btn-sm po-line-delete"
+                            title="Delete">&#10005;</button>
                   </td>
                 </tr>
-              {% empty %}
-                <!-- Empty state handled in JS or CSS -->
-              {% endfor %}
+              {% empty %}{% endfor %}
             </tbody>
             <tfoot>
               <tr class="table-light">
-                <td colspan="3" class="text-end fw-bold">Total Amount:</td>
-                <td>
-                  <div id="po-lines-total" class="fw-bold px-2">0.00</div>
+                <td colspan="3" class="text-end fw-bold pe-2">Total Amount:</td>
+                <td class="text-end">
+                  <div id="po-lines-total" class="fw-bold px-1">0.00</div>
                 </td>
                 <td></td>
               </tr>
             </tfoot>
           </table>
         </div>
-      </div>
-    </div>
+      </div>{# /.po-zone-section (D) #}
 
-    <div class="row g-4 mb-4">
-      <div class="col-md-6">
-        <div class="card shadow-sm h-100">
-          <div class="card-header bg-light">
-            <h5 class="card-title mb-0">Snippet Library</h5>
-          </div>
-          <div class="card-body">
-            <div class="mb-3">
-              <label for="po-snippet-select" class="form-label">Select Snippet</label>
-              <select id="po-snippet-select" class="form-select form-select-sm">
-                <option value="">-- Choose Snippet --</option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-bold">Preview</label>
-              <div id="po-snippet-preview" class="border p-2 bg-light" style="min-height: 100px; white-space: pre-wrap; font-size: 0.875rem;"></div>
-            </div>
-            <div class="d-flex gap-2">
-              <button type="button" id="po-snippet-insert-line-btn" class="btn btn-outline-primary btn-sm">Insert as Line</button>
-              <button type="button" id="po-snippet-set-footer-btn" class="btn btn-outline-secondary btn-sm">Set as Footer</button>
-            </div>
+      {# Zone E – PO Footer #}
+      <div class="po-zone-section">
+        <div class="po-zone-section-header">
+          <span>PO FOOTER</span>
+        </div>
+        <div class="p-2">
+          <textarea id="po-footer-input"
+                    class="form-control form-control-sm"
+                    rows="4"
+                    placeholder="Enter PO footer / special notes…">{{ po.footer }}</textarea>
+        </div>
+      </div>{# /.po-zone-section (E) #}
+
+    </div>{# /.po-left-panel #}
+
+    {# ── Right Panel: Zone G (Snippet Builder) ── #}
+    <div class="po-right-panel">
+      <div class="po-zone-g">
+
+        <div class="po-zone-section-header po-zone-g-label">
+          <span>SNIPPET LIBRARY</span>
+        </div>
+
+        <div class="po-zone-g-inner">
+          <select id="po-snippet-select"
+                  class="form-select form-select-sm mb-2 flex-shrink-0">
+            <option value="">-- Choose Snippet --</option>
+          </select>
+
+          <div id="po-snippet-preview"
+               class="po-snippet-preview-box"></div>
+
+          <div class="d-flex gap-2 mt-2 flex-shrink-0">
+            <button type="button" id="po-snippet-insert-line-btn"
+                    class="btn btn-outline-primary btn-sm">Insert as Line</button>
+            <button type="button" id="po-snippet-set-footer-btn"
+                    class="btn btn-outline-secondary btn-sm">Set as Footer</button>
           </div>
         </div>
-      </div>
 
-      <div class="col-md-6">
-        <div class="card shadow-sm h-100">
-          <div class="card-header bg-light">
-            <h5 class="card-title mb-0">Footer / Special Notes</h5>
-          </div>
-          <div class="card-body">
-            <textarea id="po-footer-input" class="form-control h-100" rows="8" placeholder="Enter PO footer/special notes here...">{{ po.footer }}</textarea>
-          </div>
-        </div>
       </div>
-    </div>
+    </div>{# /.po-right-panel #}
 
-  </div>
-</div>
+  </div>{# /.po-body #}
+
+</div>{# /.po-page #}
 {% endblock %}
 
 {% block extra_scripts %}
