@@ -4,6 +4,7 @@ from django.http import HttpResponse, HttpResponseForbidden, Http404
 from django.utils.decorators import method_decorator
 from django.db.models import Count
 from STATZWeb.decorators import conditional_login_required
+from decimal import Decimal
 
 from ..models import PartnerReconciliation, PartnerReconciliationRow
 from ..forms import PartnerReconciliationForm
