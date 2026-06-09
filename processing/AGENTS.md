@@ -212,6 +212,7 @@ defeat the supplier-matching prefill flow.
 - Staging `ProcessClinSplit` (processing) vs `contracts.ClinSplit` (finalized) — different tables. Migration history still mentions older `ProcessContractSplit`; `0019` moved splits onto `ProcessClin`.
 - When adding a new FK to `ProcessClin` or `ProcessContract`, decide whether it should be nullable (staging data is often incomplete) and whether it must be mapped to the canonical model during finalization.
 - `QueueContract` and `QueueClin` use `AuditModel` from `contracts`. If `AuditModel` changes, these models are affected.
+- **Company propagation rule**: `start_new_contract` must pass `company=request.active_company` to every `.objects.create()` call. `start_processing` must pass `company=queue_item.company` to every `.objects.create()` call. Finalization views must read `process_contract.company` when building the contract creation payload — never `request.active_company`. Breaking this chain causes all contracts to land under the default company.
 
 ---
 

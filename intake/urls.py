@@ -9,6 +9,7 @@ urlpatterns = [
     path('drafts/<int:pk>/start/', views.start_draft, name='start_draft'),
     path('drafts/<int:pk>/release/', views.release_draft, name='release_draft'),
     path('drafts/<int:pk>/delete/', views.delete_draft, name='delete_draft'),
+    path('drafts/<int:pk>/update-company/', views.update_draft_company, name='update_draft_company'),
     # Editor (Phase 2a)
     path('drafts/<int:pk>/edit/', views.edit_draft, name='edit_draft'),
     path('drafts/<int:pk>/save/', views.save_draft, name='save_draft'),

@@ -38,6 +38,7 @@ from .views.processing_views import (
     finalize_idiq_contract,
     scan_sharepoint_status,
     parse_award_pdf_from_sharepoint,
+    update_queue_company,
 )
 from processing.views.matching_views import match_packhouse
 from .views.api_views import (
@@ -61,6 +62,7 @@ urlpatterns = [
     path('queue/', ContractQueueListView.as_view(), name='queue'),
     path('queue/delete/<int:queue_id>/', delete_queue_contract, name='delete_queue_contract'),
     path('queue/match/<int:queue_id>/', match_contract_number, name='match_contract_number'),
+    path('queue/<int:queue_id>/update-company/', update_queue_company, name='update_queue_company'),
     path('start-new-contract/', start_new_contract, name='start_new_contract'),
     path('next-numbers/', get_next_numbers, name='get_next_numbers'),
     path('queue/cancel/<int:queue_id>/', cancel_process_contract, name='queue_cancel_processing'),

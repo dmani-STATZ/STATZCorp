@@ -1,0 +1,35 @@
+/* Scaffold styling for Purchase Order page */
+
+.po-page {
+    position: relative;
+}
+
+.po-page textarea.po-line-activity {
+    resize: vertical;
+    min-height: 70px;
+    font-family: inherit;
+}
+
+.po-page input.po-line-qty,
+.po-page input.po-line-rate,
+.po-page input.po-line-amount {
+    text-align: right;
+}
+
+.po-page #po-snippet-preview {
+    max-height: 150px;
+    overflow-y: auto;
+    border-radius: 0.25rem;
+}
+
+/* Dark mode overrides (only using attribute selector) */
+[data-bs-theme="dark"] .po-page .card {
+    background-color: var(--bs-card-bg, #212529);
+    border-color: var(--bs-border-color, #495057);
+}
+
+[data-bs-theme="dark"] .po-page .table-light {
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-bg: #2b3035;
+    --bs-table-border-color: var(--bs-border-color);
+}

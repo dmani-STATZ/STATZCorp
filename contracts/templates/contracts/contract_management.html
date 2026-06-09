@@ -29,6 +29,9 @@
                         {% else %}
                         <span class="w-24 inline-block px-3 py-1 text-sm font-medium rounded-md btn btn-sm btn-secondary disabled">Create</span>
                         {% endif %}
+                        {% if request.active_company.enable_po_generator %}
+                          <a href="{% url 'contracts:purchase-order-page' contract.id %}" class="btn btn-primary btn-sm">Generate PO</a>
+                        {% endif %}
                     </div>
                     <span class="text-xs text-gray-500 w-1/3 text-right">
                         {% if acknowledgment_letter %}

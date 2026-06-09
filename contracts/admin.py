@@ -8,6 +8,7 @@ from .models import (
     ClinSplit,
     ClinType,
     Company,
+    CompanyPOProfile,
     Contract,
     ContractFinanceLine,
     ContractStatus,
@@ -17,7 +18,9 @@ from .models import (
     DfasImportRow,
     FinanceLinePayment,
     FinanceLineType,
+    POLineItem,
     POSnippet,
+    PurchaseOrder,
     Reminder,
     SalesClass,
     SpecialPaymentTerms,
@@ -40,11 +43,11 @@ class ContractAdmin(ActiveUserAdminMixin, admin.ModelAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'is_active', 'sharepoint_site_name')
+    list_display = ('name', 'slug', 'is_active', 'enable_po_generator', 'sharepoint_site_name')
     search_fields = ('name', 'slug')
     list_filter = ('is_active',)
     fieldsets = (
-        (None, {'fields': ('name', 'slug', 'is_active', 'logo', 'primary_color', 'secondary_color')}),
+        (None, {'fields': ('name', 'slug', 'is_active', 'enable_po_generator', 'logo', 'primary_color', 'secondary_color')}),
         ('SharePoint documents', {
             'fields': ('sharepoint_base_url', 'sharepoint_site_name', 'sharepoint_documents_path'),
             'description': 'Base URL down to /sites/ (e.g. https://statzcorpgcch.sharepoint.us/sites). '
@@ -221,3 +224,22 @@ class ClinReclassificationDraftAdmin(admin.ModelAdmin):
         'clin__item_number',
     )
     ordering = ('-updated_at',)
+
+
+class POLineItemInline(admin.TabularInline):
+    model = POLineItem
+    extra = 0
+
+
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+    list_display = ('po_number', 'contract', 'supplier', 'po_date', 'modified_on')
+    search_fields = ('po_number', 'contract__contract_number')
+    inlines = [POLineItemInline]
+    autocomplete_fields = ()
+    raw_id_fields = ('contract', 'supplier', 'company')
+
+
+@admin.register(CompanyPOProfile)
+class CompanyPOProfileAdmin(admin.ModelAdmin):
+    list_display = ('company', 'ship_to_name', 'cage_code')

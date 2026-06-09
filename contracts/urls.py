@@ -169,6 +169,7 @@ from .views.acknowledgment_views import (
 
 from .views import payment_history_views
 from .views import note_views
+from .views import purchase_order_views
 from .views.folder_tracking_views import (
     folderstack_list,
     folderstack_save,
@@ -805,6 +806,14 @@ urlpatterns = [
         get_existing_acknowledgment_pdf,
         name='acknowledgment-letter-existing-pdf',
     ),
+    # Purchase Order Generator
+    path('contract/<int:contract_id>/purchase-order/', purchase_order_views.purchase_order_page, name='purchase-order-page'),
+    path('purchase-order/<int:po_id>/update/', purchase_order_views.update_purchase_order, name='purchase-order-update'),
+    path('purchase-order/<int:po_id>/line/add/', purchase_order_views.add_po_line, name='po-line-add'),
+    path('po-line/<int:line_id>/update/', purchase_order_views.update_po_line, name='po-line-update'),
+    path('po-line/<int:line_id>/delete/', purchase_order_views.delete_po_line, name='po-line-delete'),
+    path('purchase-order/<int:po_id>/lines/reorder/', purchase_order_views.reorder_po_lines, name='po-lines-reorder'),
+    path('purchase-order/<int:po_id>/print/', purchase_order_views.purchase_order_print, name='purchase-order-print'),
     # CLIN Splits
     path("clin/<int:clin_pk>/splits/add/", add_clin_split, name="add_clin_split"),
     path("clin/splits/<int:split_pk>/update/", update_clin_split, name="update_clin_split"),

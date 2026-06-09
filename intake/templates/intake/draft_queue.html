@@ -135,13 +135,25 @@
                                 </a>
                             {% endif %}
                         </td>
-                        <td class="px-3 py-2 whitespace-nowrap">
-                            {% if draft.company %}
-                                <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:0.7rem;">
-                                    {{ draft.company.name }}
-                                </span>
+                        <td class="px-3 py-2 whitespace-nowrap" id="draft-company-cell-{{ draft.id }}">
+                            {% if request.user.is_staff or request.user.is_superuser %}
+                                <button type="button"
+                                        class="badge bg-secondary-subtle text-secondary-emphasis border-0 draft-company-badge"
+                                        style="font-size:0.7rem; cursor:pointer;"
+                                        data-draft-id="{{ draft.id }}"
+                                        data-company-name="{% if draft.company %}{{ draft.company.name }}{% endif %}"
+                                        title="Click to change company"
+                                        onclick="openChangeDraftCompanyModal({{ draft.id }}, '{% if draft.company %}{{ draft.company.name|escapejs }}{% endif %}')">
+                                    {% if draft.company %}{{ draft.company.name }}{% else %}<span class="text-muted">—</span>{% endif %}
+                                </button>
                             {% else %}
-                                <span class="text-muted small">—</span>
+                                {% if draft.company %}
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:0.7rem;">
+                                        {{ draft.company.name }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
                             {% endif %}
                         </td>
                         <td class="px-6 py-2 whitespace-nowrap">
@@ -567,4 +579,117 @@ function openDraftDocuments(draftId) {
     if (popup) popup.focus();
 }
 </script>
+
+{% if request.user.is_staff or request.user.is_superuser %}
+{# ── Change-company modal (staff/superuser only) ────────────────────────── #}
+<div class="modal fade" id="changeDraftCompanyModal" tabindex="-1" aria-labelledby="changeDraftCompanyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title mb-0" id="changeDraftCompanyModalLabel">Assign Company</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="small text-muted mb-2" id="draftCompanyModalDesc">Select the company for this draft.</p>
+                <select id="draftCompanySelect" class="form-select form-select-sm">
+                    <option value="">— No company —</option>
+                    {% for co in available_companies %}
+                    <option value="{{ co.id }}">{{ co.name }}</option>
+                    {% endfor %}
+                </select>
+                <div id="draftCompanyModalError" class="text-danger small mt-2 d-none"></div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary" id="draftCompanySaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const UPDATE_URL_TPL = "{% url 'intake:update_draft_company' pk=0 %}".replace('/0/', '/{id}/');
+    const CSRF_TOKEN = () => document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    let _activeDraftId = null;
+
+    window.openChangeDraftCompanyModal = function (draftId, currentCompanyName) {
+        _activeDraftId = draftId;
+        const select = document.getElementById('draftCompanySelect');
+        const errBox = document.getElementById('draftCompanyModalError');
+        const desc   = document.getElementById('draftCompanyModalDesc');
+
+        errBox.classList.add('d-none');
+        errBox.textContent = '';
+
+        // Pre-select matching option by text
+        if (currentCompanyName) {
+            const opt = Array.from(select.options).find(o => o.text === currentCompanyName);
+            select.value = opt ? opt.value : '';
+        } else {
+            select.value = '';
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('changeDraftCompanyModal'));
+        modal.show();
+    };
+
+    document.getElementById('draftCompanySaveBtn')?.addEventListener('click', async function () {
+        if (_activeDraftId == null) return;
+
+        const select  = document.getElementById('draftCompanySelect');
+        const errBox  = document.getElementById('draftCompanyModalError');
+        const saveBtn = document.getElementById('draftCompanySaveBtn');
+        const companyId = select.value ? parseInt(select.value, 10) : null;
+
+        errBox.classList.add('d-none');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+
+        const url = UPDATE_URL_TPL.replace('{id}', _activeDraftId);
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': CSRF_TOKEN(),
+                },
+                body: JSON.stringify({ company_id: companyId }),
+            });
+            const data = await resp.json().catch(() => ({}));
+
+            if (!resp.ok || !data.success) {
+                errBox.textContent = data.error || ('HTTP ' + resp.status);
+                errBox.classList.remove('d-none');
+                return;
+            }
+
+            // Update the badge in-place
+            const cell = document.getElementById('draft-company-cell-' + _activeDraftId);
+            if (cell) {
+                const btn = cell.querySelector('.draft-company-badge');
+                if (btn) {
+                    const newName = data.company_name || '';
+                    btn.dataset.companyName = newName;
+                    btn.setAttribute('onclick', `openChangeDraftCompanyModal(${_activeDraftId}, ${JSON.stringify(newName)})`);
+                    btn.innerHTML = newName
+                        ? newName
+                        : '<span class="text-muted">—</span>';
+                }
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('changeDraftCompanyModal'))?.hide();
+        } catch (err) {
+            errBox.textContent = err.message || 'Network error';
+            errBox.classList.remove('d-none');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+        }
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}

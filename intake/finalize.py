@@ -156,6 +156,7 @@ def _draft_to_service_payload(draft: DraftContract, kind: str) -> dict:
         or ''
     )
     return {
+        'company': draft.company,
         'contract_type_kind': kind,
         'contract_number': draft.contract_number,
         'pr_number': data.get('pr_number'),
@@ -332,6 +333,7 @@ def _finalize_idiq(draft: DraftContract, user: User) -> IdiqContract:
         or ''
     )
     payload = {
+        'company': draft.company,
         'contract_number': draft.contract_number,
         'buyer_id': data.get('buyer_id'),
         'award_date': data.get('award_date'),

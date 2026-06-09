@@ -238,6 +238,37 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - **Category field** is free-text; a `<datalist>` populates from existing categories as the user types. Snippets are grouped by category in the list.
 - **Dark mode:** all colours use `var(--bs-*)` tokens; dark mode styles use `[data-bs-theme="dark"]` attribute selectors only.
 
+## Purchase Order Generator (Data Layer — Slice 1)
+- **Models (contracts/models.py):**
+  - `Company.enable_po_generator` (BooleanField, default False) — controls visibility of the Generate PO button per company.
+  - `CompanyPOProfile` (OneToOne→Company, related_name `po_profile`) — per-company Ship-To / letterhead block (name, attn, title, address, phone, email, CAGE, default_footer). Edited in admin; values TBD with Barb. No audit fields.
+  - `PurchaseOrder` (AuditModel; OneToOne→Contract, related_name `purchase_order`; FK→Company PROTECT; FK→Supplier PROTECT nullable). **One PO per contract, enforced by the OneToOne.** `po_number` is editable text incl. revision suffix (e.g. J00121A). `po_date`, `footer`. Document-only — NOT wired to finance/splits/transactions.
+  - `POLineItem` (FK→PurchaseOrder CASCADE, related_name `line_items`). `sort_order`, `activity` text, `qty`/`rate`/`amount` (all nullable → priced lines and text-only boilerplate lines). No audit fields.
+- **Vendor resolution (logic lands in Slice 2):** supplier is derived from the distinct suppliers across the contract's CLINs — auto-set when exactly one, user-picked when more than one. Supplier is NOT on Contract; it lives on `Clin.supplier`.
+- **PDF (Slice 2):** built programmatically with python-docx, converted via the existing Graph pipeline, saved as `PO-<po_number>.pdf` to the contract SharePoint folder (mirrors the acknowledgment-letter flow).
+- **Snippets:** reuses the existing `POSnippet` library; no new snippet model.
+
+## Purchase Order Generator (Slice 2a — Page + Line CRUD)
+- **Views (contracts/views/purchase_order_views.py):**
+  - `purchase_order_page` (GET) — gates access behind `Company.enable_po_generator` (403 if disabled). Gets or creates a `PurchaseOrder` for the contract (resolving supplier and seeding line items). Renders `purchase_order_page.html`.
+  - `update_purchase_order` (POST AJAX) — updates `po_number`, `po_date`, `footer`, and optional `supplier_id`.
+  - `add_po_line` (POST AJAX) — creates a new `POLineItem` for the PO. If `activity` is provided (e.g. from snippet insertion), it is set; otherwise empty. Returns JSON details.
+  - `update_po_line` (POST AJAX) — updates individual fields (`activity`, `qty`, `rate`, `amount`) of a `POLineItem`.
+  - `delete_po_line` (POST AJAX) — deletes a specific `POLineItem`.
+  - `reorder_po_lines` (POST AJAX) — bulk updates `sort_order` for line items based on a list of ordered IDs.
+- **Supplier Resolution:** Supplier is resolved from distinct suppliers of the contract's CLINs. If exactly one distinct CLIN supplier exists, it is auto-set on the PO; if 0 or >1, a dropdown picker is displayed on the page allowing the user to select one.
+- **Seeding Rule:** Seeding of PO lines from CLINs (priced line items) runs **exactly once at creation time**. Reopening the page reads existing `POLineItem` records and does NOT re-seed, preserving any manual modifications.
+- **Snippet Library integration:** Loads snippets via the existing `/contracts/api/po-snippets/` endpoint. Inserting a snippet strips its HTML body to plain text before creating/appending a PO line item or replacing the footer text.
+
+## Purchase Order Generator (Slice 2b — Print View)
+- **Print View & URL:** `purchase_order_print` view (URL name `purchase-order-print`). Accessible at `/contracts/purchase-order/<po_id>/print/`. Gates access behind `Company.enable_po_generator`.
+- **Standalone Layout:** Renders `po_print.html` which is a standalone HTML document (not extending the standard Django base template) to facilitate clean, print-to-PDF output from the browser.
+- **Letterhead / Contact Blocks:** Renders logo via `Company.logo_url` and letterhead block via `CompanyPOProfile.letterhead_html` (trusted admin HTML). Per Contract block reads from `CompanyPOProfile` contact fields (including the new `contact_note` field).
+- **Vendor block:** Loaded from the physical address of the supplier (`po.supplier.physical_address`).
+- **Browser-Based PDF Generation:** Utilizes browser print-to-PDF functionality (`window.print()`). Toolbar is hidden during printing via the `.no-print` class. No server-side PDF libraries or SharePoint/Graph APIs are involved.
+
+
+
 ## 12. URL Surface / API Surface
 - Dashboard & exports: `/contracts/`, `/contracts/dashboard/metric-detail/`, `/contracts/dashboard/metric-detail/export/`.
 - Contract lifecycle URLs: `<pk>/` (management), `<pk>/detail/`, `<pk>/close/`, `<pk>/cancel/`, `<pk>/review/`, toggles like `mark-reviewed`, `toggle-contract-field`, `toggle-expedite-status`. (Canonical contract **create** is in the `processing` app, not under `/contracts/create/`.)

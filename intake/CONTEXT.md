@@ -75,6 +75,7 @@ incompatible with new code. Validation is a hard requirement.
   transition to `ready_for_review` + release lock
 - `intake:cancel_draft` — `POST /intake/drafts/<pk>/cancel/` — transition to
   `cancelled` + release lock
+- `intake:update_draft_company` — `POST /intake/drafts/<pk>/update-company/` — staff/superuser only, updates DraftContract.company
 
 ## Editor
 The editor (`intake/templates/intake/draft_edit.html`) is a CLIN-card
@@ -276,6 +277,7 @@ UI: drag-and-drop zone on the queue page (`draft_queue.html`) that hits
 the upload endpoint and reloads the queue on any success.
 
 ## What's Built (Phase 1 + 2a + 2b + 3a + 3c PDF)
+- Company on DraftContract is now propagated through finalization — finalized Contract and IdiqContract rows receive the company from the DraftContract via the shared creation service payload.
 - `DraftContract` model + migrations
 - Pydantic schemas for all seven contract types
 - Lock model + helpers + clear-stale management command

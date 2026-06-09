@@ -20,6 +20,14 @@ class Company(models.Model):
     name = models.CharField(max_length=150, unique=True)
     slug = models.SlugField(max_length=150, unique=True)
     is_active = models.BooleanField(default=True)
+    enable_po_generator = models.BooleanField(
+        default=False,
+        help_text=(
+            "When True, the 'Generate PO' button appears on the contract "
+            "management page for this company. Leave False for companies that "
+            "issue purchase orders through QuickBooks or another external system."
+        ),
+    )
     logo = models.FileField(upload_to='company-logos/', null=True, blank=True)
     primary_color = models.CharField(max_length=7, null=True, blank=True, help_text="Hex color like #004eb3")
     secondary_color = models.CharField(max_length=7, null=True, blank=True, help_text="Hex color like #e5e7eb")
@@ -1124,9 +1132,15 @@ class FinanceLinePayment(AuditModel):
 
 
 class IdiqContract(AuditModel):
+    company = models.ForeignKey('Company', on_delete=models.PROTECT, related_name='idiq_contracts', default=1, null=False, blank=True)
     contract_number = models.CharField(max_length=50, null=True, blank=True)
     buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
     award_date = models.DateField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            self.company = Company.get_default_company()
+        super().save(*args, **kwargs)
     term_length = models.IntegerField(null=True, blank=True)
     option_length = models.IntegerField(
         null=True,
@@ -1885,3 +1899,84 @@ class POSnippet(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class CompanyPOProfile(models.Model):
+    """Per-company letterhead / Ship-To block used when rendering POs.
+    One row per Company. Edited in admin (values TBD with Barb)."""
+    company = models.OneToOneField('Company', on_delete=models.CASCADE, related_name='po_profile')
+    ship_to_name = models.CharField(max_length=150, blank=True, default='')
+    ship_to_attn = models.CharField(max_length=150, blank=True, default='')
+    ship_to_title = models.CharField(max_length=100, blank=True, default='')
+    address_line_1 = models.CharField(max_length=200, blank=True, default='')
+    address_line_2 = models.CharField(max_length=200, blank=True, default='')
+    city = models.CharField(max_length=100, blank=True, default='')
+    state = models.CharField(max_length=50, blank=True, default='')
+    zip = models.CharField(max_length=15, blank=True, default='')
+    phone = models.CharField(max_length=40, blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    cage_code = models.CharField(max_length=20, blank=True, default='')
+    default_footer = models.TextField(blank=True, default='')
+    letterhead_html = models.TextField(
+        blank=True, default='',
+        help_text=(
+            "Trusted, admin-authored HTML for the printed letterhead block "
+            "(company legal name, CAGE codes, address, parent companies, "
+            "phones, tagline). Rendered as-is next to the company logo."
+        ),
+    )
+    contact_note = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="Optional extra line in the 'Per Contract' contact block (e.g. 'for shipping instructions').",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Company PO Profile'
+        verbose_name_plural = 'Company PO Profiles'
+
+    def __str__(self):
+        return f"PO Profile — {self.company.name}"
+
+
+class PurchaseOrder(AuditModel):
+    """A purchase order issued for a Contract. Exactly one per Contract.
+    Vendor is resolved from the contract's CLIN suppliers at creation
+    (auto when one distinct supplier; user-selected when more than one).
+    Document-only: NOT linked to finance, splits, or audit transactions."""
+    company = models.ForeignKey('Company', on_delete=models.PROTECT, related_name='purchase_orders')
+    contract = models.OneToOneField('Contract', on_delete=models.CASCADE, related_name='purchase_order')
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, null=True, blank=True, related_name='purchase_orders')
+    po_number = models.CharField(
+        max_length=30, blank=True, default='',
+        help_text="Editable PO number including any revision suffix, e.g. J00121A.",
+    )
+    po_date = models.DateField(null=True, blank=True)
+    footer = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-modified_on']
+        verbose_name = 'Purchase Order'
+        verbose_name_plural = 'Purchase Orders'
+
+    def __str__(self):
+        return f"PO {self.po_number or self.pk} — {self.contract.contract_number}"
+
+
+class POLineItem(models.Model):
+    purchase_order = models.ForeignKey('PurchaseOrder', on_delete=models.CASCADE, related_name='line_items')
+    sort_order = models.IntegerField(default=0)
+    activity = models.TextField(blank=True, default='')
+    qty = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    rate = models.DecimalField(max_digits=19, decimal_places=4, null=True, blank=True)
+    amount = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+        verbose_name = 'PO Line Item'
+        verbose_name_plural = 'PO Line Items'
+
+    def __str__(self):
+        return f"Line {self.sort_order} of PO {self.purchase_order_id}"
+

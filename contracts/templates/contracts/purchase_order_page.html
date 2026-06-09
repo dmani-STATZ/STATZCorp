@@ -1,0 +1,167 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'contracts/css/purchase_order.css' %}?v={{ cache_version }}">
+{% endblock %}
+
+{% block title %}Purchase Order — {{ contract.contract_number }}{% endblock %}
+
+{% block body_class %}purchase-order-page-body{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+    <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-outline-secondary">Back to Contract</a>
+    <h1 class="h4 mb-0">Generate Purchase Order</h1>
+  </div>
+
+  <div class="po-page" id="po-page" data-po-id="{{ po.id }}" data-contract-id="{{ contract.id }}">
+    {% csrf_token %}
+    
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-light">
+        <h5 class="card-title mb-0">Header Details</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Contract Number</label>
+            <div id="po-contract-number" class="form-control-plaintext">{{ contract.contract_number }}</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">IDIQ Number</label>
+            <div id="po-idiq-number" class="form-control-plaintext">{{ idiq_number|default:"—" }}</div>
+          </div>
+          <div class="col-md-3">
+            <label for="po-number-input" class="form-label fw-bold">PO Number</label>
+            <input type="text" id="po-number-input" class="form-control form-control-sm" value="{{ po.po_number }}">
+          </div>
+          <div class="col-md-3">
+            <label for="po-date-input" class="form-label fw-bold">PO Date</label>
+            <input type="date" id="po-date-input" class="form-control form-control-sm" value="{{ po.po_date|date:'Y-m-d' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Supplier</label>
+            {% if needs_supplier_picker %}
+              <select id="po-supplier-select" class="form-select form-select-sm">
+                <option value="">-- Select Supplier --</option>
+                {% for supplier in clin_suppliers %}
+                  <option value="{{ supplier.id }}" {% if supplier.id == po.supplier_id %}selected{% endif %}>
+                    {{ supplier.name }} {% if supplier.cage_code %}({{ supplier.cage_code }}){% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+            {% else %}
+              <div id="po-supplier-display" class="form-control-plaintext">{{ po.supplier.name|default:"—" }}</div>
+            {% endif %}
+          </div>
+          <div class="col-md-6 d-flex align-items-end justify-content-end gap-2">
+            <a href="{% url 'contracts:purchase-order-print' po.id %}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">Print / Preview PO</a>
+            <button type="button" id="po-save-header-btn" class="btn btn-primary btn-sm px-4">Save Header</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Line Items</h5>
+        <button type="button" id="po-add-line-btn" class="btn btn-success btn-sm">Add Line Item</button>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-bordered mb-0" id="po-lines-table">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 50%;">Activity (NSN / Description / PN)</th>
+                <th style="width: 12%;">Qty</th>
+                <th style="width: 12%;">Rate</th>
+                <th style="width: 14%;">Amount</th>
+                <th style="width: 12%; text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="po-lines-tbody">
+              {% for line in line_items %}
+                <tr data-line-id="{{ line.id }}">
+                  <td>
+                    <textarea class="form-control form-control-sm po-line-activity" rows="3">{{ line.activity }}</textarea>
+                  </td>
+                  <td>
+                    <input type="number" step="any" class="form-control form-control-sm po-line-qty" value="{{ line.qty|default_if_none:'' }}">
+                  </td>
+                  <td>
+                    <input type="number" step="any" class="form-control form-control-sm po-line-rate" value="{{ line.rate|default_if_none:'' }}">
+                  </td>
+                  <td>
+                    <input type="number" step="any" class="form-control form-control-sm po-line-amount" value="{{ line.amount|default_if_none:'' }}">
+                  </td>
+                  <td class="text-nowrap text-center">
+                    <button type="button" class="btn btn-outline-secondary btn-sm po-line-up">▲</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm po-line-down">▼</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm po-line-delete">✕</button>
+                  </td>
+                </tr>
+              {% empty %}
+                <!-- Empty state handled in JS or CSS -->
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="table-light">
+                <td colspan="3" class="text-end fw-bold">Total Amount:</td>
+                <td>
+                  <div id="po-lines-total" class="fw-bold px-2">0.00</div>
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-light">
+            <h5 class="card-title mb-0">Snippet Library</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label for="po-snippet-select" class="form-label">Select Snippet</label>
+              <select id="po-snippet-select" class="form-select form-select-sm">
+                <option value="">-- Choose Snippet --</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Preview</label>
+              <div id="po-snippet-preview" class="border p-2 bg-light" style="min-height: 100px; white-space: pre-wrap; font-size: 0.875rem;"></div>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" id="po-snippet-insert-line-btn" class="btn btn-outline-primary btn-sm">Insert as Line</button>
+              <button type="button" id="po-snippet-set-footer-btn" class="btn btn-outline-secondary btn-sm">Set as Footer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-light">
+            <h5 class="card-title mb-0">Footer / Special Notes</h5>
+          </div>
+          <div class="card-body">
+            <textarea id="po-footer-input" class="form-control h-100" rows="8" placeholder="Enter PO footer/special notes here...">{{ po.footer }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'contracts/js/purchase_order.js' %}?v={{ cache_version }}"></script>
+{% endblock %}

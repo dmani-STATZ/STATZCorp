@@ -20,7 +20,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
-from contracts.models import Contract, IdiqContract
+from contracts.models import Company, Contract, IdiqContract
 
 from .finalize import FinalizationError, finalize_draft
 from .forms_parse import parse_post
@@ -151,7 +151,35 @@ def delete_draft(request, pk: int):
     messages.success(request, 'Draft deleted.')
     return redirect('intake:queue')
 
+@login_required
+@require_POST
+def update_draft_company(request, pk: int):
+    """
+    Update the company on a DraftContract. Staff or superuser only.
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({'success': False, 'error': 'Permission denied.'}, status=403)
+    try:
+        data = json.loads(request.body)
+        company_id = data.get('company_id')
+        if not company_id:
+            return JsonResponse({'success': False, 'error': 'company_id is required.'}, status=400)
 
+        from contracts.models import Company
+        company = get_object_or_404(Company, id=company_id, is_active=True)
+        draft = get_object_or_404(DraftContract, pk=pk)
+
+        draft.company = company
+        draft.save(update_fields=['company', 'modified_at'])
+
+        logger.info(
+            'Draft %s company updated to %s by %s',
+            pk, company.name, request.user.username,
+        )
+        return JsonResponse({'success': True, 'company_id': company.id, 'company_name': company.name})
+    except Exception as e:
+        logger.exception('Error updating company for draft %s', pk)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 # ---------------------------------------------------------------------------
 # Editor (Phase 2a)
 # ---------------------------------------------------------------------------

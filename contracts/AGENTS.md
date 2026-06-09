@@ -289,6 +289,20 @@ NSN search is dash-agnostic. `get_select_options` in `contracts/views/api_views.
 
 **`POSnippet`** — company-scoped snippet store. No `ContentType`, no audit trail, no FK to `Contract` or `Clin`. Safe to query/filter freely. `snippet_views.py` is the only view file; do not add snippet logic elsewhere.
 
+- **PurchaseOrder is one-per-contract (OneToOne on `contract`).** Never create a second PO for a contract; get-or-create on the contract.
+- **PurchaseOrder is document-only.** Do NOT connect it to `ClinSplit`, `finance_audit`, `PaymentHistory`, or `transactions` signals. Line-item amounts never feed financial rollups.
+- **PO vendor is derived from CLIN suppliers** (Contract has no supplier FK). Picker appears only when a contract has more than one distinct CLIN supplier.
+- **Reuse `POSnippet`** for PO boilerplate; do not add a parallel snippet model.
+- **PO page 403s unless `request.active_company.enable_po_generator`.**
+- **PO views are function-based.** Use `getattr(request, 'active_company', None)` to get the active company, never `ActiveCompanyQuerysetMixin`.
+- **PO line seeding runs ONCE at creation.** Never re-seed or overwrite manual edits on subsequent page opens.
+- **Snippet insertion strips HTML to plain text.** The `activity` field is plain text, so convert Quill HTML body to text before insert/footer update.
+- **All PO views live in `purchase_order_views.py` only.** Keep views modular and scoped.
+- **`po_print.html` is standalone.** Never make it extend the standard app base template as it is designed for clean print-to-PDF output without sidebar or navigation chrome.
+- **`letterhead_html` is trusted HTML content.** It is rendered with `|safe` filter, so its input field should only be editable by administrators/staff via the Django admin panel.
+- **Newlines in line item `activity` are preserved via CSS.** Use `white-space: pre-wrap;` rather than the `linebreaks` filter or `safe` on the activity text.
+- **Browser-based printing is used for PDF export.** The print view does not generate, store, or upload PDFs to SharePoint. The user prints/saves as PDF using their browser's print engine.
+
 ### Apps that depend on this app:
 | App | How it depends |
 |-----|---------------|

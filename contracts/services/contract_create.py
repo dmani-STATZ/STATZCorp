@@ -91,6 +91,7 @@ def create_contract_from_payload(payload: dict, user: User) -> ContractCreationR
     nsns, suppliers = _resolve_clin_fks(clin_rows)
 
     contract = Contract.objects.create(
+        company=payload.get('company') or payload.get('company_id'),
         contract_number=payload.get('contract_number'),
         idiq_contract=parent_idiq,
         pr_number=payload.get('pr_number'),
@@ -155,6 +156,7 @@ def create_idiq_from_payload(payload: dict, user: User) -> IdiqContract:
     buyer = _resolve_buyer(payload.get('buyer_id'), required=False)
 
     idiq = IdiqContract.objects.create(
+        company=payload.get('company'),
         contract_number=contract_number,
         buyer=buyer,
         award_date=payload.get('award_date') or None,

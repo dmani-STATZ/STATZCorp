@@ -34,6 +34,7 @@ from contracts.models import (
     PaymentHistory,
     ContractStatus,
     ContractLevelCharge,
+    Company,
 )
 from contracts.services import (
     ContractCreationError,
@@ -125,6 +126,7 @@ def _process_contract_to_payload(process_contract, *, seed_payment_history: bool
             ],
         })
     payload = {
+        'company': process_contract.company,
         'contract_type_kind': 'AWD',
         'contract_number': process_contract.contract_number,
         'idiq_contract_id': process_contract.idiq_contract_id,
@@ -196,6 +198,13 @@ def start_new_contract(request):
         data = json.loads(request.body.decode('utf-8'))
         contract_number = data.get('contract_number')
 
+        active_company = getattr(request, 'active_company', None)
+        if active_company is None:
+            return JsonResponse(
+                {'success': False, 'error': 'No active company selected. Please select a company before creating a contract.'},
+                status=400
+            )
+
         if not contract_number:
             return JsonResponse({
                 'success': False,
@@ -225,6 +234,7 @@ def start_new_contract(request):
 
         #step 1: create a new queue contract in the database
         queue_contract = QueueContract.objects.create(
+            company=active_company,
             contract_number=contract_number,
             award_date=timezone.now(),
             created_by=request.user,
@@ -240,6 +250,7 @@ def start_new_contract(request):
 
         #Create a new blank contract in the database
         process_contract = ProcessContract.objects.create(
+            company=active_company,
             queue_id=queue_contract.id,
             contract_number=contract_number,
             po_number=None,
@@ -254,6 +265,7 @@ def start_new_contract(request):
 
         # Create ProcessClins from queue item
         ProcessClin.objects.create(
+            company=active_company,
             process_contract=process_contract,
 
             item_number='0001',
@@ -298,6 +310,14 @@ def start_processing(request, queue_id):
     try:
         queue_item = get_object_or_404(QueueContract, id=queue_id)
         
+        company = queue_item.company
+        if company is None:
+            company = getattr(request, 'active_company', None)
+            logger.warning(
+                "QueueContract %s has no company set; falling back to request.active_company",
+                queue_item.id
+            )
+
         if queue_item.is_being_processed:
             return JsonResponse({
                 'success': False,
@@ -313,6 +333,7 @@ def start_processing(request, queue_id):
 
         # Create ProcessContract from queue item
         process_contract = ProcessContract.objects.create(
+            company=company,
             contract_number=queue_item.contract_number,
             buyer_text=queue_item.buyer,
             solicitation_type=queue_item.solicitation_type,
@@ -342,6 +363,7 @@ def start_processing(request, queue_id):
         for clin_data in queue_item.clins.all():
             try:
                 ProcessClin.objects.create(
+                    company=company,
                     process_contract=process_contract,
                     item_number=clin_data.item_number,
                     item_type=clin_data.item_type if clin_data.item_type else 'P',
@@ -760,10 +782,12 @@ def finalize_contract(request, process_contract_id):
                 })
 
         try:
+            payload = _process_contract_to_payload(
+                process_contract, seed_payment_history=False
+            )
+            payload['company'] = process_contract.company
             result = create_contract_from_payload(
-                _process_contract_to_payload(
-                    process_contract, seed_payment_history=False
-                ),
+                payload,
                 request.user,
             )
         except ContractCreationError as exc:
@@ -1359,10 +1383,12 @@ def finalize_and_email_contract(request, process_contract_id):
         )
 
         try:
+            payload = _process_contract_to_payload(
+                process_contract, seed_payment_history=True
+            )
+            payload['company'] = process_contract.company
             result = create_contract_from_payload(
-                _process_contract_to_payload(
-                    process_contract, seed_payment_history=True
-                ),
+                payload,
                 request.user,
             )
         except ContractCreationError as exc:
@@ -1724,7 +1750,7 @@ class ContractQueueListView(ListView):
     context_object_name = 'queued_contracts'
     
     def get_queryset(self):
-        return QueueContract.objects.all().order_by('award_date')
+        return QueueContract.objects.select_related('company').order_by('award_date')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -2896,6 +2922,46 @@ def delete_queue_contract(request, queue_id):
         }, status=500)
 
 
+@login_required
+@require_POST
+def update_queue_company(request, queue_id):
+    """
+    Update the company on a QueueContract. Staff or superuser only.
+    Cascades to the associated ProcessContract and ProcessClin rows if they exist.
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({'success': False, 'error': 'Permission denied.'}, status=403)
+    try:
+        data = json.loads(request.body)
+        company_id = data.get('company_id')
+        if not company_id:
+            return JsonResponse({'success': False, 'error': 'company_id is required.'}, status=400)
+
+        company = get_object_or_404(Company, id=company_id, is_active=True)
+        queue_contract = get_object_or_404(QueueContract, id=queue_id)
+
+        queue_contract.company = company
+        queue_contract.modified_by = request.user
+        queue_contract.save(update_fields=['company', 'modified_by'])
+
+        # Cascade to ProcessContract + ProcessClin if a processing session exists
+        process_contract = ProcessContract.objects.filter(queue_id=queue_id).first()
+        if process_contract:
+            process_contract.company = company
+            process_contract.modified_by = request.user
+            process_contract.save(update_fields=['company', 'modified_by'])
+            process_contract.clins.all().update(company=company)
+
+        logger.info(
+            "Queue contract %s company updated to %s by %s",
+            queue_id, company.name, request.user.username
+        )
+        return JsonResponse({'success': True, 'company_id': company.id, 'company_name': company.name})
+    except Exception as e:
+        logger.exception("Error updating company for queue contract %s", queue_id)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
 # ---------------------------------------------------------------------------
 # IDIQ Processing views
 # ---------------------------------------------------------------------------
@@ -3013,6 +3079,7 @@ def finalize_idiq_contract(request, process_contract_id):
         try:
             idiq_contract = create_idiq_from_payload(
                 {
+                    'company': process_contract.company,
                     'contract_number': process_contract.contract_number,
                     'buyer_id': process_contract.buyer_id,
                     'award_date': process_contract.award_date,

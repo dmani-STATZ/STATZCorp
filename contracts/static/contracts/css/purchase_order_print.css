@@ -1,0 +1,379 @@
+/* ===================================================================
+   Purchase Order — Print Stylesheet
+   Matches PO_J00260_REV_C_Tobyhanna_Army_Depot sample layout.
+   =================================================================== */
+
+@page {
+    size: letter;
+    margin: 0.5in 0.6in;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+body {
+    font-family: Georgia, "Times New Roman", serif;
+    color: #1a1a1a;
+    font-size: 11pt;
+    line-height: 1.35;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+}
+
+.po-doc {
+    max-width: 7.5in;
+    margin: 0 auto;
+}
+
+/* ── Screen-only toolbar ──────────────────────────────────────────── */
+.po-toolbar {
+    background: #f0f2f5;
+    padding: 10px 16px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border: 1px solid #d0d4da;
+    border-radius: 4px;
+}
+
+.po-print-btn {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.po-print-btn:hover {
+    background: #1d4ed8;
+}
+
+.po-print-hint {
+    font-size: 12px;
+    color: #6b7280;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ── Letterhead ───────────────────────────────────────────────────── */
+.po-letterhead {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 2px;
+}
+
+.po-letterhead-left {
+    flex-shrink: 0;
+}
+
+.po-logo {
+    max-height: 80px;
+    max-width: 200px;
+    object-fit: contain;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.po-letterhead-text {
+    flex: 1;
+    font-size: 9pt;
+    line-height: 1.35;
+}
+
+/* Classes for letterhead_html content (admin-authored) */
+.lh-company-name {
+    font-weight: bold;
+    font-size: 12pt;
+    margin-bottom: 1px;
+}
+
+.lh-cage {
+    font-weight: bold;
+    font-size: 9pt;
+    margin-bottom: 2px;
+}
+
+.lh-address {
+    font-size: 9pt;
+    margin-bottom: 1px;
+}
+
+.lh-tagline {
+    font-size: 9pt;
+    font-style: italic;
+    margin-bottom: 6px;
+}
+
+.lh-partners {
+    display: flex;
+    gap: 30px;
+    margin-top: 4px;
+}
+
+.lh-partner {
+    font-size: 8.5pt;
+    line-height: 1.3;
+}
+
+.lh-partner-name {
+    font-weight: bold;
+}
+
+/* ── Title ────────────────────────────────────────────────────────── */
+.po-title {
+    font-size: 18pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin: 4px 0 0 0;
+    padding: 0;
+    letter-spacing: 0.5px;
+    text-align: left;
+}
+
+.po-divider {
+    border: none;
+    border-top: 2px solid #1a1a1a;
+    margin: 4px 0 12px 0;
+}
+
+/* ── Header Band (3 columns) ─────────────────────────────────────── */
+.po-header-band {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+    border-top: 1px solid #999;
+    border-bottom: 1px solid #999;
+    padding: 0;
+}
+
+.po-col {
+    padding: 8px 12px;
+    font-size: 10pt;
+    line-height: 1.35;
+    vertical-align: top;
+}
+
+.po-vendor {
+    flex: 1.2;
+    border-right: 1px solid #ccc;
+}
+
+.po-contact {
+    flex: 1.2;
+    border-right: 1px solid #ccc;
+}
+
+.po-no-date {
+    flex: 0.7;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.po-label {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 8pt;
+    letter-spacing: 0.3px;
+    color: #333;
+    margin-bottom: 3px;
+}
+
+.po-no-date .po-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+    font-size: 10pt;
+}
+
+.po-no-date .po-field .po-label {
+    margin-bottom: 0;
+    margin-right: 6px;
+    white-space: nowrap;
+}
+
+.po-no-date .po-field-value {
+    font-weight: normal;
+    text-align: right;
+}
+
+.po-header-rule {
+    border: none;
+    border-top: 1px solid #999;
+    margin: 0 0 16px 0;
+}
+
+/* ── Line-items table ─────────────────────────────────────────────── */
+.po-lines {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-bottom: 0;
+    font-size: 10pt;
+}
+
+.po-lines thead {
+    display: table-header-group;
+}
+
+.po-lines tr {
+    page-break-inside: avoid;
+}
+
+.po-lines th {
+    background: #d9d9d9;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 8.5pt;
+    letter-spacing: 0.3px;
+    padding: 5px 8px;
+    border: 1px solid #999;
+    color: #1a1a1a;
+}
+
+.po-lines td {
+    border: none;
+    padding: 6px 8px;
+    vertical-align: top;
+}
+
+.col-activity {
+    white-space: pre-wrap;
+    text-align: left;
+}
+
+.col-qty {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.col-rate {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.col-amount {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ── Total row ────────────────────────────────────────────────────── */
+.po-lines tfoot td {
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+}
+
+.po-total-sep {
+    border: none !important;
+    padding: 0 !important;
+    height: 6px;
+}
+
+.po-total-sep-inner {
+    border: none;
+    border-top: 1.5px dotted #666;
+    margin: 0;
+}
+
+.po-total-label {
+    text-align: right;
+    font-weight: bold;
+    font-size: 10pt;
+    padding-right: 10px !important;
+    border: none !important;
+}
+
+tfoot .col-amount {
+    font-weight: bold;
+    border-top: 1.5px solid #1a1a1a;
+}
+
+/* ── Footer text ──────────────────────────────────────────────────── */
+.po-footer-text {
+    font-size: 9.5pt;
+    white-space: pre-wrap;
+    padding: 12px 0 0 0;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+/* ── Signature block ──────────────────────────────────────────────── */
+.po-signature {
+    margin-top: 50px;
+    page-break-inside: avoid;
+}
+
+.po-sig-row {
+    display: flex;
+    align-items: flex-end;
+    font-size: 10pt;
+    margin-bottom: 28px;
+}
+
+.po-sig-row .po-label {
+    font-size: 10pt;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+    margin-bottom: 0;
+    color: #1a1a1a;
+}
+
+.po-sig-line {
+    flex: 1;
+    border-bottom: 1px solid #1a1a1a;
+    margin-left: 10px;
+    max-width: 300px;
+    height: 18px;
+}
+
+/* ── Print overrides ──────────────────────────────────────────────── */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    body {
+        background: white;
+    }
+
+    .po-doc {
+        max-width: 100%;
+        margin: 0;
+    }
+
+    .po-lines th {
+        background: #d9d9d9 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .po-header-band {
+        background: transparent !important;
+    }
+
+    .po-footer-text {
+        background: transparent !important;
+    }
+}
+
+/* ── Screen preview enhancements ──────────────────────────────────── */
+@media screen {
+    body {
+        background: #e8e8e8;
+        padding: 30px 0;
+    }
+
+    .po-doc {
+        background: #fff;
+        padding: 0.5in 0.6in;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+        border-radius: 2px;
+    }
+}

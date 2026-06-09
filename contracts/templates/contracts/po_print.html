@@ -1,0 +1,103 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PO {{ po.po_number }}</title>
+  <link rel="stylesheet" href="{% static 'contracts/css/purchase_order_print.css' %}">
+</head>
+<body>
+<div class="po-doc">
+
+  <div class="po-toolbar no-print">
+    <button type="button" onclick="window.print()" class="po-print-btn">Print / Save as PDF</button>
+    <span class="po-print-hint">In the dialog choose "Save as PDF" and turn off "Headers and footers".</span>
+  </div>
+
+  <header class="po-letterhead">
+    <div class="po-letterhead-left">
+      {% if logo_url %}<img src="{{ logo_url }}" alt="Company logo" class="po-logo">{% endif %}
+      <h1 class="po-title">Purchase Order</h1>
+    </div>
+    <div class="po-letterhead-text">
+      {% if profile and profile.letterhead_html %}{{ profile.letterhead_html|safe }}{% endif %}
+    </div>
+  </header>
+  <hr class="po-divider">
+
+  <section class="po-header-band">
+    <div class="po-col po-vendor">
+      <div class="po-label">Vendor</div>
+      {% if supplier %}
+        <div>{{ supplier.name }}</div>
+        {% with addr=supplier.physical_address %}
+          {% if addr %}
+            {% if addr.address_line_1 %}<div>{{ addr.address_line_1 }}</div>{% endif %}
+            {% if addr.address_line_2 %}<div>{{ addr.address_line_2 }}</div>{% endif %}
+            <div>{{ addr.city }} {{ addr.state }}, {{ addr.zip }}</div>
+          {% endif %}
+        {% endwith %}
+      {% endif %}
+    </div>
+    <div class="po-col po-contact">
+      <div class="po-label">Per Contract:</div>
+      {% if profile %}
+        {% if profile.ship_to_attn %}<div>{{ profile.ship_to_attn }}</div>{% endif %}
+        {% if profile.ship_to_title %}<div>{{ profile.ship_to_title }}</div>{% endif %}
+        {% if profile.contact_note %}<div>{{ profile.contact_note }}</div>{% endif %}
+        {% if profile.phone %}<div>{{ profile.phone }}</div>{% endif %}
+        {% if profile.email %}<div>{{ profile.email }}</div>{% endif %}
+      {% endif %}
+    </div>
+    <div class="po-col po-no-date">
+      <div class="po-field"><span class="po-label">P.O. No.</span> <span class="po-field-value">{{ po.po_number }}</span></div>
+      <div class="po-field"><span class="po-label">Date:</span> <span class="po-field-value">{% if po.po_date %}{{ po.po_date|date:"n/j/Y" }}{% endif %}</span></div>
+    </div>
+  </section>
+
+  <table class="po-lines">
+    <colgroup>
+      <col style="width:60%">
+      <col style="width:10%">
+      <col style="width:10%">
+      <col style="width:20%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="col-activity">Activity</th>
+        <th class="col-qty">Qty</th>
+        <th class="col-rate">Rate</th>
+        <th class="col-amount">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for li in line_items %}
+      <tr>
+        <td class="col-activity">{{ li.activity }}</td>
+        <td class="col-qty">{% if li.qty is not None %}{{ li.qty|floatformat:"-2" }}{% endif %}</td>
+        <td class="col-rate">{% if li.rate is not None %}{{ li.rate|floatformat:2 }}{% endif %}</td>
+        <td class="col-amount">{% if li.amount is not None %}{{ li.amount|floatformat:2 }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="po-total-sep">
+        <td colspan="4"><hr class="po-total-sep-inner"></td>
+      </tr>
+      <tr>
+        <td colspan="3" class="po-total-label">TOTAL</td>
+        <td class="col-amount">{{ total|floatformat:2 }}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  {% if po.footer %}<div class="po-footer-text">{{ po.footer }}</div>{% endif %}
+
+  <section class="po-signature">
+    <div class="po-sig-row"><span class="po-label">Approved By</span><span class="po-sig-line"></span></div>
+    <div class="po-sig-row"><span class="po-label">Date</span><span class="po-sig-line"></span></div>
+  </section>
+
+</div>
+</body>
+</html>
