@@ -137,23 +137,24 @@
                         </td>
                         <td class="px-3 py-2 whitespace-nowrap" id="draft-company-cell-{{ draft.id }}">
                             {% if request.user.is_staff or request.user.is_superuser %}
-                                <button type="button"
-                                        class="badge bg-secondary-subtle text-secondary-emphasis border-0 draft-company-badge"
-                                        style="font-size:0.7rem; cursor:pointer;"
-                                        data-draft-id="{{ draft.id }}"
-                                        data-company-name="{% if draft.company %}{{ draft.company.name }}{% endif %}"
-                                        title="Click to change company"
-                                        onclick="openChangeDraftCompanyModal({{ draft.id }}, '{% if draft.company %}{{ draft.company.name|escapejs }}{% endif %}')">
-                                    {% if draft.company %}{{ draft.company.name }}{% else %}<span class="text-muted">—</span>{% endif %}
-                                </button>
+                                <span class="badge rounded-pill draft-company-badge"
+                                      style="background-color: {{ draft.company.primary_color|default:'#6c757d' }};
+                                             color: {{ draft.company.secondary_color|default:'#ffffff' }};
+                                             font-size:0.7rem; cursor: pointer;"
+                                      data-draft-id="{{ draft.id }}"
+                                      data-current-company-id="{{ draft.company.id|default:'' }}"
+                                      data-current-company-name="{{ draft.company.name|default:'Unknown'|escapejs }}"
+                                      title="Click to change company"
+                                      onclick="openChangeDraftCompanyModal({{ draft.id }}, '{{ draft.company.name|default:''|escapejs }}')">
+                                    {{ draft.company.name|default:"Unknown" }}
+                                </span>
                             {% else %}
-                                {% if draft.company %}
-                                    <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:0.7rem;">
-                                        {{ draft.company.name }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted small">—</span>
-                                {% endif %}
+                                <span class="badge rounded-pill"
+                                      style="background-color: {{ draft.company.primary_color|default:'#6c757d' }};
+                                             color: {{ draft.company.secondary_color|default:'#ffffff' }};
+                                             font-size:0.7rem;">
+                                    {{ draft.company.name|default:"Unknown" }}
+                                </span>
                             {% endif %}
                         </td>
                         <td class="px-6 py-2 whitespace-nowrap">

@@ -253,17 +253,18 @@
                         </td>
                         <td class="px-6 py-2 whitespace-nowrap" id="company-cell-{{ contract.id }}">
                             {% if request.user.is_staff or request.user.is_superuser %}
-                                <span class="badge rounded-pill bg-info-subtle text-info-emphasis fw-medium queue-company-badge"
-                                      style="cursor:pointer;"
+                                <span class="badge rounded-pill fw-medium queue-company-badge"
+                                      style="background-color: {{ contract.company.primary_color|default:'#6c757d' }}; color: {{ contract.company.secondary_color|default:'#ffffff' }}; cursor: pointer;"
                                       data-queue-id="{{ contract.id }}"
                                       data-current-company-id="{{ contract.company.id|default:'' }}"
-                                      data-current-company-name="{{ contract.company.name|default:'—'|escapejs }}"
+                                      data-current-company-name="{{ contract.company.name|default:'Unknown'|escapejs }}"
                                       title="Click to change company">
-                                    {{ contract.company.name|default:"—" }}
+                                    {{ contract.company.name|default:"Unknown" }}
                                 </span>
                             {% else %}
-                                <span class="badge rounded-pill bg-info-subtle text-info-emphasis fw-medium">
-                                    {{ contract.company.name|default:"—" }}
+                                <span class="badge rounded-pill fw-medium"
+                                      style="background-color: {{ contract.company.primary_color|default:'#6c757d' }}; color: {{ contract.company.secondary_color|default:'#ffffff' }};">
+                                    {{ contract.company.name|default:"Unknown" }}
                                 </span>
                             {% endif %}
                         </td>
@@ -1339,8 +1340,45 @@
     }
 
     updateBulkParseButton();
+    </script>
 
-    // ── Change Company Modal ──────────────────────────────────────────────────
+    {# ── Change Company Modal (Bootstrap 5) ────────────────────────────────── #}
+    {# IMPORTANT: modal HTML is placed HERE — before the script block below —   #}
+    {# so that getElementById('changeCompanySaveBtn') finds the element when    #}
+    {# addEventListener is called. Modal after script = null element = no-op.   #}
+    {% if request.user.is_staff or request.user.is_superuser %}
+    <div class="modal fade" id="changeCompanyModal" tabindex="-1" aria-labelledby="changeCompanyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="changeCompanyModalLabel">Change Company</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2">
+                        Current: <strong id="changeCompanyCurrentName">—</strong>
+                    </p>
+                    <input type="hidden" id="changeCompanyQueueId" value="">
+                    <label for="changeCompanySelect" class="form-label">Select Company</label>
+                    <select id="changeCompanySelect" class="form-select form-select-sm">
+                        {% for company in available_companies %}
+                        <option value="{{ company.id }}">{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="changeCompanySaveBtn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if request.user.is_staff or request.user.is_superuser %}
+    <script>
+    // ── Change Company Modal JS ───────────────────────────────────────────────
+    // This block runs after the modal HTML above, so getElementById is safe.
     (function () {
         const UPDATE_COMPANY_URL_TEMPLATE = "{% url 'processing:update_queue_company' queue_id=987654321 %}".replace('987654321', '{queue_id}');
 
@@ -1361,10 +1399,11 @@
             modal.show();
         });
 
-        // Save button handler
+        // Save button handler — element is guaranteed to exist (modal HTML is above)
         document.getElementById('changeCompanySaveBtn').addEventListener('click', function () {
             const queueId = document.getElementById('changeCompanyQueueId').value;
             const companyId = document.getElementById('changeCompanySelect').value;
+            console.log('Saving company:', queueId, companyId);
             if (!queueId || !companyId) return;
 
             const btn = document.getElementById('changeCompanySaveBtn');
@@ -1397,10 +1436,14 @@
                     bootstrap.Modal.getInstance(document.getElementById('changeCompanyModal')).hide();
                     showToast(`Company updated to "${data.company_name}"`, 'success');
                 } else {
+                    console.error('Server error:', data.error);
                     showToast(data.error || 'Failed to update company', 'error');
                 }
             })
-            .catch(() => showToast('Network error — please try again', 'error'))
+            .catch(err => {
+                console.error('Fetch failed:', err);
+                showToast('Network error — please try again', 'error');
+            })
             .finally(() => {
                 btn.disabled = false;
                 btn.textContent = 'Save';
@@ -1408,34 +1451,5 @@
         });
     })();
     </script>
-
-    {# ── Change Company Modal (Bootstrap 5) ────────────────────────────────── #}
-    {% if request.user.is_staff or request.user.is_superuser %}
-    <div class="modal fade" id="changeCompanyModal" tabindex="-1" aria-labelledby="changeCompanyModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="changeCompanyModalLabel">Change Company</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="small text-muted mb-2">
-                        Current: <strong id="changeCompanyCurrentName">—</strong>
-                    </p>
-                    <input type="hidden" id="changeCompanyQueueId" value="">
-                    <label for="changeCompanySelect" class="form-label">Select Company</label>
-                    <select id="changeCompanySelect" class="form-select form-select-sm">
-                        {% for company in available_companies %}
-                        <option value="{{ company.id }}">{{ company.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary btn-sm" id="changeCompanySaveBtn">Save</button>
-                </div>
-            </div>
-        </div>
-    </div>
     {% endif %}
 {% endblock %}

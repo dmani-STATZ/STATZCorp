@@ -177,6 +177,7 @@ After behavior changes, expected verification is:
 - **No `__date` ORM transforms on date fields.** Reminder and contract date fields that were migrated are `DateField`, not `DateTimeField`. Do not use `__date` lookups (for example `reminder_date__date__lte=today`) — those transforms apply to `DateTimeField` and raise `FieldError` on `DateField`. Query date fields directly (for example `reminder_date__lte=today`).
 - **No time format specifiers in templates for date-only fields.** Migrated `DateField` values cannot use Django date format characters that imply time (`g`, `G`, `h`, `H`, `i`, `s`, `A`, `a`, `c`). Using them raises `TypeError`. Use date-only formats such as `M j, Y` or `Y-m-d`.
 - **No `datetime-local` inputs for date-only fields.** HTML inputs bound to a `DateField` must use `type="date"`, not `type="datetime-local"`. The latter submits a datetime string that `DateField` validation rejects.
+- **PO slot in Options dropdown:** The Options dropdown PO slot is mutually exclusive: only one of 'Generate PO' or 'PO Templates' ever renders for a given company. Do not add a second PO-related item to that menu without removing or adjusting the other.
 
 ## 12. Standard Safe Change Workflow
 1. Read project-level context (`PROJECT_CONTEXT.md` if present; otherwise `PROJECT_STRUCTURE.md`, `STATZWeb/settings.py`, `STATZWeb/urls.py`).

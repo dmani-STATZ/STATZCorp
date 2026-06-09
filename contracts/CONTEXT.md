@@ -240,7 +240,7 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 
 ## Purchase Order Generator (Data Layer — Slice 1)
 - **Models (contracts/models.py):**
-  - `Company.enable_po_generator` (BooleanField, default False) — controls visibility of the Generate PO button per company.
+  - `Company.enable_po_generator` (BooleanField, default False) — controls PO entry point: the 'Generate PO' / 'PO Templates' slot in the Options dropdown (`#optionsMenu`) on `contract_management.html` is company-type-aware: `enable_po_generator=True` shows a 'Generate PO' link to `purchase-order-page`; `enable_po_generator=False` shows the existing PO Templates item (opens `#poSnippetsOffcanvas`). The standalone Generate PO button that was in the Acknowledgment section has been removed.
   - `CompanyPOProfile` (OneToOne→Company, related_name `po_profile`) — per-company Ship-To / letterhead block (name, attn, title, address, phone, email, CAGE, default_footer). Edited in admin; values TBD with Barb. No audit fields.
   - `PurchaseOrder` (AuditModel; OneToOne→Contract, related_name `purchase_order`; FK→Company PROTECT; FK→Supplier PROTECT nullable). **One PO per contract, enforced by the OneToOne.** `po_number` is editable text incl. revision suffix (e.g. J00121A). `po_date`, `footer`. Document-only — NOT wired to finance/splits/transactions.
   - `POLineItem` (FK→PurchaseOrder CASCADE, related_name `line_items`). `sort_order`, `activity` text, `qty`/`rate`/`amount` (all nullable → priced lines and text-only boilerplate lines). No audit fields.
