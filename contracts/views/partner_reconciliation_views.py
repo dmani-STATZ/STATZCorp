@@ -82,7 +82,7 @@ class PartnerReconciliationDetailView(View):
             status_filter = ''
             
         # Get status counts
-        counts = reconciliation.rows.values('status').annotate(count=Count('id'))
+        counts = reconciliation.rows.values('status').annotate(count=Count('id')).order_by()
         status_counts = {choice[0]: 0 for choice in PartnerReconciliationRow.STATUS_CHOICES}
         for item in counts:
             status_counts[item['status']] = item['count']

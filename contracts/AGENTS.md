@@ -115,6 +115,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
   - **Do not add wildcard `button:not(...)` CSS rules** in `app-core.css` or elsewhere. All buttons must be explicitly styled. Bare `<button>` elements without classes are a bug to be fixed, not caught by a wildcard.
   - If you encounter Tailwind utility classes in a template you are already editing, replace them with Bootstrap 5 equivalents or named classes from `app-core.css`. Do not leave Tailwind classes in place.
   - Inline `style` attributes are acceptable for one-off layout fixes but prefer a named class in `app-core.css` for anything reusable or that requires a hover/focus/pseudo-element state.
+  - **Desktop-only design standard:** This application is desktop-only; mobile is not supported, so no responsive/mobile breakpoint code is required. Full-page forms and data tables (e.g. Partner Reconciliation, finance tools) should use 90–100% of the available page width via a fluid container rather than a narrow centered column.
 
 ### Before changing exports/reports
 - `contracts/utils/excel_utils.py` — wraps openpyxl with a lazy-import pattern to avoid NumPy conflicts; do not add direct `import openpyxl` elsewhere in the app
@@ -406,6 +407,8 @@ partner_reconciliation_export.
 The parse_ppi_excel function expects openpyxl — do not swap for pandas.
 The reconcile_partner function performs bulk_create — do not call inside
 a loop or request-per-row pattern.
+The upload form on `partner_reconciliation_list.html` displays a processing overlay and disables the submit button with an inline spinner upon valid form submission to prevent double submits.
+Partner Commission Reconciliation matching normalizes contract numbers using `normalize_contract_number()` from `dfas_matcher.py` (strips dashes/spaces, uppercases) on both the partner-supplied and STATZ DB sides, consistent with the DFAS matcher's external-contract-number matching pattern.
 
 **After any model/migration change:**
 - Run `python manage.py makemigrations --check` to confirm no missing migrations

@@ -1,10 +1,10 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from django.db import models
 from django.db.models import Sum
 from contracts.models import Contract, ClinSplit, PartnerReconciliation, PartnerReconciliationRow
 from contracts.utils.excel_utils import load_workbook
-from decimal import Decimal, InvalidOperation
 from django.db import transaction
+from contracts.services.dfas_matcher import normalize_contract_number
 
 def _safe_decimal(value):
     """
@@ -45,6 +45,25 @@ def to_decimal(value):
         return Decimal(val_str)
     except Exception:
         return None
+
+def _db_decimal(value):
+    """
+    Sanitize a decimal value for safe SQL Server insertion into a
+    DecimalField(max_digits=19, decimal_places=2). Quantizes to 2
+    places and rejects values whose integer part exceeds 17 digits
+    (which would overflow the column). Returns None on any failure.
+    """
+    d = to_decimal(value)
+    if d is None:
+        return None
+    try:
+        d = d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    except Exception:
+        return None
+    # Max storable absolute value is 99999999999999999.99 (< 1E+17).
+    if d.copy_abs() >= Decimal('1E+17'):
+        return None
+    return d
 
 def parse_ppi_excel(file_obj):
     """
@@ -142,30 +161,36 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
     Core reconciliation logic that compares raw partner rows against STATZ's ClinSplit records.
     """
     with transaction.atomic():
-        # Step 1 — Build lookup of all contracts in our DB that have splits for this partner
-        partner_splits_qs = (
-            ClinSplit.objects
-            .filter(
-                clin__contract__company=company,
-                company_name__iexact=partner_name,
+        try:
+            # Step 1 — Build lookup of all contracts in our DB that have splits for this partner
+            partner_splits_qs = (
+                ClinSplit.objects
+                .filter(
+                    clin__contract__company=company,
+                    company_name__iexact=partner_name,
+                )
+                .values('clin__contract__id', 'clin__contract__contract_number')
+                .annotate(
+                    total_split_value=Sum('split_value'),
+                    total_split_paid=Sum('split_paid'),
+                )
+                .order_by()
             )
-            .values('clin__contract__id', 'clin__contract__contract_number')
-            .annotate(
-                total_split_value=Sum('split_value'),
-                total_split_paid=Sum('split_paid'),
-            )
-            .order_by()
-        )
-        statz_by_contract_number = {
-            row['clin__contract__contract_number'].strip().upper(): row
-            for row in partner_splits_qs
-        }
+            statz_by_contract_number = {
+                normalize_contract_number(row['clin__contract__contract_number']): row
+                for row in partner_splits_qs
+            }
+        except Exception as e:
+            raise Exception(f"STEP 1 FAILED (ClinSplit query): {e}") from e
 
-        # Step 2 — Also build a lookup of Contract objects by contract_number for FK assignment
-        contracts_by_number = {
-            c.contract_number.strip().upper(): c
-            for c in Contract.objects.filter(company=company)
-        }
+        try:
+            # Step 2 — Also build a lookup of Contract objects by contract_number for FK assignment
+            contracts_by_number = {
+                normalize_contract_number(c.contract_number): c
+                for c in Contract.objects.filter(company=company)
+            }
+        except Exception as e:
+            raise Exception(f"STEP 2 FAILED (Contract query): {e}") from e
 
         # Step 3 — Create the PartnerReconciliation header record (save first to get PK for rows)
         reconciliation = PartnerReconciliation(
@@ -182,7 +207,7 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
 
         # Step 4 — Process each row from raw_rows
         for raw_row in raw_rows:
-            lookup_key = raw_row['contract_number'].strip().upper()
+            lookup_key = normalize_contract_number(raw_row['contract_number'])
             statz_data = statz_by_contract_number.get(lookup_key)
             contract_obj = contracts_by_number.get(lookup_key)
 
@@ -193,8 +218,8 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
                 amount_variance = None
             else:
                 if statz_data is not None:
-                    statz_split_value = statz_data['total_split_value']
-                    statz_split_paid = statz_data['total_split_paid']
+                    statz_split_value = to_decimal(statz_data['total_split_value'])
+                    statz_split_paid = to_decimal(statz_data['total_split_paid'])
                 else:
                     statz_split_value = None
                     statz_split_paid = None
@@ -225,13 +250,13 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
                 contract=contract_obj,
                 partner_contract_number=raw_row['contract_number'],
                 partner_po_number=raw_row['po_number'],
-                partner_award_amount=raw_row['award_amount'],
-                partner_commission_amount=raw_row['commission_amount'],
+                partner_award_amount=_db_decimal(raw_row['award_amount']),
+                partner_commission_amount=_db_decimal(raw_row['commission_amount']),
                 partner_tab=raw_row['tab'],
-                statz_split_value=statz_split_value,
-                statz_split_paid=statz_split_paid,
+                statz_split_value=_db_decimal(statz_split_value),
+                statz_split_paid=_db_decimal(statz_split_paid),
                 status=status,
-                amount_variance=amount_variance,
+                amount_variance=_db_decimal(amount_variance),
             ))
 
         # Step 5 — Find missing_in_partner rows
@@ -248,15 +273,28 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
                     partner_award_amount=None,
                     partner_commission_amount=None,
                     partner_tab='',
-                    statz_split_value=statz_data['total_split_value'],
-                    statz_split_paid=statz_data['total_split_paid'],
+                    statz_split_value=_db_decimal(statz_data['total_split_value']),
+                    statz_split_paid=_db_decimal(statz_data['total_split_paid']),
                     status=PartnerReconciliationRow.STATUS_MISSING_IN_PARTNER,
                     amount_variance=None,
                 ))
 
         # Step 6 — Bulk create all rows, compute summary counts, save reconciliation
-        if rows_to_create:
-            PartnerReconciliationRow.objects.bulk_create(rows_to_create)
+        created_count = 0
+        for row in rows_to_create:
+            try:
+                row.save()
+                created_count += 1
+            except Exception as e:
+                raise Exception(
+                    f"ROW SAVE FAILED for contract '{row.partner_contract_number}' "
+                    f"(tab='{row.partner_tab}', status='{row.status}'): "
+                    f"award={row.partner_award_amount!r}, "
+                    f"commission={row.partner_commission_amount!r}, "
+                    f"split_value={row.statz_split_value!r}, "
+                    f"split_paid={row.statz_split_paid!r}, "
+                    f"variance={row.amount_variance!r} -> {e}"
+                ) from e
 
         # Calculate summary counts
         total_partner_rows = 0

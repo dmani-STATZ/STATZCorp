@@ -331,6 +331,13 @@ button.finance-audit-payment-note:hover {
 }
 
 
+/* Partner Reconciliation Page Full-width Override */
+.partner-reconciliation-page main > div.mx-auto {
+    width: 95% !important;
+    max-width: 95% !important;
+}
+
+
 /* === CLIN Detail Page === */
 
 /* Full-width layout override — applied when .clin-detail-page is on the
