@@ -165,10 +165,11 @@
     width: 100%;
 }
 
-.po-col-activity { width: 60%; }
-.po-col-numeric  { width: 10%; }
-.po-col-amount   { width: 13%; }
-.po-col-actions  { width: 7%;  }
+.po-col-activity { width: 52%; }
+.po-col-qty      { width: 11%; }
+.po-col-rate     { width: 11%; }
+.po-col-amount   { width: 14%; }
+.po-col-actions  { width: 12%; }
 
 .po-page textarea.po-line-activity {
     resize: vertical;
