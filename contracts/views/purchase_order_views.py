@@ -108,7 +108,7 @@ def _get_or_create_po(contract, request):
                             getattr(addr, 'state', ''),
                             getattr(addr, 'zip', ''),
                         ])),
-                    ] if p.strip()
+                    ] if p and p.strip()
                 ]
                 po.vendor_address = '\n'.join(addr_parts)
 
