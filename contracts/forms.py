@@ -33,6 +33,7 @@ from .models import (
     FolderTracking,
     Company,
     GovAction,
+    ClinSplit,
 )
 
 User = get_user_model()
@@ -827,3 +828,40 @@ class GovActionForm(BaseModelForm):
             'date_submitted': forms.DateInput(attrs={'type': 'date'}),
             'date_closed': forms.DateInput(attrs={'type': 'date'}),
         }
+
+
+class PartnerReconciliationForm(forms.Form):
+    partner_name = forms.ChoiceField(
+        label='Partner',
+        help_text='Select the partner whose report you are uploading.',
+    )
+    excel_file = forms.FileField(
+        label='Partner Excel File',
+        help_text='Upload the Excel (.xlsx) file received from the partner.',
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2}),
+        label='Notes',
+        help_text='Optional context about this reconciliation run.',
+    )
+
+    def __init__(self, *args, company=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if company:
+            partner_names = (
+                ClinSplit.objects
+                .filter(clin__contract__company=company)
+                .values_list('company_name', flat=True)
+                .distinct()
+                .order_by('company_name')
+            )
+            choices = [(name, name) for name in partner_names if name]
+            self.fields['partner_name'].choices = choices
+
+    def clean_excel_file(self):
+        f = self.cleaned_data['excel_file']
+        if not f.name.lower().endswith('.xlsx'):
+            raise forms.ValidationError('Only .xlsx files are supported.')
+        return f
+

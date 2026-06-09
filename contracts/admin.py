@@ -24,6 +24,8 @@ from .models import (
     Reminder,
     SalesClass,
     SpecialPaymentTerms,
+    PartnerReconciliation,
+    PartnerReconciliationRow,
 )
 
 User = get_user_model()
@@ -247,3 +249,25 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
 @admin.register(CompanyPOProfile)
 class CompanyPOProfileAdmin(admin.ModelAdmin):
     list_display = ('company', 'ship_to_name', 'cage_code')
+
+
+@admin.register(PartnerReconciliation)
+class PartnerReconciliationAdmin(admin.ModelAdmin):
+    list_display = [
+        'partner_name', 'company', 'uploaded_at', 'uploaded_by',
+        'total_partner_rows', 'matched_count', 'amount_discrepancy_count',
+        'payment_discrepancy_count', 'missing_in_statz_count',
+        'missing_in_partner_count',
+    ]
+    list_filter = ['partner_name', 'company', 'uploaded_at']
+    readonly_fields = ['uploaded_at']
+
+
+@admin.register(PartnerReconciliationRow)
+class PartnerReconciliationRowAdmin(admin.ModelAdmin):
+    list_display = [
+        'partner_contract_number', 'status', 'partner_commission_amount',
+        'statz_split_value', 'amount_variance', 'partner_tab',
+    ]
+    list_filter = ['status', 'partner_tab', 'reconciliation__partner_name']
+    search_fields = ['partner_contract_number', 'partner_po_number']

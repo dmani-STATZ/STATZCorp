@@ -397,6 +397,16 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 
 **Current state:** `contracts/tests.py` is a stub. No automated tests exist for this app.
 
+**Partner reconciliation:** PartnerReconciliation, PartnerReconciliationRow
+models in contracts/models.py. Service:
+contracts/services/partner_reconciliation.py. Views in
+contracts/views/partner_reconciliation_views.py.
+URL names: partner_reconciliation_list, partner_reconciliation_detail,
+partner_reconciliation_export.
+The parse_ppi_excel function expects openpyxl — do not swap for pandas.
+The reconcile_partner function performs bulk_create — do not call inside
+a loop or request-per-row pattern.
+
 **After any model/migration change:**
 - Run `python manage.py makemigrations --check` to confirm no missing migrations
 - Open Django admin at `/admin/contracts/` and verify `Contract`, `Company`, and `Reminder` displays load without error

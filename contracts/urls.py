@@ -2,6 +2,7 @@ from django.urls import path, re_path
 from django.views.generic import TemplateView
 from users.views import test_app_name
 from . import views
+from .views import partner_reconciliation_views
 from .views.payment_forecast_views import PaymentForecastView, upsert_payment_plan
 from .views.finance_views import FinanceAuditView, finance_audit_summary_api, finance_audit_clin_api
 from .views.finance_line_views import (
@@ -236,6 +237,21 @@ from .views import clin_fix_views
 app_name = "contracts"
 
 urlpatterns = [
+    path(
+        'partner-reconciliation/',
+        partner_reconciliation_views.PartnerReconciliationListView.as_view(),
+        name='partner_reconciliation_list',
+    ),
+    path(
+        'partner-reconciliation/<int:pk>/',
+        partner_reconciliation_views.PartnerReconciliationDetailView.as_view(),
+        name='partner_reconciliation_detail',
+    ),
+    path(
+        'partner-reconciliation/<int:pk>/export/',
+        partner_reconciliation_views.PartnerReconciliationExportView.as_view(),
+        name='partner_reconciliation_export',
+    ),
     # CLIN Shipment URLs - Moving these to the top
     path("api/shipments/create/", create_shipment, name="create_shipment"),
     path(

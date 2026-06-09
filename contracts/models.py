@@ -1987,3 +1987,134 @@ class POLineItem(models.Model):
     def __str__(self):
         return f"Line {self.sort_order} of PO {self.purchase_order_id}"
 
+
+class PartnerReconciliation(models.Model):
+    """
+    Represents a single partner commission reconciliation upload event.
+    Stores the parsed comparison between a partner's Excel report and
+    STATZWeb's ClinSplit records.
+    """
+    company = models.ForeignKey(
+        'Company',
+        on_delete=models.CASCADE,
+        related_name='partner_reconciliations',
+    )
+    partner_name = models.CharField(max_length=100)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='partner_reconciliations',
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    filename = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True, default='')
+
+    # Summary counts — populated by the reconcile service
+    total_partner_rows = models.IntegerField(default=0)
+    matched_count = models.IntegerField(default=0)
+    amount_discrepancy_count = models.IntegerField(default=0)
+    payment_discrepancy_count = models.IntegerField(default=0)
+    missing_in_statz_count = models.IntegerField(default=0)
+    missing_in_partner_count = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+        verbose_name = 'Partner Reconciliation'
+        verbose_name_plural = 'Partner Reconciliations'
+
+    def __str__(self):
+        return f"{self.partner_name} reconciliation — {self.uploaded_at:%Y-%m-%d}"
+
+    @property
+    def total_rows(self):
+        return self.rows.count()
+
+    @property
+    def has_issues(self):
+        return (
+            self.amount_discrepancy_count
+            + self.payment_discrepancy_count
+            + self.missing_in_statz_count
+            + self.missing_in_partner_count
+        ) > 0
+
+
+class PartnerReconciliationRow(models.Model):
+    """
+    Represents one reconciled row — either from the partner's Excel or
+    a contract in our DB the partner omitted entirely.
+    """
+    STATUS_MATCH = 'match'
+    STATUS_AMOUNT_DISCREPANCY = 'amount_discrepancy'
+    STATUS_PAYMENT_DISCREPANCY = 'payment_discrepancy'
+    STATUS_MISSING_IN_STATZ = 'missing_in_statz'
+    STATUS_MISSING_IN_PARTNER = 'missing_in_partner'
+
+    STATUS_CHOICES = [
+        (STATUS_MATCH, 'Match'),
+        (STATUS_AMOUNT_DISCREPANCY, 'Amount Discrepancy'),
+        (STATUS_PAYMENT_DISCREPANCY, 'Payment Discrepancy'),
+        (STATUS_MISSING_IN_STATZ, 'Missing in STATZ'),
+        (STATUS_MISSING_IN_PARTNER, 'Missing in Partner Report'),
+    ]
+
+    PARTNER_TAB_TO_BE_PAID = 'TO BE PAID'
+    PARTNER_TAB_PAID = 'PAID TO MSC'
+    PARTNER_TAB_MISSING_INFO = 'MISSING INFORMATION'
+
+    reconciliation = models.ForeignKey(
+        PartnerReconciliation,
+        on_delete=models.CASCADE,
+        related_name='rows',
+    )
+    # FK to Contract — null when missing_in_statz (contract not found)
+    contract = models.ForeignKey(
+        'Contract',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reconciliation_rows',
+    )
+
+    # From partner's Excel
+    partner_contract_number = models.CharField(max_length=100, blank=True, default='')
+    partner_po_number = models.CharField(max_length=100, blank=True, default='')
+    partner_award_amount = models.DecimalField(
+        max_digits=19, decimal_places=2, null=True, blank=True
+    )
+    partner_commission_amount = models.DecimalField(
+        max_digits=19, decimal_places=2, null=True, blank=True,
+        help_text="Value from the partner's commission column (e.g. MSC/PPI column)"
+    )
+    # Which tab this row came from in the partner's Excel
+    partner_tab = models.CharField(max_length=50, blank=True, default='')
+
+    # Snapshot from our DB at upload time
+    statz_split_value = models.DecimalField(
+        max_digits=19, decimal_places=2, null=True, blank=True,
+        help_text="SUM of ClinSplit.split_value for this partner on this contract"
+    )
+    statz_split_paid = models.DecimalField(
+        max_digits=19, decimal_places=2, null=True, blank=True,
+        help_text="SUM of ClinSplit.split_paid for this partner on this contract"
+    )
+
+    # Reconciliation result
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES)
+    amount_variance = models.DecimalField(
+        max_digits=19, decimal_places=2, null=True, blank=True,
+        help_text="partner_commission_amount minus statz_split_value. "
+                  "Positive = partner claims more than we have. Negative = we have more."
+    )
+
+    class Meta:
+        ordering = ['status', 'partner_contract_number']
+        verbose_name = 'Partner Reconciliation Row'
+        verbose_name_plural = 'Partner Reconciliation Rows'
+
+    def __str__(self):
+        return f"{self.partner_contract_number} — {self.get_status_display()}"
+
+

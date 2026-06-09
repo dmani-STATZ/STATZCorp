@@ -514,3 +514,18 @@ The `tags` array will fail validation if it does not contain exactly two items:
   - PWA users must reinstall the application after manifest updates for the changes to take full effect.
 
 
+---
+
+## Recently completed features
+
+Partner Commission Reconciliation: Upload a partner's Excel commission
+report and reconcile against ClinSplit records. Supports PPI's 3-tab format
+(TO BE PAID / PAID TO MSC / MISSING INFORMATION). Service layer in
+contracts/services/partner_reconciliation.py is adapter-based for future
+partner formats. Models: PartnerReconciliation, PartnerReconciliationRow
+in contracts app. URLs at /contracts/partner-reconciliation/.
+Four status types: match, amount_discrepancy, payment_discrepancy,
+missing_in_statz, missing_in_partner.
+
+
+

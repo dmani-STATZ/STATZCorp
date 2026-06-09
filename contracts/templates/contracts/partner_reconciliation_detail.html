@@ -1,0 +1,201 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Partner Reconciliation Details{% endblock %}
+{% block body_class %}partner-reconciliation-page{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+  <!-- Navigation / Breadcrumbs -->
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-3">
+      <li class="breadcrumb-item"><a href="{% url 'contracts:partner_reconciliation_list' %}">Partner Reconciliations</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Details</li>
+    </ol>
+  </nav>
+
+  <!-- Title / Actions Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-0">{{ reconciliation.partner_name }} Reconciliation</h1>
+      <p class="text-body-secondary mb-0">
+        Uploaded on {{ reconciliation.uploaded_at|date:"Y-m-d H:i" }} by {{ reconciliation.uploaded_by.username|default:reconciliation.uploaded_by|default:"System" }}
+        {% if reconciliation.notes %}
+          <br><span class="text-body small"><strong>Notes:</strong> {{ reconciliation.notes }}</span>
+        {% endif %}
+      </p>
+    </div>
+    <div>
+      <a href="{% url 'contracts:partner_reconciliation_export' pk=reconciliation.pk %}" class="btn btn-success">
+        Export to Excel
+      </a>
+      <a href="{% url 'contracts:partner_reconciliation_list' %}" class="btn btn-outline-secondary ms-2">Back to List</a>
+    </div>
+  </div>
+
+  <!-- Summary Stats Row -->
+  <div class="row mb-4">
+    <div class="col-6 col-lg-2 mb-3">
+      <div class="card border-0 shadow-sm h-100 text-center py-2">
+        <div class="card-body">
+          <h6 class="text-body-secondary text-uppercase small mb-1">Total Excel Rows</h6>
+          <h3 class="fw-bold mb-0 text-primary">{{ reconciliation.total_partner_rows }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2 mb-3">
+      <div class="card border-0 shadow-sm h-100 text-center py-2">
+        <div class="card-body">
+          <h6 class="text-body-secondary text-uppercase small mb-1">Matched</h6>
+          <h3 class="fw-bold mb-0 text-success">{{ reconciliation.matched_count }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2 mb-3">
+      <div class="card border-0 shadow-sm h-100 text-center py-2">
+        <div class="card-body">
+          <h6 class="text-body-secondary text-uppercase small mb-1">Amount Discr.</h6>
+          <h3 class="fw-bold mb-0 text-warning">{{ reconciliation.amount_discrepancy_count }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2 mb-3">
+      <div class="card border-0 shadow-sm h-100 text-center py-2">
+        <div class="card-body">
+          <h6 class="text-body-secondary text-uppercase small mb-1">Payment Discr.</h6>
+          <h3 class="fw-bold mb-0 text-warning">{{ reconciliation.payment_discrepancy_count }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2 mb-3">
+      <div class="card border-0 shadow-sm h-100 text-center py-2">
+        <div class="card-body">
+          <h6 class="text-body-secondary text-uppercase small mb-1">Missing in STATZ</h6>
+          <h3 class="fw-bold mb-0 text-danger">{{ reconciliation.missing_in_statz_count }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2 mb-3">
+      <div class="card border-0 shadow-sm h-100 text-center py-2">
+        <div class="card-body">
+          <h6 class="text-body-secondary text-uppercase small mb-1">Missing in Partner</h6>
+          <h3 class="fw-bold mb-0 text-info">{{ reconciliation.missing_in_partner_count }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Filter Navigation -->
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <a href="?status=" class="btn btn-sm btn-outline-secondary {% if not status_filter %}active{% endif %}">
+      All ({{ status_counts.all }})
+    </a>
+    <a href="?status=match" class="btn btn-sm btn-outline-success {% if status_filter == 'match' %}active{% endif %}">
+      Match ({{ status_counts.match }})
+    </a>
+    <a href="?status=amount_discrepancy" class="btn btn-sm btn-outline-warning {% if status_filter == 'amount_discrepancy' %}active{% endif %}">
+      Amount Discrepancy ({{ status_counts.amount_discrepancy }})
+    </a>
+    <a href="?status=payment_discrepancy" class="btn btn-sm btn-outline-warning {% if status_filter == 'payment_discrepancy' %}active{% endif %}">
+      Payment Discrepancy ({{ status_counts.payment_discrepancy }})
+    </a>
+    <a href="?status=missing_in_statz" class="btn btn-sm btn-outline-danger {% if status_filter == 'missing_in_statz' %}active{% endif %}">
+      Missing in STATZ ({{ status_counts.missing_in_statz }})
+    </a>
+    <a href="?status=missing_in_partner" class="btn btn-sm btn-outline-info {% if status_filter == 'missing_in_partner' %}active{% endif %}">
+      Missing in Partner ({{ status_counts.missing_in_partner }})
+    </a>
+  </div>
+
+  <!-- Results Table -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      {% if not rows %}
+        <div class="text-center py-5">
+          <p class="text-body-secondary mb-0">No rows found matching the active filter.</p>
+        </div>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 180px;">Status</th>
+                <th>Contract #</th>
+                <th>PO</th>
+                <th>Partner Tab</th>
+                <th class="text-end">Partner Amount</th>
+                <th class="text-end">STATZ Amount</th>
+                <th class="text-end">STATZ Paid</th>
+                <th class="text-end">Variance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+                <tr>
+                  <td>
+                    {% if r.status == 'match' %}
+                      <span class="badge bg-success w-100 py-1">Match</span>
+                    {% elif r.status == 'amount_discrepancy' %}
+                      <span class="badge bg-warning text-dark w-100 py-1">Amount Discrepancy</span>
+                    {% elif r.status == 'payment_discrepancy' %}
+                      <span class="badge bg-warning text-dark w-100 py-1" style="background-color: #ffcc99 !important; color: #853c00 !important;">Payment Discrepancy</span>
+                    {% elif r.status == 'missing_in_statz' %}
+                      <span class="badge bg-danger w-100 py-1">Missing in STATZ</span>
+                    {% elif r.status == 'missing_in_partner' %}
+                      <span class="badge bg-info text-dark w-100 py-1">Missing in Partner</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if r.contract %}
+                      <a href="{% url 'contracts:contract_detail' pk=r.contract.pk %}" class="fw-semibold">{{ r.partner_contract_number }}</a>
+                    {% else %}
+                      <span class="text-body-secondary font-monospace">{{ r.partner_contract_number }}</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ r.partner_po_number|default:"—" }}</td>
+                  <td>
+                    {% if r.partner_tab %}
+                      <span class="small font-monospace">{{ r.partner_tab }}</span>
+                    {% else %}
+                      <span class="text-body-secondary">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end font-monospace">
+                    {% if r.partner_commission_amount is not None %}
+                      ${{ r.partner_commission_amount|floatformat:2|intcomma }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="text-end font-monospace">
+                    {% if r.statz_split_value is not None %}
+                      ${{ r.statz_split_value|floatformat:2|intcomma }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="text-end font-monospace">
+                    {% if r.statz_split_paid is not None %}
+                      ${{ r.statz_split_paid|floatformat:2|intcomma }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="text-end font-monospace fw-semibold {% if r.amount_variance > 0 %}text-danger{% elif r.amount_variance < 0 %}text-success{% endif %}">
+                    {% if r.amount_variance is not None %}
+                      {% if r.amount_variance > 0 %}+{% endif %}${{ r.amount_variance|floatformat:2|intcomma }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
