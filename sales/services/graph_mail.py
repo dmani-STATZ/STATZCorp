@@ -80,6 +80,7 @@ def send_mail_via_graph(
     reply_to: str | None = None,
     attachments: list[dict] | None = None,
     cc_addresses: list[str] | None = None,
+    sender: str | None = None,
 ) -> bool:
     """
     Send a single email via Microsoft Graph API.
@@ -111,7 +112,7 @@ def send_mail_via_graph(
     if not token:
         return False
 
-    sender = settings.GRAPH_MAIL_SENDER_RFQ
+    sender = sender or settings.GRAPH_MAIL_SENDER_RFQ
     effective_reply_to = reply_to or sender
 
     # Build the Graph API message payload

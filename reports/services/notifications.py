@@ -81,6 +81,7 @@ def notify_request_submitted(report_request):
         to_address=admin_email,
         subject=subject,
         body=body,
+        sender=_sender(),
         reply_to=_sender(),
         cc_addresses=[requester_email] if requester_email else [],
     )
@@ -151,6 +152,7 @@ def notify_request_completed(report_request, report):
         to_address=requester_email,
         subject=subject,
         body=body,
+        sender=_sender(),
         reply_to=_sender(),
         cc_addresses=[admin_email] if admin_email else [],
     )
