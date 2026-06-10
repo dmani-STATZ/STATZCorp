@@ -12,7 +12,7 @@ Track field-level edits for a handful of auditable models and surface that histo
 ## 3. High-Level Responsibilities
 - Persist every field change listed in `signals.TRACKED` as a `Transaction` row keyed by `ContentType` plus `object_id`, so history can be browsed by record or field (`models.py`, `signals.py`).
 - Offer an AJAX list/detail/edit UI over `/transactions/.../` that renders `transactions/transaction_modal.html` plus partials, supporting view-only history and inline editing (`views.py`, `templates/transactions`).
-- Determine form widget types and select choices for each tracked field via `get_field_info()`, so the edit modal renders date pickers, selects, numbers, or text areas (`field_types.py`, `forms.py`).
+- Determine form widget types and select choices for each tracked field via `get_field_info()`, so the edit modal renders date pickers, selects, numbers, text areas, or Tom Select AJAX autocompletes for large FK tables (>100 records) (`field_types.py`, `forms.py`).
 - Hold request-scoped metadata (current user plus cached old state) so signals attach `user` and compare deltas safely (`middleware.py`, `signals.py`).
 - Surface change history in the admin as read-only rows for auditing (`admin.py`).
 
@@ -61,11 +61,14 @@ All views are decorated with `@login_required`, and `transaction_edit_field` use
 - Both forms expose a `field_info` property so callers can reuse widget metadata.
 - `field_types.get_field_info` inspects the concrete field type, supplies `(value,label)` choices for booleans, ForeignKeys (using `_fk_choices` limited to 500 rows), and fields with `choices`, and returns the verbose name for UI labels.
 
+FK fields on models with more than `FK_AJAX_THRESHOLD` (100) records use `WIDGET_FK_AUTOCOMPLETE` and are rendered as Tom Select AJAX autocomplete widgets. The search endpoint is `GET /transactions/api/fk-search/`. Smaller FK tables use `WIDGET_SELECT` with preloaded choices, also enhanced by Tom Select for local search. The `FK_SEARCH_CONFIG` dict in `field_types.py` defines which fields to search per related model. The `get_fk_label()` function in `field_types.py` controls label formatting for both AJAX results and edit form pre-population.
+
 ## 10. Business Logic and Services
 - `signals.py` contains the core logic: `TRACKED` enumerates the fields audited on `Contract` (contract_number, po_number, tab_num, buyer, due_date, award_date, sales_class, solicitation_type), `Clin` (item_type, clin_po_num, supplier, nsn, ia, fob, special_payment_terms, supplier_due_date, due_date, order_qty, ship_qty, ship_date, item_value, uom), `ClinShipment` (`pod_date`), and `Supplier` (cage_code, dodaac, allows_gsi, probation, conditional, archived, iso, ppi, special_terms, supplier_type, business_phone, primary_phone, business_email, primary_email, website_url).
 - `store_old_state` (pre_save) queries the database for tracked values before the change, serializes them via `_serialize` (handling dates, datetimes, and FKs), and caches them in a request-scoped dictionary keyed by `(model_class, pk)`.
 - `record_transactions` (post_save) compares serialized old values to the instance’s new values and creates `Transaction` rows only when the value changed; `get_current_user()` provides the user for attribution.
 - `utils.set_field_value` handles coercion: it trims strings, enforces nullability, parses ISO dates/datetimes, resolves ForeignKeys by PK, converts numeric/decimal inputs, and normalizes booleans; it returns `False` when the conversion fails so the edit view can reject the request.
+- A `get_fk_label(obj)` helper in `field_types.py` provides consistent FK display labels used by both the AJAX search endpoint (`fk_search`) and `EditFieldForm`'s initial value pre-population.
 - `utils.get_field_value_display` returns `YYYY-MM-DD` strings for date pickers; `get_display_value` formats values for the page (using `get_<field>_display` when available or falling back to `strftime`).
 - `field_types`, `forms`, `utils`, and `views.transaction_edit_field` cooperate so edits are validated, coerced, saved, and trigger signal-driven `Transaction` creation without duplicate logic.
 
@@ -84,6 +87,7 @@ All views are decorated with `@login_required`, and `transaction_edit_field` use
 | `GET /transactions/edit/<content_type_id>/<object_id>/<field_name>/` | `transaction_edit_field` (GET) -> returns `transaction_edit.html` (table, field info, edit form, last 20 field transactions). |
 | `POST /transactions/edit/...` | `transaction_edit_field` (POST) -> validates `EditFieldForm`, coerces and saves the field, and returns JSON with `display_value` so the caller can refresh that field. |
 | `GET /transactions/api/field-info/?content_type_id=...&field_name=...` | `field_info_api` -> JSON describing the widget type/choices/label for the field, or 400/404 on missing/unknown fields. |
+| `GET /transactions/api/fk-search/?content_type_id=&field_name=&q=&limit=` | `fk_search` — JSON `{"results": [{"value", "label"}]}` for Tom Select AJAX autocomplete. Min 3-char query, max 50 results. @login_required. |
 All endpoints require authentication (`@login_required`).
 
 ## 13. Permissions / Security Considerations

@@ -4,7 +4,11 @@ Widget type is determined from the model field via field_types.get_field_info().
 """
 from django import forms
 from .models import Transaction
-from .field_types import get_field_info, WIDGET_DATE, WIDGET_DATETIME, WIDGET_BOOLEAN, WIDGET_SELECT, WIDGET_NUMBER
+from .field_types import (
+    get_field_info, get_fk_label,
+    WIDGET_DATE, WIDGET_DATETIME, WIDGET_BOOLEAN, WIDGET_SELECT,
+    WIDGET_NUMBER, WIDGET_FK_AUTOCOMPLETE,
+)
 
 
 def _input_attrs(editable=True):
@@ -29,6 +33,8 @@ class TransactionForm(forms.ModelForm):
     def __init__(self, content_type_id=None, field_name=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._field_info = None
+        self._content_type_id = content_type_id
+        self._field_name = field_name
         if content_type_id and field_name:
             self._field_info = get_field_info(content_type_id, field_name)
             if self._field_info:
@@ -55,6 +61,37 @@ class TransactionForm(forms.ModelForm):
         elif wt == WIDGET_NUMBER:
             self.fields["old_value"].widget = forms.NumberInput(attrs={**attrs, "step": "any"})
             self.fields["new_value"].widget = forms.NumberInput(attrs={**attrs, "step": "any"})
+        elif wt == WIDGET_FK_AUTOCOMPLETE:
+            # Read-only display in the detail view.
+            # Look up the label for the stored PK and mutate instance values so the
+            # TextInput renders a human-readable label instead of a raw PK string.
+            from django.contrib.contenttypes.models import ContentType as _CT
+            try:
+                ct = _CT.objects.get(pk=self._content_type_id)
+                model_class = ct.model_class()
+                fk_field = model_class._meta.get_field(self._field_name)
+                related_model = fk_field.remote_field.model
+                old_pk = self.instance.old_value if self.instance else None
+                new_pk = self.instance.new_value if self.instance else None
+                if old_pk:
+                    try:
+                        self.instance.old_value = get_fk_label(
+                            related_model.objects.get(pk=old_pk)
+                        )
+                    except Exception:
+                        pass  # keep raw PK as fallback
+                if new_pk:
+                    try:
+                        self.instance.new_value = get_fk_label(
+                            related_model.objects.get(pk=new_pk)
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            # attrs already has readonly=True from _input_attrs(editable=False)
+            self.fields["old_value"].widget = forms.TextInput(attrs={**attrs})
+            self.fields["new_value"].widget = forms.TextInput(attrs={**attrs})
         else:
             self.fields["old_value"].widget = forms.Textarea(attrs={**attrs, "rows": 2})
             self.fields["new_value"].widget = forms.Textarea(attrs={**attrs, "rows": 2})
@@ -69,11 +106,13 @@ class EditFieldForm(forms.Form):
 
     new_value = forms.CharField(required=False, label="New value")
 
-    def __init__(self, content_type_id=None, field_name=None, initial_value=None, *args, **kwargs):
+    def __init__(self, content_type_id=None, field_name=None, initial_value=None, initial_label=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._field_info = get_field_info(content_type_id, field_name) if (content_type_id and field_name) else None
         self._content_type_id = content_type_id
         self._field_name = field_name
+        self._initial_label = initial_label
+        self._initial_value = initial_value
         if initial_value is not None:
             self.fields["new_value"].initial = initial_value
         if self._field_info:
@@ -95,6 +134,28 @@ class EditFieldForm(forms.Form):
             self.fields["new_value"].widget = forms.Select(choices=choices or [], attrs=attrs)
         elif wt == WIDGET_NUMBER:
             self.fields["new_value"].widget = forms.NumberInput(attrs={**attrs, "step": "any"})
+        elif wt == WIDGET_FK_AUTOCOMPLETE:
+            search_url = (
+                "/transactions/api/fk-search/"
+                f"?content_type_id={info['content_type_id']}&field_name={info['field_name']}"
+            )
+            widget_attrs = {
+                **attrs,
+                "data-fk-autocomplete": "true",
+                "data-search-url": search_url,
+            }
+            # Pre-populate the currently-selected object so Tom Select displays it on
+            # load before the user types a search query.
+            initial_choices = [("", "—")]
+            if self._initial_value and self._initial_label:
+                initial_choices.append((str(self._initial_value), str(self._initial_label)))
+            elif self._initial_value:
+                # Label not available — show PK as fallback; Tom Select still works
+                initial_choices.append((str(self._initial_value), str(self._initial_value)))
+            self.fields["new_value"].widget = forms.Select(
+                choices=initial_choices,
+                attrs=widget_attrs,
+            )
         else:
             self.fields["new_value"].widget = forms.Textarea(attrs={**attrs, "rows": 2})
 

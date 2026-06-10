@@ -24,4 +24,9 @@ urlpatterns = [
         views.field_info_api,
         name="field_info",
     ),
+    path(
+        "api/fk-search/",
+        views.fk_search,
+        name="fk_search",
+    ),
 ]

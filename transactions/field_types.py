@@ -14,6 +14,38 @@ WIDGET_DATETIME = "datetime"
 WIDGET_BOOLEAN = "boolean"
 WIDGET_SELECT = "select"
 WIDGET_FOREIGN_KEY = "select"  # same as select; choices built from FK
+WIDGET_FK_AUTOCOMPLETE = "fk_autocomplete"  # Large FK tables: AJAX via Tom Select
+FK_AJAX_THRESHOLD = 100  # FK tables with more records than this use AJAX
+
+
+# Maps related model name (lowercase class name) to the list of fields to
+# filter on with icontains OR logic. Add new entries here when a new large FK
+# model is added to TRACKED.
+FK_SEARCH_CONFIG = {
+    "supplier": ["name", "cage_code"],
+    "nsn": ["nsn_code", "part_number"],
+}
+
+
+def get_fk_label(obj):
+    """
+    Return a consistent human-readable label for a FK-related object.
+    Called by both the fk_search view (AJAX results) and EditFieldForm
+    pre-population logic. Keep this in sync with FK_SEARCH_CONFIG.
+    """
+    if obj is None:
+        return ""
+    model_name = obj.__class__.__name__.lower()
+    if model_name == "supplier":
+        name = getattr(obj, "name", "") or ""
+        cage = getattr(obj, "cage_code", "") or ""
+        return f"{name} ({cage})" if cage else name
+    if model_name == "nsn":
+        nsn_code = getattr(obj, "nsn_code", "") or ""
+        description = getattr(obj, "description", "") or ""
+        label = f"NSN {nsn_code}" if nsn_code else str(obj)
+        return f"{label} — {description}" if description else label
+    return str(obj)
 
 
 def get_field_info(content_type_id, field_name):
@@ -47,8 +79,22 @@ def get_field_info(content_type_id, field_name):
             "label": label,
         }
     if isinstance(field, models.ForeignKey):
-        choices = _fk_choices(field)
-        return {"widget_type": WIDGET_SELECT, "choices": choices, "label": label}
+        related_model = field.remote_field.model
+        try:
+            count = related_model.objects.count()
+        except Exception:
+            count = 0
+        if count > FK_AJAX_THRESHOLD:
+            return {
+                "widget_type": WIDGET_FK_AUTOCOMPLETE,
+                "choices": None,
+                "label": label,
+                "content_type_id": content_type_id,
+                "field_name": field_name,
+            }
+        else:
+            choices = _fk_choices(field)
+            return {"widget_type": WIDGET_SELECT, "choices": choices, "label": label}
     if hasattr(field, "choices") and field.choices:
         choices = [("", "—")] + list(field.choices)
         return {"widget_type": WIDGET_SELECT, "choices": choices, "label": label}

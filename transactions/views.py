@@ -6,7 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from .models import Transaction
 from .forms import TransactionForm, EditFieldForm
-from .field_types import get_field_info
+from .field_types import get_field_info, get_fk_label, WIDGET_FK_AUTOCOMPLETE, FK_SEARCH_CONFIG
 from .utils import get_field_value_display, set_field_value, get_display_value
 
 
@@ -56,6 +56,76 @@ def field_info_api(request):
     if not info:
         return JsonResponse({"error": "Unknown model or field"}, status=404)
     return JsonResponse(info)
+
+
+@login_required
+@require_GET
+def fk_search(request):
+    """
+    AJAX endpoint for Tom Select FK autocomplete in the transaction edit modal.
+
+    Returns JSON { "results": [{ "value": "<pk>", "label": "<display text>" }] }
+    for a given FK field and search query.
+
+    Required params: content_type_id, field_name, q (min 3 characters).
+    Optional: limit (default 20, max 50).
+    Only serves fields that get_field_info() resolves as WIDGET_FK_AUTOCOMPLETE.
+    """
+    content_type_id = request.GET.get("content_type_id")
+    field_name = request.GET.get("field_name")
+    q = request.GET.get("q", "").strip()
+    try:
+        limit = min(int(request.GET.get("limit", 20)), 50)
+    except (ValueError, TypeError):
+        limit = 20
+
+    if not content_type_id or not field_name:
+        return JsonResponse(
+            {"error": "content_type_id and field_name are required"}, status=400
+        )
+    if len(q) < 3:
+        return JsonResponse({"results": []})
+
+    info = get_field_info(int(content_type_id), field_name)
+    if not info or info.get("widget_type") != WIDGET_FK_AUTOCOMPLETE:
+        return JsonResponse(
+            {"error": "Field is not an AJAX FK autocomplete field"}, status=400
+        )
+
+    try:
+        ct = ContentType.objects.get(pk=content_type_id)
+        model_class = ct.model_class()
+        if not model_class:
+            return JsonResponse({"error": "Unknown model"}, status=404)
+        fk_field = model_class._meta.get_field(field_name)
+        related_model = fk_field.remote_field.model
+    except Exception:
+        return JsonResponse({"error": "Unknown model or field"}, status=404)
+
+    model_name = related_model.__name__.lower()
+    search_fields = FK_SEARCH_CONFIG.get(model_name)
+
+    if not search_fields:
+        # Generic fallback: try common label attributes
+        for attr in ("name", "description"):
+            if hasattr(related_model, attr):
+                search_fields = [attr]
+                break
+
+    if not search_fields:
+        return JsonResponse({"results": []})
+
+    from django.db.models import Q
+    q_filter = Q()
+    for sf in search_fields:
+        q_filter |= Q(**{f"{sf}__icontains": q})
+
+    qs = related_model.objects.filter(q_filter).order_by(search_fields[0])[:limit]
+    results = [
+        {"value": str(obj.pk), "label": get_fk_label(obj)}
+        for obj in qs
+    ]
+    return JsonResponse({"results": results})
 
 
 @login_required
@@ -145,10 +215,19 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
         return JsonResponse(response_data)
 
     old_value_str = get_field_value_display(instance, field_name)
+    # For AJAX FK autocomplete fields, compute the display label for the
+    # currently-selected object so Tom Select can pre-populate the selection.
+    initial_label = None
+    if field_info.get("widget_type") == WIDGET_FK_AUTOCOMPLETE:
+        related_obj = getattr(instance, field_name, None)
+        if related_obj is not None:
+            initial_label = get_fk_label(related_obj)
+
     form = EditFieldForm(
         content_type_id=content_type_id,
         field_name=field_name,
         initial_value=old_value_str,
+        initial_label=initial_label,
     )
     transactions = (
         Transaction.objects.filter(content_type=ct, object_id=object_id, field_name=field_name)

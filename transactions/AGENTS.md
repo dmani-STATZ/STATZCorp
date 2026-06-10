@@ -39,6 +39,8 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 ### Before changing widget/form behavior
 - `TransactionForm` and `EditFieldForm` widget styling is centralized in `_input_attrs()` in `transactions/forms.py` and uses the Bootstrap 5 `form-control` class.
 - `transactions/field_types.py` — `get_field_info()` and `_fk_choices()`
+- `transactions/field_types.py` — `FK_AJAX_THRESHOLD` (100), `FK_SEARCH_CONFIG`, and `get_fk_label()` control AJAX autocomplete. When adding a new large FK field (related model >100 records), add the model's lowercase class name and its search fields to `FK_SEARCH_CONFIG`, and add a label-formatting branch in `get_fk_label()`.
+- Tom Select 2.x is loaded from CDN in `transaction_modal.html`. It initializes on `select[data-fk-autocomplete='true']` (AJAX mode) and on preloaded `select.form-control` elements with more than 8 options (local search mode). Initialization is called from `initTomSelectWidgets(body)` inside `openTransactionsEditModal` after HTML injection.
 - `transactions/forms.py` — `TransactionForm._set_value_widgets()` and `EditFieldForm._set_widget()`
 - `transactions/templates/transactions/partials/transaction_edit.html` — the edit partial is injected via `innerHTML`; its form field names and JS submit handler must stay aligned with `EditFieldForm`
 
@@ -86,6 +88,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 1. `field_types.py` — `get_field_info()` return dict
 2. `forms.py` — `TransactionForm._set_value_widgets()` and `EditFieldForm._set_widget()`
 3. `templates/transactions/partials/transaction_edit.html` — if HTML input structure changes, verify JS submit path in `transaction_modal.html` still reads `new_value` correctly
+4. `field_types.py` — `FK_SEARCH_CONFIG` dict and `get_fk_label()` function (if the new field's related model is large or needs a custom label format)
 
 ### Changing URL structure
 1. `urls.py`
@@ -193,6 +196,8 @@ There are **no automated tests** in this app. After any edit, verify manually:
 - **ContentType IDs are environment-specific.** The caller templates pass `supplier_content_type_id` and `contract_content_type_id` from the view context. If ContentType rows are ever manually deleted or re-seeded, these IDs change. Never hardcode numeric ContentType IDs.
 - **`TransactionUserMiddleware` must stay in MIDDLEWARE after authentication.** Moving it before auth means `request.user` may not be set, and all `Transaction.user` values will be `None`.
 - **No tests.** Regressions in signal field serialization, `set_field_value` coercion, or widget selection will not be caught automatically.
+- **`FK_SEARCH_CONFIG` and `get_fk_label()` are NOT automatically updated when new FK fields are added to TRACKED.** If a new FK field's related model has >100 records and its model name is not in `FK_SEARCH_CONFIG`, the `fk_search` endpoint falls back to a generic `name`/`description` field search. If neither attribute exists on the model, the endpoint returns empty results silently.
+- **Tom Select initializes only on elements found by `container.querySelectorAll(...)` inside `#transactionsModalBody` after `innerHTML` injection.** If a template change wraps the `<select>` in a way that removes `data-fk-autocomplete` or the `form-control` class, Tom Select will not enhance it and the raw browser select will be shown instead.
 
 ---
 
@@ -215,7 +220,7 @@ There are **no automated tests** in this app. After any edit, verify manually:
 | Area | Primary files |
 |---|---|
 | Field tracking logic | `signals.py` (`TRACKED`, `store_old_state`, `record_transactions`) |
-| Widget resolution | `field_types.py` (`get_field_info`, `_fk_choices`) |
+| Widget resolution | `field_types.py` (`get_field_info`, `_fk_choices`, `FK_SEARCH_CONFIG`, `get_fk_label`, `FK_AJAX_THRESHOLD`, `WIDGET_FK_AUTOCOMPLETE`) |
 | Form/input | `forms.py` (`TransactionForm`, `EditFieldForm`) |
 | Value coercion | `utils.py` (`set_field_value`, `get_field_value_display`, `get_display_value`) |
 | Views | `views.py` (4 views, all `@login_required`) |
@@ -226,6 +231,8 @@ There are **no automated tests** in this app. After any edit, verify manually:
 | Admin | `admin.py` (read-only audit view) |
 
 **Main coupled areas:** `TRACKED` ↔ `store_old_state` branches; `field_types` ↔ `forms` ↔ `utils` ↔ `transaction_edit.html`; modal JS ↔ URL paths ↔ caller templates.
+
+**Main URLs:** `transactions:transaction_list`, `transactions:transaction_detail`, `transactions:transaction_edit_field`, `transactions:field_info`, `transactions:fk_search`.
 
 **Main cross-app dependencies:** `contracts.models.Contract`, `contracts.models.Clin`, `suppliers.models.Supplier` (imported in signals); `templates/suppliers/supplier_detail.html` and `contracts/templates/contracts/contract_management.html` (call modal helpers).
 

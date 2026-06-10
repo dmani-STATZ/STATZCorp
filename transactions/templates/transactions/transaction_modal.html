@@ -1,4 +1,6 @@
 {% load static %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2/dist/css/tom-select.bootstrap5.min.css">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2/dist/js/tom-select.complete.min.js"></script>
 {# Transactions modal: include this where you need the transactions popup. #}
 {# Data attributes: data-content-type-id, data-object-id for loading list. #}
 <div id="transactionsModal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 9999;" aria-labelledby="transactionsModalTitle" aria-modal="true">
@@ -18,6 +20,56 @@
 
 <script>
 (function() {
+  function initTomSelectWidgets(container) {
+    if (typeof TomSelect === 'undefined') return;
+
+    // Large FK tables: Supplier, NSN, etc. — AJAX search
+    container.querySelectorAll('select[data-fk-autocomplete="true"]').forEach(function(el) {
+      if (el.tomselect) return; // prevent double-init
+      var searchUrl = el.dataset.searchUrl;
+      new TomSelect(el, {
+        valueField: 'value',
+        labelField: 'label',
+        searchField: ['label'],
+        preload: false,
+        placeholder: 'Type 3+ characters to search\u2026',
+        shouldLoad: function(query) { return query.length >= 3; },
+        load: function(query, callback) {
+          if (query.length < 3) return callback();
+          fetch(searchUrl + '&q=' + encodeURIComponent(query), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(data) { callback(data.results || []); })
+          .catch(function() { callback(); });
+        },
+        render: {
+          no_results: function(data, escape) {
+            return '<div class="no-results">No results for "' + escape(data.input) + '"</div>';
+          },
+          option: function(data, escape) {
+            return '<div>' + escape(data.label) + '</div>';
+          },
+          item: function(data, escape) {
+            return '<div>' + escape(data.label) + '</div>';
+          }
+        }
+      });
+    });
+
+    // Small preloaded selects with enough options — add Tom Select local search
+    container.querySelectorAll('select.form-control:not([data-fk-autocomplete])').forEach(function(el) {
+      if (el.tomselect) return;
+      if (el.options.length > 8) {
+        new TomSelect(el, {
+          create: false,
+          allowEmptyOption: true,
+          placeholder: 'Search or select\u2026',
+        });
+      }
+    });
+  }
+
   const modal = document.getElementById('transactionsModal');
   const body = document.getElementById('transactionsModalBody');
   const titleEl = document.getElementById('transactionsModalTitle');
@@ -45,6 +97,7 @@
       .then(function(r) { return r.text(); })
       .then(function(html) {
         body.innerHTML = html;
+        initTomSelectWidgets(body);  // initialize Tom Select on FK autocomplete and preloaded selects
         var form = body.querySelector('#transaction-edit-form');
         var cancelBtn = body.querySelector('#transaction-edit-cancel');
         if (form) {
