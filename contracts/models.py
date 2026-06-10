@@ -1425,6 +1425,7 @@ class GovAction(AuditModel):
         ('QN', 'QN'),
         ('NCR', 'NCR'),
         ('SOW', 'SOW'),
+        ('SWO', 'SWO'),
     ]
     REQUEST_CHOICES = [
         ('Admin', 'Admin'),
