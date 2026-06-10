@@ -483,7 +483,7 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by, personalization_text=""):
             })
 
     if settings.GRAPH_MAIL_ENABLED:
-        from sales.services.graph_mail import send_mail_via_graph
+        from mailer.services.graph_mail import send_mail_via_graph
 
         cage_reply = (cage.smtp_reply_to or "").strip() if cage else ""
         pdf_attachments = [

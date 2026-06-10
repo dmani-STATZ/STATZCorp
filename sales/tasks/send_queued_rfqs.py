@@ -8,13 +8,13 @@ from collections import defaultdict
 from django.db import transaction
 from django.utils import timezone
 
+from mailer.services.graph_mail import send_mail_via_graph
 from sales.models import SupplierContactLog, SupplierRFQ
 from sales.services.email import (
     _default_cage,
     compose_grouped_rfq_email_message,
     resolve_supplier_email_for_send,
 )
-from sales.services.graph_mail import send_mail_via_graph
 
 logger = logging.getLogger("sales.background_tasks")
 

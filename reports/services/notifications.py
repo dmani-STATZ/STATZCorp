@@ -15,7 +15,7 @@ logger = logging.getLogger("reports.notifications")
 def _get_graph_mail():
     """Lazy import to avoid hard dependency if sales app is ever not installed."""
     try:
-        from sales.services.graph_mail import send_mail_via_graph
+        from mailer.services.graph_mail import send_mail_via_graph
         return send_mail_via_graph
     except ImportError:
         logger.warning("reports.notifications: graph_mail service unavailable.")

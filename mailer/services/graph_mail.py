@@ -1,5 +1,5 @@
 """
-sales/services/graph_mail.py
+mailer/services/graph_mail.py
 
 Microsoft Graph API mail dispatch for STATZ RFQ outbound emails.
 Uses client credentials flow (app-only auth) — no user login required.

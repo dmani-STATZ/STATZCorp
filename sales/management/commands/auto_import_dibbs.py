@@ -545,7 +545,7 @@ class Command(BaseCommand):
             return
 
         try:
-            from sales.services.graph_mail import send_mail_via_graph
+            from mailer.services.graph_mail import send_mail_via_graph
 
             subject = (
                 f"STATZ Auto Import Failed — {len(failures)} date(s) need attention"

@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "contracts.apps.ContractsConfig",
     "sales.apps.SalesConfig",
     "accesslog.apps.AccesslogConfig",
+    "mailer",
     "crispy_forms",
     "crispy_bootstrap5",
     "django.contrib.admin",

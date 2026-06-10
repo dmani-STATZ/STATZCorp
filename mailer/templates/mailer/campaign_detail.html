@@ -1,0 +1,123 @@
+{% extends 'base_template.html' %}
+
+{% block title %}{{ campaign.name }} | STATZ{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div class="d-flex align-items-center">
+            <a href="{% url 'mailer:campaign_list' %}" class="btn btn-outline-secondary me-3 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            </a>
+            <div>
+                <h2 class="mb-0">{{ campaign.name }}</h2>
+                <span class="badge 
+                    {% if campaign.status == 'DRAFT' %}bg-secondary
+                    {% elif campaign.status == 'SCHEDULED' %}bg-info
+                    {% elif campaign.status == 'SENDING' %}bg-warning text-dark
+                    {% elif campaign.status == 'COMPLETED' %}bg-success
+                    {% else %}bg-danger{% endif %} mt-2">
+                    {{ campaign.status }}
+                </span>
+            </div>
+        </div>
+        <div>
+            {% if campaign.status == 'DRAFT' %}
+                <a href="{% url 'mailer:campaign_edit' campaign.pk %}" class="btn btn-outline-primary me-2">Edit Details</a>
+                <a href="{% url 'mailer:campaign_import' campaign.pk %}" class="btn btn-outline-success me-2 d-inline-flex align-items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Import Contacts
+                </a>
+                
+                <form method="post" action="{% url 'mailer:campaign_schedule' campaign.pk %}" class="d-inline" onsubmit="return confirm('Are you sure you want to schedule this campaign? It will be sent in the background.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary d-inline-flex align-items-center" {% if recipients.count == 0 %}disabled{% endif %}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>Send Campaign
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="d-flex flex-column flex-lg-row gap-4">
+        <!-- Left Pane: Campaign Details -->
+        <div class="flex-shrink-0" style="width: 100%; max-width: 450px;">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Campaign Details</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted">Sender</dt>
+                        <dd class="col-sm-8">{{ campaign.sender_email }}</dd>
+                        
+                        <dt class="col-sm-4 text-muted">Subject</dt>
+                        <dd class="col-sm-8">{{ campaign.subject_template }}</dd>
+                        
+                        <dt class="col-sm-4 text-muted">Created</dt>
+                        <dd class="col-sm-8">{{ campaign.created_at|date:"M d, Y H:i" }}</dd>
+                    </dl>
+                    
+                    <hr>
+                    <h6 class="text-muted">Message Preview (Raw)</h6>
+                    <div class="bg-light p-3 rounded text-break" style="max-height: 350px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.9em;">{{ campaign.body_template }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Pane: Recipients -->
+        <div class="flex-grow-1">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recipients ({{ recipients.count }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: calc(100vh - 250px); overflow-y: auto;">
+                        <table class="table table-hover table-sm mb-0 align-middle">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th class="ps-3">Email</th>
+                                    <th>Name</th>
+                                    <th>Company</th>
+                                    <th>Status</th>
+                                    <th class="pe-3">Sent At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in recipients %}
+                                <tr>
+                                    <td class="ps-3">{{ r.email }}</td>
+                                    <td>{{ r.first_name|default:"-" }} {{ r.last_name|default:"" }}</td>
+                                    <td>{{ r.company_name|default:"-" }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if r.status == 'PENDING' %}bg-secondary
+                                            {% elif r.status == 'SENT' %}bg-success
+                                            {% else %}bg-danger{% endif %}">
+                                            {{ r.status }}
+                                        </span>
+                                    </td>
+                                    <td class="pe-3">{{ r.sent_at|date:"M d, H:i"|default:"-" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        No recipients yet.<br>
+                                        <a href="{% url 'mailer:campaign_import' campaign.pk %}" class="btn btn-sm btn-outline-success mt-2">Import Contacts</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

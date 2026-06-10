@@ -5,13 +5,14 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 
+from mailer.services.graph_mail import send_mail_via_graph
 from sales.models import AwardImportBatch
 from sales.services.awards_file_importer import import_aw_records
 from sales.services.dibbs_awards_scraper import scrape_awards_for_date
 from sales.services.queue_we_won_awards import queue_we_won_awards
-from sales.services.graph_mail import send_mail_via_graph
 
 _CHROMIUM_ARGS = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
 

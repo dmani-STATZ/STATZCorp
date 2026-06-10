@@ -170,6 +170,7 @@ urlpatterns = [
     path("api/system-test/", views.system_test_api, name="system_test_api"),
     path("tools/", include("tools.urls")),
     path("imports/", include("imports.urls", namespace="imports")),
+    path("mailer/", include("mailer.urls", namespace="mailer")),
 ]
 
 # Always serve static/media files (even in production)
