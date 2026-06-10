@@ -14,7 +14,13 @@
 <div class="po-page container-fluid px-3"
      id="po-page"
      data-po-id="{{ po.id }}"
-     data-contract-id="{{ contract.id }}">
+     data-contract-id="{{ contract.id }}"
+     data-snippet-list-url="{% url 'contracts:po_snippet_list' %}"
+     data-snippet-create-url="{% url 'contracts:po_snippet_create' %}"
+     data-snippet-delete-url-template="/contracts/api/po-snippets/__ID__/delete/"
+     data-snippet-update-url-template="/contracts/api/po-snippets/__ID__/update/"
+     data-signature-update-url="{% url 'contracts:po-profile-signature-update' %}"
+     data-has-signature="{% if profile and profile.signature_image_base64 %}true{% else %}false{% endif %}">
   {% csrf_token %}
 
   {# ── Zone 0: Page Header Bar (full-width, normal flow, does not scroll) ── #}
@@ -26,6 +32,11 @@
       <a href="{% url 'contracts:purchase-order-print' po.id %}"
          target="_blank" rel="noopener"
          class="btn btn-outline-secondary btn-sm">Print / Preview PO</a>
+      <button type="button" id="po-signature-btn"
+              class="btn btn-outline-secondary btn-sm"
+              title="View or update company signature">
+        ✎ Signature
+      </button>
       <button type="button" id="po-save-header-btn"
               class="btn btn-primary btn-sm px-4">Save</button>
     </div>
@@ -223,10 +234,26 @@
         </div>
 
         <div class="po-zone-g-inner">
-          <select id="po-snippet-select"
-                  class="form-select form-select-sm mb-2 flex-shrink-0">
-            <option value="">-- Choose Snippet --</option>
-          </select>
+          <div class="d-flex gap-1 align-items-center mb-2">
+            <select id="po-snippet-select"
+                    class="form-select form-select-sm flex-grow-1">
+              <option value="">-- Choose Snippet --</option>
+            </select>
+            <button id="po-snippet-add-btn"
+                    class="btn btn-sm btn-outline-success"
+                    title="New snippet"
+                    type="button">+</button>
+            <button id="po-snippet-edit-btn"
+                    class="btn btn-sm btn-outline-secondary"
+                    title="Edit selected snippet"
+                    type="button"
+                    disabled>✎</button>
+            <button id="po-snippet-delete-btn"
+                    class="btn btn-sm btn-outline-danger"
+                    title="Delete selected snippet"
+                    type="button"
+                    disabled>✕</button>
+          </div>
 
           <div id="po-snippet-preview"
                class="po-snippet-preview-box"></div>
@@ -243,6 +270,104 @@
     </div>{# /.po-right-panel #}
 
   </div>{# /.po-body #}
+
+  <div class="modal fade" id="poSnippetMgmtModal"
+       tabindex="-1" aria-labelledby="poSnippetMgmtLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="poSnippetMgmtLabel">New Snippet</h5>
+          <button type="button" class="btn-close"
+                  data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="poSnippetMgmtId" value="">
+          <div class="mb-3">
+            <label for="poSnippetMgmtTitle" class="form-label fw-semibold">
+              Title <span class="text-danger">*</span>
+            </label>
+            <input type="text" id="poSnippetMgmtTitle"
+                   class="form-control" maxlength="200"
+                   placeholder="e.g. JVIC Footer">
+          </div>
+          <div class="mb-3">
+            <label for="poSnippetMgmtCategory" class="form-label fw-semibold">
+              Category
+            </label>
+            <input type="text" id="poSnippetMgmtCategory"
+                   class="form-control" maxlength="100"
+                   placeholder="e.g. JVIC">
+          </div>
+          <div class="mb-3">
+            <label for="poSnippetMgmtBody" class="form-label fw-semibold">
+              Snippet text <span class="text-danger">*</span>
+            </label>
+            <textarea id="poSnippetMgmtBody"
+                      class="form-control" rows="8"
+                      placeholder="Paste or type the snippet text here…"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary"
+                  data-bs-dismiss="modal">Cancel</button>
+          <button type="button" id="poSnippetMgmtSave"
+                  class="btn btn-primary">Save snippet</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="poSignatureModal"
+       tabindex="-1" aria-labelledby="poSignatureModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="poSignatureModalLabel">Company Signature</h5>
+          <button type="button" class="btn-close"
+                  data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="poSigCurrentWrap" class="mb-3 text-center">
+            {% if profile and profile.signature_image_base64 %}
+              <img id="poSigCurrentImg"
+                   src="{{ profile.signature_image_base64 }}"
+                   alt="Current signature"
+                   style="max-height:100px; max-width:100%;">
+              <p class="text-muted mt-1 mb-0" style="font-size:12px;">
+                Current signature
+              </p>
+            {% else %}
+              <img id="poSigCurrentImg" src="" alt=""
+                   style="max-height:100px; max-width:100%; display:none;">
+              <p id="poSigNone" class="text-muted fst-italic">
+                No signature on file.
+              </p>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            <label for="poSigFileInput" class="form-label fw-semibold">
+              Upload signature image
+            </label>
+            <input type="file" id="poSigFileInput"
+                   class="form-control" accept="image/png,image/jpeg,image/gif">
+            <div class="form-text">PNG recommended. Keep under 500 KB.</div>
+          </div>
+        </div>
+        <div class="modal-footer justify-content-between">
+          <button type="button" id="poSigClearBtn"
+                  class="btn btn-outline-danger btn-sm">
+            Remove signature
+          </button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary btn-sm"
+                    data-bs-dismiss="modal">Cancel</button>
+            <button type="button" id="poSigSaveBtn"
+                    class="btn btn-primary btn-sm">Save signature</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div>{# /.po-page #}
 {% endblock %}

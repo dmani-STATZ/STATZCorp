@@ -5,6 +5,14 @@
   <meta charset="utf-8">
   <title>PO {{ po.po_number }}</title>
   <link rel="stylesheet" href="{% static 'contracts/css/purchase_order_print.css' %}">
+  <style>
+    .po-sig-img  { max-height: 56px; max-width: 200px;
+                   vertical-align: middle; }
+    .po-sig-date { font-size: 11pt; }
+    .po-sig-line-wrap { display: inline-block; min-width: 220px;
+                        border-bottom: 1px solid #000;
+                        margin-left: 12px; }
+  </style>
 </head>
 <body>
 <div class="po-doc">
@@ -91,11 +99,30 @@
     </tfoot>
   </table>
 
-  {% if po.footer %}<div class="po-footer-text">{{ po.footer }}</div>{% endif %}
+  {% if po.footer and po.footer.strip %}<div class="po-footer-text">{{ po.footer }}</div>{% endif %}
 
   <section class="po-signature">
-    <div class="po-sig-row"><span class="po-label">Approved By</span><span class="po-sig-line"></span></div>
-    <div class="po-sig-row"><span class="po-label">Date</span><span class="po-sig-line"></span></div>
+    <div class="po-sig-row">
+      <span class="po-label">Approved By</span>
+      <span class="po-sig-line-wrap">
+        {% if profile and profile.signature_image_base64 %}
+          <img src="{{ profile.signature_image_base64 }}"
+               alt="Signature" class="po-sig-img">
+        {% else %}
+          <span class="po-sig-line"></span>
+        {% endif %}
+      </span>
+    </div>
+    <div class="po-sig-row">
+      <span class="po-label">Date</span>
+      <span class="po-sig-line-wrap">
+        {% if po.po_date %}
+          <span class="po-sig-date">{{ po.po_date|date:"N j, Y" }}</span>
+        {% else %}
+          <span class="po-sig-line"></span>
+        {% endif %}
+      </span>
+    </div>
   </section>
 
 </div>

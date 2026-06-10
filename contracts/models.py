@@ -1917,6 +1917,14 @@ class CompanyPOProfile(models.Model):
     email = models.EmailField(blank=True, default='')
     cage_code = models.CharField(max_length=20, blank=True, default='')
     default_footer = models.TextField(blank=True, default='')
+    signature_image_base64 = models.TextField(
+        blank=True, default='',
+        help_text=(
+            "Base64-encoded data URL of the company signature image "
+            "(e.g. data:image/png;base64,...). Rendered on printed POs. "
+            "Set via the PO editor page signature modal or admin."
+        ),
+    )
     letterhead_html = models.TextField(
         blank=True, default='',
         help_text=(

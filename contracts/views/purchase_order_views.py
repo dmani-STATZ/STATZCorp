@@ -10,7 +10,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Contract, Clin, PurchaseOrder, POLineItem
+from ..models import CompanyPOProfile, Contract, Clin, PurchaseOrder, POLineItem
 from suppliers.models import Supplier
 
 logger = logging.getLogger('django')
@@ -155,6 +155,7 @@ def purchase_order_page(request, contract_id):
         'needs_supplier_picker': needs_picker,
         'clin_suppliers': clin_suppliers,
         'idiq_number': contract.idiq_contract.contract_number if contract.idiq_contract else '',
+        'profile': getattr(company, 'po_profile', None),
     })
 
 
@@ -269,4 +270,37 @@ def purchase_order_print(request, po_id):
         'idiq_number': po.contract.idiq_contract.contract_number if po.contract.idiq_contract else '',
         'logo_url': company.logo_url,
     })
+
+
+@conditional_login_required
+@require_POST
+def update_po_profile_signature(request):
+    """Save or clear the company signature image (base64 data URL).
+    Accepts JSON body: {signature_base64: "data:image/..."}
+    Pass empty string to clear. Creates CompanyPOProfile if absent."""
+    company = _active_company_or_403(request)
+    if not company.enable_po_generator:
+        raise PermissionDenied("PO generator is not enabled.")
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'success': False,
+                             'error': 'Invalid JSON'}, status=400)
+    sig = (data.get('signature_base64') or '').strip()
+    # Basic guard: must be empty or a data URL
+    if sig and not sig.startswith('data:image/'):
+        return JsonResponse({'success': False,
+                             'error': 'Invalid image data'}, status=400)
+    # Size guard: ~500 KB base64 ceiling
+    if len(sig) > 700_000:
+        return JsonResponse({'success': False,
+                             'error': 'Image too large (500 KB max)'},
+                            status=400)
+    profile, _ = CompanyPOProfile.objects.get_or_create(
+        company=company,
+        defaults={},
+    )
+    profile.signature_image_base64 = sig
+    profile.save(update_fields=['signature_image_base64'])
+    return JsonResponse({'success': True, 'signature_base64': sig})
 

@@ -249,6 +249,16 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
 @admin.register(CompanyPOProfile)
 class CompanyPOProfileAdmin(admin.ModelAdmin):
     list_display = ('company', 'ship_to_name', 'cage_code')
+    fields = (
+        'company',
+        'ship_to_name', 'ship_to_attn', 'ship_to_title',
+        'address_line_1', 'address_line_2', 'city', 'state', 'zip',
+        'phone', 'email', 'cage_code',
+        'default_footer', 'signature_image_base64',
+        'letterhead_html', 'contact_note',
+        'created_at', 'updated_at',
+    )
+    readonly_fields = ('created_at', 'updated_at')
 
 
 @admin.register(PartnerReconciliation)

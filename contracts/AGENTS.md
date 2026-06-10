@@ -303,6 +303,7 @@ NSN search is dash-agnostic. `get_select_options` in `contracts/views/api_views.
 - **All PO views live in `purchase_order_views.py` only.** Keep views modular and scoped.
 - **`po_print.html` is standalone.** Never make it extend the standard app base template as it is designed for clean print-to-PDF output without sidebar or navigation chrome.
 - **`letterhead_html` is trusted HTML content.** It is rendered with `|safe` filter, so its input field should only be editable by administrators/staff via the Django admin panel.
+- **`signature_image_base64` is a base64 data URL stored directly in the DB** — do NOT treat it as a file path or run file-system operations on it. Clear by saving empty string. The field is on `CompanyPOProfile` (company-level) not `PurchaseOrder` (it is the same for every PO from that company).
 - **Newlines in line item `activity` are preserved via CSS.** Use `white-space: pre-wrap;` rather than the `linebreaks` filter or `safe` on the activity text.
 - **Browser-based printing is used for PDF export.** The print view does not generate, store, or upload PDFs to SharePoint. The user prints/saves as PDF using their browser's print engine.
 

@@ -830,6 +830,9 @@ urlpatterns = [
     path('po-line/<int:line_id>/delete/', purchase_order_views.delete_po_line, name='po-line-delete'),
     path('purchase-order/<int:po_id>/lines/reorder/', purchase_order_views.reorder_po_lines, name='po-lines-reorder'),
     path('purchase-order/<int:po_id>/print/', purchase_order_views.purchase_order_print, name='purchase-order-print'),
+    path('po-profile/signature/',
+         purchase_order_views.update_po_profile_signature,
+         name='po-profile-signature-update'),
     # CLIN Splits
     path("clin/<int:clin_pk>/splits/add/", add_clin_split, name="add_clin_split"),
     path("clin/splits/<int:split_pk>/update/", update_clin_split, name="update_clin_split"),
