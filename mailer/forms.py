@@ -1,5 +1,5 @@
 from django import forms
-from .models import Campaign
+from .models import Campaign, CampaignRecipient, CampaignFollowUp
 from django.core.exceptions import ValidationError
 from django.utils.safestring import mark_safe
 import csv
@@ -60,3 +60,29 @@ class AudienceBuilderForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
         help_text="Select the years. Suppliers who won contracts in ANY of these years will be added."
     )
+
+class CampaignAIGenerateForm(forms.ModelForm):
+    class Meta:
+        model = Campaign
+        fields = ['ai_instruction']
+        widgets = {
+            'ai_instruction': forms.Textarea(attrs={
+                'rows': 5,
+                'placeholder': 'e.g. Write a friendly sentence to win them back based on their drop off. Keep it under 2 sentences.'
+            }),
+        }
+        labels = {
+            'ai_instruction': 'Instruction for Claude'
+        }
+        help_texts = {
+            'ai_instruction': 'The AI will receive this instruction along with each recipient\'s custom data and generate a unique message for them.'
+        }
+
+class CampaignFollowUpForm(forms.ModelForm):
+    class Meta:
+        model = CampaignFollowUp
+        fields = ['delay_days', 'subject_template', 'body_template']
+        widgets = {
+            'delay_days': forms.NumberInput(attrs={'min': 1}),
+            'body_template': forms.Textarea(attrs={'rows': 5}),
+        }

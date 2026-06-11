@@ -3,11 +3,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 import csv
 import io
 
-from .models import Campaign, CampaignRecipient
-from .forms import CampaignForm, CampaignRecipientImportForm
+from .models import Campaign, CampaignRecipient, CampaignFollowUp
+from .forms import CampaignForm, CampaignRecipientImportForm, CampaignAIGenerateForm, CampaignFollowUpForm
+from suppliers.models import Contact
 
 @login_required
 def campaign_list(request):
@@ -95,6 +97,14 @@ def campaign_import_recipients(request, pk):
                         
                         # Store any extra columns in custom_data
                         custom_data = {k: v for k, v in row.items() if k not in ['email', 'first_name', 'last_name', 'company_name']}
+                        
+                        # Look up supplier flags if possible
+                        contact = Contact.objects.filter(email__iexact=email).select_related('supplier').first()
+                        if contact and contact.supplier:
+                            if contact.supplier.probation:
+                                custom_data['is_probation'] = True
+                            if contact.supplier.conditional:
+                                custom_data['is_conditional'] = True
                         
                         obj, created = CampaignRecipient.objects.update_or_create(
                             campaign=campaign,
@@ -189,3 +199,112 @@ def recipient_preview(request, pk):
         'subject': subject,
         'body': body,
     })
+
+@login_required
+@require_POST
+def recipient_delete(request, pk):
+    recipient = get_object_or_404(CampaignRecipient, pk=pk)
+    campaign_pk = recipient.campaign.pk
+    recipient.delete()
+    messages.success(request, f"Recipient {recipient.email} removed from campaign.")
+    return redirect('mailer:campaign_detail', pk=campaign_pk)
+
+@login_required
+def campaign_generate_ai(request, pk):
+    campaign = get_object_or_404(Campaign, pk=pk)
+    
+    if request.method == 'POST':
+        form = CampaignAIGenerateForm(request.POST, instance=campaign)
+        if form.is_valid():
+            campaign = form.save(commit=False)
+            campaign.ai_status = 'PROCESSING'
+            campaign.save()
+            messages.info(request, "AI Generation has been scheduled. It may take a few minutes depending on the number of recipients.")
+            return redirect('mailer:campaign_detail', pk=campaign.pk)
+    else:
+        form = CampaignAIGenerateForm(instance=campaign)
+        
+    return render(request, 'mailer/campaign_generate_ai.html', {
+        'form': form,
+        'campaign': campaign,
+        'title': 'Generate AI Messages'
+    })
+
+@login_required
+@require_POST
+def recipient_toggle_followup(request, pk):
+    recipient = get_object_or_404(CampaignRecipient, pk=pk)
+    recipient.follow_up_active = not recipient.follow_up_active
+    recipient.save()
+    messages.success(request, f"Follow-ups {'enabled' if recipient.follow_up_active else 'disabled'} for {recipient.email}.")
+    return redirect('mailer:campaign_detail', pk=recipient.campaign.pk)
+
+@login_required
+@require_POST
+def campaign_toggle_followup(request, pk):
+    campaign = get_object_or_404(Campaign, pk=pk)
+    campaign.follow_up_enabled = not campaign.follow_up_enabled
+    campaign.save()
+    messages.success(request, f"Campaign follow-ups {'enabled' if campaign.follow_up_enabled else 'disabled'}.")
+    return redirect('mailer:campaign_detail', pk=campaign.pk)
+
+@login_required
+def campaign_followup_add(request, pk):
+    campaign = get_object_or_404(Campaign, pk=pk)
+    
+    if request.method == 'POST':
+        form = CampaignFollowUpForm(request.POST)
+        if form.is_valid():
+            followup = form.save(commit=False)
+            followup.campaign = campaign
+            # Auto-assign step number
+            existing = campaign.follow_ups.count()
+            followup.step_number = existing + 1
+            followup.save()
+            messages.success(request, f"Added Follow-Up Step {followup.step_number}")
+            return redirect('mailer:campaign_detail', pk=campaign.pk)
+    else:
+        form = CampaignFollowUpForm()
+        
+    return render(request, 'mailer/campaign_followup_form.html', {
+        'form': form,
+        'campaign': campaign,
+        'title': 'Add Follow-Up Step'
+    })
+
+@login_required
+def campaign_followup_edit(request, pk, followup_pk):
+    campaign = get_object_or_404(Campaign, pk=pk)
+    followup = get_object_or_404(CampaignFollowUp, pk=followup_pk, campaign=campaign)
+    
+    if request.method == 'POST':
+        form = CampaignFollowUpForm(request.POST, instance=followup)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Follow-Up updated.")
+            return redirect('mailer:campaign_detail', pk=campaign.pk)
+    else:
+        form = CampaignFollowUpForm(instance=followup)
+        
+    return render(request, 'mailer/campaign_followup_form.html', {
+        'form': form,
+        'campaign': campaign,
+        'title': f'Edit Follow-Up Step {followup.step_number}'
+    })
+
+@login_required
+@require_POST
+def campaign_followup_delete(request, pk, followup_pk):
+    campaign = get_object_or_404(Campaign, pk=pk)
+    followup = get_object_or_404(CampaignFollowUp, pk=followup_pk, campaign=campaign)
+    step_num = followup.step_number
+    followup.delete()
+    
+    # Reorder remaining steps
+    for idx, remaining in enumerate(campaign.follow_ups.order_by('step_number'), start=1):
+        if remaining.step_number != idx:
+            remaining.step_number = idx
+            remaining.save()
+            
+    messages.success(request, f"Follow-Up Step {step_num} deleted.")
+    return redirect('mailer:campaign_detail', pk=campaign.pk)

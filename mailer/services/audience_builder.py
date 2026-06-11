@@ -79,6 +79,13 @@ def build_audience_by_years(campaign, active_company, target_years):
         # Get the stats for this contact's supplier
         custom_data = stats_map.get(contact.supplier_id, {})
         
+        # Add probation and conditional flags
+        if contact.supplier:
+            if contact.supplier.probation:
+                custom_data['is_probation'] = True
+            if contact.supplier.conditional:
+                custom_data['is_conditional'] = True
+        
         # Split name (heuristic for first/last)
         name_parts = (contact.name or "").split(" ", 1)
         first_name = name_parts[0] if len(name_parts) > 0 else ""

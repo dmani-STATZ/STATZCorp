@@ -28,7 +28,33 @@
         <div class="card-body">
             <p>You can import recipients in two ways:</p>
             <ol>
-                <li><strong>CSV Upload:</strong> Upload a file containing the columns <code>email</code>, <code>first_name</code>, <code>last_name</code>, <code>company_name</code>. Any additional columns will be saved and can be used for advanced personalization later.</li>
+                <li class="mb-3">
+                    <strong>CSV Upload:</strong> Upload a file containing the required columns. Any additional columns will be saved and can be used for advanced personalization later.
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm table-bordered bg-white mb-0" style="font-size: 0.9em;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>email <span class="text-danger">*</span></th>
+                                    <th>first_name</th>
+                                    <th>last_name</th>
+                                    <th>company_name</th>
+                                    <th class="text-muted fst-italic">your_custom_column_1</th>
+                                    <th class="text-muted fst-italic">...</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>john@example.com</td>
+                                    <td>John</td>
+                                    <td>Doe</td>
+                                    <td>Acme Corp</td>
+                                    <td class="text-muted fst-italic">$450,000</td>
+                                    <td class="text-muted fst-italic">...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </li>
                 <li><strong>Text Box:</strong> Paste a simple list of email addresses separated by semicolons (e.g., <code>john@example.com; jane@example.com</code>).</li>
             </ol>
         </div>

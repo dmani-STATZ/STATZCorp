@@ -27,6 +27,9 @@
                 <a href="{% url 'mailer:campaign_audience' campaign.pk %}" class="btn btn-outline-info me-2 d-inline-flex align-items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>Build Audience
                 </a>
+                <a href="{% url 'mailer:campaign_generate_ai' campaign.pk %}" class="btn btn-outline-warning me-2 d-inline-flex align-items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>Generate AI
+                </a>
                 <a href="{% url 'mailer:campaign_import' campaign.pk %}" class="btn btn-outline-success me-2 d-inline-flex align-items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Import Contacts
                 </a>
@@ -48,27 +51,86 @@
     {% endif %}
 
     <div class="d-flex flex-column flex-lg-row gap-4">
-        <!-- Left Pane: Campaign Details -->
-        <div class="flex-shrink-0" style="width: 100%; max-width: 450px;">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">Campaign Details</h5>
+        <div class="row g-4 mb-4">
+            <!-- Main Details Card -->
+            <div class="col-md-7">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Campaign Details</h5>
+                        <a href="{% url 'mailer:campaign_edit' campaign.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4 text-muted">Sender Email</dt>
+                            <dd class="col-sm-8">{{ campaign.sender_email }}</dd>
+                            
+                            <dt class="col-sm-4 text-muted">Subject</dt>
+                            <dd class="col-sm-8">{{ campaign.subject_template }}</dd>
+                            
+                            <dt class="col-sm-4 text-muted">AI Status</dt>
+                            <dd class="col-sm-8">
+                                <span class="badge 
+                                    {% if campaign.ai_status == 'IDLE' %}bg-secondary
+                                    {% elif campaign.ai_status == 'PROCESSING' %}bg-warning text-dark
+                                    {% elif campaign.ai_status == 'COMPLETED' %}bg-success
+                                    {% else %}bg-danger{% endif %}">
+                                    {{ campaign.ai_status }}
+                                </span>
+                            </dd>
+                            
+                            <dt class="col-sm-4 text-muted">Created</dt>
+                            <dd class="col-sm-8">{{ campaign.created_at|date:"M d, Y H:i" }}</dd>
+                        </dl>
+                        
+                        <hr>
+                        <h6 class="text-muted">Message Preview (Raw)</h6>
+                        <div class="bg-light p-3 rounded text-break" style="max-height: 350px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.9em;">{{ campaign.body_template }}</div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <dl class="row mb-0">
-                        <dt class="col-sm-4 text-muted">Sender</dt>
-                        <dd class="col-sm-8">{{ campaign.sender_email }}</dd>
-                        
-                        <dt class="col-sm-4 text-muted">Subject</dt>
-                        <dd class="col-sm-8">{{ campaign.subject_template }}</dd>
-                        
-                        <dt class="col-sm-4 text-muted">Created</dt>
-                        <dd class="col-sm-8">{{ campaign.created_at|date:"M d, Y H:i" }}</dd>
-                    </dl>
-                    
-                    <hr>
-                    <h6 class="text-muted">Message Preview (Raw)</h6>
-                    <div class="bg-light p-3 rounded text-break" style="max-height: 350px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.9em;">{{ campaign.body_template }}</div>
+            </div>
+            
+            <!-- Follow-Ups Card -->
+            <div class="col-md-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Follow-Up Sequence</h5>
+                        <form method="post" action="{% url 'mailer:campaign_toggle_followup' campaign.pk %}" class="m-0">
+                            {% csrf_token %}
+                            {% if campaign.follow_up_enabled %}
+                                <button type="submit" class="btn btn-sm btn-success d-flex align-items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-1"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg> Active
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn btn-sm btn-secondary d-flex align-items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-1"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Disabled
+                                </button>
+                            {% endif %}
+                        </form>
+                    </div>
+                    <div class="card-body">
+                        {% if not campaign.follow_ups.exists %}
+                            <p class="text-muted small mb-3">No follow-ups configured yet. Add steps below to create a drip sequence.</p>
+                        {% else %}
+                            <div class="list-group list-group-flush mb-3">
+                                {% for step in campaign.follow_ups.all %}
+                                    <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <div class="fw-bold">Step {{ step.step_number }}</div>
+                                            <div class="small text-muted">Wait {{ step.delay_days }} day{{ step.delay_days|pluralize }}</div>
+                                        </div>
+                                        <div class="btn-group">
+                                            <a href="{% url 'mailer:campaign_followup_edit' campaign.pk step.pk %}" class="btn btn-sm btn-light py-0">Edit</a>
+                                            <form method="post" action="{% url 'mailer:campaign_followup_delete' campaign.pk step.pk %}" class="m-0" onsubmit="return confirm('Remove Step {{ step.step_number }}?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-light py-0 text-danger">Del</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <a href="{% url 'mailer:campaign_followup_add' campaign.pk %}" class="btn btn-sm btn-outline-primary w-100">+ Add Step</a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -84,12 +146,11 @@
                         <table class="table table-hover table-sm mb-0 align-middle">
                             <thead class="table-light sticky-top">
                                 <tr>
-                                    <th class="ps-3">Email</th>
-                                    <th>Name</th>
-                                    <th>Company</th>
-                                    <th>Status</th>
-                                    <th class="pe-3 text-end">Sent At</th>
-                                    <th></th>
+                                    <th class="ps-3 border-0 bg-light rounded-start">Email</th>
+                                    <th class="border-0 bg-light">Name</th>
+                                    <th class="border-0 bg-light">Company</th>
+                                    <th class="border-0 bg-light">Status</th>
+                                    <th class="text-end pe-3 border-0 bg-light rounded-end">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -97,20 +158,60 @@
                                 <tr>
                                     <td class="ps-3">{{ r.email }}</td>
                                     <td>{{ r.first_name|default:"-" }} {{ r.last_name|default:"" }}</td>
-                                    <td>{{ r.company_name|default:"-" }}</td>
                                     <td>
-                                        <span class="badge 
-                                            {% if r.status == 'PENDING' %}bg-secondary
-                                            {% elif r.status == 'SENT' %}bg-success
-                                            {% else %}bg-danger{% endif %}">
-                                            {{ r.status }}
-                                        </span>
+                                        {{ r.company_name|default:"-" }}
+                                        {% if r.custom_data.is_probation %}
+                                            <span class="badge bg-danger ms-1">Probation</span>
+                                        {% endif %}
+                                        {% if r.custom_data.is_conditional %}
+                                            <span class="badge bg-warning text-dark ms-1">Conditional</span>
+                                        {% endif %}
                                     </td>
-                                    <td class="pe-3 text-end">{{ r.sent_at|date:"M d, H:i"|default:"-" }}</td>
+                                    <td>
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge 
+                                                {% if r.status == 'PENDING' %}bg-secondary
+                                                {% elif r.status == 'SENT' %}bg-success
+                                                {% else %}bg-danger{% endif %} w-auto align-self-start" 
+                                                {% if r.error_message %}title="{{ r.error_message }}"{% endif %}>
+                                                {{ r.status }}
+                                            </span>
+                                            {% if r.sent_at %}
+                                                <small class="text-muted">{{ r.sent_at|date:"M d, H:i" }}</small>
+                                            {% endif %}
+                                            {% if campaign.follow_up_enabled and r.status == 'SENT' %}
+                                                {% if r.follow_up_active %}
+                                                    <span class="badge bg-info align-self-start" title="Follow-ups will be sent to this recipient">Follow-ups Active</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary align-self-start" title="Follow-ups paused for this recipient">Follow-ups Paused</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </td>
                                     <td class="text-end pe-3">
-                                        <a href="{% url 'mailer:recipient_preview' r.pk %}" target="_blank" class="btn btn-sm btn-outline-primary" title="Preview personalized email">
-                                            Preview
-                                        </a>
+                                        <div class="d-flex justify-content-end gap-2">
+                                            {% if campaign.follow_up_enabled and r.status == 'SENT' %}
+                                                <form method="post" action="{% url 'mailer:recipient_toggle_followup' r.pk %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm {% if r.follow_up_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}" title="{% if r.follow_up_active %}Pause Follow-ups{% else %}Resume Follow-ups{% endif %}">
+                                                        {% if r.follow_up_active %}
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        {% else %}
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        {% endif %}
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                            <a href="{% url 'mailer:recipient_preview' r.pk %}" target="_blank" class="btn btn-sm btn-outline-primary" title="Preview personalized email">
+                                                Preview
+                                            </a>
+                                            <form method="post" action="{% url 'mailer:recipient_delete' r.pk %}" onsubmit="return confirm('Are you sure you want to remove this recipient?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove recipient">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% empty %}
