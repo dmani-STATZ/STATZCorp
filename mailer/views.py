@@ -134,3 +134,58 @@ def campaign_schedule(request, pk):
             messages.error(request, f'Campaign is already {campaign.status}.')
             
     return redirect('mailer:campaign_detail', pk=campaign.pk)
+
+@login_required
+def campaign_audience(request, pk):
+    campaign = get_object_or_404(Campaign, pk=pk)
+    if campaign.status not in ['DRAFT', 'FAILED']:
+        messages.error(request, 'Cannot build an audience for a campaign that is already scheduled or sent.')
+        return redirect('mailer:campaign_detail', pk=campaign.pk)
+
+    from .forms import AudienceBuilderForm
+    from .services.audience_builder import build_audience_by_years
+
+    if request.method == 'POST':
+        form = AudienceBuilderForm(request.POST)
+        if form.is_valid():
+            target_years = form.cleaned_data.get('target_years')
+            added_count = build_audience_by_years(campaign, request.active_company, target_years)
+            messages.success(request, f'Successfully built audience! Added {added_count} recipients based on contract history.')
+            return redirect('mailer:campaign_detail', pk=campaign.pk)
+    else:
+        form = AudienceBuilderForm()
+        
+    return render(request, 'mailer/campaign_audience.html', {
+        'form': form,
+        'campaign': campaign
+    })
+
+@login_required
+def recipient_preview(request, pk):
+    recipient = get_object_or_404(CampaignRecipient, pk=pk)
+    campaign = recipient.campaign
+    
+    context = {
+        'first_name': recipient.first_name or '',
+        'last_name': recipient.last_name or '',
+        'company_name': recipient.company_name or '',
+        'email': recipient.email or '',
+        **recipient.custom_data
+    }
+    
+    try:
+        subject = campaign.subject_template.format(**context)
+    except KeyError as e:
+        subject = campaign.subject_template.replace('{' + str(e.args[0]) + '}', '')
+        
+    try:
+        body = campaign.body_template.format(**context)
+    except KeyError as e:
+        body = campaign.body_template.replace('{' + str(e.args[0]) + '}', '')
+        
+    return render(request, 'mailer/recipient_preview.html', {
+        'recipient': recipient,
+        'campaign': campaign,
+        'subject': subject,
+        'body': body,
+    })

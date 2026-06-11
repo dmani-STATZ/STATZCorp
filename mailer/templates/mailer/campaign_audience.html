@@ -1,0 +1,57 @@
+{% extends 'base_template.html' %}
+
+{% block title %}Build Audience - {{ campaign.name }} | STATZ{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex align-items-center">
+                    <a href="{% url 'mailer:campaign_detail' campaign.pk %}" class="btn btn-sm btn-outline-secondary me-3 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                    </a>
+                    <h4 class="mb-0">Build Audience</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>How it works:</strong>
+                        <p class="mb-0">
+                            Select the target years below. The system will find all suppliers who have won at least one contract with <strong>{{ request.active_company.name }}</strong> during those years. It will then automatically calculate the exact number of contracts they won in each year and attach their primary contacts to this campaign.
+                        </p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Target Years</label>
+                            <div class="text-muted small mb-2">{{ form.target_years.help_text }}</div>
+                            <div class="d-flex flex-wrap gap-3">
+                                {% for checkbox in form.target_years %}
+                                    <div class="form-check">
+                                        {{ checkbox.tag }}
+                                        <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                            {{ checkbox.choice_label }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% if form.target_years.errors %}
+                                <div class="text-danger small mt-1">{{ form.target_years.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary py-2 d-flex justify-content-center align-items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                Run Query & Build Audience
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock body %}
