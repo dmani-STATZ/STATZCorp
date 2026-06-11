@@ -34,6 +34,56 @@ This repository is a multi-app Django monolith with app-based ownership but stro
 - UI pattern mix: server-rendered templates with significant inline JS in several apps.
 - Background pattern: no Celery/task queue files; most heavy work is synchronous request-time logic. The **`core`** app houses cross-cutting infrastructure; **`core/management/commands/run_background_tasks.py`** is the WebJob entry (1-minute heartbeat) that reads **`ScheduledTask`** rows and runs due tasks (Azure **`webjobs/background_tasks/`**). Individual task modules live under app-owned packages such as **`sales/tasks/`** (e.g. **`send_queued_rfqs`**) and are imported by that command. **Pattern:** add a new callable in the owning app’s **`tasks/`** package, register it in **`TASK_FUNCTIONS`** in **`run_background_tasks.py`**, and seed a **`ScheduledTask`** row (migration or admin).
 
+### Adding a New Background Task
+
+To register a new background task, three things must be done. All three are required — missing any one of them will cause the task to either be silently skipped or never run.
+
+**1. Create the task function**
+
+The function must live in an app-owned `tasks/` package (e.g. `sales/tasks/`, `mailer/tasks/`, `users/tasks/`). The function must accept no arguments and handle its own exceptions internally if partial failure is acceptable. The management command wraps each call in a top-level try/except, but internal error handling is still encouraged.
+
+Example:
+
+```python
+# cool_stuff/tasks/cool_stuff_dion_does.py
+def run_random_stuff():
+    # do the thing
+```
+
+**2. Register the function in TASK_FUNCTIONS**
+
+Open `core/management/commands/run_background_tasks.py`. Import your function and add it to the `TASK_FUNCTIONS` dict:
+
+```python
+from cool_stuff.tasks.cool_stuff_dion_does import run_random_stuff
+
+TASK_FUNCTIONS = {
+    ...
+    "run_random_stuff": run_random_stuff,
+}
+```
+
+The dict key is the lookup string. It must exactly match the `name` field in the `ScheduledTask` table — case-sensitive. A missing or mismatched key logs a WARNING and skips the task.
+
+**3. Insert a ScheduledTask row**
+
+Add a row to `core.ScheduledTask` via a data migration. Do not insert manually via Django admin — use a migration so the row exists in all environments on deploy.
+
+Required fields:
+
+```
+name            — must match the TASK_FUNCTIONS key exactly
+interval_minutes — how often to run (minimum 1)
+run_order       — next available integer (controls execution
+                  order when multiple tasks are due simultaneously)
+is_enabled      — True
+is_running      — False
+freeze_count    — 0
+last_run_at     — None (null — task will run on first heartbeat)
+```
+
+**No WebJob redeployment is required** when adding a new task. The 1-minute heartbeat picks up new ScheduledTask rows automatically on the next tick.
+
 ## 4. Global Safe-Edit Rules
 - Keep changes scoped to the requested behavior. Do not do opportunistic cleanup in unrelated files.
 - Edit in the owning app first, then update downstream consumers in the same change.
