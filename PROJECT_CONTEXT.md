@@ -210,14 +210,14 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 - Three match tiers: T1 (`dibbs_supplier_nsn_scored` view — indexed `match_count` column, refreshed nightly), T2 (approved sources from `tbl_ApprovedSource`), T3 (FSC match).
 - DIBBS PDFs fetched via Playwright in batches of 10 sessions.
 - `NsnProcurementHistory` keyed on `(nsn, contract_number)` — `save_procurement_history` updates `last_seen_sol`/`extracted_at` only for existing keys; never overwrites price/quantity.
-- Background tasks registered via `core/management/commands/run_background_tasks.py`:
-  1. `send_queued_rfqs` (Task #1): Sends queued RFQs.
-  2. `poll_we_won_today` (Task #2): Daytime we-won award detection.
+- Background tasks registered via `core/management/commands/run_background_tasks.py` and scheduled per-task in `core.ScheduledTask` (`interval_minutes`, `run_order`). The WebJob heartbeat fires every 1 minute (`0 * 11-22 * * *`, 6 AM–5 PM CT window).
+  1. `send_queued_rfqs` (5 min): Sends queued RFQs.
+  2. `poll_we_won_today` (15 min): Daytime we-won award detection.
      - Service: `sales/services/poll_we_won_today.py` (wrapped in `sales/tasks/poll_we_won_today.py`).
      - Activation: Controlled by `WE_WON_POLL_ENABLED=true` environment variable (feature is off by default).
      - Session: Uses `make_www_session()` from `sales/services/dibbs_session.py` (requests-only, no Playwright).
      - Storage & Reconciliation: Inserts batches into `AwardImportBatch` with source `SOURCE_HOT_POLL` (`"hot_poll"`). This batch source is never touched by the nightly `scrape_awards` reconciliation.
-     - Schedule Window: Runs every 15 minutes, between 6 AM and 5 PM CT (inherited from background_tasks WebJob cron schedule `0 */15 11-22 * * *`).
+     - Schedule: Every 15 minutes during the WebJob business-hours window (6 AM–5 PM CT).
      - Backstop: The nightly `scrape_awards` continues unchanged as the full-day backstop for all contractors, and naturally dedupes hot-poll captured awards by award number.
 
 ---
@@ -380,7 +380,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
 | Reminder sidebar context | `contracts/context_processors.py` | All templates extending `contract_base.html` |
 | PO/TAB sequence numbers | `processing.SequenceNumber` | `processing` finalization into `contracts.Contract`; `initialize_sequence_numbers` management command |
 | Field-change audit | `transactions/signals.py` | `contracts.Contract`, `contracts.Clin`, `contracts.ClinShipment` (`pod_date`), `suppliers.Supplier` |
-| Background task registry | `core/management/commands/run_background_tasks.py` | `sales/tasks/`, other app task modules |
+| Background task registry | `core.ScheduledTask` + `core/management/commands/run_background_tasks.py` | `sales/tasks/`, other app task modules |
 | CSS / design system | `static/css/theme-vars.css`, `app-core.css`, `utilities.css` | All templates |
 | Microsoft Graph API token | `users.UserOAuthToken` | `sales` (RFQ mail) |
 
@@ -442,7 +442,7 @@ Finalization is the only write path. Never write `Contract`/`Clin` from processi
 Injected by `users/middleware.py`. Every queryset on company-scoped data must filter by it. `ActiveCompanyQuerysetMixin` handles this on CBVs. Never query company-scoped models without this filter.
 
 ### When adding a new background task
-Add a callable under the owning app's `tasks/` package, then register it in `core/management/commands/run_background_tasks.py`. Do not add ad-hoc management commands for recurring work.
+Add a callable under the owning app's `tasks/` package, register it in `TASK_FUNCTIONS` in `core/management/commands/run_background_tasks.py`, and insert a `ScheduledTask` row (data migration or Django admin) with `name`, `interval_minutes`, and `run_order`. Do not add ad-hoc management commands for recurring work.
 
 ### When adding a field that needs audit history
 Add the field path to `transactions/signals.py` `TRACKED` dict. Never use `QuerySet.update()` on tracked models — it bypasses save signals.

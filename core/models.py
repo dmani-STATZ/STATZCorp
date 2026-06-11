@@ -29,3 +29,24 @@ class APIUsageLog(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+
+
+class ScheduledTask(models.Model):
+    """
+    Registry of background tasks with per-task scheduling metadata.
+    The run_background_tasks management command reads this table on every
+    WebJob heartbeat to determine which tasks are due to run.
+    """
+    name = models.CharField(max_length=100, unique=True)
+    interval_minutes = models.IntegerField()
+    run_order = models.IntegerField(default=0, help_text="Lower numbers run first when multiple tasks are due simultaneously.")
+    last_run_at = models.DateTimeField(null=True, blank=True)
+    is_running = models.BooleanField(default=False)
+    is_enabled = models.BooleanField(default=True)
+    freeze_count = models.IntegerField(default=0, help_text="Incremented each time a stale lock is detected and cleared on this task.")
+
+    class Meta:
+        ordering = ['run_order']
+
+    def __str__(self):
+        return self.name
