@@ -354,6 +354,8 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 
 **Partner reconciliation contract matching:** Partner Commission Reconciliation matching normalizes contract numbers using `normalize_contract_number()` from `dfas_matcher.py` (strips dashes/spaces, uppercases) on both the partner-supplied and STATZ DB sides, consistent with the DFAS matcher's external-contract-number matching pattern.
 
+**Partner reconciliation contract snapshots (2026-06):** `PartnerReconciliationRow` snapshots `contract_status_at_upload` and `contract_date_closed` at upload time (alongside `statz_split_value` / `statz_split_paid`). The detail view hides `MISSING_IN_PARTNER` rows whose contract closed more than ~2 years ago (730-day cutoff, guarded against pre-2000 sentinel dates) unless `?show_settled=1`. Rows on the partner's list that closed more than 2 years ago are flagged via `row.closed_long_ago` for a warning indicator.
+
 ## Recent completions
 
 **Dashboard period boundaries (2026-05-28):** `get_period_boundaries()` in `contracts/views/dashboard_views.py` now calls `timezone.localtime(now)` as its first step so monthly/weekly/quarterly/yearly boundaries use local calendar dates instead of UTC (preventing off-by-one-day bleed at period edges). `_start_end_of_day()` on `DashboardMetricDetailView` now returns plain `date` objects for `DateField` range filters on `award_date` and `due_date` (post migration 0054).

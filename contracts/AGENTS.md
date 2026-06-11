@@ -410,6 +410,7 @@ The reconcile_partner function performs bulk_create — do not call inside
 a loop or request-per-row pattern.
 The upload form on `partner_reconciliation_list.html` displays a processing overlay and disables the submit button with an inline spinner upon valid form submission to prevent double submits.
 Partner Commission Reconciliation matching normalizes contract numbers using `normalize_contract_number()` from `dfas_matcher.py` (strips dashes/spaces, uppercases) on both the partner-supplied and STATZ DB sides, consistent with the DFAS matcher's external-contract-number matching pattern.
+`PartnerReconciliationRow` snapshots `contract_status_at_upload` and `contract_date_closed` at upload time (alongside `statz_split_value` / `statz_split_paid`). The detail view hides `MISSING_IN_PARTNER` rows whose contract closed more than ~2 years ago (730-day cutoff, guarded against pre-2000 sentinel dates) unless `?show_settled=1`. Rows on the partner's list that closed more than 2 years ago are flagged via `row.closed_long_ago` for a warning indicator.
 
 **After any model/migration change:**
 - Run `python manage.py makemigrations --check` to confirm no missing migrations

@@ -2109,6 +2109,8 @@ class PartnerReconciliationRow(models.Model):
         max_digits=19, decimal_places=2, null=True, blank=True,
         help_text="SUM of ClinSplit.split_paid for this partner on this contract"
     )
+    contract_status_at_upload = models.CharField(max_length=100, blank=True, default='')
+    contract_date_closed = models.DateField(null=True, blank=True)
 
     # Reconciliation result
     status = models.CharField(max_length=30, choices=STATUS_CHOICES)

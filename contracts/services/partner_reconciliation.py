@@ -245,6 +245,12 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
 
             processed_contract_numbers.add(lookup_key)
 
+            contract_status_at_upload = (
+                contract_obj.status.description
+                if (contract_obj and contract_obj.status) else ''
+            )
+            contract_date_closed = contract_obj.date_closed if contract_obj else None
+
             rows_to_create.append(PartnerReconciliationRow(
                 reconciliation=reconciliation,
                 contract=contract_obj,
@@ -255,6 +261,8 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
                 partner_tab=raw_row['tab'],
                 statz_split_value=_db_decimal(statz_split_value),
                 statz_split_paid=_db_decimal(statz_split_paid),
+                contract_status_at_upload=contract_status_at_upload,
+                contract_date_closed=contract_date_closed,
                 status=status,
                 amount_variance=_db_decimal(amount_variance),
             ))
@@ -264,6 +272,12 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
             if key not in processed_contract_numbers:
                 db_contract_number = statz_data['clin__contract__contract_number']
                 contract_obj = contracts_by_number.get(key)
+
+                contract_status_at_upload = (
+                    contract_obj.status.description
+                    if (contract_obj and contract_obj.status) else ''
+                )
+                contract_date_closed = contract_obj.date_closed if contract_obj else None
 
                 rows_to_create.append(PartnerReconciliationRow(
                     reconciliation=reconciliation,
@@ -275,6 +289,8 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
                     partner_tab='',
                     statz_split_value=_db_decimal(statz_data['total_split_value']),
                     statz_split_paid=_db_decimal(statz_data['total_split_paid']),
+                    contract_status_at_upload=contract_status_at_upload,
+                    contract_date_closed=contract_date_closed,
                     status=PartnerReconciliationRow.STATUS_MISSING_IN_PARTNER,
                     amount_variance=None,
                 ))

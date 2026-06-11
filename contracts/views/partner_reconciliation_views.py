@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from django.views import View
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, HttpResponseForbidden, Http404
@@ -5,6 +7,9 @@ from django.utils.decorators import method_decorator
 from django.db.models import Count
 from STATZWeb.decorators import conditional_login_required
 from decimal import Decimal
+
+SETTLED_CUTOFF_DAYS = 730            # ~2 years
+MIN_REAL_DATE = date(2000, 1, 1)     # guard against corrupt 0001-01-01 sentinels
 
 from ..models import PartnerReconciliation, PartnerReconciliationRow
 from ..forms import PartnerReconciliationForm
@@ -74,28 +79,63 @@ class PartnerReconciliationDetailView(View):
         )
         
         status_filter = request.GET.get('status', '').strip()
-        rows = reconciliation.rows.all()
-        
+        rows_qs = reconciliation.rows.all()
+
         valid_statuses = [choice[0] for choice in PartnerReconciliationRow.STATUS_CHOICES]
         if status_filter in valid_statuses:
-            rows = rows.filter(status=status_filter)
+            rows_qs = rows_qs.filter(status=status_filter)
         else:
             status_filter = ''
-            
+
+        settled_cutoff = date.today() - timedelta(days=SETTLED_CUTOFF_DAYS)
+        show_settled = request.GET.get('show_settled') == '1'
+
+        rows = list(rows_qs)
+
+        def _closed_long_ago(r):
+            return (
+                r.contract_date_closed is not None
+                and r.contract_date_closed > MIN_REAL_DATE
+                and r.contract_date_closed < settled_cutoff
+            )
+
+        if show_settled:
+            hidden_settled_count = 0
+            displayed_rows = rows
+        else:
+            hidden_settled_count = sum(
+                1 for r in rows
+                if r.status == PartnerReconciliationRow.STATUS_MISSING_IN_PARTNER
+                and _closed_long_ago(r)
+            )
+            displayed_rows = [
+                r for r in rows
+                if not (
+                    r.status == PartnerReconciliationRow.STATUS_MISSING_IN_PARTNER
+                    and _closed_long_ago(r)
+                )
+            ]
+
+        for r in displayed_rows:
+            r.closed_long_ago = _closed_long_ago(r)
+
         # Get status counts
         counts = reconciliation.rows.values('status').annotate(count=Count('id')).order_by()
         status_counts = {choice[0]: 0 for choice in PartnerReconciliationRow.STATUS_CHOICES}
         for item in counts:
             status_counts[item['status']] = item['count']
-            
+
         status_counts['all'] = reconciliation.rows.count()
-        
+
         context = {
             'reconciliation': reconciliation,
-            'rows': rows,
+            'rows': displayed_rows,
             'status_filter': status_filter,
             'status_counts': status_counts,
             'STATUS_CHOICES': PartnerReconciliationRow.STATUS_CHOICES,
+            'show_settled': show_settled,
+            'hidden_settled_count': hidden_settled_count,
+            'settled_cutoff': settled_cutoff,
         }
         return render(request, 'contracts/partner_reconciliation_detail.html', context)
 
