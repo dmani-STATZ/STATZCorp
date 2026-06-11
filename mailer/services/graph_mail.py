@@ -81,6 +81,7 @@ def send_mail_via_graph(
     attachments: list[dict] | None = None,
     cc_addresses: list[str] | None = None,
     sender: str | None = None,
+    is_html: bool = False,
 ) -> bool:
     """
     Send a single email via Microsoft Graph API.
@@ -119,7 +120,7 @@ def send_mail_via_graph(
     message = {
         "subject": subject,
         "body": {
-            "contentType": "Text",
+            "contentType": "HTML" if is_html else "Text",
             "content": body,
         },
         "toRecipients": [

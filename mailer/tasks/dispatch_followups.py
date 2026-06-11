@@ -2,7 +2,8 @@ import logging
 from django.utils.timezone import now
 from datetime import timedelta
 from mailer.models import Campaign
-from mailer.services.graph_mail import send_email_via_graph
+from mailer.services.graph_mail import send_mail_via_graph
+from django.utils.html import linebreaks, urlize
 
 logger = logging.getLogger("mailer.background_tasks")
 
@@ -73,13 +74,16 @@ def dispatch_followups():
                             recipient.save(update_fields=['follow_up_active', 'error_message'])
                             continue
                             
+                        # Convert plain text to HTML (auto-link URLs and linebreaks)
+                        html_body = linebreaks(urlize(final_body))
+                            
                         # Send via Graph
-                        success, error = send_email_via_graph(
-                            sender_address=campaign.sender_email,
-                            recipient_address=recipient.email,
+                        success = send_mail_via_graph(
+                            sender=campaign.sender_email,
+                            to_address=recipient.email,
                             subject=final_subject,
-                            body=final_body,
-                            is_html=True # Keep true if we support HTML body
+                            body=html_body,
+                            is_html=True
                         )
                         
                         if success:
@@ -91,9 +95,9 @@ def dispatch_followups():
                             logger.info(f"Sent follow-up step {next_step.step_number} to {recipient.email}")
                         else:
                             # Don't increment step, but maybe disable follow-up or log error
-                            recipient.error_message = f"Follow-Up {next_step.step_number} failed: {error}"
+                            recipient.error_message = f"Follow-Up {next_step.step_number} failed via Graph API"
                             recipient.save(update_fields=['error_message'])
-                            logger.error(f"Failed to send follow-up step {next_step.step_number} to {recipient.email}: {error}")
+                            logger.error(f"Failed to send follow-up step {next_step.step_number} to {recipient.email}")
                             
                     except Exception as e:
                         logger.exception(f"Unexpected error processing follow-up for {recipient.email}: {e}")

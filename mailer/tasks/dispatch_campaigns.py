@@ -2,6 +2,7 @@ import logging
 from django.utils import timezone
 from mailer.models import Campaign
 from mailer.services.graph_mail import send_mail_via_graph
+from django.utils.html import linebreaks, urlize
 
 logger = logging.getLogger("mailer.background_tasks")
 
@@ -42,13 +43,17 @@ def dispatch_campaigns():
                 body = campaign.body_template.format(**context)
             except KeyError as e:
                 body = campaign.body_template.replace('{' + str(e.args[0]) + '}', '')
+                
+            # Convert plain text to HTML (auto-link URLs and linebreaks)
+            html_body = linebreaks(urlize(body))
 
             # 3. Send email via Graph API
             success = send_mail_via_graph(
                 to_address=recipient.email,
                 subject=subject,
-                body=body,
-                sender=campaign.sender_email
+                body=html_body,
+                sender=campaign.sender_email,
+                is_html=True
             )
             
             # 4. Update recipient status
