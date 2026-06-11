@@ -19,6 +19,7 @@ urlpatterns = [
     path('drafts/<int:pk>/match/', views.match_endpoint, name='match'),
     # Phase 3a: shred draft into canonical contracts.*
     path('drafts/<int:pk>/finalize/', views.finalize_draft_view, name='finalize_draft'),
+    path('drafts/<int:pk>/finalize-direct/', views.finalize_direct_view, name='finalize_direct'),
     # Phase 3c: PDF drag-and-drop ingestion
     path('upload/', views.upload_pdfs, name='upload_pdfs'),
     # SharePoint scan API

@@ -175,7 +175,7 @@ defeat the supplier-matching prefill flow.
 |---|---|
 | `contracts` | `Contract`, `Clin`, `ClinSplit`, `Buyer`, `IdiqContract`, `ContractType`, `SalesClass`, `ClinType`, `SpecialPaymentTerms`, `PaymentHistory`, `ContractStatus`, `ContractPackaging`, `AuditModel`, `Company` |
 | `products` | `Nsn` — FK target for `ProcessClin.nsn` and `QueueClin.matched_nsn` |
-| `suppliers` | `Supplier` — FK target for `ProcessClin.supplier` and `QueueClin.matched_supplier` |
+| `suppliers` | `Supplier` — FK target for `ProcessClin.supplier` and `QueueClin.matched_supplier`. All search querysets on `Supplier` must include `archived=False`. Do not write new supplier lookups without this filter. |
 | `users` / `auth` | `User` — FK for `processed_by`, `created_by`, `modified_by` |
 
 ### Other apps that depend on this app:

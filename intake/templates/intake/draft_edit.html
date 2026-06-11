@@ -624,6 +624,13 @@
                 Mark Ready for Review
             </button>
             <button type="submit"
+                    formaction="{% url 'intake:finalize_direct' draft.pk %}"
+                    class="btn btn-warning"
+                    {% if not lock_held_by_user %}disabled{% endif %}
+                    onclick="return confirm('Save and finalize {{ draft.contract_number }} now? The draft will be deleted on success.')">
+                Save &amp; Finalize
+            </button>
+            <button type="submit"
                     formaction="{% url 'intake:cancel_draft' draft.pk %}"
                     class="btn btn-outline-danger"
                     {% if not lock_held_by_user %}disabled{% endif %}

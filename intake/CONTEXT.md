@@ -75,6 +75,11 @@ incompatible with new code. Validation is a hard requirement.
   transition to `ready_for_review` + release lock
 - `intake:cancel_draft` — `POST /intake/drafts/<pk>/cancel/` — transition to
   `cancelled` + release lock
+- `intake:finalize_draft` — `POST /intake/drafts/<pk>/finalize/` — shred draft
+  (requires lock + status=`ready_for_review`)
+- `intake:finalize_direct` — `POST /intake/drafts/<pk>/finalize-direct/` —
+  save + finalize in one step (lock retained through both phases; bypasses
+  the review queue)
 - `intake:update_draft_company` — `POST /intake/drafts/<pk>/update-company/` — staff/superuser only, updates DraftContract.company
 
 ## Editor
@@ -183,7 +188,10 @@ in the JSON via a `target_path` grammar. Replaces the processing app's five
 per-entity modals with one reusable modal partial + JS module.
 
 Actions:
-- `search` — read-only, no lock required.
+- `search` — read-only, no lock required. Supplier search automatically
+  excludes archived suppliers (`archived=False`). Archived suppliers can
+  still be matched by ID if already stored in a draft's JSON from before
+  archival.
 - `apply` — locks the row, writes `*_text` + `*_id` (+ `*_description` /
   `*_cage` where relevant) under the chosen path, saves through schema
   validation.
@@ -247,6 +255,15 @@ URL: `intake:finalize_draft` → `POST /intake/drafts/<pk>/finalize/`
 redirects to `/processing/email-compose/` with subject + body pre-populated
 (matches the long-standing processing-app email workflow). MOD/AMD skip the
 email step.
+
+**One-step finalization (`finalize_direct`)**
+`finalize_direct_view` combines save + finalization into a single action for
+analysts who are both editor and finalizer. It runs two sequential atomic
+transactions: TX1 saves the form data and transitions status to
+`ready_for_review` WITHOUT releasing the soft lock; TX2 calls
+`finalize_draft`. If TX1 fails (validation), the draft is unchanged. If TX2
+fails, data is saved from TX1 and the standard Finalize button is now
+visible. The existing two-step "Mark Ready → Finalize" flow is unchanged.
 
 ## PDF Ingestion (Phase 3c)
 `intake/ingest.py` wraps `intake/pdf_parser.py` (the intake-owned DLA 1155

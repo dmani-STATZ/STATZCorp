@@ -44,7 +44,7 @@ def match_supplier(request, pk, clin_id):
     supplier_text = request.POST.get('supplier_text', '')
     
     # Search for matching supplier
-    suppliers = Supplier.objects.filter(name__icontains=supplier_text)
+    suppliers = Supplier.objects.filter(name__icontains=supplier_text, archived=False)
     
     if suppliers.exists():
         return JsonResponse({

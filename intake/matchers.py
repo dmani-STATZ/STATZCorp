@@ -92,7 +92,7 @@ def _search_nsn(q: str):
 def _search_supplier(q: str):
     qs = Supplier.objects.filter(
         Q(name__icontains=q) | Q(cage_code__icontains=q)
-    )[:20]
+    ).filter(archived=False)[:20]
     return [
         {
             'id': s.id,

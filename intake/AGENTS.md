@@ -23,6 +23,13 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   the 30-minute window is referenced in admin and queue UI copy.
 
 ### Finalization (Phase 3 — all seven types)
+- **One-step finalization (`finalize_direct`):** `finalize_direct_view` in
+  `views.py` runs two sequential atomic transactions. TX1: parse POST →
+  validate → save → set status=READY_FOR_REVIEW (lock NOT released). TX2:
+  call `finalize_draft`. The lock must be held between TX1 and TX2 — do not
+  release it in TX1. `finalize.py` is NOT modified — the status guard in
+  `finalize_draft` still requires `ready_for_review`. If you change the status
+  guard in `finalize.py`, update `finalize_direct_view` accordingly.
 - The view (`finalize_draft_view`) wraps `finalize.finalize_draft` in
   `transaction.atomic()`. **`finalize.py` itself does not start the
   transaction** — it assumes the caller does. If you call `finalize_draft`
@@ -104,6 +111,12 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
 - **Supplier flag display rule (intake):** Intake is JSON-backed — there are no live Supplier ORM objects in the template. `_editor_context` builds `supplier_flags` (one DB query, `only('id','probation','conditional')`) and passes it to the template. Templates use `supplier_flags|get_item:sid` to look up flags. Apply `.supplier-flag-probation` for probation, `.supplier-flag-conditional` for conditional-only, no class for neither. Only apply when `supplier_id` is non-null. Never query Supplier inside a template — always use the pre-built `supplier_flags` context variable.
 
 ### Matcher changes (Phase 2b/2c)
+- **Archived supplier exclusion:** `_search_supplier` filters
+  `archived=False`. Do not remove this filter. Suppliers that were matched
+  before being archived retain their `supplier_id` in the draft JSON —
+  finalization still resolves them by PK. Do not add archived filtering to
+  `_lookup_supplier` — lookups must succeed even for archived suppliers
+  already stored in a draft.
 - `intake/matchers.py` is the single source of truth for what target_paths
   are valid and which match_type each one accepts. Don't widen path
   grammar without also expanding the test in `MatcherUnitTests` — the

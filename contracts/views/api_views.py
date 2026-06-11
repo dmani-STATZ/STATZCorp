@@ -160,7 +160,7 @@ def get_select_options(request, field_name):
                 })
                 
         elif field_name == 'supplier':
-            queryset = Supplier.objects.all()
+            queryset = Supplier.objects.filter(archived=False)
             prefer_raw = (request.GET.get('prefer_packhouse') or '').strip().lower()
             prefer_packhouse = prefer_raw in ('1', 'true', 'yes', 'on')
             if prefer_packhouse:

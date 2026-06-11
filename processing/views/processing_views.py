@@ -690,7 +690,8 @@ def match_supplier(request, process_clin_id):
             if len(q) < 3:
                 return JsonResponse({'results': []})
             results = Supplier.objects.filter(
-                models.Q(name__icontains=q) | models.Q(cage_code__icontains=q)
+                models.Q(name__icontains=q) | models.Q(cage_code__icontains=q),
+                archived=False,
             )[:20]
             return JsonResponse({
                 'results': [

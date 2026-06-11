@@ -673,6 +673,86 @@ def finalize_draft_view(request, pk: int):
 
 @login_required
 @require_POST
+def finalize_direct_view(request, pk: int):
+    """Save form data and immediately finalize — bypasses the review queue step.
+
+    Two-phase approach:
+    - TX 1: parse POST, validate, save data, set status=ready_for_review
+      (lock is NOT released — the user still holds it through finalization).
+      On validation failure: redirect to editor, draft unchanged.
+    - TX 2: run finalize_draft (requires ready_for_review status).
+      On FinalizationError: redirect to editor — data is saved from TX1 and
+      the standard Finalize button is now visible since status=ready_for_review.
+      On success: delete draft, redirect to email compose (same as finalize_draft_view).
+    """
+    from contracts.models import Contract
+
+    # --- TX 1: save + transition (lock retained) ---
+    with transaction.atomic():
+        draft = get_object_or_404(
+            DraftContract.objects.select_for_update(), pk=pk
+        )
+        try:
+            assert_holds(draft, request.user)
+        except LockError as exc:
+            messages.error(request, str(exc))
+            return redirect('intake:queue')
+
+        new_data = parse_post(request.POST)
+        draft.data = new_data
+        try:
+            draft.save()
+        except DraftDataValidationError as exc:
+            first = exc.errors[0] if exc.errors else {'msg': 'invalid data'}
+            loc = '.'.join(str(p) for p in first.get('loc', ())) or '(root)'
+            messages.error(
+                request,
+                f'Validation failed at {loc}: {first.get("msg")}',
+            )
+            return redirect('intake:edit_draft', pk=pk)
+
+        # Transition to ready_for_review so finalize_draft's status guard passes.
+        # Do NOT release the lock here — the user must keep it through TX2.
+        draft.status = DraftContract.Status.READY_FOR_REVIEW
+        draft.save(update_fields=['status', 'modified_at'])
+
+    # --- TX 2: finalize ---
+    draft_type = None
+    with transaction.atomic():
+        draft = get_object_or_404(
+            DraftContract.objects.select_for_update(), pk=pk
+        )
+        try:
+            assert_holds(draft, request.user)
+        except LockError as exc:
+            messages.error(request, str(exc))
+            return redirect('intake:queue')
+
+        draft_type = draft.get_contract_type_display()
+        try:
+            target = finalize_draft(draft, request.user)
+        except FinalizationError as exc:
+            messages.error(
+                request,
+                f'Finalization blocked: {exc} — your changes have been saved. '
+                f'Fix the issue above and click "Finalize Draft → Contract".',
+            )
+            return redirect('intake:edit_draft', pk=pk)
+
+    messages.success(
+        request,
+        f'Finalized → {type(target).__name__} #{target.pk}.',
+    )
+
+    if isinstance(target, Contract):
+        if draft_type in ('Modification', 'Amendment'):
+            return redirect('intake:queue')
+        return redirect(_build_compose_url(target, draft_type or 'Contract'))
+    return redirect('intake:queue')
+
+
+@login_required
+@require_POST
 def cancel_draft(request, pk: int):
     """Move a draft to CANCELLED + release lock. Doesn't delete the row."""
     with transaction.atomic():
