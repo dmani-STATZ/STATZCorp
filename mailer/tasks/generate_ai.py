@@ -58,7 +58,7 @@ def process_ai_snippets():
                 user_prompt = f"Instruction: {campaign.ai_instruction}\n\nRecipients:\n{json.dumps(recipients_data)}"
                 
                 payload = {
-                    "model": "claude-sonnet-4-20250514",
+                    "model": "claude-sonnet-4-6",
                     "max_tokens": 4096,
                     "system": system_prompt,
                     "messages": [
