@@ -67,7 +67,7 @@
                 {{ form|crispy }}
                 
                 <div class="mt-4 d-flex justify-content-end">
-                    <a href="{% url 'mailer:campaign_detail' campaign.pk %}" class="btn btn-light me-2">Cancel</a>
+                    <a href="{% url 'mailer:campaign_detail' campaign.pk %}" class="btn btn-light me-2" target="_self">Cancel</a>
                     <button type="submit" class="btn btn-primary">Import</button>
                 </div>
             </form>
