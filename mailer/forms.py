@@ -5,27 +5,43 @@ from django.utils.safestring import mark_safe
 import csv
 import io
 
+MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024  # 5MB
+
 class CampaignForm(forms.ModelForm):
     class Meta:
         model = Campaign
-        fields = ['name', 'sender_email', 'subject_template', 'body_template']
+        fields = ['name', 'sender_email', 'subject_template', 'body_template', 'is_html_body']
         widgets = {
             'subject_template': forms.TextInput(attrs={'placeholder': 'Hello {first_name}'}),
-            'body_template': forms.Textarea(attrs={
-                'rows': 10,
-                'placeholder': 'Dear {first_name},\n\nWe noticed you won {won_2023} contracts in 2023. {ai_custom_message}'
-            }),
+            'body_template': forms.HiddenInput(),  # Quill manages this via JS
+            'is_html_body': forms.HiddenInput(),    # Set by JS based on editor mode
         }
         help_texts = {
             'subject_template': 'You can use variables like {first_name}, {last_name}, {company_name}.',
-            'body_template': mark_safe(
-                'Use {first_name}, {last_name}, {company_name} for basic personalization.<br><br>'
-                '<strong>Dynamic Audience Variables:</strong> If you built your audience via a database query, '
-                'you can directly use the calculated stats (e.g., <code>{won_2023}</code>, <code>{won_2024}</code>).<br><br>'
-                '<strong>LLM Personalization:</strong> If you generated AI messages, use <code>{ai_custom_message}</code> '
-                'where you want the custom paragraph to appear.'
-            ),
         }
+
+class CampaignAttachmentForm(forms.Form):
+    file = forms.FileField(
+        help_text="Max 5MB per file. Accepted: PDF, images, Word, Excel."
+    )
+
+    ALLOWED_CONTENT_TYPES = [
+        'application/pdf',
+        'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv',
+    ]
+
+    def clean_file(self):
+        uploaded = self.cleaned_data['file']
+        if uploaded.size > MAX_ATTACHMENT_SIZE:
+            raise ValidationError(
+                f"File is too large ({uploaded.size / (1024*1024):.1f} MB). Maximum allowed is 5 MB."
+            )
+        return uploaded
 
 class CampaignRecipientImportForm(forms.Form):
     csv_file = forms.FileField(
@@ -84,5 +100,5 @@ class CampaignFollowUpForm(forms.ModelForm):
         fields = ['delay_days', 'subject_template', 'body_template']
         widgets = {
             'delay_days': forms.NumberInput(attrs={'min': 1}),
-            'body_template': forms.Textarea(attrs={'rows': 5}),
+            'body_template': forms.HiddenInput(),  # Quill manages this via JS
         }

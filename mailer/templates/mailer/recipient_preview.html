@@ -25,9 +25,39 @@
             </dl>
         </div>
         <div class="card-body p-4" style="min-height: 300px;">
-            <div style="font-family: sans-serif; font-size: 1.05em; line-height: 1.6; color: #333;">{{ body|urlize|linebreaks }}</div>
+            <div style="font-family: sans-serif; font-size: 1.05em; line-height: 1.6; color: #333;">
+                {% if campaign.is_html_body %}
+                    {{ body|safe }}
+                {% else %}
+                    {{ body|urlize|linebreaks }}
+                {% endif %}
+            </div>
         </div>
     </div>
+
+    {% if attachments %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0 text-muted">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="me-1" style="vertical-align: text-bottom;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+                Attachments ({{ attachments.count }})
+            </h6>
+        </div>
+        <div class="card-body">
+            {% for att in attachments %}
+                <div class="d-flex align-items-center {% if not forloop.last %}mb-2{% endif %}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="text-muted me-2 flex-shrink-0">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span class="fw-semibold">{{ att.original_name }}</span>
+                    <span class="text-muted small ms-2">({{ att.file_size_display }})</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
     
     <div class="card shadow-sm border-0">
         <div class="card-header bg-light">

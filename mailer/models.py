@@ -13,6 +13,7 @@ class Campaign(models.Model):
     name = models.CharField(max_length=255)
     subject_template = models.CharField(max_length=255, blank=True, null=True)
     body_template = models.TextField(blank=True, null=True)
+    is_html_body = models.BooleanField(default=True, help_text="When True, body_template contains rich HTML from the editor. When False, plain text with auto-linking.")
     sender_email = models.EmailField(help_text="The email address this campaign is sent from")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
     
@@ -36,6 +37,27 @@ class Campaign(models.Model):
 
     def __str__(self):
         return self.name
+
+class CampaignAttachment(models.Model):
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='campaign_attachments/')
+    original_name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100)
+    file_size = models.PositiveIntegerField(help_text="File size in bytes")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.original_name
+
+    @property
+    def file_size_display(self):
+        """Human-readable file size."""
+        if self.file_size < 1024:
+            return f"{self.file_size} B"
+        elif self.file_size < 1024 * 1024:
+            return f"{self.file_size / 1024:.1f} KB"
+        else:
+            return f"{self.file_size / (1024 * 1024):.1f} MB"
 
 class CampaignFollowUp(models.Model):
     campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='follow_ups')

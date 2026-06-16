@@ -74,10 +74,15 @@ def dispatch_followups():
                             recipient.save(update_fields=['follow_up_active', 'error_message'])
                             continue
                             
-                        # Convert plain text to HTML (auto-link URLs and linebreaks)
-                        html_body = linebreaks(urlize(final_body))
+                        # Convert to HTML if needed
+                        if campaign.is_html_body:
+                            # Body is already HTML from Quill editor
+                            html_body = final_body
+                        else:
+                            # Legacy plain text — auto-link URLs and convert linebreaks
+                            html_body = linebreaks(urlize(final_body))
                             
-                        # Send via Graph
+                        # Send via Graph (no attachments on follow-ups)
                         success = send_mail_via_graph(
                             sender=campaign.sender_email,
                             to_address=recipient.email,

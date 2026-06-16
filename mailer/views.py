@@ -6,9 +6,10 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 import csv
 import io
+import mimetypes
 
-from .models import Campaign, CampaignRecipient, CampaignFollowUp
-from .forms import CampaignForm, CampaignRecipientImportForm, CampaignAIGenerateForm, CampaignFollowUpForm
+from .models import Campaign, CampaignRecipient, CampaignFollowUp, CampaignAttachment
+from .forms import CampaignForm, CampaignRecipientImportForm, CampaignAIGenerateForm, CampaignFollowUpForm, CampaignAttachmentForm
 from suppliers.models import Contact
 
 @login_required
@@ -51,9 +52,13 @@ def campaign_edit(request, pk):
 def campaign_detail(request, pk):
     campaign = get_object_or_404(Campaign, pk=pk)
     recipients = campaign.recipients.all().order_by('-id')
+    attachments = campaign.attachments.all().order_by('uploaded_at')
+    attachment_form = CampaignAttachmentForm()
     return render(request, 'mailer/campaign_detail.html', {
         'campaign': campaign,
         'recipients': recipients,
+        'attachments': attachments,
+        'attachment_form': attachment_form,
     })
 
 @login_required
@@ -193,11 +198,13 @@ def recipient_preview(request, pk):
     except KeyError as e:
         body = campaign.body_template.replace('{' + str(e.args[0]) + '}', '')
         
+    attachments = campaign.attachments.all()
     return render(request, 'mailer/recipient_preview.html', {
         'recipient': recipient,
         'campaign': campaign,
         'subject': subject,
         'body': body,
+        'attachments': attachments,
     })
 
 @login_required
@@ -308,3 +315,45 @@ def campaign_followup_delete(request, pk, followup_pk):
             
     messages.success(request, f"Follow-Up Step {step_num} deleted.")
     return redirect('mailer:campaign_detail', pk=campaign.pk)
+
+@login_required
+@require_POST
+def campaign_attachment_add(request, pk):
+    campaign = get_object_or_404(Campaign, pk=pk)
+    if campaign.status not in ['DRAFT', 'FAILED']:
+        messages.error(request, 'Cannot add attachments to a campaign that is already scheduled or sent.')
+        return redirect('mailer:campaign_detail', pk=campaign.pk)
+
+    form = CampaignAttachmentForm(request.POST, request.FILES)
+    if form.is_valid():
+        uploaded = form.cleaned_data['file']
+        mime_type, _ = mimetypes.guess_type(uploaded.name)
+        if not mime_type:
+            mime_type = 'application/octet-stream'
+
+        CampaignAttachment.objects.create(
+            campaign=campaign,
+            file=uploaded,
+            original_name=uploaded.name,
+            content_type=mime_type,
+            file_size=uploaded.size,
+        )
+        messages.success(request, f'Attached "{uploaded.name}" ({uploaded.size / (1024*1024):.1f} MB).')
+    else:
+        for error in form.errors.get('file', []):
+            messages.error(request, error)
+
+    return redirect('mailer:campaign_detail', pk=campaign.pk)
+
+@login_required
+@require_POST
+def campaign_attachment_delete(request, pk):
+    attachment = get_object_or_404(CampaignAttachment, pk=pk)
+    campaign_pk = attachment.campaign.pk
+    name = attachment.original_name
+    # Delete the physical file from storage
+    if attachment.file:
+        attachment.file.delete(save=False)
+    attachment.delete()
+    messages.success(request, f'Removed attachment "{name}".')
+    return redirect('mailer:campaign_detail', pk=campaign_pk)

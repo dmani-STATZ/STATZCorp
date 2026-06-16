@@ -21,4 +21,8 @@ urlpatterns = [
     path('<int:pk>/followups/add/', views.campaign_followup_add, name='campaign_followup_add'),
     path('<int:pk>/followups/<int:followup_pk>/edit/', views.campaign_followup_edit, name='campaign_followup_edit'),
     path('<int:pk>/followups/<int:followup_pk>/delete/', views.campaign_followup_delete, name='campaign_followup_delete'),
+
+    # Attachments
+    path('<int:pk>/attachments/add/', views.campaign_attachment_add, name='campaign_attachment_add'),
+    path('attachment/<int:pk>/delete/', views.campaign_attachment_delete, name='campaign_attachment_delete'),
 ]

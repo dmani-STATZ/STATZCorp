@@ -19,10 +19,23 @@ def dispatch_campaigns():
             campaign.save(update_fields=['status'])
             logger.info(f"Started sending campaign '{campaign.name}'")
 
+        # Pre-load attachments once for the campaign (initial email only)
+        attachment_list = []
+        for att in campaign.attachments.all():
+            try:
+                att.file.open('rb')
+                file_bytes = att.file.read()
+                att.file.close()
+                attachment_list.append({
+                    'name': att.original_name,
+                    'content_type': att.content_type,
+                    'data': file_bytes,
+                })
+            except Exception as e:
+                logger.error(f"Failed to read attachment '{att.original_name}' for campaign '{campaign.name}': {e}")
+
         pending_recipients = campaign.recipients.filter(status='PENDING')
         
-        # In a real heavy-duty environment, we'd chunk this.
-        # But this is a basic implementation for V1.
         for recipient in pending_recipients:
             # 1. Build context for formatting
             context = {
@@ -44,19 +57,25 @@ def dispatch_campaigns():
             except KeyError as e:
                 body = campaign.body_template.replace('{' + str(e.args[0]) + '}', '')
                 
-            # Convert plain text to HTML (auto-link URLs and linebreaks)
-            html_body = linebreaks(urlize(body))
+            # 3. Convert to HTML if needed
+            if campaign.is_html_body:
+                # Body is already HTML from Quill editor — send as-is
+                html_body = body
+            else:
+                # Legacy plain text — auto-link URLs and convert linebreaks
+                html_body = linebreaks(urlize(body))
 
-            # 3. Send email via Graph API
+            # 4. Send email via Graph API
             success = send_mail_via_graph(
                 to_address=recipient.email,
                 subject=subject,
                 body=html_body,
                 sender=campaign.sender_email,
-                is_html=True
+                is_html=True,
+                attachments=attachment_list if attachment_list else None,
             )
             
-            # 4. Update recipient status
+            # 5. Update recipient status
             if success:
                 recipient.status = 'SENT'
                 recipient.sent_at = timezone.now()
