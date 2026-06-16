@@ -9,6 +9,84 @@
         {% endif %}
     </div>
 
+    <style>
+    .portal-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid transparent;
+      color: inherit;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: background-color 0.15s, border-color 0.15s;
+      margin-bottom: 0.25rem;
+    }
+    .portal-nav-item:hover {
+      background-color: rgba(0,0,0,0.05);
+      color: inherit;
+      text-decoration: none;
+    }
+    .portal-nav-item.active {
+      background-color: rgba(var(--company-primary-rgb, 0,0,0), 0.08);
+      border-color: var(--company-primary, #0d6efd);
+      color: var(--company-primary, #0d6efd);
+    }
+    @keyframes dibbs-glow {
+      0%, 100% { box-shadow: 0 0 4px 2px rgba(245, 158, 11, 0.25); }
+      50%       { box-shadow: 0 0 14px 5px rgba(245, 158, 11, 0.70); }
+    }
+    .dibbs-notice-glow {
+      animation: dibbs-glow 2.2s ease-in-out infinite;
+      border-color: #f59e0b !important;
+      color: #92400e !important;
+      background-color: rgba(245, 158, 11, 0.08) !important;
+    }
+    #portal-sidebar {
+      position: sticky;
+      top: calc(var(--header-height, 60px) + 1rem);
+      z-index: 10;
+    }
+    @media (min-width: 768px) {
+      #portal-sidebar {
+        width: 180px;
+      }
+    }
+    @media (max-width: 767.98px) {
+      .portal-nav-item {
+        margin-bottom: 0;
+        white-space: nowrap;
+      }
+    }
+    </style>
+
+    <div class="d-flex flex-column flex-md-row gap-3" id="portal-layout">
+      <!-- Left: Sidebar -->
+      <div id="portal-sidebar" class="align-self-md-start flex-shrink-0">
+        <nav id="portal-sidebar-nav" aria-label="Page sections" class="d-flex flex-row flex-md-column overflow-auto gap-2 pb-2 pb-md-0">
+          <a href="#section-resources"   id="sidebar-resources"     class="portal-nav-item">
+            <span class="nav-icon">📁</span> Resources
+          </a>
+          <a href="#section-calendar"    id="sidebar-calendar"      class="portal-nav-item">
+            <span class="nav-icon">📅</span> Calendar
+          </a>
+          <a href="#section-announcements" id="sidebar-announcements" class="portal-nav-item">
+            <span class="nav-icon">📢</span> Announcements
+          </a>
+          <a href="#section-dibbs-notices" id="sidebar-dibbs-notices" class="portal-nav-item">
+            <span class="nav-icon">🛡️</span> DIBBS Notices
+            <span id="dibbs-notice-badge" class="badge bg-warning text-dark ms-1 d-none">0</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Right: Main content (existing + new section) -->
+      <div id="portal-main" class="flex-grow-1 min-width-0">
+
+      <div id="section-resources">
+
     <div class="mb-4 flex justify-between items-center">
         <h2 class="text-xl font-medium text-gray-800">Resources</h2>
         <div class="flex items-center gap-2">
@@ -101,9 +179,10 @@
         </div>
         {% endfor %}
     </div>
+    </div> <!-- END section-resources -->
 
     <!-- Calendar Section -->
-    <div class="mt-8 p-4 border rounded-lg">
+    <div class="mt-8 p-4 border rounded-lg" id="section-calendar">
         <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-3">
                 <h2 class="text-xl font-medium text-gray-800 cursor-pointer select-none" onclick="toggleCalendarMenu()">Calendar</h2>
@@ -283,7 +362,7 @@
     </div>
 
     <!-- Announcements Section -->
-    <div class="mt-8 p-4 border rounded-lg">
+    <div class="mt-8 p-4 border rounded-lg" id="section-announcements">
         <h2 class="text-xl font-medium mb-4 text-gray-800">Recent Announcements</h2>
         <div class="space-y-4 ">
             {% for announcement in announcements %}
@@ -308,6 +387,28 @@
         </button>
         {% endif %}
     </div>
+
+    <div id="section-dibbs-notices" class="mt-4 p-4 border rounded-lg">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span>🛡️</span>
+        <h2 class="h5 mb-0">DIBBS Notices</h2>
+        <a href="https://www.dibbs.bsm.dla.mil"
+           target="_blank" rel="noopener noreferrer"
+           class="ms-auto small text-muted text-decoration-none">
+          dibbs.bsm.dla.mil ↗
+        </a>
+      </div>
+      <p class="small text-muted mb-3">
+        Public notices from DLA — cybersecurity updates, CMMC requirements,
+        and procurement policy changes. Updated daily.
+      </p>
+      <div id="dibbs-notices-list">
+        <p class="small text-muted fst-italic">Loading notices…</p>
+      </div>
+    </div>
+
+      </div> <!-- End #portal-main -->
+    </div> <!-- End #portal-layout -->
 
 </div>
 {% endblock body %}
@@ -1361,6 +1462,91 @@
         closeEventDetails();
         openAddEventModal(payload);
     }
+
+async function loadDibbsNotices() {
+  const container = document.getElementById('dibbs-notices-list');
+  const badge     = document.getElementById('dibbs-notice-badge');
+  const sidebarItem = document.getElementById('sidebar-dibbs-notices');
+  if (!container) return;
+
+  try {
+    const resp = await fetch('/sales/dibbs-notices/api/');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    // Badge + glow
+    if (data.recent_count > 0) {
+      badge.textContent = data.recent_count;
+      badge.classList.remove('d-none');
+      sidebarItem?.classList.add('dibbs-notice-glow');
+    }
+
+    // Render list
+    if (!data.notices || data.notices.length === 0) {
+      container.innerHTML =
+        '<p class="small text-muted">No notices found.</p>';
+      return;
+    }
+
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    const rows = data.notices.map(n => {
+      const isRecent = new Date(n.posted_date).getTime() >= cutoff;
+      const newBadge = isRecent
+        ? '<span class="badge bg-warning text-dark me-2 flex-shrink-0">NEW</span>'
+        : '<span class="me-2 flex-shrink-0" style="width:40px"></span>';
+      return `
+        <div class="d-flex align-items-start py-2 border-bottom">
+          ${newBadge}
+          <a href="${n.external_url}"
+             target="_blank" rel="noopener noreferrer"
+             class="small text-decoration-none flex-grow-1">
+            ${n.title}
+          </a>
+          <span class="small text-muted ms-3 flex-shrink-0">
+            ${n.posted_date}
+          </span>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = rows;
+
+  } catch (e) {
+    container.innerHTML =
+      '<p class="small text-danger">Could not load DIBBS notices.</p>';
+    console.warn('DIBBS notices load failed:', e);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadDibbsNotices);
+
+(function initSidebarObserver() {
+  const map = {
+    'section-resources':      'sidebar-resources',
+    'section-calendar':       'sidebar-calendar',
+    'section-announcements':  'sidebar-announcements',
+    'section-dibbs-notices':  'sidebar-dibbs-notices',
+  };
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      const sidebarId = map[entry.target.id];
+      const sidebarEl = document.getElementById(sidebarId);
+      if (!sidebarEl) return;
+      // Don't remove 'active' from DIBBS item if glow is active — let glow win
+      if (entry.target.id === 'section-dibbs-notices' &&
+          sidebarEl.classList.contains('dibbs-notice-glow')) return;
+      sidebarEl.classList.toggle('active', entry.isIntersecting);
+    });
+  }, { threshold: 0.2, rootMargin: '-80px 0px -60% 0px' });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    Object.keys(map).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+  });
+})();
 </script>
 
 <!-- Modal Template -->

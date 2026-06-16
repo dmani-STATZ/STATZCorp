@@ -195,7 +195,7 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 ### `sales` — DIBBS Procurement Workflow
 **Purpose:** Solicitation triage → RFQ dispatch → quote capture → BQ export; DIBBS award file imports; Tier 1–3 supplier matching; saved filter presets.
 
-**Owns:** `Solicitation`, `SolicitationLine`, `SupplierRFQ`, `GovernmentBid`, `DibbsAward`, `NsnProcurementHistory`, `SavedFilter`, `MassPassLog`, `SolPackaging`, `SAMEntityCache`
+**Owns:** `Solicitation`, `SolicitationLine`, `SupplierRFQ`, `GovernmentBid`, `DibbsAward`, `DibbsNotice`, `NsnProcurementHistory`, `SavedFilter`, `MassPassLog`, `SolPackaging`, `SAMEntityCache`
 
 **Consumes from other apps:**
 - `suppliers.Supplier` — RFQ targets, quotes
@@ -205,6 +205,8 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 **Other apps consume from it:** Nothing — terminal system
 
 **URL prefix:** `/sales/`
+
+**URL surface (portal):** `/sales/dibbs-notices/api/` — JSON feed of DIBBS public notices for the portal home page; returns up to 30 notices and a `recent_count` of notices posted within the last 7 days.
 
 **Critical notes:**
 - Three match tiers: T1 (`dibbs_supplier_nsn_scored` view — indexed `match_count` column, refreshed nightly), T2 (approved sources from `tbl_ApprovedSource`), T3 (FSC match).
@@ -219,6 +221,8 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
      - Storage & Reconciliation: Inserts batches into `AwardImportBatch` with source `SOURCE_HOT_POLL` (`"hot_poll"`). This batch source is never touched by the nightly `scrape_awards` reconciliation.
      - Schedule: Every 15 minutes during the WebJob business-hours window (6 AM–5 PM CT).
      - Backstop: The nightly `scrape_awards` continues unchanged as the full-day backstop for all contractors, and naturally dedupes hot-poll captured awards by award number.
+  3. `check_dibbs_notices` (1440 min / daily): Scrapes `www.dibbs.bsm.dla.mil` homepage for public DIBBS Notices using `make_www_session()` (requests only — no Playwright). Upserts new rows into `DibbsNotice` via `get_or_create` on `(title, posted_date)`; never overwrites existing rows.
+- `DibbsNotice` rows are keyed on `(title, posted_date)`. Use `get_or_create` only. `external_url` is resolved to absolute URL at scrape time and stored; never re-updated. Do not use Playwright for notice scraping — `make_www_session()` is sufficient.
 
 ---
 

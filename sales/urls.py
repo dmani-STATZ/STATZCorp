@@ -109,6 +109,7 @@ from .views import (
     no_quote_deactivate,
     entity_lookup,
     entity_no_quote_add,
+    dibbs_notices_api,
 )
 from .views import awards
 
@@ -284,4 +285,5 @@ urlpatterns = [
     # SAM.gov entity lookup + No Quote add (POST)
     path("entity/cage/<str:cage_code>/no-quote/add/", entity_no_quote_add, name="entity_no_quote_add"),
     path("entity/cage/<str:cage_code>/", entity_lookup, name="entity_cage_lookup"),
+    path("dibbs-notices/api/", dibbs_notices_api, name="dibbs_notices_api"),
 ]

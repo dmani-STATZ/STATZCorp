@@ -11,7 +11,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Owns:** The entire DIBBS bidding lifecycle — file import, solicitation triage, supplier matching, RFQ dispatch, quote entry, government bid assembly, BQ file export, and DIBBS AW file award import (`DibbsAward`).
 
-**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, **`ApprovedSource`** (table **`tbl_ApprovedSource`** — legacy name predating `dibbs_*`), `SupplierNSN`, **`SupplierNSNScored`** (unmanaged; SQL view `dibbs_supplier_nsn_scored` for tier-1 live scores), `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `AwardImportBatch`, `NoQuoteCAGE`, `InboxMessage`, `InboxMessageRFQLink`, **`SavedFilter`** (`dibbs_saved_filter` — list-view filter presets; system rows seeded by data migration, not deletable via UI).
+**Owns operationally:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, **`ApprovedSource`** (table **`tbl_ApprovedSource`** — legacy name predating `dibbs_*`), `SupplierNSN`, **`SupplierNSNScored`** (unmanaged; SQL view `dibbs_supplier_nsn_scored` for tier-1 live scores), `SupplierFSC`, `SupplierMatch`, `SupplierRFQ`, `SupplierContactLog`, `SupplierQuote`, `GovernmentBid`, `CompanyCAGE`, `EmailTemplate`, `DibbsAward`, `DibbsNotice`, `AwardImportBatch`, `NoQuoteCAGE`, `InboxMessage`, `InboxMessageRFQLink`, **`SavedFilter`** (`dibbs_saved_filter` — list-view filter presets; system rows seeded by data migration, not deletable via UI).
 
 **Does not own:** `suppliers.Supplier` — this is the central supplier record from the `suppliers` app. Every FK to a supplier crosses app boundaries.
 
@@ -264,6 +264,10 @@ Each step updates `ImportJob.status` and `ImportJob.step_results`. The progress 
 **Awards grid parsing note:** DIBBS appends a small `»` + package-view link in table cells. `parse_awards_table` uses uniform `get_text(separator=" ", strip=True)` per cell; `normalize_award_record_for_importer` strips `»` and trailing link text with `re.sub(r"\s*».*$", "", v)`. Do not reintroduce per-column anchor surgery.
 
 **`awards_file_importer.py`** exposes `import_aw_file()` (file upload) and `import_aw_records()` (scraper, called once per date after the browser closes). Both stage rows and call `usp_process_award_staging`; business logic lives in SQL Server. Win detection for display and reporting uses the `WeWonAward` SQL view (`dibbs_we_won_awards`), not the `DibbsAward.we_won` column at import time.
+
+**`check_dibbs_notices`** (1440 min / daily, run_order 7): Scrapes `www.dibbs.bsm.dla.mil` homepage for public DIBBS Notices using `make_www_session()` (requests only — no Playwright). Upserts new rows into `DibbsNotice` using `get_or_create` keyed on `(title, posted_date)`. Never overwrites existing rows.
+
+**DIBBS notice ingestion:** `DibbsNotice` rows are keyed on `(title, posted_date)`. Use `get_or_create` only. `external_url` is resolved to absolute URL at scrape time and stored; never re-updated. Do not use Playwright for notice scraping — `make_www_session()` is sufficient.
 
 **DIBBS fetch** (`import_fetch_dibbs`) requires Playwright + Chromium. If not installed, it will raise `DibbsFetchError`. The awards scraper has the same Playwright dependency.
 

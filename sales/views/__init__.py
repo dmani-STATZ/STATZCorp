@@ -116,6 +116,7 @@ from sales.views.settings import (
     no_quote_deactivate,
 )
 from sales.views.entity_lookup import entity_lookup, entity_no_quote_add
+from sales.views.dibbs_notices import dibbs_notices_api
 from sales.views.awards_wins import awards_wins
 
 __all__ = [
@@ -222,5 +223,6 @@ __all__ = [
     "no_quote_deactivate",
     "entity_lookup",
     "entity_no_quote_add",
+    "dibbs_notices_api",
     "awards_wins",
 ]
