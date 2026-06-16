@@ -69,10 +69,12 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
 - Templates intentionally mirror `processing/` visually so analysts learning
   the new system see familiar UI. Don't introduce styling primitives that
   diverge from the processing app without a deliberate reason.
-- The queue is a worklist, NOT a report. Resist requests to add award date,
-  contract value, or buyer columns — those belong on the draft detail page.
-  The queue answers "what's waiting and what do I do with it?" and nothing
-  more.
+- The queue is a worklist. The award date column is intentional and
+  approved (added 2026-06). Adding contract value or buyer columns is
+  still out of scope — those belong on the draft detail page. The pipeline
+  column (PDF → SP Folder → In Progress → Ready) replaces the old
+  Status + PDF + SP Folder columns and is the canonical way to show draft
+  readiness on the queue.
 
 ### Coupling
 - `intake` reads `contracts.Contract` for the "Already in DB" badge.

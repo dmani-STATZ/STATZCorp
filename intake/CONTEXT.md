@@ -293,6 +293,14 @@ outcomes.
 UI: drag-and-drop zone on the queue page (`draft_queue.html`) that hits
 the upload endpoint and reloads the queue on any success.
 
+**Queue layout (2026-06):** Column order is now Company | Type |
+Contract Number | Award Date | Pipeline | Actions. The Pipeline column
+consolidates Status, PDF parse status, and SharePoint folder status into
+four progressive nodes (PDF → SP Folder → In Progress → Ready). The PDF
+node is clickable: DIBBS drafts trigger `fetchDibbsPdf`; manual drafts
+scroll to the upload drop zone. The SP Folder node is clickable to
+trigger a per-row SP rescan. The Docs button is now icon-only.
+
 ## What's Built (Phase 1 + 2a + 2b + 3a + 3c PDF)
 - Company on DraftContract is now propagated through finalization — finalized Contract and IdiqContract rows receive the company from the DraftContract via the shared creation service payload.
 - `DraftContract` model + migrations
@@ -334,13 +342,13 @@ drafts with `company=None`). DIBBS injection resolves company via
 
 SharePoint scan API — POST /intake/api/scan-sharepoint/ (`intake:scan_sharepoint_drafts`). Accepts `draft_id` or `all=true`. Probes SharePoint and updates `sharepoint_folder_status` + `data['sharepoint_folder_path']` on each draft. Company-scoped: non-superusers only see their companies' drafts.
 
-Queue SP column — Draft queue table shows SP folder status badge per row with per-row rescan icon and bulk "Scan SP" toolbar button.
+Queue pipeline column — Draft queue table shows a four-node Pipeline column (PDF → SP Folder → In Progress → Ready) with clickable PDF and SP nodes, plus bulk "Scan SP" toolbar button.
 
 Company column — Draft queue table shows company badge per row.
 
 PDF upload creates folder — `upload_pdfs` calls `create_draft_sharepoint_folder` after successful ingestion. Non-blocking.
 
-- Draft documents browser — `contracts:intake_draft_documents_browser` at `/contracts/documents/draft/?draft_id=N`. Opens the shared documents browser popup in draft mode. Save Path writes to `draft.data['sharepoint_folder_path']` via `contracts:set_draft_file_path_api`. "Docs" button appears on each queue row. At finalization, `sharepoint_folder_path` is carried through to `Contract.files_url` (or `IdiqContract.files_url`) automatically.
+- Draft documents browser — `contracts:intake_draft_documents_browser` at `/contracts/documents/draft/?draft_id=N`. Opens the shared documents browser popup in draft mode. Save Path writes to `draft.data['sharepoint_folder_path']` via `contracts:set_draft_file_path_api`. Icon-only Docs button on each queue row. At finalization, `sharepoint_folder_path` is carried through to `Contract.files_url` (or `IdiqContract.files_url`) automatically.
 - **DIBBS PDF Fetch** — `fetch_and_apply_dibbs_pdf` service + `fetch_dibbs_pdf` view. `DraftContract.is_dibbs_draft` property. Downloads award PDF from DIBBS via predictable URL pattern (`Downloads/Awards/{DDMONYY}/{contract_number}.PDF`), parses with intake parser, merges into draft, uploads to SharePoint. URL stored at injection time in `data['award_pdf_url']`; `DibbsAward` ORM fallback for older skeletons.
 
 ## Not Yet Built (explicitly out of scope)
