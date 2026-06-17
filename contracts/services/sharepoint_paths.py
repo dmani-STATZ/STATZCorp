@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict
+from urllib.parse import quote
 
 from django.conf import settings
 
@@ -208,3 +209,19 @@ def resolve_idiq_folder_path(idiq) -> Dict[str, Any]:
 def get_idiq_root_fallback_path(idiq=None) -> str:
     """Return the SharePoint root folder used when an IDIQ path 404s."""
     return get_sharepoint_prefix() + "/"
+
+
+def build_explorer_uri(drive_relative_path: str) -> str:
+    """Map a SharePoint drive-relative folder path to a statzfile:// URI that
+    the desktop handler resolves under %USERPROFILE%. Returns '' when the path
+    cannot be mapped (legacy/unknown root) so callers can hide the action."""
+    if not drive_relative_path:
+        return ''
+    path = drive_relative_path.strip().strip('/').replace('\\', '/')
+    strip = settings.EXPLORER_SHAREPOINT_STRIP_PREFIX.strip('/')
+    if not (path == strip or path.startswith(strip + '/')):
+        return ''
+    tail = path[len(strip):].lstrip('/')
+    mount = settings.EXPLORER_LOCAL_MOUNT.strip('/').replace('\\', '/')
+    local_rel = f'{mount}/{tail}'.rstrip('/')
+    return 'statzfile:///' + quote(local_rel, safe='/')

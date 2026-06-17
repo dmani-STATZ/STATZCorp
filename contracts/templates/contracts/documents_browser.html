@@ -605,6 +605,7 @@
         const ENTITY_ID = IS_DRAFT ? DRAFT_ID : {{ contract_id|default:"null" }};
         let currentContractId = ENTITY_ID;
         let currentFolderPath = "{{ initial_folder_path|default:''|escapejs }}";
+        let currentExplorerUri = '';
         let currentFiles = [];
         let currentFolders = [];
         let legacyPathDetected = false;
@@ -702,6 +703,7 @@
                     if (!currentFolderPath) {
                         currentFolderPath = data.default_folder_path || '';
                     }
+                    currentExplorerUri = data.current_explorer_uri || '';
                     legacyPathDetected = !!data.legacy_detected;
                     loadFolderContents();
                 })
@@ -756,6 +758,7 @@
                     currentFiles = data.files || [];
                     currentFolders = data.folders || [];
                     currentFolderPath = data.currentPath || currentFolderPath;
+                    currentExplorerUri = data.current_explorer_uri || currentExplorerUri;
 
                     selectedItems.clear();
                     const selectAllOnLoad = document.getElementById('select-all-checkbox');
@@ -809,6 +812,7 @@
             checkbox.dataset.name = item.name || '';
             checkbox.dataset.type = isFolder ? 'folder' : 'file';
             checkbox.dataset.weburl = isFolder ? (item.webUrl || '') : (item.downloadUrl || '');
+            checkbox.dataset.exploreruri = isFolder ? (item.explorer_uri || '') : '';
             checkbox.checked = selectedItems.has(item.id || '');
             checkbox.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -847,7 +851,8 @@
                 id: cb.dataset.id,
                 name: cb.dataset.name,
                 type: cb.dataset.type,
-                webUrl: cb.dataset.weburl || ''
+                webUrl: cb.dataset.weburl || '',
+                explorer_uri: cb.dataset.exploreruri || ''
             };
             if (cb.checked) {
                 selectedItems.set(item.id, item);
@@ -875,7 +880,8 @@
                         id: cb.dataset.id,
                         name: cb.dataset.name,
                         type: cb.dataset.type,
-                        webUrl: cb.dataset.weburl || ''
+                        webUrl: cb.dataset.weburl || '',
+                        explorer_uri: cb.dataset.exploreruri || ''
                     });
                 });
             } else {
@@ -910,13 +916,17 @@
             return folders.length === 1 ? folders[0] : null;
         }
 
-        function makeDropdownItem(label, onclick, isDanger) {
+        function makeDropdownItem(label, onclick, isDanger, iconHtml) {
             const li = document.createElement('li');
             const a = document.createElement('a');
             a.className = 'dropdown-item' + (isDanger ? ' text-danger' : '');
             a.href = '#';
             a.setAttribute('onclick', onclick);
-            a.textContent = label;
+            if (iconHtml) {
+                a.innerHTML = iconHtml + label;
+            } else {
+                a.textContent = label;
+            }
             li.appendChild(a);
             return li;
         }
@@ -945,6 +955,11 @@
                 ? 'openSelectedFolderInSharePoint(); return false;'
                 : 'openCurrentFolderInSharePoint(); return false;';
             menu.appendChild(makeDropdownItem(openLabel, openOnclick));
+
+            if (currentExplorerUri) {
+                const explorerIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-2px;margin-right:4px;"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v.64c.57.265.94.876.856 1.546l-.64 5.124A2.5 2.5 0 0 1 12.733 15H3.266a2.5 2.5 0 0 1-2.481-2.19l-.64-5.124A1.5 1.5 0 0 1 1 6.14V3.5zM2 6h12v-.5a.5.5 0 0 0-.5-.5H9c-.964 0-1.71-.629-2.174-1.154C6.374 3.334 5.82 3 5.264 3H2.5a.5.5 0 0 0-.5.5V6zm-.367 1a.5.5 0 0 0-.496.562l.64 5.124A1.5 1.5 0 0 0 3.266 14h9.468a1.5 1.5 0 0 0 1.489-1.314l.64-5.124A.5.5 0 0 0 14.367 7H1.633z"/></svg>';
+                menu.appendChild(makeDropdownItem('Open in Explorer', 'openCurrentFolderInExplorer(); return false;', false, explorerIcon));
+            }
 
             const files = [...selectedItems.values()].filter(function(i) { return i.type === 'file'; });
             if (files.length > 0) {
@@ -994,6 +1009,46 @@
                 })
                 .catch(function(err) {
                     showToast(err.message || 'Could not open folder in SharePoint.', 'error');
+                });
+        }
+
+        function openSelectedFolderInExplorer() {
+            const folder = getSingleSelectedFolder();
+            if (!folder || !folder.explorer_uri) {
+                showToast('This folder cannot be opened in Explorer.', 'error');
+                return;
+            }
+            window.location.href = folder.explorer_uri;
+        }
+
+        function openCurrentFolderInExplorer() {
+            if (currentExplorerUri) {
+                window.location.href = currentExplorerUri;
+                return;
+            }
+
+            const params = new URLSearchParams({
+                ...entityAuthParams(),
+                folder_path: currentFolderPath
+            });
+
+            fetch(FOLDER_WEBURL_URL + '?' + params.toString(), {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(function(r) {
+                    return r.json().then(function(data) {
+                        return { ok: r.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (!result.ok || !result.data.success || !result.data.explorer_uri) {
+                        throw new Error((result.data && result.data.error) || 'Could not open folder in Explorer.');
+                    }
+                    window.location.href = result.data.explorer_uri;
+                })
+                .catch(function(err) {
+                    showToast(err.message || 'Could not open folder in Explorer.', 'error');
                 });
         }
 

@@ -494,12 +494,15 @@ def _get_drive_item_by_id(file_id: str) -> Dict[str, Any]:
 
 
 def _folder_payload(item: Dict[str, Any], parent_path: str) -> Dict[str, Any]:
+    from contracts.services.sharepoint_paths import build_explorer_uri
+
     folder_path = normalize_folder_path(f"{parent_path}/{item.get('name', '')}")
     return {
         "name": item.get("name") or "",
         "path": folder_path,
         "id": item.get("id") or "",
         "webUrl": item.get("webUrl") or "",
+        "explorer_uri": build_explorer_uri(folder_path),
     }
 
 

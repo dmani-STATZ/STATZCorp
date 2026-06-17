@@ -1,0 +1,19 @@
+Windows Registry Editor Version 5.00
+
+; STATZ statzfile:// custom URL protocol
+; Import on each workstation (or deploy via Intune) after copying open-explorer.ps1
+; to C:\ProgramData\STATZ\open-explorer.ps1
+
+[HKEY_CLASSES_ROOT\statzfile]
+@="URL:STATZ File Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\statzfile\DefaultIcon]
+@="explorer.exe,1"
+
+[HKEY_CLASSES_ROOT\statzfile\shell]
+
+[HKEY_CLASSES_ROOT\statzfile\shell\open]
+
+[HKEY_CLASSES_ROOT\statzfile\shell\open\command]
+@="powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File \"C:\\ProgramData\\STATZ\\open-explorer.ps1\" \"%1\""

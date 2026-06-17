@@ -83,6 +83,27 @@ Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()
 
 `legacy_detected` is surfaced on both `contract_details_api` and `sharepoint_files_api` GET responses; the browser shows a warning banner prompting the user to click **Save Path to Contract** to update `files_url` to the modern format. `fell_back_to_root` is surfaced on the files API when the resolved path 404s, prompting a separate banner.
 
+##### Open in Explorer
+
+Read-only derivation maps a contract's SharePoint drive-relative folder path to a local OneDrive path so users can open the folder in Windows Explorer from the document browser **Actions** menu.
+
+**Settings** (in `STATZWeb/settings.py`, near `SHAREPOINT_PATH_PREFIX`):
+
+- `EXPLORER_SHAREPOINT_STRIP_PREFIX` — SharePoint prefix stripped before mapping (currently `Statz-Public/data/V87`)
+- `EXPLORER_LOCAL_MOUNT` — local OneDrive mount under `%USERPROFILE%` (currently `OneDrive - statzcorpgcch/Statz - V87`)
+
+The library version token (**V87**) also appears in `SHAREPOINT_PATH_PREFIX`; bump all three together on a library version change.
+
+**Helper:** `build_explorer_uri()` in `contracts/services/sharepoint_paths.py` — pure function, no Graph/I/O. Returns a `statzfile:///` URI or `''` when the path cannot be mapped (legacy UNC, URLs, unknown root). Callers hide the Explorer action when the result is empty.
+
+**URI scheme:** `statzfile:///` — resolved by the desktop handler under `%USERPROFILE%`.
+
+**Desktop handler:** `deploy/explorer-handler/` (`open-explorer.ps1`, `statzfile.reg`, README). Deploy script to `C:\ProgramData\STATZ\`; register protocol via Intune. Requires Edge **AutoLaunchProtocolsFromOrigins** for the STATZ web origin.
+
+**API surfaces:** `explorer_uri` on folder rows (`_folder_payload`) and `folder_weburl_api`; `current_explorer_uri` on `contract_details_api` and `sharepoint_files_api` GET responses. Intake draft browser reuses the same template/service automatically.
+
+Path construction is **not** duplicated — derivation uses the same drive-relative paths already returned by SharePoint listing and `Contract.get_sharepoint_relative_path()` resolution.
+
 ---
 
 ### `processing` — Staging Pipeline

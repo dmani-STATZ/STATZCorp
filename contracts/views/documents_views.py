@@ -15,6 +15,7 @@ from STATZWeb.decorators import conditional_login_required
 from contracts.models import Contract
 from contracts.services import sharepoint_service
 from contracts.services.sharepoint_paths import (
+    build_explorer_uri,
     get_idiq_root_fallback_path,
     get_root_fallback_path,
     get_sharepoint_prefix,
@@ -151,6 +152,7 @@ def contract_details_api(request, contract_id):
             "default_folder_path": resolution["path"],
             "path_source": resolution["source"],
             "legacy_detected": resolution["legacy_detected"],
+            "current_explorer_uri": build_explorer_uri(resolution["path"]),
         }
     )
 
@@ -199,6 +201,7 @@ def idiq_contract_details_api(request, idiq_id):
             "default_folder_path": resolution["path"],
             "path_source": resolution["source"],
             "legacy_detected": resolution["legacy_detected"],
+            "current_explorer_uri": build_explorer_uri(resolution["path"]),
         }
     )
 
@@ -281,6 +284,7 @@ def intake_draft_details_api(request, draft_id):
         "default_folder_path": default_path,
         "path_source": path_source,
         "legacy_detected": False,
+        "current_explorer_uri": build_explorer_uri(default_path),
     })
 
 
@@ -334,6 +338,7 @@ def _list_sharepoint_files(request) -> JsonResponse:
         data["requestedPath"] = requested_path
         data["legacy_detected"] = legacy_detected
         data["fell_back_to_root"] = False
+        data["current_explorer_uri"] = build_explorer_uri(data.get("currentPath") or requested_path)
         return JsonResponse(data)
     except (SharePointNotFound, SharePointError) as error:
         # If the path doesn't exist or is invalid (400/404), try to find a valid parent
@@ -357,6 +362,9 @@ def _list_sharepoint_files(request) -> JsonResponse:
                     "fallbackPath": fallback_path,
                     "legacy_detected": legacy_detected,
                     "fell_back_to_root": True,
+                    "current_explorer_uri": build_explorer_uri(
+                        data.get("currentPath") or fallback_path
+                    ),
                     "error": (
                         "The requested SharePoint folder was not found. "
                         "Showing the nearest available parent folder."
@@ -675,4 +683,8 @@ def folder_weburl_api(request):
     if not web_url:
         return JsonResponse({"success": False, "error": "Folder not found."}, status=404)
 
-    return JsonResponse({"success": True, "webUrl": web_url})
+    return JsonResponse({
+        "success": True,
+        "webUrl": web_url,
+        "explorer_uri": build_explorer_uri(folder_path),
+    })

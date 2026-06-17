@@ -401,6 +401,17 @@ SHAREPOINT_SOURCE_TIMEZONE = os.environ.get(
     "America/Los_Angeles",
 )
 
+# Canonical SharePoint documents root when Company.sharepoint_documents_path is unset.
+SHAREPOINT_PATH_PREFIX = "Statz-Public/data/V87/aFed-DOD"
+
+# --- Open in Explorer (OneDrive local mapping) -------------------------------
+# Maps a SharePoint drive-relative folder path to the user's locally-synced
+# OneDrive path so the desktop handler can open it in Windows Explorer.
+# NOTE: the library version token (currently 'V87') ALSO appears in
+# SHAREPOINT_PATH_PREFIX. On a library version bump, update all of them together.
+EXPLORER_SHAREPOINT_STRIP_PREFIX = "Statz-Public/data/V87"
+EXPLORER_LOCAL_MOUNT = "OneDrive - statzcorpgcch/Statz - V87"
+
 # Authentication settings
 LOGIN_REDIRECT_URL = "index"
 LOGOUT_REDIRECT_URL = "landing"
