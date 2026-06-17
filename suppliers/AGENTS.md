@@ -74,7 +74,7 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 ## 5. Files That Commonly Need to Change Together
 
 ### Supplier model field change
-`suppliers/models.py` → `suppliers/migrations/` → `contracts/forms.py` (SupplierForm) → `templates/suppliers/supplier_edit.html` / `supplier_form.html` → `suppliers/admin.py` → any `contracts/views/supplier_views.py` AJAX update endpoint that references the field by name → `SupplierApplyEnrichmentView.ALLOWED_FIELDS` if the field is enrichable
+`suppliers/models.py` → `suppliers/migrations/` → `contracts/forms.py` (SupplierForm) → `templates/suppliers/supplier_edit.html` / `supplier_form.html` → `suppliers/admin.py` → any `contracts/views/supplier_views.py` AJAX update endpoint that references the field by name (`contracts:supplier_update_notes`, `contracts:supplier_update_selects`, `contracts:supplier_update_compliance`, `contracts:supplier_update_files`, `contracts:supplier_update_address`, etc.) → `SupplierApplyEnrichmentView.ALLOWED_FIELDS` if the field is enrichable
 
 `prime` field: `contracts/forms.py` (ModelChoiceField + clean_prime) ↔ `contracts/views/supplier_views.py` (initial value in get_form)
 

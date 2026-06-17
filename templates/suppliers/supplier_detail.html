@@ -777,7 +777,10 @@
 
 <section id="section-notes">
   <div class="card card-padded shadow-sm">
-      <h2 class="text-lg font-semibold mb-3">Notes</h2>
+      <div class="row-between mb-3">
+        <h2 class="text-lg font-semibold">Notes</h2>
+        <button type="button" id="notes-edit-btn" class="btn btn-sm btn-outline-primary">Edit</button>
+      </div>
       {% if supplier.notes %}
         <p class="text-sm text-gray-900 whitespace-pre-line">{{ supplier.notes }}</p>
       {% else %}
@@ -990,6 +993,25 @@
     <div class="mt-6 flex justify-end gap-2">
       <button type="button" id="contact-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-secondary text-sm">Cancel</button>
       <button type="button" id="contact-modal-save" class="px-4 py-2 rounded-md btn btn-success text-sm font-semibold">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notes edit modal -->
+<div id="notesEditModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+  <div class="card card-padded shadow-2xl w-full max-w-lg">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h3 class="text-lg font-semibold">Edit Notes</h3>
+      </div>
+      <button type="button" id="notes-modal-close" class="btn-close"></button>
+    </div>
+    <div class="space-y-3">
+      <textarea id="notes-textarea" rows="10" class="form-control">{{ supplier.notes|default:'' }}</textarea>
+    </div>
+    <div class="mt-6 flex justify-end gap-2">
+      <button type="button" id="notes-cancel-btn" class="px-4 py-2 rounded-md border border-gray-300 btn btn-secondary text-sm">Cancel</button>
+      <button type="button" id="notes-save-btn" class="px-4 py-2 rounded-md btn btn-success text-sm font-semibold">Save</button>
     </div>
   </div>
 </div>
@@ -2276,6 +2298,75 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+</script>
+
+<script>
+(function () {
+    // Restore scroll position after notes save
+    document.addEventListener('DOMContentLoaded', function () {
+        var savedScroll = sessionStorage.getItem('supplier_notes_scroll');
+        if (savedScroll !== null) {
+            window.scrollTo({ top: parseInt(savedScroll, 10), behavior: 'instant' });
+            sessionStorage.removeItem('supplier_notes_scroll');
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var notesModal = document.getElementById('notesEditModal');
+        var notesEditBtn = document.getElementById('notes-edit-btn');
+        var notesCancelBtn = document.getElementById('notes-cancel-btn');
+        var notesModalCloseBtn = document.getElementById('notes-modal-close');
+        var notesSaveBtn = document.getElementById('notes-save-btn');
+
+        if (notesEditBtn) {
+            notesEditBtn.addEventListener('click', function () {
+                showModal(notesModal);
+            });
+        }
+
+        if (notesCancelBtn) {
+            notesCancelBtn.addEventListener('click', function () {
+                hideModal(notesModal);
+            });
+        }
+
+        if (notesModalCloseBtn) {
+            notesModalCloseBtn.addEventListener('click', function () {
+                hideModal(notesModal);
+            });
+        }
+
+        if (notesSaveBtn) {
+            notesSaveBtn.addEventListener('click', function () {
+                var notes = document.getElementById('notes-textarea').value;
+                sessionStorage.setItem('supplier_notes_scroll', window.scrollY.toString());
+
+                fetch("{% url 'contracts:supplier_update_notes' pk=supplier.pk %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({ notes: notes }),
+                })
+                .then(function (resp) { return resp.json(); })
+                .then(function (data) {
+                    if (data.ok) {
+                        window.location.reload();
+                    } else {
+                        sessionStorage.removeItem('supplier_notes_scroll');
+                        alert('Failed to save notes. Please try again.');
+                    }
+                })
+                .catch(function () {
+                    sessionStorage.removeItem('supplier_notes_scroll');
+                    alert('Network error. Please try again.');
+                });
+            });
+        }
+    });
+})();
 </script>
 
 {% endblock %}

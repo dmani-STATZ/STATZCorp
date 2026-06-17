@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.http import HttpResponseRedirect, JsonResponse
+from django.views.decorators.http import require_POST
 from django.db.models import Q, Count, Sum, Case, When, DecimalField
 from django.db import DatabaseError
 from django.utils import timezone
@@ -481,15 +482,22 @@ def update_supplier_header(request, pk):
 
 
 @conditional_login_required
+@require_POST
 def update_supplier_notes(request, pk):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Invalid method'}, status=405)
+    """Update Supplier.notes from the supplier detail/list notes modal."""
     supplier = get_object_or_404(Supplier, pk=pk)
     notes = request.POST.get('notes', '')
-    supplier.notes = notes
-    supplier.modified_by = request.user
-    supplier.save(update_fields=['notes', 'modified_by', 'modified_on'])
+    try:
+        supplier.notes = notes
+        supplier.modified_by = request.user
+        supplier.save(update_fields=['notes', 'modified_by', 'modified_on'])
+    except DatabaseError:
+        return JsonResponse(
+            {'ok': False, 'error': 'Failed to update notes.'},
+            status=400,
+        )
     payload = SupplierListView.build_detail_payload(supplier)
+    payload['ok'] = True
     return JsonResponse(payload, safe=False)
 
 
