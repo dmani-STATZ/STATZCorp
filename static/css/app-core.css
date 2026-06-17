@@ -868,7 +868,8 @@ textarea {
 }
 
 /* ===== Section 13: Layout Helpers (Deduplicated) ===== */
-.row {
+/* Horizontal flex chip row — not Bootstrap grid rows (those use g-* gutter classes). */
+.row:not([class*="g-"]) {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -2343,4 +2344,50 @@ main {
     flex-direction: column;
     gap: 0.75rem;
     width: 100%;
+}
+
+/* ── Supplier Detail: Contact card color banding ─────────────────────────── */
+
+.contact-card-item {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  position: relative;
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+/* Alphabetical banding — left border color by first letter of contact name */
+.contact-band-blue   { border-left-color: #4361ee; } /* A – F */
+.contact-band-teal   { border-left-color: #2ec4b6; } /* G – L */
+.contact-band-amber  { border-left-color: #ff9f1c; } /* M – R */
+.contact-band-purple { border-left-color: #8338ec; } /* S – Z */
+
+/* Primary contact overrides the alphabet band color */
+.contact-card-primary {
+  border-left-color: var(--bs-danger, #dc3545) !important;
+  border-left-width: 4px !important;
+}
+
+.contact-card-primary-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background-color: var(--bs-danger, #dc3545);
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 20px;
+}
+
+/* ── Supplier detail: anchor scroll offset for fixed navbar ──────────────── */
+/* Prevents fixed top navbar from covering section headings on anchor jump.   */
+/* Value = fixed navbar height + small buffer. Adjust if navbar height changes */
+.supplier-section-anchor {
+  scroll-margin-top: 72px;
 }

@@ -32,7 +32,7 @@
 .supplier-sidebar-nav a.sidebar-nav-active { background: #fff; color: var(--company-primary) !important; font-weight: 600; }
 .supplier-sidebar-nav .badge { font-size: 0.65rem; }
 .supplier-detail-main { flex: 1; min-width: 0; padding: 1.25rem 1.5rem 2rem; overflow-y: auto; max-height: calc(100vh - var(--header-height, 60px)); display: flex; flex-direction: column; }
-.supplier-detail-main section { scroll-margin-top: 1rem; margin-bottom: 1.5rem; }
+.supplier-detail-main section { margin-bottom: 1.5rem; }
 .supplier-status-banner { border-radius: 0.375rem; padding: 0.65rem 1rem; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; }
 .supplier-status-banner-probation { background: var(--bs-danger); color: #fff; }
 .supplier-status-banner-conditional { background: var(--bs-warning); color: var(--bs-dark); }
@@ -75,7 +75,7 @@
 </aside>
 <div class="supplier-detail-main">
 
-<section id="section-overview">
+<section id="section-overview" class="supplier-section-anchor">
 {% if supplier.probation or supplier.conditional or supplier.archived %}
 <div class="mb-2">
 {% if supplier.probation %}<div class="supplier-status-banner supplier-status-banner-probation">&#9888; This supplier is currently on Probation</div>{% endif %}
@@ -83,7 +83,9 @@
 {% if supplier.archived %}<div class="supplier-status-banner supplier-status-banner-archived">This supplier is Archived</div>{% endif %}
 </div>
 {% endif %}
-<div class="card card-padded shadow-sm mb-3">
+<div class="row g-3 mb-3">
+  <div class="col-7">
+    <div class="card card-padded shadow-sm h-100">
   <div class="d-flex flex-wrap gap-3 align-items-start justify-content-between">
       <!-- Column 1 — Supplier identity -->
       <div class="d-flex gap-3 align-items-start flex-shrink-0">
@@ -163,8 +165,66 @@
       </button>
     </li>
   </ul>
+    </div>
+  </div>
+  <div class="col-5">
+    <div class="card card-padded shadow-sm h-100">
+  <h2 class="h6 fw-semibold mb-3">Supplier Health</h2>
+  <div class="d-flex flex-wrap align-items-start gap-3" style="min-width:0;">
+      {% if health_score.contract_count > 0 %}
+      <div class="d-flex flex-row flex-nowrap align-items-start gap-4">
+      <!-- Mini gauge (left) -->
+      <div class="text-center flex-shrink-0" style="width: 200px;">
+        <svg viewBox="0 0 200 110" width="200" height="110" aria-hidden="true">
+          <path d="M 20,100 A 80,80 0 0,1 60.36,26.36" fill="none" stroke="#198754" stroke-width="18" stroke-linecap="butt"/>
+          <path d="M 60.36,26.36 A 80,80 0 0,1 139.64,26.36" fill="none" stroke="#ffc107" stroke-width="18" stroke-linecap="butt"/>
+          <path d="M 139.64,26.36 A 80,80 0 0,1 180,100" fill="none" stroke="#dc3545" stroke-width="18" stroke-linecap="butt"/>
+          {% if health_score.band %}
+          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round"
+            transform="rotate({% if health_score.band == 'green' %}-60{% elif health_score.band == 'amber' %}0{% else %}60{% endif %}, 100, 100)"/>
+          {% else %}
+          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round" style="display:none"/>
+          {% endif %}
+          <circle cx="100" cy="100" r="5" fill="#333"/>
+        </svg>
+        <div id="hs-band-label" class="fw-bold small {% if health_score.band == 'green' %}text-success{% elif health_score.band == 'amber' %}text-warning{% elif health_score.band == 'red' %}text-danger{% else %}text-muted{% endif %}">
+          {% if health_score.band %}{{ health_score.band|capfirst }}{% else %}No Data{% endif %}
+        </div>
+      </div>
+
+      <!-- Stats breakdown + warning + toggle (right) -->
+      <div class="d-flex flex-column flex-grow-1 min-w-0" style="min-height: 110px;">
+        <div class="hs-stats-grid text-muted mb-2">
+          <div>Contracts: <span id="hs-contract-count" class="text-body fw-medium">{{ health_score.contract_count }}</span> <span style="font-size:0.65rem;">({{ health_score.window_label }})</span></div>
+          <div>Notes: <span id="hs-note-count" class="text-body fw-medium">{{ health_score.note_count }}</span></div>
+          <div>Avg margin: <span id="hs-avg-margin" class="text-body fw-medium">${{ health_score.avg_margin_per_contract|floatformat:2 }}</span></div>
+          <div>Gov actions: <span id="hs-gov-count" class="text-body fw-medium">{{ health_score.gov_action_count }}</span></div>
+          <div>Avg friction: <span id="hs-avg-friction" class="text-body fw-medium">{{ health_score.avg_friction_per_contract|floatformat:1 }}</span> pts</div>
+          <div>Ship. corrns: <span id="hs-ship-count" class="text-body fw-medium">{{ health_score.shipment_correction_count }}</span></div>
+          <div></div>
+          <div>Payments: <span id="hs-pay-count" class="text-body fw-medium">{{ health_score.payment_history_count }}</span></div>
+        </div>
+        <div class="flex-shrink-0" style="min-height: 1.5rem;">
+          <div id="hs-fallback-warning" class="text-warning mb-1" style="font-size:0.7rem;{% if not health_score.using_fallback %}display:none;{% endif %}">
+            &#9888; &lt;5 contracts in 24 months — all-time data
+          </div>
+        </div>
+        <button id="hs-toggle-btn" type="button" class="btn btn-outline-secondary align-self-start" style="font-size:0.7rem; padding:0.15rem 0.5rem;">
+          Switch to {{ health_score_alternate.window_label }}
+        </button>
+      </div>
+      </div>
+      {% else %}
+      <div class="text-muted small flex-shrink-0 align-self-center">No contract history.</div>
+      {% endif %}
+
+  </div>
+    </div>
+  </div>
 </div>
-<div class="card card-padded shadow-sm mb-3">
+<div class="row g-3 mb-3">
+  <div class="col-8">
+    <div class="card card-padded shadow-sm h-100">
   <h2 class="h6 fw-semibold mb-3">Contact &amp; Web</h2>
       <dl class="space-y-2 text-sm text-gray-800">
         <div class="flex items-start justify-between gap-3">
@@ -229,63 +289,10 @@
         </div>
       </dl>
 
-</div>
-<div class="card card-padded shadow-sm">
-  <h2 class="h6 fw-semibold mb-3">Supplier Health</h2>
-  <div class="d-flex flex-wrap align-items-start gap-3" style="min-width:0;">
-      {% if health_score.contract_count > 0 %}
-      <div class="d-flex flex-row flex-nowrap align-items-start gap-4">
-      <!-- Mini gauge (left) -->
-      <div class="text-center flex-shrink-0" style="width: 200px;">
-        <svg viewBox="0 0 200 110" width="200" height="110" aria-hidden="true">
-          <path d="M 20,100 A 80,80 0 0,1 60.36,26.36" fill="none" stroke="#198754" stroke-width="18" stroke-linecap="butt"/>
-          <path d="M 60.36,26.36 A 80,80 0 0,1 139.64,26.36" fill="none" stroke="#ffc107" stroke-width="18" stroke-linecap="butt"/>
-          <path d="M 139.64,26.36 A 80,80 0 0,1 180,100" fill="none" stroke="#dc3545" stroke-width="18" stroke-linecap="butt"/>
-          {% if health_score.band %}
-          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round"
-            transform="rotate({% if health_score.band == 'green' %}-60{% elif health_score.band == 'amber' %}0{% else %}60{% endif %}, 100, 100)"/>
-          {% else %}
-          <line id="hs-needle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="3" stroke-linecap="round" style="display:none"/>
-          {% endif %}
-          <circle cx="100" cy="100" r="5" fill="#333"/>
-        </svg>
-        <div id="hs-band-label" class="fw-bold small {% if health_score.band == 'green' %}text-success{% elif health_score.band == 'amber' %}text-warning{% elif health_score.band == 'red' %}text-danger{% else %}text-muted{% endif %}">
-          {% if health_score.band %}{{ health_score.band|capfirst }}{% else %}No Data{% endif %}
-        </div>
-      </div>
-
-      <!-- Stats breakdown + warning + toggle (right) -->
-      <div class="d-flex flex-column flex-grow-1 min-w-0" style="min-height: 110px;">
-        <div class="hs-stats-grid text-muted mb-2">
-          <div>Contracts: <span id="hs-contract-count" class="text-body fw-medium">{{ health_score.contract_count }}</span> <span style="font-size:0.65rem;">({{ health_score.window_label }})</span></div>
-          <div>Notes: <span id="hs-note-count" class="text-body fw-medium">{{ health_score.note_count }}</span></div>
-          <div>Avg margin: <span id="hs-avg-margin" class="text-body fw-medium">${{ health_score.avg_margin_per_contract|floatformat:2 }}</span></div>
-          <div>Gov actions: <span id="hs-gov-count" class="text-body fw-medium">{{ health_score.gov_action_count }}</span></div>
-          <div>Avg friction: <span id="hs-avg-friction" class="text-body fw-medium">{{ health_score.avg_friction_per_contract|floatformat:1 }}</span> pts</div>
-          <div>Ship. corrns: <span id="hs-ship-count" class="text-body fw-medium">{{ health_score.shipment_correction_count }}</span></div>
-          <div></div>
-          <div>Payments: <span id="hs-pay-count" class="text-body fw-medium">{{ health_score.payment_history_count }}</span></div>
-        </div>
-        <div class="flex-shrink-0" style="min-height: 1.5rem;">
-          <div id="hs-fallback-warning" class="text-warning mb-1" style="font-size:0.7rem;{% if not health_score.using_fallback %}display:none;{% endif %}">
-            &#9888; &lt;5 contracts in 24 months — all-time data
-          </div>
-        </div>
-        <button id="hs-toggle-btn" type="button" class="btn btn-outline-secondary align-self-start" style="font-size:0.7rem; padding:0.15rem 0.5rem;">
-          Switch to {{ health_score_alternate.window_label }}
-        </button>
-      </div>
-      </div>
-      {% else %}
-      <div class="text-muted small flex-shrink-0 align-self-center">No contract history.</div>
-      {% endif %}
-
+    </div>
   </div>
-</div>
-</section>
-
-<section id="section-compliance">
-  <div class="card card-padded shadow-sm">
+  <div class="col-4 supplier-section-anchor" id="section-compliance">
+    <div class="card card-padded shadow-sm h-100">
     <h2 class="h5 fw-semibold mb-3">Compliance &amp; Status</h2>
     <h3 class="h6 text-muted mb-2">Status Flags</h3>
       <ul class="space-y-2 text-sm text-gray-800">
@@ -323,27 +330,37 @@
           <span id="supplier-allows-gsi-value">{{ supplier.get_allows_gsi_display|default:"—" }}</span>
         </li>
       </ul>
+    </div>
   </div>
+</div>
 </section>
 
-<section id="section-contacts">
+<section id="section-contacts" class="supplier-section-anchor">
     <div class="card card-padded shadow-sm" id="contacts-section">
       <div class="row-between mb-3">
         <h2 class="text-lg font-semibold">Contacts</h2>
         <button type="button" id="open-contact-modal" class="btn btn-sm btn-outline-primary">Add Contact</button>
       </div>
-      <div class="space-y-3">
+      <div class="row g-3">
         {% for contact in contacts %}
-          <div class="border rounded-lg p-3 contact-card" data-contact-id="{{ contact.id }}">
+          {% with fl=contact.name|first|upper %}
+          <div class="col-lg-6">
+          <div class="contact-card-item contact-card
+              {% if fl == 'A' or fl == 'B' or fl == 'C' or fl == 'D' or fl == 'E' or fl == 'F' %}contact-band-blue
+              {% elif fl == 'G' or fl == 'H' or fl == 'I' or fl == 'J' or fl == 'K' or fl == 'L' %}contact-band-teal
+              {% elif fl == 'M' or fl == 'N' or fl == 'O' or fl == 'P' or fl == 'Q' or fl == 'R' %}contact-band-amber
+              {% else %}contact-band-purple{% endif %}
+              {% if contact.is_primary %} contact-card-primary{% endif %}"
+              data-contact-id="{{ contact.id }}">
+            {% if contact.is_primary %}
+              <span class="contact-card-primary-badge">Primary</span>
+            {% endif %}
             <div class="row-between gap-3">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold">
                   <a href="{% url 'contracts:contact_detail' pk=contact.id %}" class="text-blue-600 hover:text-blue-800">
                     {{ contact.name }}
                   </a>
-                  {% if contact.is_primary %}
-                  <span class="badge bg-success ms-1">Primary</span>
-                  {% endif %}
                 </p>
                 <p class="text-xs text-gray-600">{{ contact.title|default:"" }}</p>
                 {% if contact.email %}
@@ -387,6 +404,8 @@
               </div>
             </div>
           </div>
+          </div>
+          {% endwith %}
         {% empty %}
           <p class="text-sm text-gray-500">No contacts yet.</p>
         {% endfor %}
@@ -577,7 +596,7 @@
 
 </section>
 
-<section id="section-addresses">
+<section id="section-addresses" class="supplier-section-anchor">
   <div class="card card-padded shadow-sm">
       <h2 class="text-lg font-semibold mb-3">Addresses</h2>
       {{ supplier_address_slots_client|json_script:"supplier-address-slot-meta" }}
@@ -612,7 +631,7 @@
   </div>
 </section>
 
-<section id="section-contracts">
+<section id="section-contracts" class="supplier-section-anchor">
   <div class="card card-padded shadow-sm">
   <div class="row-between mb-3">
       <h2 class="text-lg font-semibold">Contracts</h2>
@@ -672,9 +691,10 @@
   </div>
 </section>
 
-<section id="section-certs">
-<div class="row g-3">
-    <div class="col-md-6"><div class="card card-padded shadow-sm h-100">
+<section id="section-certs" class="supplier-section-anchor">
+<div class="row g-3 mb-3">
+  <div class="col-6">
+    <div class="card card-padded shadow-sm h-100">
       <div class="row-between mb-3">
         <h2 class="text-lg font-semibold">Certifications</h2>
         <button type="button" id="open-cert-modal" class="btn btn-sm btn-outline-primary">Add Certification</button>
@@ -709,8 +729,10 @@
           <p class="text-sm text-gray-500">No certifications yet.</p>
         {% endfor %}
       </div>
-    </div></div>
-    <div class="col-md-6"><div class="card card-padded shadow-sm h-100">
+    </div>
+  </div>
+  <div class="col-6">
+    <div class="card card-padded shadow-sm h-100">
       <div class="row-between mb-3">
         <h2 class="text-lg font-semibold">Classifications</h2>
         <button type="button" id="open-class-modal" class="btn btn-sm btn-outline-primary">Add Classification</button>
@@ -745,10 +767,10 @@
       </div>
     </div>
   </div>
-  </div>
+</div>
 </section>
 
-<section id="section-files">
+<section id="section-files" class="supplier-section-anchor">
   <div class="card card-padded shadow-sm">
     <h2 class="text-lg font-semibold mb-3">Files &amp; Documents</h2>
     <div class="space-y-3">
@@ -775,7 +797,7 @@
   </div>
 </section>
 
-<section id="section-notes">
+<section id="section-notes" class="supplier-section-anchor">
   <div class="card card-padded shadow-sm">
       <div class="row-between mb-3">
         <h2 class="text-lg font-semibold">Notes</h2>
