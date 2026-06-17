@@ -1,7 +1,7 @@
 ---
 id: 2026-06-10-swo-gov-action
 title: "Added SWO to Gov Action dropdown"
-published: false
+published: true
 publish_date: 2026-06-10
 tags: [contracts, gov-actions]
 critical: false

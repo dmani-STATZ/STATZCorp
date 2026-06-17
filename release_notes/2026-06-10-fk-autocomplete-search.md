@@ -1,7 +1,7 @@
 ---
 id: 2026-06-10-fk-autocomplete-search
 title: Searchable autocomplete for supplier and NSN fields in transaction edit modal
-published: false
+published: true
 publish_date: 2026-06-10
 tags: [improved, system]
 critical: false

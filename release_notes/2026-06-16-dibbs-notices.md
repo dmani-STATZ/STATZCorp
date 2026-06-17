@@ -1,7 +1,7 @@
 ---
 id: 2026-06-16-dibbs-notices
 title: DIBBS Notices on Home Page
-published: false
+published: true
 publish_date: 2026-06-16
 tags: [new, sales]
 critical: false

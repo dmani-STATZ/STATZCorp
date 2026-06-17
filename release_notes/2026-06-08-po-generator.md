@@ -1,7 +1,7 @@
 ---
 id: 2026-06-08-po-generator
 title: "Purchase Order Generator"
-published: false
+published: true
 publish_date: 2026-06-08
 tags: [contracts]
 critical: false
