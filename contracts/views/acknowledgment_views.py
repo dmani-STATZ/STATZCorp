@@ -174,7 +174,7 @@ def _get_or_create_acknowledgment_letter(clin, request):
     if not letter:
         letter = AcknowledgementLetter(clin=clin)
 
-    if letter.pk is not None and letter.is_user_edited:
+    if letter.pk is not None:
         return letter
 
     if clin.supplier:
