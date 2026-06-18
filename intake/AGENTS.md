@@ -173,8 +173,15 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   unit price from the 1155 parser (`ingest._clin_to_dict` maps parser
   `unit_price` → `item_value`). `unit_price` is the supplier quote and is
   manual in the editor. Do not swap these in ingest.
-- **PO Number:** display-only placeholder in intake. Assigned after
-  finalization by processing — never add a POST field or schema key for it.
+- **PO Number:** display-only placeholder in intake (`Assigned at finalization`). Assigned during finalization by
+  `intake/services/po_number.py::assign_po_number()` for AWD/PO/DO/INTERNAL
+  types. Uses a single atomic `UPDATE ... OUTPUT INSERTED.po_number` against
+  the shared `processing_sequencenumber` table (id=1). Written to
+  `Contract.po_number` and all `Clin.po_number` / `Clin.clin_po_num` /
+  `Clin.po_num_ext`. Never add a POST field, schema key, or draft JSON key for
+  `po_number`. Do not call `assign_po_number` for IDIQ, MOD, or AMD types.
+  Do not import from the `processing` app to accomplish this — the service
+  reads the table directly via raw SQL.
 
 ### PDF Ingestion (Phase 3c)
 

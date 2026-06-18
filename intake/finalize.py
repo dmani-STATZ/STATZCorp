@@ -81,6 +81,7 @@ from contracts.services import (
 )
 
 from .models import DraftContract
+from .services.po_number import assign_po_number
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +234,9 @@ def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
     result = _call_service(_draft_to_service_payload(draft, 'AWD'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
+    # Assign PO number from shared sequence table (processing_sequencenumber).
+    # This call is inside transaction.atomic() — failure rolls back everything.
+    assign_po_number(result.contract)
     return result.contract
 
 
@@ -256,6 +260,9 @@ def _finalize_do(draft: DraftContract, user: User) -> Contract:
     result = _call_service(payload, user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
+    # Assign PO number from shared sequence table (processing_sequencenumber).
+    # This call is inside transaction.atomic() — failure rolls back everything.
+    assign_po_number(result.contract)
     return result.contract
 
 
@@ -275,6 +282,9 @@ def _finalize_internal(draft: DraftContract, user: User) -> Contract:
     result = _call_service(_draft_to_service_payload(draft, 'INTERNAL'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
+    # Assign PO number from shared sequence table (processing_sequencenumber).
+    # This call is inside transaction.atomic() — failure rolls back everything.
+    assign_po_number(result.contract)
     return result.contract
 
 

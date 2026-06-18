@@ -166,8 +166,18 @@ The entire section is removed with Remove Charges which also clears
 all rows. POST keys are chg-<i>-label and chg-<i>-estimated_amount.
 billed_paid_amount is NOT captured at intake — that is Finance Audit only.
 
-PO Number is display-only in the editor (`Assigned when submitted`). It is
-assigned post-finalization by the processing app — not a draft field.
+PO Number is display-only in the editor (`Assigned at finalization`). It is
+assigned by `intake/services/po_number.py::assign_po_number()` during
+finalization for AWD, PO, DO, and INTERNAL contract types. Assignment reads
+from and atomically increments the shared `processing_sequencenumber` table
+(id=1, `po_number` column). The same integer is written to `Contract.po_number`
+and to `Clin.po_number`, `Clin.clin_po_num`, and `Clin.po_num_ext` for every CLIN
+under the contract. IDIQ, MOD, and AMD types do not receive a PO number.
+The call lives inside `finalize.py`'s `transaction.atomic()` block so sequence
+increment and contract creation are atomic. Not a draft field — never add
+`po_number` to intake schemas or POST fields.
+⚠ `po_num_ext` is CharField(max_length=5). Sequence is currently ~15685.
+Overflow at 99999. Plan a migration before that threshold.
 
 GP calculation per CLIN:
 `contract_total = item_value × order_qty`
