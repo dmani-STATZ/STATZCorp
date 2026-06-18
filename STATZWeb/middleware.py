@@ -9,6 +9,26 @@ logger = logging.getLogger(__name__)
 
 RELEASE_NOTES_ACK_PATH = "/users/release-notes/acknowledge/"
 
+
+class NoCacheStaticFilesMiddleware:
+    """Force no-cache headers on all static file responses.
+
+    Must be placed BEFORE WhiteNoise in MIDDLEWARE so it wraps the
+    WhiteNoise response on the way back out through the middleware chain.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.static_prefix = settings.STATIC_URL  # typically "/static/"
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if request.path.startswith(self.static_prefix):
+            response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response["Pragma"] = "no-cache"
+            response["Expires"] = "0"
+        return response
+
 class LoginRequiredMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response

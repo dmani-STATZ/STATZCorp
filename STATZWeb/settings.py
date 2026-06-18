@@ -129,11 +129,19 @@ MIDDLEWARE = [
 
 if IS_PRODUCTION:
     # Production middleware
+    # NoCacheStaticFilesMiddleware must be BEFORE WhiteNoise so it wraps
+    # WhiteNoise responses and can override Cache-Control headers.
     MIDDLEWARE.insert(
-        1, "whitenoise.middleware.WhiteNoiseMiddleware"
+        1, "STATZWeb.middleware.NoCacheStaticFilesMiddleware"
+    )  # Override cache headers on static files
+    MIDDLEWARE.insert(
+        2, "whitenoise.middleware.WhiteNoiseMiddleware"
     )  # Azure static file serving
 else:
     # Development middleware
+    MIDDLEWARE.insert(
+        1, "STATZWeb.middleware.NoCacheStaticFilesMiddleware"
+    )  # Override cache headers on static files
     MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
     INSTALLED_APPS.append("django_browser_reload")
 
@@ -308,9 +316,13 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 if IS_PRODUCTION:
     # Production: Azure App Service static file serving with WhiteNoise
-    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    # Using CompressedStaticFilesStorage (no manifest hashing) to avoid
+    # long-lived cache headers on hashed filenames. All static files served
+    # with max-age=0 to prevent browser caching entirely.
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
     WHITENOISE_USE_FINDERS = True
-    WHITENOISE_AUTOREFRESH = False
+    WHITENOISE_AUTOREFRESH = True   # Always check for new/changed files
+    WHITENOISE_MAX_AGE = 0          # No browser caching of static files
     WHITENOISE_MANIFEST_STRICT = False  # Fall back to unhashed path instead of raising ValueError for files not in manifest
 else:
     # Development: Standard static files storage

@@ -14,10 +14,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Documents Browser</title>
-    <link rel="stylesheet" href="{% static 'css/spacelab.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/theme-vars.css' %}">
-    <link rel="stylesheet" href="{% static 'css/app-core.css' %}">
-    <link rel="stylesheet" href="{% static 'css/utilities.css' %}">
+    <link rel="stylesheet" href="{% static 'css/spacelab.min.css' %}?v={{ cache_version }}-{% now 'U' %}">
+    <link rel="stylesheet" href="{% static 'css/theme-vars.css' %}?v={{ cache_version }}-{% now 'U' %}">
+    <link rel="stylesheet" href="{% static 'css/app-core.css' %}?v={{ cache_version }}-{% now 'U' %}">
+    <link rel="stylesheet" href="{% static 'css/utilities.css' %}?v={{ cache_version }}-{% now 'U' %}">
     <style>
         html, body {
             height: 100%;
