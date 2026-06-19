@@ -30,6 +30,11 @@ def get_clin_details(request, clin_id):
             pod_status = 'partial'
         else:
             pod_status = 'full'
+        ship_qty = clin.ship_qty
+        order_qty = clin.order_qty
+        is_shipping_complete = bool(
+            ship_qty and order_qty and ship_qty > 0 and order_qty > 0 and ship_qty == order_qty
+        )
         return JsonResponse({
             'success': True,
             'id': clin.id,
@@ -64,6 +69,7 @@ def get_clin_details(request, clin_id):
                 (clin.ship_qty or 0) > 0
                 and (clin.order_qty is None or (clin.ship_qty or 0) < clin.order_qty)
             ),
+            'is_shipping_complete': is_shipping_complete,
             'item_value': str(clin.item_value) if clin.item_value is not None else '—',
             'unit_price': str(clin.unit_price) if clin.unit_price is not None else '—',
         })

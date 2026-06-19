@@ -553,7 +553,7 @@
                                         </button>
                                       {% endif %}
                                     </td>
-                                    <td style="font-size:13px; font-weight:500; padding:3px 0;"><span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}</span>{% if selected_clin.shipments.exists %}<span class="text-body-secondary small ms-1" title="Sum of shipment quantities">∑</span>{% endif %}{% if selected_clin.ship_qty and selected_clin.ship_qty > 0 and selected_clin.order_qty and selected_clin.ship_qty < selected_clin.order_qty %}<span id="cd-partial-pill" class="badge ms-1" style="background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>{% elif selected_clin.ship_qty and selected_clin.ship_qty > 0 and selected_clin.order_qty == None %}<span id="cd-partial-pill" class="badge ms-1" style="background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>{% else %}<span id="cd-partial-pill" class="badge ms-1" style="display:none;background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>{% endif %}</td>
+                                    <td style="font-size:13px; font-weight:500; padding:3px 0;">{% if selected_clin.ship_qty and selected_clin.order_qty and selected_clin.ship_qty == selected_clin.order_qty %}<span id="cd-ship-qty" class="text-success">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}<i class="bi bi-check-circle-fill ms-1"></i></span>{% else %}<span id="cd-ship-qty">{{ selected_clin.ship_qty|floatformat:'0'|default:"—" }} {{ selected_clin.uom|default:"EA" }}</span>{% endif %}{% if selected_clin.shipments.exists %}<span class="text-body-secondary small ms-1" title="Sum of shipment quantities">∑</span>{% endif %}{% if selected_clin.ship_qty and selected_clin.ship_qty > 0 and selected_clin.order_qty and selected_clin.ship_qty < selected_clin.order_qty %}<span id="cd-partial-pill" class="badge ms-1" style="background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>{% elif selected_clin.ship_qty and selected_clin.ship_qty > 0 and selected_clin.order_qty == None %}<span id="cd-partial-pill" class="badge ms-1" style="background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>{% else %}<span id="cd-partial-pill" class="badge ms-1" style="display:none;background-color:#fd7e14;color:#fff;font-size:0.7rem;">Partial</span>{% endif %}</td>
                                 </tr>
                                 <tr>
                                     <td style="font-size:12px; color:var(--bs-secondary-color); padding:3px 0; width:46%;"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Target Ship Date:</button></td>
@@ -1984,6 +1984,10 @@ function fetchClinDetails(clinId) {
             const shipQtyLabel = d.has_shipments
                 ? '<span style="font-size:12px; color:var(--bs-secondary-color);">Ship Qty:</span>'
                 : '<button type="button" onclick="openTransactionsEditModalForClin(\'ship_qty\')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Ship Qty:</button>';
+            const shipQtyClass = d.is_shipping_complete ? ' class="text-success"' : '';
+            const shipQtyCheck = d.is_shipping_complete
+                ? ' <i class="bi bi-check-circle-fill ms-1"></i>'
+                : '';
             panel.innerHTML = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 28px;">
                     <div>
@@ -2032,7 +2036,7 @@ function fetchClinDetails(clinId) {
                             </tr>
                             <tr>
                                 <td style="font-size:12px; color:var(--bs-secondary-color); padding:3px 0; width:46%;">${shipQtyLabel}</td>
-                                <td style="font-size:13px; font-weight:500; padding:3px 0;"><span id="cd-ship-qty">${shipQty} ${d.uom || 'EA'}</span>${d.has_shipments ? '<span class="text-body-secondary small ms-1" title="Sum of shipment quantities">∑</span>' : ''}${partialPillHtml}</td>
+                                <td style="font-size:13px; font-weight:500; padding:3px 0;"><span id="cd-ship-qty"${shipQtyClass}>${shipQty} ${d.uom || 'EA'}${shipQtyCheck}</span>${d.has_shipments ? '<span class="text-body-secondary small ms-1" title="Sum of shipment quantities">∑</span>' : ''}${partialPillHtml}</td>
                             </tr>
                             <tr>
                                 <td style="font-size:12px; color:var(--bs-secondary-color); padding:3px 0; width:46%;"><button type="button" onclick="openTransactionsEditModalForClin('supplier_due_date')" class="inline-block bg-transparent border-none shadow-none p-0 font-inherit cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none">Target Ship Date:</button></td>
