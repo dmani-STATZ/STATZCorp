@@ -31,13 +31,30 @@ def _next_po_number() -> int:
     Raises RuntimeError if the sequence row is missing.
     """
     with connection.cursor() as cursor:
-        cursor.execute(
-            "UPDATE processing_sequencenumber "
-            "SET po_number = po_number + 1 "
-            "OUTPUT INSERTED.po_number "
-            "WHERE id = 1"
-        )
-        row = cursor.fetchone()
+        if connection.vendor == 'microsoft':
+            cursor.execute(
+                "UPDATE processing_sequencenumber "
+                "SET po_number = po_number + 1 "
+                "OUTPUT INSERTED.po_number "
+                "WHERE id = 1"
+            )
+            row = cursor.fetchone()
+        else:
+            cursor.execute(
+                "UPDATE processing_sequencenumber "
+                "SET po_number = po_number + 1 "
+                "WHERE id = 1"
+            )
+            if cursor.rowcount == 0:
+                cursor.execute(
+                    "INSERT INTO processing_sequencenumber (id, po_number, tab_number) "
+                    "VALUES (1, 10001, 10000)"
+                )
+            cursor.execute(
+                "SELECT po_number FROM processing_sequencenumber WHERE id = %s",
+                [cursor.lastrowid or 1],
+            )
+            row = cursor.fetchone()
     if row is None:
         raise RuntimeError(
             "processing_sequencenumber row id=1 not found. "
