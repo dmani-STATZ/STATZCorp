@@ -20,6 +20,8 @@ urlpatterns = [
     # Phase 3a: shred draft into canonical contracts.*
     path('drafts/<int:pk>/finalize/', views.finalize_draft_view, name='finalize_draft'),
     path('drafts/<int:pk>/finalize-direct/', views.finalize_direct_view, name='finalize_direct'),
+    path('email-compose/', views.email_compose_page, name='email_compose'),
+    path('send-email/', views.send_contract_email, name='send_contract_email'),
     # Phase 3c: PDF drag-and-drop ingestion
     path('upload/', views.upload_pdfs, name='upload_pdfs'),
     # SharePoint scan API

@@ -586,12 +586,175 @@ def scan_sharepoint_drafts(request):
     return JsonResponse({'results': results})
 
 
-def _build_compose_url(contract, draft_type: str) -> str:
-    """Produce the URL of /processing/email-compose/?subject=...&body=...
+@login_required
+def email_compose_page(request):
+    """Standalone email compose page opened in a new tab after finalization.
 
-    Mirrors `processing.views.processing_views.finalize_and_email_contract`
-    so analysts get the same email-compose page they're used to. Returns
-    a path-only URL (no host), suitable for HttpResponseRedirect.
+    Reads subject and body from GET query params (pre-populated by finalize).
+    Renders intake/email_compose.html — intake-owned, no processing dependency.
+    """
+    from django.conf import settings
+
+    return render(
+        request,
+        'intake/email_compose.html',
+        {
+            'subject': request.GET.get('subject', ''),
+            'body': request.GET.get('body', ''),
+            'sender_email': getattr(settings, 'GRAPH_MAIL_SENDER_CONTRACT', ''),
+        },
+    )
+
+
+@login_required
+@require_POST
+def send_contract_email(request):
+    """Send the finalization notification email via Microsoft Graph (GCC High).
+
+    Accepts: to_email (semicolon-separated), subject, body (form-encoded POST).
+    Mirrors processing:send_contract_email — same Graph endpoint and settings
+    keys — but lives in intake so the two apps are independent.
+    """
+    import re as _re
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlencode
+
+    from django.conf import settings
+
+    raw_to = (request.POST.get('to_email') or '').strip()
+    subject = (request.POST.get('subject') or '').strip()
+    body = request.POST.get('body') or ''
+
+    recipients = [r.strip() for r in raw_to.split(';') if r.strip()]
+    if not recipients:
+        return JsonResponse(
+            {'success': False, 'error': 'Recipient email is required.'},
+            status=400,
+        )
+    _EMAIL_RE = _re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+    bad = [r for r in recipients if not _EMAIL_RE.match(r)]
+    if bad:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': f'Invalid email address(es): {", ".join(bad)}',
+            },
+            status=400,
+        )
+    if not subject:
+        return JsonResponse(
+            {'success': False, 'error': 'Subject is required.'},
+            status=400,
+        )
+
+    if not getattr(settings, 'GRAPH_MAIL_ENABLED', False):
+        return JsonResponse(
+            {
+                'success': False,
+                'error': (
+                    'Graph Mail is not enabled. '
+                    'Set GRAPH_MAIL_ENABLED=True in environment settings.'
+                ),
+            }
+        )
+
+    try:
+        token_url = (
+            f'https://login.microsoftonline.us/'
+            f'{settings.GRAPH_MAIL_TENANT_ID}/oauth2/v2.0/token'
+        )
+        token_data = {
+            'grant_type': 'client_credentials',
+            'client_id': settings.GRAPH_MAIL_CLIENT_ID,
+            'client_secret': settings.GRAPH_MAIL_CLIENT_SECRET,
+            'scope': 'https://graph.microsoft.us/.default',
+        }
+        token_req = urllib.request.Request(
+            token_url,
+            data=urlencode(token_data).encode('utf-8'),
+            method='POST',
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        )
+        with urllib.request.urlopen(token_req, timeout=60) as token_resp:
+            token_payload = json.loads(token_resp.read().decode('utf-8'))
+        access_token = token_payload.get('access_token')
+        if not access_token:
+            logger.error(
+                'Intake Graph Mail: token response missing access_token: %s',
+                token_payload,
+            )
+            return JsonResponse(
+                {
+                    'success': False,
+                    'error': 'Failed to send email. Check server logs.',
+                },
+                status=500,
+            )
+
+        to_recipients = [
+            {'emailAddress': {'address': r}} for r in recipients
+        ]
+
+        send_url = (
+            f'https://graph.microsoft.us/v1.0/users/'
+            f'{settings.GRAPH_MAIL_SENDER_CONTRACT}/sendMail'
+        )
+        payload = {
+            'message': {
+                'subject': subject,
+                'body': {'contentType': 'Text', 'content': body},
+                'toRecipients': to_recipients,
+            },
+            'saveToSentItems': True,
+        }
+        send_req = urllib.request.Request(
+            send_url,
+            data=json.dumps(payload).encode('utf-8'),
+            method='POST',
+            headers={
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json',
+            },
+        )
+        with urllib.request.urlopen(send_req, timeout=60) as send_resp:
+            status_code = send_resp.status
+        if not (200 <= status_code < 300):
+            logger.error('Intake Graph sendMail returned HTTP %s', status_code)
+            return JsonResponse(
+                {
+                    'success': False,
+                    'error': 'Failed to send email. Check server logs.',
+                },
+                status=500,
+            )
+        return JsonResponse({'success': True})
+
+    except urllib.error.HTTPError as exc:
+        err_body = exc.read().decode('utf-8', errors='replace')
+        logger.error('Intake Graph Mail HTTP error: %s %s', exc.code, err_body)
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Failed to send email. Check server logs.',
+            },
+            status=500,
+        )
+    except Exception as exc:
+        logger.error('Intake Graph Mail error: %s', str(exc), exc_info=True)
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Failed to send email. Check server logs.',
+            },
+            status=500,
+        )
+
+
+def _build_compose_url(contract, draft_type: str) -> str:
+    """Produce the URL of intake:email_compose with subject + body query params.
+
+    Returns a path-only URL (no host), suitable for client-side navigation.
     """
     from urllib.parse import urlencode
 
@@ -599,8 +762,10 @@ def _build_compose_url(contract, draft_type: str) -> str:
     lines = [
         f'A new {draft_type} contract has been finalized via intake.',
         '',
-        f'Contract #: {contract.contract_number}',
     ]
+    if getattr(contract, 'po_number', None):
+        lines.append(f'PO #: {contract.po_number}')
+    lines.append(f'Contract #: {contract.contract_number}')
     if getattr(contract, 'pr_number', None):
         lines.append(f'PR #: {contract.pr_number}')
     if getattr(contract, 'files_url', None):
@@ -616,7 +781,7 @@ def _build_compose_url(contract, draft_type: str) -> str:
             lines.append('CLINs:')
             lines.extend(clin_lines)
     body = '\n'.join(lines)
-    return f"/processing/email-compose/?{urlencode({'subject': subject, 'body': body})}"
+    return f"{reverse('intake:email_compose')}?{urlencode({'subject': subject, 'body': body})}"
 
 
 @login_required
@@ -627,10 +792,9 @@ def finalize_draft_view(request, pk: int):
     Whole flow is one atomic transaction: lock the row, assert the user
     holds the soft lock, run the shred. On any failure the transaction
     rolls back and the draft stays in `ready_for_review`. On success the
-    draft is deleted (spec: drafts are not contracts) and we redirect to
-    the new canonical record — or to a pre-populated email compose page
-    when the draft created a new Contract row, matching the long-standing
-    processing-app behavior.
+    draft is deleted (spec: drafts are not contracts) and returns JSON so
+    the client can open intake:email_compose in a new tab while redirecting
+    the current tab to the queue.
     """
     from contracts.models import Contract  # avoid top-level cycle risk
 
@@ -642,33 +806,41 @@ def finalize_draft_view(request, pk: int):
         try:
             assert_holds(draft, request.user)
         except LockError as exc:
-            messages.error(request, str(exc))
-            return redirect('intake:queue')
+            return JsonResponse(
+                {'success': False, 'error': str(exc)},
+                status=400,
+            )
         draft_type = draft.get_contract_type_display()
 
         try:
             target = finalize_draft(draft, request.user)
         except FinalizationError as exc:
-            messages.error(request, f'Finalization blocked: {exc}')
-            return redirect('intake:edit_draft', pk=pk)
+            return JsonResponse(
+                {'success': False, 'error': str(exc)},
+                status=400,
+            )
 
-    messages.success(
-        request,
-        f'Finalized → {type(target).__name__} #{target.pk}.',
-    )
-
-    # New Contract → route to the email compose page (matches processing
-    # workflow). MOD/AMD return the *parent* Contract; we don't want a
-    # "new contract email" for those, so route them to the queue with a
-    # success message instead.
     if isinstance(target, Contract):
-        # Heuristic: if the draft type was MOD/AMD the email is wrong
-        # (target is the parent, not a new contract). draft_type was
-        # captured pre-delete.
         if draft_type in ('Modification', 'Amendment'):
-            return redirect('intake:queue')
-        return redirect(_build_compose_url(target, draft_type or 'Contract'))
-    return redirect('intake:queue')
+            return JsonResponse({
+                'success': True,
+                'compose_url': None,
+                'redirect_url': reverse('intake:queue'),
+                'message': f'Finalized → Contract #{target.pk}.',
+            })
+        compose_url = _build_compose_url(target, draft_type or 'Contract')
+        return JsonResponse({
+            'success': True,
+            'compose_url': compose_url,
+            'redirect_url': reverse('intake:queue'),
+            'message': f'Finalized → Contract #{target.pk}.',
+        })
+    return JsonResponse({
+        'success': True,
+        'compose_url': None,
+        'redirect_url': reverse('intake:queue'),
+        'message': f'Finalized → {type(target).__name__} #{target.pk}.',
+    })
 
 
 @login_required

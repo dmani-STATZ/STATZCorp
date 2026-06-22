@@ -583,6 +583,59 @@ class FinalizationTests(TestCase):
         # Draft must be deleted on success.
         self.assertFalse(DraftContract.objects.filter(pk=draft_pk).exists())
 
+    def test_awd_clin_price_fields_translated_to_canonical_semantics(self):
+        """Intake JSON item_value=gov unit, unit_price=supplier unit → canonical Clin."""
+        draft = self._ready_awd(
+            clins=[
+                {
+                    'item_number': '0001',
+                    'item_type': 'P',
+                    'nsn_id': self.nsn1.id,
+                    'nsn_text': '1111-11-111-1111',
+                    'supplier_id': self.supplier1.id,
+                    'supplier_text': 'Supp A',
+                    'order_qty': 20,
+                    'item_value': '792.34',
+                    'unit_price': '755.33',
+                    'ia': 'O',
+                    'fob': 'D',
+                },
+            ],
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        clin = target.clin_set.get()
+        self.assertEqual(clin.unit_price, Decimal('792.34'))
+        self.assertEqual(clin.price_per_unit, Decimal('755.33'))
+        self.assertEqual(clin.item_value, Decimal('792.34') * 20)
+        self.assertEqual(clin.quote_value, Decimal('755.33') * 20)
+
+    def test_awd_clin_missing_order_qty_stores_per_unit_only(self):
+        draft = self._ready_awd(
+            clins=[
+                {
+                    'item_number': '0001',
+                    'item_type': 'P',
+                    'nsn_id': self.nsn1.id,
+                    'nsn_text': '1111-11-111-1111',
+                    'supplier_id': self.supplier1.id,
+                    'supplier_text': 'Supp A',
+                    'order_qty': None,
+                    'item_value': '792.34',
+                    'unit_price': '755.33',
+                    'ia': 'O',
+                    'fob': 'D',
+                },
+            ],
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        clin = target.clin_set.get()
+        self.assertEqual(clin.unit_price, Decimal('792.34'))
+        self.assertEqual(clin.price_per_unit, Decimal('755.33'))
+        self.assertIsNone(clin.item_value)
+        self.assertIsNone(clin.quote_value)
+
     def test_awd_status_guard(self):
         draft = self._ready_awd()
         draft.status = DraftContract.Status.IN_PROGRESS
@@ -704,6 +757,125 @@ class FinalizationTests(TestCase):
         with self.assertRaises(FinalizationError):
             with transaction.atomic():
                 finalize_draft(draft, self.alice)
+
+
+class PoNumberMintingTests(TestCase):
+    """PO number minting at finalization for AWD/PO/DO/INTERNAL only."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+        cls.buyer = Buyer.objects.create(description='Acme Buying Office')
+        cls.nsn = Nsn.objects.create(nsn_code='7777-77-777-7777', description='Bolt')
+        cls.supplier = Supplier.objects.create(name='Supp PO', cage_code='PO777')
+        cls.parent_idiq = IdiqContract.objects.create(
+            contract_number='SPE7L1-23-D-POIDIQ',
+        )
+
+    def _ready_awd(self, contract_number='SPE7L1-26-P-POMINT1'):
+        return DraftContract.objects.create(
+            contract_number=contract_number,
+            contract_type='AWD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'buyer_id': self.buyer.id,
+                'buyer_text': 'Acme',
+                'clins': [{
+                    'item_number': '0001',
+                    'nsn_id': self.nsn.id, 'nsn_text': '7777',
+                    'supplier_id': self.supplier.id, 'supplier_text': 'Supp PO',
+                }],
+            },
+        )
+
+    @patch('intake.services.po_sequence.mint_intake_po_number', return_value=15685)
+    def test_awd_finalize_stamps_po_on_contract_and_clins(self, _mock_mint):
+        draft = self._ready_awd()
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        target.refresh_from_db()
+        self.assertTrue(target.po_number)
+        self.assertTrue(target.po_number.isdigit())
+        for clin in Clin.objects.filter(contract=target):
+            self.assertEqual(clin.po_number, target.po_number)
+            self.assertEqual(clin.clin_po_num, target.po_number)
+
+    @patch('intake.services.po_sequence.mint_intake_po_number', return_value=20001)
+    def test_do_finalize_stamps_po_on_contract_and_clins(self, _mock_mint):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-F-PODO',
+            contract_type='DO',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'buyer_id': self.buyer.id,
+                'parent_idiq_id': self.parent_idiq.id,
+                'clins': [{
+                    'item_number': '0001',
+                    'nsn_id': self.nsn.id,
+                    'supplier_id': self.supplier.id,
+                }],
+            },
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        target.refresh_from_db()
+        self.assertEqual(target.po_number, '20001')
+        for clin in Clin.objects.filter(contract=target):
+            self.assertEqual(clin.po_number, '20001')
+            self.assertEqual(clin.clin_po_num, '20001')
+
+    @patch('intake.services.po_sequence.mint_intake_po_number', return_value=30001)
+    def test_internal_finalize_stamps_po_on_contract_and_clins(self, _mock_mint):
+        draft = DraftContract.objects.create(
+            contract_number='STATZ1-26-N-POINT',
+            contract_type='INTERNAL',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={'notes': 'internal tracking'},
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        target.refresh_from_db()
+        self.assertEqual(target.po_number, '30001')
+
+    @patch('intake.services.po_sequence.mint_intake_po_number')
+    def test_idiq_finalize_does_not_mint_po(self, mock_mint):
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-D-POIDIQ',
+            contract_type='IDIQ',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={'term_months': 36},
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        mock_mint.assert_not_called()
+        self.assertFalse(hasattr(target, 'po_number'))
+
+    @patch('intake.services.po_sequence.mint_intake_po_number', side_effect=[10001, 10002])
+    def test_sequential_awd_finalizations_increment_po(self, _mock_mint):
+        draft1 = self._ready_awd('SPE7L1-26-P-POSEQ1')
+        draft2 = self._ready_awd('SPE7L1-26-P-POSEQ2')
+        with transaction.atomic():
+            first = finalize_draft(draft1, self.alice)
+        with transaction.atomic():
+            second = finalize_draft(draft2, self.alice)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(int(second.po_number), int(first.po_number) + 1)
+
+    @patch(
+        'intake.services.po_sequence.mint_intake_po_number',
+        side_effect=RuntimeError('sequence row missing'),
+    )
+    def test_mint_failure_rolls_back_contract_creation(self, _mock_mint):
+        draft = self._ready_awd('SPE7L1-26-P-POROLL')
+        draft_pk = draft.pk
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                finalize_draft(draft, self.alice)
+        self.assertFalse(
+            Contract.objects.filter(contract_number='SPE7L1-26-P-POROLL').exists()
+        )
+        self.assertTrue(DraftContract.objects.filter(pk=draft_pk).exists())
 
 
 class FinalizeViewTests(TestCase):
@@ -1365,11 +1537,15 @@ class FinalizeEmailRedirectTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn('/processing/email-compose/', resp.url)
-        # The body should contain the new contract number.
-        self.assertIn('SPE7L1-26-C-EMAIL', resp.url)
-        self.assertIn('subject=', resp.url)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data['success'])
+        self.assertIn('/intake/email-compose/', data['compose_url'])
+        self.assertIn('SPE7L1-26-C-EMAIL', data['compose_url'])
+        self.assertIn('subject=', data['compose_url'])
+        contract = Contract.objects.get(contract_number='SPE7L1-26-C-EMAIL')
+        self.assertTrue(contract.po_number)
+        self.assertIn('PO', data['compose_url'])
 
     def test_mod_finalize_skips_email_redirect(self):
         parent = Contract.objects.create(contract_number='SPE7L1-25-C-PMOD')
@@ -1386,9 +1562,151 @@ class FinalizeEmailRedirectTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data['success'])
+        self.assertIsNone(data['compose_url'])
+        self.assertEqual(data['redirect_url'], reverse('intake:queue'))
+
+
+class IntakeEmailComposeTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+
+    def test_compose_page_renders(self):
+        self.client.force_login(self.alice)
+        resp = self.client.get(
+            reverse('intake:email_compose') + '?subject=Foo&body=Bar'
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Foo')
+        self.assertContains(resp, 'Bar')
+        self.assertTemplateUsed(resp, 'intake/email_compose.html')
+
+    def test_compose_page_requires_login(self):
+        resp = self.client.get(reverse('intake:email_compose'))
         self.assertEqual(resp.status_code, 302)
-        # MOD returns parent — no email compose, just queue.
-        self.assertNotIn('/processing/email-compose/', resp.url)
+        self.assertIn('/login', resp.url)
+
+
+class IntakeSendEmailTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.alice = User.objects.create_user('alice', 'a@x.com', 'pw')
+
+    _GRAPH_SETTINGS = {
+        'GRAPH_MAIL_ENABLED': True,
+        'GRAPH_MAIL_TENANT_ID': 'tenant-id',
+        'GRAPH_MAIL_CLIENT_ID': 'client-id',
+        'GRAPH_MAIL_CLIENT_SECRET': 'secret',
+        'GRAPH_MAIL_SENDER_CONTRACT': 'sender@example.com',
+    }
+
+    def _make_urlopen_side_effect(self, captured_payloads=None, send_status=202):
+        def side_effect(request, timeout=60):
+            from unittest.mock import MagicMock
+
+            resp = MagicMock()
+            resp.__enter__ = MagicMock(return_value=resp)
+            resp.__exit__ = MagicMock(return_value=False)
+            url = request.full_url
+            if 'oauth2' in url or '/token' in url:
+                resp.read.return_value = b'{"access_token": "test-token"}'
+            else:
+                if captured_payloads is not None:
+                    captured_payloads.append(
+                        json.loads(request.data.decode('utf-8'))
+                    )
+                resp.status = send_status
+                resp.read.return_value = b''
+            return resp
+
+        return side_effect
+
+    @patch('urllib.request.urlopen')
+    def test_send_single_recipient(self, mock_urlopen):
+        from django.test import override_settings
+
+        mock_urlopen.side_effect = self._make_urlopen_side_effect()
+        with override_settings(**self._GRAPH_SETTINGS):
+            self.client.force_login(self.alice)
+            resp = self.client.post(
+                reverse('intake:send_contract_email'),
+                {'to_email': 'a@b.com', 'subject': 'S', 'body': 'B'},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+
+    @patch('urllib.request.urlopen')
+    def test_send_multiple_recipients(self, mock_urlopen):
+        from django.test import override_settings
+
+        captured = []
+        mock_urlopen.side_effect = self._make_urlopen_side_effect(
+            captured_payloads=captured,
+        )
+        with override_settings(**self._GRAPH_SETTINGS):
+            self.client.force_login(self.alice)
+            resp = self.client.post(
+                reverse('intake:send_contract_email'),
+                {'to_email': 'a@b.com; c@d.com', 'subject': 'S', 'body': 'B'},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.assertEqual(len(captured), 1)
+        recipients = captured[0]['message']['toRecipients']
+        self.assertEqual(len(recipients), 2)
+        addresses = {r['emailAddress']['address'] for r in recipients}
+        self.assertEqual(addresses, {'a@b.com', 'c@d.com'})
+
+    def test_send_missing_recipient(self):
+        self.client.force_login(self.alice)
+        resp = self.client.post(
+            reverse('intake:send_contract_email'),
+            {'to_email': '', 'subject': 'S', 'body': 'B'},
+        )
+        self.assertEqual(resp.status_code, 400)
+        data = resp.json()
+        self.assertFalse(data['success'])
+        self.assertIn('recipient', data['error'].lower())
+
+    def test_send_invalid_email(self):
+        self.client.force_login(self.alice)
+        resp = self.client.post(
+            reverse('intake:send_contract_email'),
+            {'to_email': 'notanemail', 'subject': 'S', 'body': 'B'},
+        )
+        self.assertEqual(resp.status_code, 400)
+        data = resp.json()
+        self.assertFalse(data['success'])
+        self.assertIn('notanemail', data['error'])
+
+    def test_send_graph_disabled(self):
+        from django.test import override_settings
+
+        with override_settings(GRAPH_MAIL_ENABLED=False):
+            self.client.force_login(self.alice)
+            resp = self.client.post(
+                reverse('intake:send_contract_email'),
+                {'to_email': 'a@b.com', 'subject': 'S', 'body': 'B'},
+            )
+        data = resp.json()
+        self.assertFalse(data['success'])
+        self.assertIn('Graph Mail', data['error'])
+
+    def test_send_requires_post(self):
+        self.client.force_login(self.alice)
+        resp = self.client.get(reverse('intake:send_contract_email'))
+        self.assertEqual(resp.status_code, 405)
+
+    def test_send_requires_login(self):
+        resp = self.client.post(
+            reverse('intake:send_contract_email'),
+            {'to_email': 'a@b.com', 'subject': 'S', 'body': 'B'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/login', resp.url)
 
 
 # ---------------------------------------------------------------------------

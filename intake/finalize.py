@@ -59,6 +59,7 @@ IDIQ
 from __future__ import annotations
 
 import logging
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Union
 
 from django.contrib.auth.models import User
@@ -81,7 +82,6 @@ from contracts.services import (
 )
 
 from .models import DraftContract
-from .services.po_number import assign_po_number
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +173,10 @@ def _draft_to_service_payload(draft: DraftContract, kind: str) -> dict:
         'due_date': data.get('due_date'),
         'contract_value': data.get('contract_value'),
         'files_url': files_url_value,
-        'clins': [_draft_clin_to_payload(c) for c in (data.get('clins') or [])],
+        'clins': [
+            _draft_clin_to_payload(c, draft.contract_number)
+            for c in (data.get('clins') or [])
+        ],
         'packaging': data.get('packaging'),
         'level_charges': data.get('level_charges') or [],
         'seed_payment_history': False,
@@ -182,17 +185,59 @@ def _draft_to_service_payload(draft: DraftContract, kind: str) -> dict:
     }
 
 
-def _draft_clin_to_payload(row: dict) -> dict:
-    """Translate one draft CLIN dict into the service CLIN shape."""
+def _draft_clin_to_payload(row: dict, contract_number: str | None = None) -> dict:
+    """Translate one draft CLIN dict into the service CLIN shape.
+
+    Intake JSON uses inverted price keys vs canonical Clin:
+      intake item_value  → canonical unit_price  (gov per-unit)
+      intake unit_price  → canonical price_per_unit (supplier per-unit)
+    Canonical item_value and quote_value are qty × per-unit totals.
+    """
+    intake_gov_unit = _decimal_or_none(row.get('item_value'))
+    intake_supplier_unit = _decimal_or_none(row.get('unit_price'))
+    order_qty = _order_qty_decimal(row.get('order_qty'))
+
+    canonical_unit_price = intake_gov_unit
+    canonical_price_per_unit = intake_supplier_unit
+    canonical_item_value = None
+    canonical_quote_value = None
+
+    item_number = row.get('item_number')
+    if intake_gov_unit is not None:
+        if order_qty is None:
+            logger.warning(
+                'Intake finalize: contract %s CLIN %s has government unit price '
+                'but no parseable order_qty; item_value total left unset.',
+                contract_number, item_number,
+            )
+        else:
+            canonical_item_value = (intake_gov_unit * order_qty).quantize(
+                Decimal('0.0001'), rounding=ROUND_HALF_UP,
+            )
+
+    if intake_supplier_unit is not None:
+        if order_qty is None:
+            logger.warning(
+                'Intake finalize: contract %s CLIN %s has supplier unit price '
+                'but no parseable order_qty; quote_value total left unset.',
+                contract_number, item_number,
+            )
+        else:
+            canonical_quote_value = (intake_supplier_unit * order_qty).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP,
+            )
+
     return {
-        'item_number': row.get('item_number'),
+        'item_number': item_number,
         'item_type': row.get('item_type'),
         'nsn_id': row.get('nsn_id'),
         'supplier_id': row.get('supplier_id'),
         'order_qty': row.get('order_qty'),
         'uom': row.get('uom'),
-        'unit_price': row.get('unit_price'),
-        'item_value': row.get('item_value'),
+        'unit_price': canonical_unit_price,
+        'item_value': canonical_item_value,
+        'price_per_unit': canonical_price_per_unit,
+        'quote_value': canonical_quote_value,
         'due_date': row.get('due_date'),
         'supplier_due_date': row.get('supplier_due_date'),
         'special_payment_terms': row.get('special_payment_terms'),
@@ -203,12 +248,57 @@ def _draft_clin_to_payload(row: dict) -> dict:
     }
 
 
+def _decimal_or_none(value) -> Decimal | None:
+    if value is None or value == '':
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _order_qty_decimal(value) -> Decimal | None:
+    if value is None or value == '':
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
 def _call_service(payload: dict, user: User) -> ContractCreationResult:
     """Invoke the shared service and rewrap its exception as FinalizationError."""
     try:
         return create_contract_from_payload(payload, user)
     except ContractCreationError as exc:
         raise FinalizationError(str(exc)) from exc
+
+
+def _stamp_po_number(contract, clins_by_item_number: dict) -> int:
+    """Mint the next PO number and write it to Contract + all Clins.
+
+    Must be called AFTER the contract-creation service has returned so
+    the canonical rows exist. Runs inside the caller's transaction.atomic().
+
+    Returns the minted PO number.
+    """
+    from intake.services.po_sequence import mint_intake_po_number
+    from contracts.models import Clin
+
+    po = mint_intake_po_number()
+    po_str = str(po)
+
+    # Stamp the contract row
+    contract.po_number = po_str
+    contract.save(update_fields=['po_number'])
+
+    # Stamp every CLIN (both po_number and clin_po_num — matches processing)
+    Clin.objects.filter(contract=contract).update(
+        po_number=po_str,
+        clin_po_num=po_str,
+    )
+    logger.info('Minted PO %s for contract %s', po_str, contract.contract_number)
+    return po
 
 
 # ---------------------------------------------------------------------------
@@ -234,9 +324,7 @@ def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
     result = _call_service(_draft_to_service_payload(draft, 'AWD'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
-    # Assign PO number from shared sequence table (processing_sequencenumber).
-    # This call is inside transaction.atomic() — failure rolls back everything.
-    assign_po_number(result.contract)
+    _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 
 
@@ -260,9 +348,7 @@ def _finalize_do(draft: DraftContract, user: User) -> Contract:
     result = _call_service(payload, user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
-    # Assign PO number from shared sequence table (processing_sequencenumber).
-    # This call is inside transaction.atomic() — failure rolls back everything.
-    assign_po_number(result.contract)
+    _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 
 
@@ -282,9 +368,7 @@ def _finalize_internal(draft: DraftContract, user: User) -> Contract:
     result = _call_service(_draft_to_service_payload(draft, 'INTERNAL'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
-    # Assign PO number from shared sequence table (processing_sequencenumber).
-    # This call is inside transaction.atomic() — failure rolls back everything.
-    assign_po_number(result.contract)
+    _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 
 

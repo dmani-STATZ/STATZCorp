@@ -167,17 +167,15 @@ all rows. POST keys are chg-<i>-label and chg-<i>-estimated_amount.
 billed_paid_amount is NOT captured at intake — that is Finance Audit only.
 
 PO Number is display-only in the editor (`Assigned at finalization`). It is
-assigned by `intake/services/po_number.py::assign_po_number()` during
-finalization for AWD, PO, DO, and INTERNAL contract types. Assignment reads
-from and atomically increments the shared `processing_sequencenumber` table
-(id=1, `po_number` column). The same integer is written to `Contract.po_number`
-and to `Clin.po_number`, `Clin.clin_po_num`, and `Clin.po_num_ext` for every CLIN
-under the contract. IDIQ, MOD, and AMD types do not receive a PO number.
-The call lives inside `finalize.py`'s `transaction.atomic()` block so sequence
-increment and contract creation are atomic. Not a draft field — never add
-`po_number` to intake schemas or POST fields.
-⚠ `po_num_ext` is CharField(max_length=5). Sequence is currently ~15685.
-Overflow at 99999. Plan a migration before that threshold.
+minted during finalization for AWD, PO, DO, and INTERNAL contract types via
+`intake/services/po_sequence.py::mint_intake_po_number()` (raw T-SQL cursor
+against the shared `processing_sequencenumber` table, id=1). The same integer
+is written to `Contract.po_number` and to `Clin.po_number` and
+`Clin.clin_po_num` for every CLIN under the contract. IDIQ, MOD, and AMD
+types do not receive a PO number. Minting runs inside `finalize.py`'s
+`transaction.atomic()` block so sequence increment and contract creation are
+atomic. Not a draft field — never add `po_number` to intake schemas or POST
+fields.
 
 GP calculation per CLIN:
 `contract_total = item_value × order_qty`
@@ -260,11 +258,46 @@ canonical `Clin`. Legacy root-level `finance_lines` are still accepted for
 in-flight drafts and attach to the first canonical CLIN with a warning
 (removed once the queue is clear of pre-redesign drafts).
 
+**CLIN price translation at finalization:** Intake draft JSON keeps its own
+semantics (`item_value` = government per-unit price, `unit_price` = supplier
+per-unit quote — see GP note above). `_draft_clin_to_payload` is the single
+boundary that maps those keys to canonical `Clin` fields before calling
+`create_contract_from_payload`:
+
+| Intake JSON key | Canonical `Clin` field | Notes |
+|-----------------|------------------------|-------|
+| `item_value` | `unit_price` | gov per-unit, stored as-is |
+| `item_value` × `order_qty` | `item_value` | customer total |
+| `unit_price` | `price_per_unit` | supplier per-unit, stored as-is |
+| `unit_price` × `order_qty` | `quote_value` | supplier total |
+
+If `order_qty` is missing or unparseable, per-unit fields are stored but the
+corresponding totals are left `None` (finalization still succeeds).
+
+**PO number minting** — AWD, PO, DO, and INTERNAL finalization atomically
+increments `processing_sequencenumber.po_number` via raw T-SQL cursor
+(`intake/services/po_sequence.py::mint_intake_po_number`), stamps
+`Contract.po_number`, and bulk-updates all child `Clin` rows
+(`po_number` + `clin_po_num`). IDIQ/MOD/AMD do not receive a PO. Minting
+runs inside the existing `transaction.atomic()` — a failed finalization
+rolls back the sequence increment automatically. Intake does NOT import
+`processing.models.SequenceNumber`.
+
 URL: `intake:finalize_draft` → `POST /intake/drafts/<pk>/finalize/`
 (requires lock + status=`ready_for_review`). On success for AWD/PO/DO/INTERNAL,
-redirects to `/processing/email-compose/` with subject + body pre-populated
-(matches the long-standing processing-app email workflow). MOD/AMD skip the
-email step.
+returns JSON with `compose_url` pointing to `intake:email_compose` (subject +
+body pre-populated). MOD/AMD skip the email step (`compose_url` is null).
+
+**Finalization Email** — After finalization, `finalize_draft_view` returns JSON
+`{success, compose_url, redirect_url}`. The Finalize button JS pre-opens a blank
+tab (popup-blocker safe), then navigates it to `intake:email_compose` on success
+while redirecting the current tab to the queue. `intake:send_contract_email`
+sends via Microsoft Graph GCC High (same settings as processing:
+`GRAPH_MAIL_ENABLED`, `GRAPH_MAIL_TENANT_ID`, `GRAPH_MAIL_CLIENT_ID`,
+`GRAPH_MAIL_CLIENT_SECRET`, `GRAPH_MAIL_SENDER_CONTRACT`). Multiple To addresses
+are semicolon-delimited; both the template (client-side) and the view
+(server-side) validate and split them. Intake no longer redirects to
+`/processing/email-compose/`.
 
 **One-step finalization (`finalize_direct`)**
 `finalize_direct_view` combines save + finalization into a single action for
@@ -336,8 +369,8 @@ trigger a per-row SP rescan. The Docs button is now icon-only.
   immediately after Processing queue injection. Creates skeleton DraftContracts
   (status=queued, pdf_parse_status=no_pdf) for the same STATZ-won awards
   injected into the Processing queue. No manual command needed.
-- **Finalization email** — redirects to `/processing/email-compose/` with
-  prefilled subject + body on Contract-creating finalize paths
+- **Finalization email** — intake-owned compose + send (`intake:email_compose`,
+  `intake:send_contract_email`); see Finalization Email section above
 
 **Company scoping** — `DraftContract.company` FK added. Queue view filters to all
 companies the user has membership in (superusers see all, including unscoped

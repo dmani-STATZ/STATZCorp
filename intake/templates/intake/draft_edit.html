@@ -649,20 +649,17 @@
             Drafts are deleted on success. The action is wrapped in a
             transaction so any failure leaves the draft intact.
         </p>
-        <form method="post" action="{% url 'intake:finalize_draft' draft.pk %}">
-            {% csrf_token %}
-            <button type="submit"
-                    class="btn btn-success"
-                    {% if not lock_held_by_user %}disabled{% endif %}
-                    onclick="return confirm('Finalize {{ draft.contract_number }}? The draft will be deleted on success.')">
-                Finalize Draft → Contract
-            </button>
-            {% if not lock_held_by_user %}
-            <p class="small text-muted mt-2 mb-0">
-                Re-acquire the lock from the queue to finalize.
-            </p>
-            {% endif %}
-        </form>
+        <button type="button"
+                id="intake-finalize-btn"
+                class="btn btn-success"
+                {% if not lock_held_by_user %}disabled{% endif %}>
+            Finalize Draft → Contract
+        </button>
+        {% if not lock_held_by_user %}
+        <p class="small text-muted mt-2 mb-0">
+            Re-acquire the lock from the queue to finalize.
+        </p>
+        {% endif %}
     </div>
     {% elif draft.status == 'in_progress' %}
     <div class="alert alert-info">
@@ -1396,6 +1393,57 @@
         bootRecalc();
         restoreOpenClins();
     }
+})();
+
+(function () {
+    const finalizeBtn = document.getElementById('intake-finalize-btn');
+    if (!finalizeBtn) return;
+
+    const finalizeUrl = "{% url 'intake:finalize_draft' draft.pk %}";
+    const csrfToken = function () {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    };
+
+    finalizeBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        if (!confirm('Finalize {{ draft.contract_number }}? '
+                     + 'The draft will be deleted on success.')) return;
+
+        const emailWindow = window.open('', '_blank');
+
+        finalizeBtn.disabled = true;
+        finalizeBtn.textContent = 'Finalizing…';
+
+        fetch(finalizeUrl, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+            if (data.success) {
+                if (data.compose_url && emailWindow) {
+                    emailWindow.location.href = data.compose_url;
+                } else if (emailWindow) {
+                    emailWindow.close();
+                }
+                window.location.href = data.redirect_url;
+            } else {
+                if (emailWindow) emailWindow.close();
+                alert('Finalization failed: ' + (data.error || 'Unknown error.'));
+                finalizeBtn.disabled = false;
+                finalizeBtn.textContent = 'Finalize Draft → Contract';
+            }
+        })
+        .catch(function (err) {
+            if (emailWindow) emailWindow.close();
+            alert('Finalization request failed. Check your connection and try again.');
+            finalizeBtn.disabled = false;
+            finalizeBtn.textContent = 'Finalize Draft → Contract';
+        });
+    });
 })();
 </script>
 

@@ -23,6 +23,10 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   the 30-minute window is referenced in admin and queue UI copy.
 
 ### Finalization (Phase 3 — all seven types)
+- **`finalize_draft_view` returns `JsonResponse` — not `HttpResponseRedirect`.**
+  Any test or client code that expects a 302 must be updated to expect 200
+  JSON. The Finalize button uses the pre-open popup pattern — do not change
+  this to a synchronous redirect or the new-window behavior breaks.
 - **One-step finalization (`finalize_direct`):** `finalize_direct_view` in
   `views.py` runs two sequential atomic transactions. TX1: parse POST →
   validate → save → set status=READY_FOR_REVIEW (lock NOT released). TX2:
@@ -64,6 +68,19 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   percentage). `split_value` is computed in finalize as
   `planned_gp × percentage / 100` (quantized to cents), not pulled from
   the draft. The editor renders the live value for analyst feedback.
+- **CLIN price translation at finalization:** Intake JSON `item_value` is the
+  government per-unit price and `unit_price` is the supplier per-unit quote
+  (see ingest/editor notes below — do not swap those keys in draft JSON).
+  `_draft_clin_to_payload` in `finalize.py` is the **single translation
+  boundary** to canonical `Clin` semantics: intake `item_value` →
+  `unit_price`; intake `unit_price` → `price_per_unit`; canonical
+  `item_value` and `quote_value` are computed as per-unit × `order_qty` at
+  finalize (totals quantized to 4 dp / 2 dp). Missing `order_qty` stores
+  per-unit values only and leaves totals `None`.
+- **PO minting** uses `intake/services/po_sequence.py` — raw cursor only, no
+  processing import. Never call `SequenceNumber` from processing in intake
+  code. Applies to AWD/PO/DO/INTERNAL only (`_stamp_po_number` in
+  `finalize.py`).
 
 ### Template changes
 - Templates intentionally mirror `processing/` visually so analysts learning
@@ -77,6 +94,12 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   readiness on the queue.
 
 ### Coupling
+- Intake now owns its own email compose + send path. The Graph API call in
+  `intake/views.py::send_contract_email` duplicates the pattern from
+  `processing/views.py::send_contract_email` intentionally to avoid coupling.
+  This duplication is a known tech-debt candidate for a future shared
+  `contracts.services.graph_mail` helper — do not resolve that refactor
+  without a separate prompt.
 - `intake` reads `contracts.Contract` for the "Already in DB" badge.
   Don't write to `contracts.*` from `intake` except via the (future)
   finalization path.
@@ -174,14 +197,16 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   `unit_price` → `item_value`). `unit_price` is the supplier quote and is
   manual in the editor. Do not swap these in ingest.
 - **PO Number:** display-only placeholder in intake (`Assigned at finalization`). Assigned during finalization by
-  `intake/services/po_number.py::assign_po_number()` for AWD/PO/DO/INTERNAL
+  `_stamp_po_number` in `intake/finalize.py` (calls
+  `intake/services/po_sequence.py::mint_intake_po_number`) for AWD/PO/DO/INTERNAL
   types. Uses a single atomic `UPDATE ... OUTPUT INSERTED.po_number` against
   the shared `processing_sequencenumber` table (id=1). Written to
-  `Contract.po_number` and all `Clin.po_number` / `Clin.clin_po_num` /
-  `Clin.po_num_ext`. Never add a POST field, schema key, or draft JSON key for
-  `po_number`. Do not call `assign_po_number` for IDIQ, MOD, or AMD types.
-  Do not import from the `processing` app to accomplish this — the service
-  reads the table directly via raw SQL.
+  `Contract.po_number` and all `Clin.po_number` / `Clin.clin_po_num`.
+  Never add a POST field, schema key, or draft JSON key for
+  `po_number`. Do not mint PO numbers for IDIQ, MOD, or AMD types.
+  **PO minting uses `intake/services/po_sequence.py` — raw cursor only, no
+  processing import. Never call `SequenceNumber` from processing in intake
+  code. Applies to AWD/PO/DO/INTERNAL only.**
 
 ### PDF Ingestion (Phase 3c)
 
