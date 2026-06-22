@@ -909,7 +909,8 @@ class FinalizeViewTests(TestCase):
         draft = self._ready_draft()
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.json()['success'])
         # Draft must still exist — lock check rejected before shred.
         self.assertTrue(DraftContract.objects.filter(pk=draft.pk).exists())
 
@@ -918,7 +919,9 @@ class FinalizeViewTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
+        self.assertIn('compose_url', resp.json())
         self.assertFalse(DraftContract.objects.filter(pk=draft.pk).exists())
         self.assertTrue(
             Contract.objects.filter(contract_number='SPE7L1-26-P-VFIN1').exists()
@@ -937,7 +940,8 @@ class FinalizeViewTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['success'])
 
         contract = Contract.objects.get(contract_number='SPE7L1-26-P-VFIN1')
         charges = list(ContractLevelCharge.objects.filter(contract=contract).order_by('label'))
@@ -957,7 +961,8 @@ class FinalizeViewTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.json()['success'])
         # Draft remains; nothing landed in contracts.
         self.assertTrue(DraftContract.objects.filter(pk=draft.pk).exists())
         self.assertFalse(

@@ -23,6 +23,9 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   the 30-minute window is referenced in admin and queue UI copy.
 
 ### Finalization (Phase 3 — all seven types)
+- After Prompt 1's price-field fix, `item_value` and `quote_value` arriving at
+  `create_contract_from_payload` are pre-computed totals — do not multiply by
+  `order_qty` again inside the service's GP calculation.
 - **`finalize_draft_view` returns `JsonResponse` — not `HttpResponseRedirect`.**
   Any test or client code that expects a 302 must be updated to expect 200
   JSON. The Finalize button uses the pre-open popup pattern — do not change

@@ -193,8 +193,9 @@ class ContractCreationServiceTests(TestCase):
                 create_contract_from_payload(payload, self.user)
 
     def test_intake_style_split_computes_value_from_percentage(self):
-        # planned_gp = (100*10) - (100*10 + 50) = -50  → percentage 50% → -25
+        # planned_gp = 1000 − (800 + 50) = 150  → percentage 50% → 75.00
         payload = self._awd_payload()
+        payload['clins'][0]['item_value'] = Decimal('1000.00')
         payload['clins'][0]['splits'] = [
             {'company_name': 'STATZ', 'percentage': Decimal('50')},
         ]
@@ -203,7 +204,7 @@ class ContractCreationServiceTests(TestCase):
         clin = result.clins_by_item_number['0001']
         split = ClinSplit.objects.get(clin=clin)
         self.assertEqual(split.percentage, Decimal('50'))
-        self.assertEqual(split.split_value, Decimal('-25.00'))
+        self.assertEqual(split.split_value, Decimal('75.00'))
 
 
 class IdiqCreationServiceTests(TestCase):

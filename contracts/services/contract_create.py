@@ -376,7 +376,8 @@ def _create_splits(clin, clin_row: dict) -> None:
     If a split row supplies `split_value`, use it verbatim (Processing
     style). Otherwise, if `percentage` is provided, derive
     split_value = planned_gp × percentage / 100 (Intake style), where
-    planned_gp = (item_value × order_qty) − (unit_price × order_qty + Σ finance_lines).
+    planned_gp = item_value − (quote_value + Σ finance_lines). Payload
+    totals must not be multiplied by order_qty again.
     """
     splits = clin_row.get('splits') or []
     if not splits:
@@ -507,20 +508,20 @@ def _to_decimal(value) -> Optional[Decimal]:
 
 
 def _compute_planned_gp(row: dict) -> Decimal:
-    """planned_gp = (item_value × order_qty) − (unit_price × order_qty + Σ finance_lines)."""
+    """planned_gp = item_value − (quote_value + Σ finance_lines).
+
+    item_value and quote_value in the payload are pre-computed totals.
+    """
     def _dec(v):
         d = _to_decimal(v)
         return d if d is not None else Decimal('0')
 
     item_value = _dec(row.get('item_value'))
-    unit_price = _dec(row.get('unit_price'))
-    order_qty = _dec(row.get('order_qty'))
+    quote_value = _dec(row.get('quote_value'))
     finance_total = Decimal('0')
     for fl in row.get('finance_lines') or []:
         amt = fl.get('amount_billed')
         if amt is None:
             amt = fl.get('amount')
         finance_total += _dec(amt)
-    contract_total = item_value * order_qty
-    quote_total = unit_price * order_qty
-    return contract_total - (quote_total + finance_total)
+    return item_value - (quote_value + finance_total)
