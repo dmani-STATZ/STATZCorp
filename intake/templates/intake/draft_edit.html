@@ -444,29 +444,16 @@
 
         {# ---- CLINs (AWD / PO / DO / INTERNAL) ---- #}
         {% if draft.contract_type == 'AWD' or draft.contract_type == 'PO' or draft.contract_type == 'DO' or draft.contract_type == 'INTERNAL' %}
-        {% if not pkg_has_data %}
-        <div class="mb-4" id="pkg-add-wrap">
+        <div class="mb-4" id="pkg-add-wrap"{% if pkg_has_data %} style="display:none"{% endif %}>
             <button type="button" class="btn btn-sm btn-outline-success" id="btn-add-packaging">
                 + Add Packaging
             </button>
         </div>
-        {% endif %}
         <div class="card card-padded shadow-sm mb-4" id="packaging-card"
              {% if not pkg_has_data %}style="display:none"{% endif %}>
             <div class="row-between mb-3">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <h2 class="text-xl font-semibold mb-0">Packaging</h2>
-                    {% with pkg_supp=packaging|get_item:'packhouse_supplier_text' %}
-                        {% if pkg_supp %}
-                            {% for clin in clins %}
-                                {% if clin|get_item:'supplier_text' == pkg_supp %}
-                                    <span class="badge bg-secondary">
-                                        Same as supplier — packhouse may not be needed
-                                    </span>
-                                {% endif %}
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-danger" id="btn-remove-packaging">
                     Remove Packaging
@@ -887,6 +874,7 @@
     // Counters keep newly added rows from colliding with server-rendered
     // indexes. We don't care about gaps; the backend reindexes on save.
     const counters = {clin: 1000, pair: 1000};
+    const removePackagingUrl = "{% url 'intake:remove_packaging' draft.pk %}";
     // Per-CLIN sub-counters for finance lines and splits, keyed by CLIN idx.
     const subCounters = {};
 
@@ -947,6 +935,18 @@
             card.style.display = 'none';
             card.querySelectorAll('[name^="pkg-"]').forEach(el => { el.value = ''; });
             if (addWrap) addWrap.style.display = '';
+
+            // Persist the removal to the server so a page reload does not
+            // resurrect the packaging card.
+            fetch(removePackagingUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            }).catch(function(err) {
+                console.warn('remove_packaging_api failed:', err);
+            });
         }
 
         if (btnAdd) btnAdd.addEventListener('click', function(ev) {

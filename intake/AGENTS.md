@@ -154,6 +154,34 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   regressions here — don't disable it without thinking.
 - **Supplier flag display rule (intake):** Intake is JSON-backed — there are no live Supplier ORM objects in the template. `_editor_context` builds `supplier_flags` (one DB query, `only('id','probation','conditional')`) and passes it to the template. Templates use `supplier_flags|get_item:sid` to look up flags. Apply `.supplier-flag-probation` for probation, `.supplier-flag-conditional` for conditional-only, no class for neither. Only apply when `supplier_id` is non-null. Never query Supplier inside a template — always use the pre-built `supplier_flags` context variable.
 
+### Packaging suppression (same-CAGE rule)
+- `intake/ingest.py::_result_to_data` skips populating `data['packaging']` when
+  `result.packhouse_cage` (uppercased, stripped) equals `result.contract_supplier_cage`
+  (uppercased, stripped). This reflects the domain rule: when the packhouse and
+  supplier share a CAGE, packaging is bundled into the supplier quote — no separate
+  packhouse entry is needed.
+- The extraction code in `intake/pdf_parser.py` (`_extract_packaging_party`,
+  `packaging_cage` field on `AwardParseResult`) is intentionally preserved.
+  Analysts change their minds. Do not remove parser extraction logic.
+- Analysts retain full manual control. The "Remove Packaging" / "+ Add Packaging"
+  UI path is always available regardless of CAGE comparison results.
+- The "Same as supplier" badge has been removed from `draft_edit.html`. The
+  suppression happens at parse time so the badge is never needed.
+
+### Remove Packaging persistence
+- `remove_packaging_api` view (`intake/views.py`) at
+  `POST /intake/drafts/<pk>/remove-packaging/` (`intake:remove_packaging`).
+  Requires the user to hold the soft lock. Pops `packaging` from `draft.data`
+  and saves. Returns JSON `{"ok": true/false}`.
+- `hidePackaging()` in `draft_edit.html` calls this endpoint via `fetch()` after
+  clearing the DOM. The `removePackagingUrl` JS variable is injected from a
+  Django `{% url %}` tag in the same `<script>` block — do not move it to an
+  external file.
+- `pkg-add-wrap` (`div#pkg-add-wrap`) is always rendered in the template.
+  Visibility is controlled via `style="display:none"` toggled by `hidePackaging()`
+  / `showPackaging()`. Do NOT revert to a `{% if not pkg_has_data %}` conditional
+  render — that is the root cause of the button-disappearing bug.
+
 ### Matcher changes (Phase 2b/2c)
 - **Auto-save on match open:** The capture-phase dirty-form guard in
   `draft_edit.html` calls `intake:autosave_draft` via AJAX before opening

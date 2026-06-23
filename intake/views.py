@@ -35,7 +35,7 @@ from .matchers import (
     search as matcher_search,
 )
 from .models import DraftContract
-from .schemas import DraftDataValidationError
+from .schemas import DraftDataValidationError, validate_data
 
 logger = logging.getLogger('intake.views')
 
@@ -372,6 +372,42 @@ def autosave_draft(request, pk: int):
                 status=400,
             )
 
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def remove_packaging_api(request, pk: int):
+    """
+    AJAX endpoint: clear the packaging block from a draft's JSON data and save.
+    Requires the user to hold the soft lock. Returns JSON {"ok": true/false}.
+
+    Called by the "Remove Packaging" button in draft_edit.html after the DOM
+    has already been cleared, so the server state stays in sync.
+    """
+    draft = get_object_or_404(DraftContract, pk=pk)
+    try:
+        with transaction.atomic():
+            draft_locked = DraftContract.objects.select_for_update().get(pk=pk)
+            assert_holds(draft_locked, request.user)
+            data = dict(draft_locked.data or {})
+            data.pop('packaging', None)
+            validated = validate_data(draft_locked.contract_type, data)
+            if validated.get('packaging') is None:
+                validated.pop('packaging', None)
+            DraftContract.objects.filter(pk=pk).update(data=validated)
+    except LockError as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=409)
+    except DraftDataValidationError as exc:
+        first = exc.errors[0] if exc.errors else {'msg': 'invalid data'}
+        loc = '.'.join(str(p) for p in first.get('loc', ())) or '(root)'
+        return JsonResponse(
+            {'ok': False, 'error': f'Validation failed at {loc}: {first.get("msg")}'},
+            status=400,
+        )
+    except Exception as exc:
+        logger.error('remove_packaging_api error: %s', exc, exc_info=True)
+        return JsonResponse({'ok': False, 'error': 'Server error'}, status=500)
     return JsonResponse({'ok': True})
 
 

@@ -156,6 +156,13 @@ or auto-shown on load when any of `packhouse_supplier_text`,
 `packhouse_supplier_id`, `quote_amount`, or `notes` is pre-filled. The
 section sits above the CLIN stack. **Remove Packaging** clears all `pkg-*`
 inputs so the next save drops the packaging block from JSON.
+- **Packaging same-CAGE suppression** — `_result_to_data` in `ingest.py` skips
+  populating `data['packaging']` when the packhouse CAGE matches the contract
+  supplier CAGE. Domain rule: same CAGE means the supplier bundles packaging.
+  Parser extraction code is preserved. Analysts can still add packaging manually.
+- **Remove Packaging persistence** — `remove_packaging_api` view persists the
+  removal server-side via AJAX so the packaging card does not reappear on reload.
+  `pkg-add-wrap` is always rendered in the template; toggled via JS `display` only.
 
 Contract Level Charges: hidden in the editor until the analyst clicks
 + Add Contract Level Charges, or auto-shown on load when

@@ -1192,6 +1192,88 @@ class IngestUnitTests(TestCase):
             draft = ingest_pdf(b'fake', original_filename='sc_none_test.pdf')
         self.assertIsNone(draft.data.get('sales_class_id'))
 
+    def test_packaging_suppressed_when_packhouse_cage_matches_supplier_cage(self):
+        """Parser must not populate packaging when packhouse CAGE == supplier CAGE."""
+        from intake.ingest import _result_to_data
+
+        result = _stub_parse_result(
+            contract_supplier_cage='2V045',
+            contract_supplier_name='MALONES CNC MACHINING INC',
+            packhouse_cage='2V045',
+            contract_packhouse_name='MALONES CNC MACHINING INC',
+        )
+        data = _result_to_data(result)
+        self.assertNotIn('packaging', data,
+            "packaging must not be populated when packhouse CAGE matches supplier CAGE")
+
+    def test_packaging_populated_when_packhouse_cage_differs(self):
+        """Parser must populate packaging when packhouse CAGE differs from supplier CAGE."""
+        from intake.ingest import _result_to_data
+
+        result = _stub_parse_result(
+            contract_supplier_cage='2V045',
+            contract_supplier_name='MALONES CNC MACHINING INC',
+            packhouse_cage='9Z123',
+            contract_packhouse_name='ACME PACKAGING CO',
+        )
+        data = _result_to_data(result)
+        self.assertIn('packaging', data,
+            "packaging must be populated when packhouse CAGE differs from supplier CAGE")
+        self.assertEqual(data['packaging']['packhouse_cage'], '9Z123')
+
+    def test_packaging_populated_when_supplier_cage_is_none(self):
+        """If supplier CAGE is unknown, do not suppress packaging."""
+        from intake.ingest import _result_to_data
+
+        result = _stub_parse_result(
+            contract_supplier_cage=None,
+            packhouse_cage='9Z123',
+            contract_packhouse_name='ACME PACKAGING CO',
+        )
+        data = _result_to_data(result)
+        self.assertIn('packaging', data)
+
+
+class RemovePackagingApiTests(TestCase):
+    """Tests for the remove_packaging_api AJAX endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('pkg_user', password='pw')
+        self.draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-RMVPKG',
+            contract_type='AWD',
+            status=DraftContract.Status.IN_PROGRESS,
+            locked_by=self.user,
+            locked_at=timezone.now(),
+            data={
+                'packaging': {
+                    'packhouse_cage': '9Z123',
+                    'packhouse_supplier_text': 'ACME PACKAGING CO',
+                }
+            },
+        )
+
+    def test_remove_packaging_clears_server_state(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse('intake:remove_packaging', args=[self.draft.pk]),
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()['ok'])
+        self.draft.refresh_from_db()
+        self.assertNotIn('packaging', self.draft.data)
+
+    def test_remove_packaging_requires_lock(self):
+        other = User.objects.create_user('other_pkg', password='pw')
+        self.client.force_login(other)
+        resp = self.client.post(
+            reverse('intake:remove_packaging', args=[self.draft.pk]),
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp.status_code, 409)
+        self.assertFalse(resp.json()['ok'])
+
 
 class UploadViewTests(TestCase):
     @classmethod

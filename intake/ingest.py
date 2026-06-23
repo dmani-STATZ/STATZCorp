@@ -155,10 +155,20 @@ def _result_to_data(result: AwardParseResult) -> dict:
         if clin_dates:
             data['due_date'] = _date(min(clin_dates))
     if result.packhouse_cage or result.contract_packhouse_name:
-        data['packaging'] = {
-            'packhouse_cage': result.packhouse_cage or None,
-            'packhouse_supplier_text': result.contract_packhouse_name or None,
-        }
+        # When the packhouse CAGE matches the contract supplier CAGE, the
+        # supplier bundles packaging into their quote — there is no separate
+        # packhouse. Do not populate the packaging block in this case.
+        # Analysts can still add packaging manually in the editor if needed.
+        # Do NOT delete the extraction code in pdf_parser.py — analysts change
+        # their minds and the extraction logic must remain available.
+        _pkg_cage = (result.packhouse_cage or '').strip().upper()
+        _sup_cage = (result.contract_supplier_cage or '').strip().upper()
+        _same_as_supplier = bool(_pkg_cage and _sup_cage and _pkg_cage == _sup_cage)
+        if not _same_as_supplier:
+            data['packaging'] = {
+                'packhouse_cage': result.packhouse_cage or None,
+                'packhouse_supplier_text': result.contract_packhouse_name or None,
+            }
     # DO: parent IDIQ reference
     if result.idiq_contract_number:
         data['parent_idiq_contract_number'] = result.idiq_contract_number
