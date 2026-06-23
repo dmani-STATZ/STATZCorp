@@ -1,7 +1,7 @@
 ---
 id: 2026-06-23-save-finalize-popup
 title: Save & Finalize also opens email notification in popup
-published: false
+published: true
 publish_date: 2026-06-23
 tags: [improved, contracts]
 critical: false

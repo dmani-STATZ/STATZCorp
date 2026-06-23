@@ -1,7 +1,7 @@
 ---
 id: 2026-06-23-finalize-email-popup
 title: Finalize opens email notification in popup window
-published: false
+published: true
 publish_date: 2026-06-23
 tags: [improved, contracts]
 critical: false
