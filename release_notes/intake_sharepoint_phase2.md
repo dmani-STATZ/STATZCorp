@@ -1,7 +1,7 @@
 ---
 id: intake_sharepoint_phase2
 title: Intake Queue — SharePoint Folder Status & Company Column
-published: false
+published: true
 publish_date: 2026-05-28
 tags: [improved, contracts]
 critical: false

@@ -1,7 +1,7 @@
 ---
 id: 2026-06-09-partner-reconciliation
 title: Partner Commission Reconciliation
-published: false
+published: true
 publish_date: 2026-06-09
 tags: [new, finance]
 critical: false

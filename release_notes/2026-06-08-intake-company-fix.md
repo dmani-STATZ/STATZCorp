@@ -1,7 +1,7 @@
 ---
 id: 2026-06-08-intake-company-fix
 title: Intake Company Fix and Draft Reassignment
-published: false
+published: true
 publish_date: 2026-06-08
 tags: [fixed, contracts]
 critical: false

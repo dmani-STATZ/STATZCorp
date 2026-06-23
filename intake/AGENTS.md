@@ -267,6 +267,17 @@ canonical `Contract.contract_number`.
   paths. Drafts are always open-contract paths — no Closed/Cancelled routing at
   draft time. Contract number is normalized to dashed format inside this function as a
   defensive measure before the path is assembled.
+- DO draft folder path is derived from the parent IDIQ's `files_url` (via
+  `resolve_idiq_folder_path()`), not from the default prefix + computed pattern.
+  Pattern: `{idiq_resolved_path}/Delivery Order {do_number}/`.
+- `seed_do_draft_sp_path(draft, idiq=None)` in `sharepoint_intake.py` is the
+  single function that resolves the IDIQ and writes the DO path. Call it:
+  at DIBBS ingestion time (`queue_we_won_drafts.py`) after `ingest_dibbs_record`;
+  when the analyst applies an IDIQ match to a DO draft (match view). It never
+  overwrites a user-confirmed path (`sharepoint_folder_status == 'exists'`).
+- `build_draft_folder_path()` returns `None` for DO drafts without a matched
+  `parent_idiq_id`. Text-based fallback is handled by `seed_do_draft_sp_path`
+  only (not by `build_draft_folder_path`).
 - `probe_draft_sharepoint_folder(draft)` — probe only, no create.
 - `create_draft_sharepoint_folder(draft)` — probe first, create if missing. Called
   at PDF upload time only.

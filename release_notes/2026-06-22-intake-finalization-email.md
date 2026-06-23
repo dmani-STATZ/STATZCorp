@@ -1,7 +1,7 @@
 ---
 id: 2026-06-22-intake-finalization-email
 title: Intake — finalization email in new window
-published: false
+published: true
 publish_date: 2026-06-22
 tags: [improved, contracts]
 critical: false

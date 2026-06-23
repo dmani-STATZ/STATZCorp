@@ -1,7 +1,7 @@
 ---
 id: 2026-05-28-intake-sharepoint
 title: Intake Queue — SharePoint Document Integration
-published: false
+published: true
 publish_date: 2026-05-28
 tags: [new, contracts]
 critical: false

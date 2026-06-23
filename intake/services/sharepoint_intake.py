@@ -27,12 +27,15 @@ def build_draft_folder_path(draft: 'DraftContract') -> str | None:
     Derive the expected SharePoint folder path for a DraftContract.
 
     Drafts are always treated as open/active contracts (never Closed/Cancelled
-    at draft time). Path pattern: {prefix}/Contract {contract_number}/
+    at draft time). Non-DO path pattern: {prefix}/Contract {contract_number}/.
+    DO drafts: {idiq_resolved_path}/Delivery Order {do_number}/ when
+    parent_idiq_id is set; otherwise None.
 
     Uses company.sharepoint_documents_path if set, otherwise falls through to
     settings.SHAREPOINT_PATH_PREFIX, then the hardcoded default.
 
-    Returns None if draft.contract_number is blank.
+    Returns None if draft.contract_number is blank, or for DO drafts without
+    a matched parent_idiq_id.
 
     Contract number is normalized to dashed DLA format before path construction.
     """
@@ -47,9 +50,121 @@ def build_draft_folder_path(draft: 'DraftContract') -> str | None:
     from intake.pdf_parser import normalize_contract_number
     contract_number = normalize_contract_number(contract_number) or contract_number
 
+    if draft.contract_type == 'DO':
+        data = draft.data or {}
+        parent_idiq_id = data.get('parent_idiq_id')
+        if not parent_idiq_id:
+            # No IDIQ FK yet — cannot build reliable path.
+            return None
+        try:
+            from contracts.models import IdiqContract
+            idiq = IdiqContract.objects.get(pk=parent_idiq_id)
+        except Exception:
+            return None
+        from contracts.services.sharepoint_paths import resolve_idiq_folder_path
+        idiq_path = resolve_idiq_folder_path(idiq)['path'].rstrip('/')
+        return f"{idiq_path}/Delivery Order {contract_number}/"
+
     company = getattr(draft, 'company', None)
     prefix = get_sharepoint_prefix(company=company)
     return f"{prefix}/Contract {contract_number}/"
+
+
+def seed_do_draft_sp_path(draft: 'DraftContract', idiq=None) -> None:
+    """
+    Resolve the parent IDIQ for a DO draft and write the correct SharePoint
+    folder path into draft.data['sharepoint_folder_path'].
+
+    Also sets data['parent_idiq_id'] and data['parent_idiq_contract_number']
+    if not already set.
+
+    Resolution order:
+      1. Use the supplied `idiq` kwarg (pre-fetched by caller — avoids double lookup).
+      2. Look up by data['parent_idiq_id'] if set.
+      3. Look up by normalized data['award_basic_number'] or
+         data['parent_idiq_contract_number'] as text fallback.
+      4. If no IDIQ found, return silently — path stays as-is.
+
+    Guard: if draft.sharepoint_folder_status == 'exists', the user has manually
+    confirmed a path via the document browser. Do NOT overwrite it.
+
+    Saves draft via update_fields=['data', 'modified_at'] only when data actually
+    changes. Never raises — all exceptions are caught and logged.
+    """
+    try:
+        if draft.sharepoint_folder_status == 'exists':
+            return
+
+        from intake.pdf_parser import normalize_contract_number
+
+        data = dict(draft.data or {})
+        changed = False
+        resolved_idiq = idiq
+
+        if resolved_idiq is None:
+            parent_idiq_id = data.get('parent_idiq_id')
+            if parent_idiq_id:
+                try:
+                    from contracts.models import IdiqContract
+                    resolved_idiq = IdiqContract.objects.filter(
+                        pk=parent_idiq_id
+                    ).first()
+                except Exception as exc:
+                    logger.warning(
+                        'seed_do_draft_sp_path: IDIQ lookup by pk failed for draft %s: %s',
+                        draft.pk, exc,
+                    )
+
+        if resolved_idiq is None:
+            for key in ('award_basic_number', 'parent_idiq_contract_number'):
+                raw = (data.get(key) or '').strip()
+                if not raw:
+                    continue
+                normalized = normalize_contract_number(raw) or raw
+                try:
+                    from contracts.models import IdiqContract
+                    resolved_idiq = IdiqContract.objects.filter(
+                        contract_number__iexact=normalized
+                    ).first()
+                except Exception as exc:
+                    logger.warning(
+                        'seed_do_draft_sp_path: IDIQ lookup by %s failed for draft %s: %s',
+                        key, draft.pk, exc,
+                    )
+                if resolved_idiq:
+                    break
+
+        if resolved_idiq is None:
+            return
+
+        if not data.get('parent_idiq_id'):
+            data['parent_idiq_id'] = resolved_idiq.pk
+            changed = True
+        if not data.get('parent_idiq_contract_number'):
+            data['parent_idiq_contract_number'] = resolved_idiq.contract_number
+            changed = True
+
+        do_number = (draft.contract_number or '').strip()
+        if not do_number:
+            return
+        do_number = normalize_contract_number(do_number) or do_number
+
+        from contracts.services.sharepoint_paths import resolve_idiq_folder_path
+        idiq_path = resolve_idiq_folder_path(resolved_idiq)['path'].rstrip('/')
+        new_path = f"{idiq_path}/Delivery Order {do_number}/"
+
+        if data.get('sharepoint_folder_path') != new_path:
+            data['sharepoint_folder_path'] = new_path
+            changed = True
+
+        if changed:
+            draft.data = data
+            draft.save(update_fields=['data', 'modified_at'])
+    except Exception as exc:
+        logger.warning(
+            'seed_do_draft_sp_path failed for draft %s (%s): %s',
+            draft.pk, draft.contract_number, exc,
+        )
 
 
 def probe_draft_sharepoint_folder(draft: 'DraftContract') -> dict:

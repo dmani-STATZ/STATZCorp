@@ -132,6 +132,18 @@ def queue_we_won_drafts(
                 )
             else:
                 result["queued"] += 1
+                # For DO drafts: resolve parent IDIQ from Award_Basic_Number and seed SP path.
+                if draft.contract_type == 'DO':
+                    award_basic = (record.get('Award_Basic_Number') or '').strip()
+                    if award_basic:
+                        from intake.pdf_parser import normalize_contract_number
+                        from contracts.models import IdiqContract
+                        normalized = normalize_contract_number(award_basic) or award_basic
+                        idiq = IdiqContract.objects.filter(
+                            contract_number__iexact=normalized
+                        ).first()
+                        from intake.services.sharepoint_intake import seed_do_draft_sp_path
+                        seed_do_draft_sp_path(draft, idiq=idiq)
                 if company is not None:
                     try:
                         from intake.services.sharepoint_intake import (

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-22-intake-auto-dibbs-injection
 title: Intake queue auto-populated from daily DIBBS award scrape
-published: false
+published: true
 publish_date: 2026-05-22
 tags: [improved, contracts]
 critical: false

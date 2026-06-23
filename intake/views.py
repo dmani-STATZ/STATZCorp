@@ -417,6 +417,17 @@ def match_endpoint(request, pk: int):
             return JsonResponse({'error': str(exc)}, status=400)
 
         draft.data = new_data
+        # After applying an IDIQ match on a DO draft, re-derive the SP folder path
+        # from the newly matched IDIQ (unless user already confirmed a path manually).
+        if (
+            action in ('apply', 'create')
+            and match_type == 'idiq'
+            and draft.contract_type == 'DO'
+            and draft.sharepoint_folder_status != 'exists'
+        ):
+            from intake.services.sharepoint_intake import seed_do_draft_sp_path
+            seed_do_draft_sp_path(draft)
+            draft.refresh_from_db(fields=['data'])
         try:
             draft.save()
         except DraftDataValidationError as exc:

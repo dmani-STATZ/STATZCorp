@@ -1515,6 +1515,84 @@ class DibbsIngestTests(TestCase):
         path = build_draft_folder_path(draft)
         self.assertIn('Contract SPE7L1-26-P-7653', path)
 
+    def test_build_draft_folder_path_do_uses_idiq_files_url(self):
+        from intake.services.sharepoint_intake import build_draft_folder_path
+        idiq = IdiqContract.objects.create(
+            contract_number='SPE7L1-23-D-PARENT',
+            files_url='Statz-Public/data/V87/aFed-DOD/Contract SPE7L1-23-D-PARENT/',
+        )
+        draft = DraftContract(
+            contract_number='SPE7L1-26-F-DO001',
+            contract_type='DO',
+            data={'parent_idiq_id': idiq.pk},
+        )
+        path = build_draft_folder_path(draft)
+        self.assertEqual(
+            path,
+            'Statz-Public/data/V87/aFed-DOD/Contract SPE7L1-23-D-PARENT/Delivery Order SPE7L1-26-F-DO001/',
+        )
+
+    def test_build_draft_folder_path_do_falls_back_to_pattern(self):
+        from contracts.services.sharepoint_paths import get_sharepoint_prefix
+        from intake.services.sharepoint_intake import build_draft_folder_path
+        idiq = IdiqContract.objects.create(
+            contract_number='SPE7L1-23-D-NOURL',
+        )
+        draft = DraftContract(
+            contract_number='SPE7L1-26-F-DO002',
+            contract_type='DO',
+            data={'parent_idiq_id': idiq.pk},
+        )
+        path = build_draft_folder_path(draft)
+        prefix = get_sharepoint_prefix()
+        self.assertEqual(
+            path,
+            f'{prefix}/Contract SPE7L1-23-D-NOURL/Delivery Order SPE7L1-26-F-DO002/',
+        )
+
+    def test_build_draft_folder_path_do_without_parent_returns_none(self):
+        from intake.services.sharepoint_intake import build_draft_folder_path
+        draft = DraftContract(
+            contract_number='SPE7L1-26-F-DO003',
+            contract_type='DO',
+            data={},
+        )
+        self.assertIsNone(build_draft_folder_path(draft))
+
+    def test_seed_do_draft_sp_path_sets_parent_and_path(self):
+        from intake.services.sharepoint_intake import seed_do_draft_sp_path
+        idiq = IdiqContract.objects.create(
+            contract_number='SPE7L1-23-D-SEED',
+            files_url='Statz-Public/data/V87/aFed-DOD/Contract SPE7L1-23-D-SEED/',
+        )
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-F-DOSEED',
+            contract_type='DO',
+            data={'award_basic_number': 'SPE7L123DSEED'},
+        )
+        seed_do_draft_sp_path(draft, idiq=idiq)
+        draft.refresh_from_db()
+        self.assertEqual(draft.data['parent_idiq_id'], idiq.pk)
+        self.assertIn('Delivery Order SPE7L1-26-F-DOSEED', draft.data['sharepoint_folder_path'])
+
+    def test_seed_do_draft_sp_path_skips_user_confirmed_path(self):
+        from intake.services.sharepoint_intake import seed_do_draft_sp_path
+        idiq = IdiqContract.objects.create(contract_number='SPE7L1-23-D-GUARD')
+        confirmed = 'Statz-Public/data/V87/aFed-DOD/Custom/Confirmed/'
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-F-DOGUARD',
+            contract_type='DO',
+            sharepoint_folder_status='exists',
+            data={
+                'sharepoint_folder_path': confirmed,
+                'award_basic_number': 'SPE7L123DGUARD',
+            },
+        )
+        seed_do_draft_sp_path(draft, idiq=idiq)
+        draft.refresh_from_db()
+        self.assertEqual(draft.data['sharepoint_folder_path'], confirmed)
+        self.assertIsNone(draft.data.get('parent_idiq_id'))
+
 
 class FinalizeEmailRedirectTests(TestCase):
     @classmethod

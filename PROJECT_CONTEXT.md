@@ -147,6 +147,12 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 **Critical notes:**
 - Drafts are deleted on successful finalization; `DraftContract` is not audited by `transactions`
 - SharePoint folder path lives in `data['sharepoint_folder_path']`; status in `sharepoint_folder_status`
+- DO drafts derive SharePoint folder paths from the parent IDIQ's actual `files_url`
+  (via `resolve_idiq_folder_path()`), not the default prefix pattern. Path shape:
+  `{idiq_resolved_path}/Delivery Order {do_number}/`. Auto-resolution at DIBBS
+  ingestion via `Award_Basic_Number` (`seed_do_draft_sp_path` in `queue_we_won_drafts`);
+  re-resolution when an analyst applies an IDIQ match in the editor. User-confirmed
+  paths (`sharepoint_folder_status == 'exists'`) are never overwritten.
 - DIBBS piggyback (`queue_we_won_drafts`) probes SharePoint only when `company` resolves; never creates folders at injection time
 - Draft documents browser at `/contracts/documents/draft/` (owned by contracts URL space, intake-authorized)
 - SharePoint folder path carried to `Contract.files_url` at finalization

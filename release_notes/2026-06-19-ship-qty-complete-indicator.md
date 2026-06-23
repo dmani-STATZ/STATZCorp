@@ -1,7 +1,7 @@
 ---
 id: 2026-06-19-ship-qty-complete-indicator
 title: "Ship Qty now shows a checkmark when fully shipped"
-published: false
+published: true
 publish_date: 2026-06-19
 tags: [improved, contracts]
 critical: false

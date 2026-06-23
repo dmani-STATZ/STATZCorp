@@ -1,7 +1,7 @@
 ---
 id: 2026-06-08-queue-company-fix
 title: Enforce and Propagate Active Company in Queue Processing
-published: false
+published: true
 publish_date: 2026-06-08
 tags: [fixed, system]
 critical: false

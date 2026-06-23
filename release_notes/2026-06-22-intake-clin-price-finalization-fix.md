@@ -1,7 +1,7 @@
 ---
 id: 2026-06-22-intake-clin-price-finalization-fix
 title: Intake — correct CLIN prices at finalization
-published: false
+published: true
 publish_date: 2026-06-22
 tags: [fixed, contracts]
 critical: false

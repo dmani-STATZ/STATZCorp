@@ -1,7 +1,7 @@
 ---
 id: 2026-06-05-supplier-payment-forecast
 title: Supplier Payment Forecast
-published: false
+published: true
 publish_date: 2026-06-05
 tags: [new, finance]
 critical: false
