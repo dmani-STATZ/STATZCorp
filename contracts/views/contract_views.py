@@ -33,6 +33,7 @@ from ..models import (
     GovAction,
 )
 from .mixins import ActiveCompanyQuerysetMixin
+from contracts.services.sharepoint_paths import build_explorer_uri
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,12 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
                     setattr(note, 'current_user_has_reminder', user_reminder is not None)
                     setattr(note, 'current_user_reminder', user_reminder)
             context['all_notes'] = contract_notes
+
+        # Explorer URI for the split button — pure computation, no Graph API call.
+        # Returns '' for legacy/unmappable paths; template shows disabled button in that case.
+        context['explorer_uri'] = build_explorer_uri(
+            contract.get_sharepoint_relative_path() or ''
+        )
 
         return context
 
