@@ -920,6 +920,8 @@ def finalize_direct_view(request, pk: int):
     """
     from contracts.models import Contract
 
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
     # --- TX 1: save + transition (lock retained) ---
     with transaction.atomic():
         draft = get_object_or_404(
@@ -928,6 +930,8 @@ def finalize_direct_view(request, pk: int):
         try:
             assert_holds(draft, request.user)
         except LockError as exc:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': str(exc)}, status=409)
             messages.error(request, str(exc))
             return redirect('intake:queue')
 
@@ -938,6 +942,14 @@ def finalize_direct_view(request, pk: int):
         except DraftDataValidationError as exc:
             first = exc.errors[0] if exc.errors else {'msg': 'invalid data'}
             loc = '.'.join(str(p) for p in first.get('loc', ())) or '(root)'
+            if is_ajax:
+                return JsonResponse(
+                    {
+                        'ok': False,
+                        'error': f'Validation failed at {loc}: {first.get("msg")}',
+                    },
+                    status=400,
+                )
             messages.error(
                 request,
                 f'Validation failed at {loc}: {first.get("msg")}',
@@ -958,6 +970,8 @@ def finalize_direct_view(request, pk: int):
         try:
             assert_holds(draft, request.user)
         except LockError as exc:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': str(exc)}, status=409)
             messages.error(request, str(exc))
             return redirect('intake:queue')
 
@@ -965,6 +979,17 @@ def finalize_direct_view(request, pk: int):
         try:
             target = finalize_draft(draft, request.user)
         except FinalizationError as exc:
+            if is_ajax:
+                return JsonResponse(
+                    {
+                        'ok': False,
+                        'error': (
+                            f'Finalization blocked: {exc} — your changes have been '
+                            'saved. Fix the issue and use the Finalize button.'
+                        ),
+                    },
+                    status=400,
+                )
             messages.error(
                 request,
                 f'Finalization blocked: {exc} — your changes have been saved. '
@@ -979,8 +1004,16 @@ def finalize_direct_view(request, pk: int):
 
     if isinstance(target, Contract):
         if draft_type in ('Modification', 'Amendment'):
+            if is_ajax:
+                return JsonResponse({'ok': True, 'compose_url': None})
             return redirect('intake:queue')
-        return redirect(_build_compose_url(target, draft_type or 'Contract'))
+        compose_url = _build_compose_url(target, draft_type or 'Contract')
+        if is_ajax:
+            return JsonResponse({'ok': True, 'compose_url': compose_url})
+        return redirect(compose_url)
+
+    if is_ajax:
+        return JsonResponse({'ok': True, 'compose_url': None})
     return redirect('intake:queue')
 
 

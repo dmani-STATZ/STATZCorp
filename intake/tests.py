@@ -1694,6 +1694,43 @@ class FinalizeEmailRedirectTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp.url, reverse('intake:queue'))
 
+    def test_finalize_direct_ajax_returns_json(self):
+        """Save & Finalize AJAX path returns JSON compose_url, not a redirect."""
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-DIRAJ',
+            contract_type='AWD',
+            status=DraftContract.Status.IN_PROGRESS,
+            data={
+                'buyer_id': self.buyer.id, 'buyer_text': 'Acme',
+                'pr_number': 'PR-DJ',
+                'clins': [{
+                    'item_number': '0001',
+                    'nsn_id': self.nsn.id, 'nsn_text': '6666',
+                    'supplier_id': self.supplier.id, 'supplier_text': 'S',
+                }],
+            },
+        )
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self.client.post(
+            reverse('intake:finalize_direct', args=[draft.pk]),
+            data={
+                'f_pr_number': 'PR-DJ',
+                'f_buyer_id': str(self.buyer.id),
+                'f_buyer_text': 'Acme',
+                'clin-0-item_number': '0001',
+                'clin-0-nsn_id': str(self.nsn.id),
+                'clin-0-nsn_text': '6666',
+                'clin-0-supplier_id': str(self.supplier.id),
+                'clin-0-supplier_text': 'S',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data['ok'])
+        self.assertIn('compose_url', data)
+
 
 class IntakeEmailComposeTests(TestCase):
     @classmethod

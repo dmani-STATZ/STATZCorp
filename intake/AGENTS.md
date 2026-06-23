@@ -30,14 +30,15 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   (`X-Requested-With: XMLHttpRequest`) receive JSON `{ok, compose_url}`.
   Non-AJAX POSTs receive a 302 redirect (backwards compatibility for tests
   and any non-JS fallback). Do not remove either path.
-- **Finalize button is AJAX, not a form submit.** The button is
-  `type="button"` — it does NOT submit the finalize form. A JS click
-  handler in `draft_edit.html` sends the POST with
-  `X-Requested-With: XMLHttpRequest`. `finalize_draft_view` checks that
-  header and returns JSON instead of redirecting. Do NOT change the button
-  back to `type="submit"`. Do NOT remove the `X-Requested-With` header
-  from the fetch — without it the view returns a redirect and the JS
-  receives HTML, not JSON.
+- **Both finalize buttons use AJAX + popup.** `#finalize-btn` (standalone
+  Finalize card, `intake:finalize_draft`) and `#save-finalize-btn`
+  (action bar Save & Finalize, `intake:finalize_direct`) are both
+  `type="button"`. Neither submits the form directly. `#save-finalize-btn`
+  serializes the main edit form via `new FormData(form)` and POSTs it
+  with `X-Requested-With: XMLHttpRequest` so `finalize_direct_view` still
+  receives all draft field values via `request.POST`. Both views branch on
+  `is_ajax` and return JSON for AJAX requests, 302 redirects for non-AJAX.
+  Do NOT revert either button to `type="submit"`.
 - **Popup pre-open pattern.** `window.open()` is called SYNCHRONOUSLY
   inside the click handler, before `fetch()` is called. This is required
   to bypass browser popup blockers. Never move `window.open()` into a

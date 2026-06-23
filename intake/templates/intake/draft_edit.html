@@ -623,11 +623,13 @@
                     {% if not lock_held_by_user %}disabled{% endif %}>
                 Mark Ready for Review
             </button>
-            <button type="submit"
-                    formaction="{% url 'intake:finalize_direct' draft.pk %}"
+            <button type="button"
+                    id="save-finalize-btn"
                     class="btn btn-warning"
                     {% if not lock_held_by_user %}disabled{% endif %}
-                    onclick="return confirm('Save and finalize {{ draft.contract_number }} now?')">
+                    data-contract-number="{{ draft.contract_number }}"
+                    data-finalize-url="{% url 'intake:finalize_direct' draft.pk %}"
+                    data-queue-url="{% url 'intake:queue' %}">
                 Save &amp; Finalize
             </button>
             <button type="submit"
@@ -1489,6 +1491,90 @@
                     alert('Finalization failed: ' + err.message);
                     finalizeBtn.disabled = false;
                     finalizeBtn.textContent = 'Finalize Draft → Contract';
+                });
+            });
+        }
+
+        // ---- Save & Finalize button: AJAX + popup (carries full form data) ----
+        const saveFinalizeBtn = document.getElementById('save-finalize-btn');
+        if (saveFinalizeBtn) {
+            saveFinalizeBtn.addEventListener('click', function () {
+                const contractNumber = saveFinalizeBtn.dataset.contractNumber;
+                const finalizeUrl    = saveFinalizeBtn.dataset.finalizeUrl;
+                const queueUrl       = saveFinalizeBtn.dataset.queueUrl;
+
+                if (!confirm(
+                    'Save and finalize ' + contractNumber + ' now? ' +
+                    'The draft will be deleted on success.'
+                )) {
+                    return;
+                }
+
+                // Pre-open popup SYNCHRONOUSLY — popup blocker bypass.
+                const popW = 920, popH = 700;
+                const popL = Math.round((screen.width  - popW) / 2);
+                const popT = Math.round((screen.height - popH) / 2);
+                const popup = window.open(
+                    '',
+                    'intake_email_compose',
+                    'width=' + popW + ',height=' + popH +
+                    ',left=' + popL + ',top=' + popT +
+                    ',resizable=yes,scrollbars=yes'
+                );
+                if (popup) {
+                    popup.document.write(
+                        '<html><body style="font-family:sans-serif;padding:2rem;">' +
+                        '<p>Saving and finalizing, please wait…</p>' +
+                        '</body></html>'
+                    );
+                }
+
+                saveFinalizeBtn.disabled = true;
+                saveFinalizeBtn.textContent = 'Saving…';
+
+                // Serialize the full edit form — finalize_direct_view needs
+                // all draft field values (it saves + finalizes in one round trip).
+                const formData = new FormData(form);
+
+                fetch(finalizeUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: formData,
+                })
+                .then(function (resp) {
+                    return resp.json().then(function (data) {
+                        return { ok: resp.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (!result.ok || !result.data.ok) {
+                        if (popup && !popup.closed) popup.close();
+                        alert(
+                            'Save & Finalize failed: ' +
+                            (result.data.error || 'Unknown error. Check server logs.')
+                        );
+                        saveFinalizeBtn.disabled = false;
+                        saveFinalizeBtn.textContent = 'Save \u0026 Finalize';
+                        return;
+                    }
+
+                    if (result.data.compose_url && popup && !popup.closed) {
+                        popup.location.href = result.data.compose_url;
+                    } else if (popup && !popup.closed) {
+                        popup.close();
+                    }
+
+                    // Main window returns to queue.
+                    window.location.href = queueUrl;
+                })
+                .catch(function (err) {
+                    if (popup && !popup.closed) popup.close();
+                    alert('Save & Finalize failed: ' + err.message);
+                    saveFinalizeBtn.disabled = false;
+                    saveFinalizeBtn.textContent = 'Save \u0026 Finalize';
                 });
             });
         }
