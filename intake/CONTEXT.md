@@ -289,19 +289,24 @@ rolls back the sequence increment automatically. Intake does NOT import
 
 URL: `intake:finalize_draft` → `POST /intake/drafts/<pk>/finalize/`
 (requires lock + status=`ready_for_review`). On success for AWD/PO/DO/INTERNAL,
-returns JSON with `compose_url` pointing to `intake:email_compose` (subject +
-body pre-populated). MOD/AMD skip the email step (`compose_url` is null).
+non-AJAX requests receive a 302 redirect to `intake:email_compose` (subject +
+body pre-populated). MOD/AMD skip the email step (redirect to queue).
 
-**Finalization Email** — After finalization, `finalize_draft_view` returns JSON
-`{success, compose_url, redirect_url}`. The Finalize button JS pre-opens a blank
-tab (popup-blocker safe), then navigates it to `intake:email_compose` on success
-while redirecting the current tab to the queue. `intake:send_contract_email`
-sends via Microsoft Graph GCC High (same settings as processing:
-`GRAPH_MAIL_ENABLED`, `GRAPH_MAIL_TENANT_ID`, `GRAPH_MAIL_CLIENT_ID`,
-`GRAPH_MAIL_CLIENT_SECRET`, `GRAPH_MAIL_SENDER_CONTRACT`). Multiple To addresses
-are semicolon-delimited; both the template (client-side) and the view
-(server-side) validate and split them. Intake no longer redirects to
-`/processing/email-compose/`.
+**Finalization Email** — On Contract-creating finalize paths, the
+"Finalize Draft → Contract" button POSTs via AJAX (`X-Requested-With:
+XMLHttpRequest`). The server returns `{"ok": true, "compose_url": "..."}`.
+The JS pre-opens a named popup (`intake_email_compose`, 920×700, centered)
+SYNCHRONOUSLY in the click handler before the fetch starts (popup-blocker
+bypass), then navigates it to `compose_url` on success. The main window
+navigates to the intake queue. MOD/AMD types return `compose_url: null`
+and no popup is shown. Non-AJAX POST requests (e.g. tests without the
+header) still receive a 302 redirect for backwards compatibility.
+`intake:send_contract_email` sends via Microsoft Graph GCC High (same settings
+as processing: `GRAPH_MAIL_ENABLED`, `GRAPH_MAIL_TENANT_ID`,
+`GRAPH_MAIL_CLIENT_ID`, `GRAPH_MAIL_CLIENT_SECRET`,
+`GRAPH_MAIL_SENDER_CONTRACT`). Multiple To addresses are semicolon-delimited;
+both the template (client-side) and the view (server-side) validate and split
+them. Intake no longer redirects to `/processing/email-compose/`.
 
 **One-step finalization (`finalize_direct`)**
 `finalize_direct_view` combines save + finalization into a single action for
@@ -373,8 +378,15 @@ trigger a per-row SP rescan. The Docs button is now icon-only.
   immediately after Processing queue injection. Creates skeleton DraftContracts
   (status=queued, pdf_parse_status=no_pdf) for the same STATZ-won awards
   injected into the Processing queue. No manual command needed.
-- **Finalization email** — intake-owned compose + send (`intake:email_compose`,
-  `intake:send_contract_email`); see Finalization Email section above
+- **Finalization email** — On Contract-creating finalize paths, the
+  "Finalize Draft → Contract" button POSTs via AJAX (`X-Requested-With:
+  XMLHttpRequest`). The server returns `{"ok": true, "compose_url": "..."}`.
+  The JS pre-opens a named popup (`intake_email_compose`, 920×700, centered)
+  SYNCHRONOUSLY in the click handler before the fetch starts (popup-blocker
+  bypass), then navigates it to `compose_url` on success. The main window
+  navigates to the intake queue. MOD/AMD types return `compose_url: null`
+  and no popup is shown. Non-AJAX POST requests (e.g. tests without the
+  header) still receive a 302 redirect for backwards compatibility.
 
 **Company scoping** — `DraftContract.company` FK added. Queue view filters to all
 companies the user has membership in (superusers see all, including unscoped

@@ -855,12 +855,15 @@ def finalize_draft_view(request, pk: int):
     Whole flow is one atomic transaction: lock the row, assert the user
     holds the soft lock, run the shred. On any failure the transaction
     rolls back and the draft stays in `ready_for_review`. On success the
-    draft is deleted (spec: drafts are not contracts) and returns JSON so
-    the client can open intake:email_compose in a new tab while redirecting
-    the current tab to the queue.
+    draft is deleted (spec: drafts are not contracts).
+
+    AJAX requests (``X-Requested-With: XMLHttpRequest``) receive JSON so
+    the client can open intake:email_compose in a popup while navigating
+    the main window to the queue. Non-AJAX POSTs receive a 302 redirect.
     """
     from contracts.models import Contract  # avoid top-level cycle risk
 
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     draft_type = None
     with transaction.atomic():
         draft = get_object_or_404(
@@ -869,41 +872,36 @@ def finalize_draft_view(request, pk: int):
         try:
             assert_holds(draft, request.user)
         except LockError as exc:
-            return JsonResponse(
-                {'success': False, 'error': str(exc)},
-                status=400,
-            )
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': str(exc)}, status=409)
+            messages.error(request, str(exc))
+            return redirect('intake:queue')
         draft_type = draft.get_contract_type_display()
 
         try:
             target = finalize_draft(draft, request.user)
         except FinalizationError as exc:
-            return JsonResponse(
-                {'success': False, 'error': str(exc)},
-                status=400,
-            )
+            if is_ajax:
+                return JsonResponse(
+                    {'ok': False, 'error': f'Finalization blocked: {exc}'},
+                    status=400,
+                )
+            messages.error(request, f'Finalization blocked: {exc}')
+            return redirect('intake:edit_draft', pk=pk)
 
     if isinstance(target, Contract):
         if draft_type in ('Modification', 'Amendment'):
-            return JsonResponse({
-                'success': True,
-                'compose_url': None,
-                'redirect_url': reverse('intake:queue'),
-                'message': f'Finalized → Contract #{target.pk}.',
-            })
+            if is_ajax:
+                return JsonResponse({'ok': True, 'compose_url': None})
+            return redirect('intake:queue')
         compose_url = _build_compose_url(target, draft_type or 'Contract')
-        return JsonResponse({
-            'success': True,
-            'compose_url': compose_url,
-            'redirect_url': reverse('intake:queue'),
-            'message': f'Finalized → Contract #{target.pk}.',
-        })
-    return JsonResponse({
-        'success': True,
-        'compose_url': None,
-        'redirect_url': reverse('intake:queue'),
-        'message': f'Finalized → {type(target).__name__} #{target.pk}.',
-    })
+        if is_ajax:
+            return JsonResponse({'ok': True, 'compose_url': compose_url})
+        return redirect(compose_url)
+
+    if is_ajax:
+        return JsonResponse({'ok': True, 'compose_url': None})
+    return redirect('intake:queue')
 
 
 @login_required

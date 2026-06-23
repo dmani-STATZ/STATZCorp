@@ -26,10 +26,25 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
 - After Prompt 1's price-field fix, `item_value` and `quote_value` arriving at
   `create_contract_from_payload` are pre-computed totals — do not multiply by
   `order_qty` again inside the service's GP calculation.
-- **`finalize_draft_view` returns `JsonResponse` — not `HttpResponseRedirect`.**
-  Any test or client code that expects a 302 must be updated to expect 200
-  JSON. The Finalize button uses the pre-open popup pattern — do not change
-  this to a synchronous redirect or the new-window behavior breaks.
+- **`finalize_draft_view` dual response mode.** AJAX requests
+  (`X-Requested-With: XMLHttpRequest`) receive JSON `{ok, compose_url}`.
+  Non-AJAX POSTs receive a 302 redirect (backwards compatibility for tests
+  and any non-JS fallback). Do not remove either path.
+- **Finalize button is AJAX, not a form submit.** The button is
+  `type="button"` — it does NOT submit the finalize form. A JS click
+  handler in `draft_edit.html` sends the POST with
+  `X-Requested-With: XMLHttpRequest`. `finalize_draft_view` checks that
+  header and returns JSON instead of redirecting. Do NOT change the button
+  back to `type="submit"`. Do NOT remove the `X-Requested-With` header
+  from the fetch — without it the view returns a redirect and the JS
+  receives HTML, not JSON.
+- **Popup pre-open pattern.** `window.open()` is called SYNCHRONOUSLY
+  inside the click handler, before `fetch()` is called. This is required
+  to bypass browser popup blockers. Never move `window.open()` into a
+  `.then()` callback or `await` expression — it will be blocked.
+- The popup window is named `'intake_email_compose'` so repeated
+  finalizations in the same session reuse the window rather than
+  spawning a new one each time.
 - **One-step finalization (`finalize_direct`):** `finalize_direct_view` in
   `views.py` runs two sequential atomic transactions. TX1: parse POST →
   validate → save → set status=READY_FOR_REVIEW (lock NOT released). TX2:

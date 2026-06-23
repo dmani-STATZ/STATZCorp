@@ -927,8 +927,8 @@ class FinalizeViewTests(TestCase):
         draft = self._ready_draft()
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()['success'])
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse('intake:queue'))
         # Draft must still exist — lock check rejected before shred.
         self.assertTrue(DraftContract.objects.filter(pk=draft.pk).exists())
 
@@ -937,9 +937,8 @@ class FinalizeViewTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()['success'])
-        self.assertIn('compose_url', resp.json())
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/intake/email-compose/', resp.url)
         self.assertFalse(DraftContract.objects.filter(pk=draft.pk).exists())
         self.assertTrue(
             Contract.objects.filter(contract_number='SPE7L1-26-P-VFIN1').exists()
@@ -958,8 +957,8 @@ class FinalizeViewTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()['success'])
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/intake/email-compose/', resp.url)
 
         contract = Contract.objects.get(contract_number='SPE7L1-26-P-VFIN1')
         charges = list(ContractLevelCharge.objects.filter(contract=contract).order_by('label'))
@@ -979,8 +978,11 @@ class FinalizeViewTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()['success'])
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(
+            resp.url,
+            reverse('intake:edit_draft', args=[draft.pk]),
+        )
         # Draft remains; nothing landed in contracts.
         self.assertTrue(DraftContract.objects.filter(pk=draft.pk).exists())
         self.assertFalse(
@@ -1638,15 +1640,41 @@ class FinalizeEmailRedirectTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 200)
-        data = resp.json()
-        self.assertTrue(data['success'])
-        self.assertIn('/intake/email-compose/', data['compose_url'])
-        self.assertIn('SPE7L1-26-C-EMAIL', data['compose_url'])
-        self.assertIn('subject=', data['compose_url'])
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/intake/email-compose/', resp.url)
+        self.assertIn('SPE7L1-26-C-EMAIL', resp.url)
+        self.assertIn('subject=', resp.url)
         contract = Contract.objects.get(contract_number='SPE7L1-26-C-EMAIL')
         self.assertTrue(contract.po_number)
-        self.assertIn('PO', data['compose_url'])
+        self.assertIn('PO', resp.url)
+
+    def test_finalize_view_ajax_returns_json(self):
+        """AJAX finalize returns JSON compose_url rather than 302."""
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-C-AJAX1',
+            contract_type='AWD',
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            data={
+                'buyer_id': self.buyer.id, 'buyer_text': 'Acme',
+                'pr_number': 'PR-AJ',
+                'clins': [{
+                    'item_number': '0001',
+                    'nsn_id': self.nsn.id, 'nsn_text': '6666',
+                    'supplier_id': self.supplier.id, 'supplier_text': 'S',
+                }],
+            },
+        )
+        acquire(draft, self.alice)
+        self.client.force_login(self.alice)
+        resp = self.client.post(
+            reverse('intake:finalize_draft', args=[draft.pk]),
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data['ok'])
+        self.assertIn('compose_url', data)
+        self.assertIsNotNone(data['compose_url'])
 
     def test_mod_finalize_skips_email_redirect(self):
         parent = Contract.objects.create(contract_number='SPE7L1-25-C-PMOD')
@@ -1663,11 +1691,8 @@ class FinalizeEmailRedirectTests(TestCase):
         acquire(draft, self.alice)
         self.client.force_login(self.alice)
         resp = self.client.post(reverse('intake:finalize_draft', args=[draft.pk]))
-        self.assertEqual(resp.status_code, 200)
-        data = resp.json()
-        self.assertTrue(data['success'])
-        self.assertIsNone(data['compose_url'])
-        self.assertEqual(data['redirect_url'], reverse('intake:queue'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse('intake:queue'))
 
 
 class IntakeEmailComposeTests(TestCase):

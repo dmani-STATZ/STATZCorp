@@ -649,12 +649,20 @@
             Drafts are deleted on success. The action is wrapped in a
             transaction so any failure leaves the draft intact.
         </p>
-        <button type="button"
-                id="intake-finalize-btn"
-                class="btn btn-success"
-                {% if not lock_held_by_user %}disabled{% endif %}>
-            Finalize Draft → Contract
-        </button>
+        <form id="finalize-form"
+              method="post"
+              action="{% url 'intake:finalize_draft' draft.pk %}">
+            {% csrf_token %}
+            <button type="button"
+                    id="finalize-btn"
+                    class="btn btn-success"
+                    {% if not lock_held_by_user %}disabled{% endif %}
+                    data-contract-number="{{ draft.contract_number }}"
+                    data-finalize-url="{% url 'intake:finalize_draft' draft.pk %}"
+                    data-queue-url="{% url 'intake:queue' %}">
+                Finalize Draft → Contract
+            </button>
+        </form>
         {% if not lock_held_by_user %}
         <p class="small text-muted mt-2 mb-0">
             Re-acquire the lock from the queue to finalize.
@@ -1395,6 +1403,95 @@
             sessionStorage.setItem('intake_open_clins', JSON.stringify(openIdxs));
             window.location.reload();
         });
+
+        // ---- Finalize button: AJAX + popup window ----------------------------
+        const finalizeBtn = document.getElementById('finalize-btn');
+        if (finalizeBtn) {
+            finalizeBtn.addEventListener('click', function () {
+                const contractNumber = finalizeBtn.dataset.contractNumber;
+                const finalizeUrl   = finalizeBtn.dataset.finalizeUrl;
+                const queueUrl      = finalizeBtn.dataset.queueUrl;
+
+                if (!confirm(
+                    'Finalize ' + contractNumber + '? ' +
+                    'The draft will be deleted on success.'
+                )) {
+                    return;
+                }
+
+                // Pre-open a blank popup SYNCHRONOUSLY while inside the
+                // user-gesture handler. Browsers allow this; async callbacks
+                // do not get this privilege. We navigate it to the real URL
+                // after the fetch resolves.
+                const popW = 920, popH = 700;
+                const popL = Math.round((screen.width  - popW) / 2);
+                const popT = Math.round((screen.height - popH) / 2);
+                const popup = window.open(
+                    '',
+                    'intake_email_compose',
+                    'width=' + popW + ',height=' + popH +
+                    ',left=' + popL + ',top=' + popT +
+                    ',resizable=yes,scrollbars=yes'
+                );
+                if (popup) {
+                    popup.document.write(
+                        '<html><body style="font-family:sans-serif;padding:2rem;">' +
+                        '<p>Finalizing contract, please wait…</p>' +
+                        '</body></html>'
+                    );
+                }
+
+                finalizeBtn.disabled = true;
+                finalizeBtn.textContent = 'Finalizing…';
+
+                const csrfInput = document.querySelector(
+                    '#finalize-form [name=csrfmiddlewaretoken]'
+                );
+                const csrfVal = csrfInput ? csrfInput.value : '';
+
+                fetch(finalizeUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': csrfVal,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                })
+                .then(function (resp) {
+                    return resp.json().then(function (data) {
+                        return { ok: resp.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (!result.ok || !result.data.ok) {
+                        if (popup && !popup.closed) popup.close();
+                        alert(
+                            'Finalization failed: ' +
+                            (result.data.error || 'Unknown error. Check server logs.')
+                        );
+                        finalizeBtn.disabled = false;
+                        finalizeBtn.textContent = 'Finalize Draft → Contract';
+                        return;
+                    }
+
+                    if (result.data.compose_url && popup && !popup.closed) {
+                        popup.location.href = result.data.compose_url;
+                    } else if (popup && !popup.closed) {
+                        // MOD/AMD or no compose URL — close the placeholder popup.
+                        popup.close();
+                    }
+
+                    // Navigate main window back to the queue.
+                    window.location.href = queueUrl;
+                })
+                .catch(function (err) {
+                    if (popup && !popup.closed) popup.close();
+                    alert('Finalization failed: ' + err.message);
+                    finalizeBtn.disabled = false;
+                    finalizeBtn.textContent = 'Finalize Draft → Contract';
+                });
+            });
+        }
     }
 
     function restoreOpenClins() {
@@ -1436,56 +1533,6 @@
     }
 })();
 
-(function () {
-    const finalizeBtn = document.getElementById('intake-finalize-btn');
-    if (!finalizeBtn) return;
-
-    const finalizeUrl = "{% url 'intake:finalize_draft' draft.pk %}";
-    const csrfToken = function () {
-        return document.querySelector('[name=csrfmiddlewaretoken]').value;
-    };
-
-    finalizeBtn.addEventListener('click', function (ev) {
-        ev.preventDefault();
-        if (!confirm('Finalize {{ draft.contract_number }}? '
-                     + 'The draft will be deleted on success.')) return;
-
-        const emailWindow = window.open('', '_blank');
-
-        finalizeBtn.disabled = true;
-        finalizeBtn.textContent = 'Finalizing…';
-
-        fetch(finalizeUrl, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrfToken(),
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        })
-        .then(function (resp) { return resp.json(); })
-        .then(function (data) {
-            if (data.success) {
-                if (data.compose_url && emailWindow) {
-                    emailWindow.location.href = data.compose_url;
-                } else if (emailWindow) {
-                    emailWindow.close();
-                }
-                window.location.href = data.redirect_url;
-            } else {
-                if (emailWindow) emailWindow.close();
-                alert('Finalization failed: ' + (data.error || 'Unknown error.'));
-                finalizeBtn.disabled = false;
-                finalizeBtn.textContent = 'Finalize Draft → Contract';
-            }
-        })
-        .catch(function (err) {
-            if (emailWindow) emailWindow.close();
-            alert('Finalization request failed. Check your connection and try again.');
-            finalizeBtn.disabled = false;
-            finalizeBtn.textContent = 'Finalize Draft → Contract';
-        });
-    });
-})();
 </script>
 
 <!-- IDIQ Alert Note Modal (Intake) -->
