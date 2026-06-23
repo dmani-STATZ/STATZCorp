@@ -401,11 +401,29 @@ class MatcherUnitTests(TestCase):
         self.assertEqual(data['clins'][2]['nsn_text'], '1234-12-345-6789')
         self.assertEqual(data['clins'][2]['nsn_description'], 'Widget')
 
-    def test_apply_packaging_supplier_carries_cage(self):
+    def test_apply_packaging_supplier_no_existing_packaging(self):
+        """apply_match must initialize packaging dict when absent from data."""
         data = {}
         apply_match(data, 'packaging', 'supplier', self.supplier.id)
         self.assertEqual(data['packaging']['packhouse_supplier_id'], self.supplier.id)
         self.assertEqual(data['packaging']['packhouse_cage'], '12345')
+        self.assertEqual(data['packaging']['packhouse_supplier_text'], 'Acme Corp')
+
+    def test_apply_packaging_supplier_null_packaging(self):
+        """apply_match must handle data['packaging'] = None (Pydantic null serialization)."""
+        data = {'packaging': None}
+        apply_match(data, 'packaging', 'supplier', self.supplier.id)
+        self.assertEqual(data['packaging']['packhouse_supplier_id'], self.supplier.id)
+        self.assertEqual(data['packaging']['packhouse_cage'], '12345')
+        self.assertEqual(data['packaging']['packhouse_supplier_text'], 'Acme Corp')
+
+    def test_apply_packaging_supplier_existing_packaging_preserved(self):
+        """apply_match must preserve existing packaging fields (quote_amount etc)."""
+        data = {'packaging': {'quote_amount': '500.00', 'notes': 'handle with care'}}
+        apply_match(data, 'packaging', 'supplier', self.supplier.id)
+        self.assertEqual(data['packaging']['packhouse_supplier_id'], self.supplier.id)
+        self.assertEqual(data['packaging']['quote_amount'], '500.00')
+        self.assertEqual(data['packaging']['notes'], 'handle with care')
 
     def test_apply_wrong_match_type_for_path_rejected(self):
         # parent_idiq path with a buyer record is nonsense.
@@ -1843,6 +1861,36 @@ class MatcherCreateUnitTests(TestCase):
         from intake.matchers import create_record
         with self.assertRaises(MatcherError):
             create_record('idiq', {'contract_number': 'X'})
+
+    def test_supplier_db_error_raises_matcher_error(self):
+        """IntegrityError from Supplier.objects.create() must become MatcherError."""
+        from intake.matchers import _create_supplier
+        with patch('intake.matchers.Supplier.objects.filter') as mock_filter, \
+             patch('intake.matchers.Supplier.objects.create',
+                   side_effect=IntegrityError('unique constraint')):
+            mock_filter.return_value.exists.return_value = False
+            with self.assertRaises(MatcherError):
+                _create_supplier({'name': 'TestCo', 'cage_code': 'ZZZZZ'})
+
+    def test_nsn_db_error_raises_matcher_error(self):
+        """IntegrityError from Nsn.objects.create() must become MatcherError."""
+        from intake.matchers import _create_nsn
+        with patch('intake.matchers.Nsn.objects.filter') as mock_filter, \
+             patch('intake.matchers.Nsn.objects.create',
+                   side_effect=IntegrityError('unique constraint')):
+            mock_filter.return_value.exists.return_value = False
+            with self.assertRaises(MatcherError):
+                _create_nsn({'nsn_code': '8888-88-888-8888'})
+
+    def test_buyer_db_error_raises_matcher_error(self):
+        """IntegrityError from Buyer.objects.create() must become MatcherError."""
+        from intake.matchers import _create_buyer
+        with patch('intake.matchers.Buyer.objects.filter') as mock_filter, \
+             patch('intake.matchers.Buyer.objects.create',
+                   side_effect=IntegrityError('unique constraint')):
+            mock_filter.return_value.exists.return_value = False
+            with self.assertRaises(MatcherError):
+                _create_buyer({'description': 'Test Buyer'})
 
 
 class MatcherCreateEndpointTests(TestCase):

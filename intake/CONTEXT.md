@@ -227,7 +227,11 @@ Target paths:
 
 Editor UX: matchers POST and save server-side as canonical state, so the
 client reloads on `intake:match-applied`. The dirty-form guard in
-`draft_edit.html` warns before clobbering unsaved manual edits.
+`draft_edit.html` intercepts `[data-match-open]` clicks in capture phase.
+When the form is dirty, it auto-saves via AJAX to `intake:autosave_draft`
+(`POST /intake/drafts/<pk>/autosave/`) before opening the modal, so no
+unsaved edits are lost. If the auto-save fails (validation error, lock
+lost), the error is shown in an alert and the modal does not open.
 
 ## Finalization (Phase 3)
 `intake/finalize.py` shreds a Ready-for-Review draft into canonical

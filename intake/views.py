@@ -67,7 +67,7 @@ class DraftQueueView(ListView):
         return (
             qs
             .select_related('locked_by', 'company')
-            .order_by('-created_at')
+            .order_by('created_at')
         )
 
     def get_context_data(self, **kwargs):
@@ -335,6 +335,48 @@ def save_draft(request, pk: int):
 
 @login_required
 @require_POST
+def autosave_draft(request, pk: int):
+    """AJAX auto-save for the match-button pre-save flow.
+
+    Mirrors the save path in _save_under_lock but returns JSON instead
+    of redirecting. Called by draft_edit.html when the form is dirty and
+    a [data-match-open] button is clicked — saves current form state
+    before the match modal reloads the page.
+
+    Returns:
+        200 {"ok": true}  — saved successfully
+        400 {"ok": false, "error": "..."}  — validation failure
+        409 {"ok": false, "error": "..."}  — lock not held
+    """
+    with transaction.atomic():
+        draft = get_object_or_404(
+            DraftContract.objects.select_for_update(), pk=pk
+        )
+        try:
+            assert_holds(draft, request.user)
+        except LockError as exc:
+            return JsonResponse({'ok': False, 'error': str(exc)}, status=409)
+
+        new_data = parse_post(request.POST)
+        draft.data = new_data
+        try:
+            draft.save()
+        except DraftDataValidationError as exc:
+            first = exc.errors[0] if exc.errors else {'msg': 'invalid data'}
+            loc = '.'.join(str(p) for p in first.get('loc', ())) or '(root)'
+            return JsonResponse(
+                {
+                    'ok': False,
+                    'error': f'Validation failed at {loc}: {first.get("msg")}',
+                },
+                status=400,
+            )
+
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
 def mark_ready(request, pk: int):
     return _save_under_lock(request, pk, mark_ready=True)
 
@@ -415,6 +457,16 @@ def match_endpoint(request, pk: int):
                 clear_match(new_data, target_path)
         except MatcherError as exc:
             return JsonResponse({'error': str(exc)}, status=400)
+        except Exception as exc:
+            logger.exception(
+                'Unhandled error in match_endpoint action=%r match_type=%r '
+                'target_path=%r draft_pk=%s',
+                action, match_type, target_path, pk,
+            )
+            return JsonResponse(
+                {'error': 'An unexpected error occurred. Please try again or contact support.'},
+                status=500,
+            )
 
         draft.data = new_data
         # After applying an IDIQ match on a DO draft, re-derive the SP folder path

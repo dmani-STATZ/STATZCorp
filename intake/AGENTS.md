@@ -139,6 +139,15 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
 - **Supplier flag display rule (intake):** Intake is JSON-backed — there are no live Supplier ORM objects in the template. `_editor_context` builds `supplier_flags` (one DB query, `only('id','probation','conditional')`) and passes it to the template. Templates use `supplier_flags|get_item:sid` to look up flags. Apply `.supplier-flag-probation` for probation, `.supplier-flag-conditional` for conditional-only, no class for neither. Only apply when `supplier_id` is non-null. Never query Supplier inside a template — always use the pre-built `supplier_flags` context variable.
 
 ### Matcher changes (Phase 2b/2c)
+- **Auto-save on match open:** The capture-phase dirty-form guard in
+  `draft_edit.html` calls `intake:autosave_draft` via AJAX before opening
+  the match modal when the form is dirty. The auto-save endpoint
+  (`autosave_draft` in `views.py`) mirrors `_save_under_lock` but returns
+  JSON `{"ok": true/false}` instead of redirecting. Do NOT redirect from
+  `autosave_draft` — the caller expects JSON. The `autosaveUrl` template
+  variable is injected inside the `init()` script block using
+  `{% url 'intake:autosave_draft' draft.pk %}` — it cannot be moved to an
+  external JS file without a data attribute or global variable bridge.
 - **Archived supplier exclusion:** `_search_supplier` filters
   `archived=False`. Do not remove this filter. Suppliers that were matched
   before being archived retain their `supplier_id` in the draft JSON —
@@ -183,6 +192,23 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   the apply or save fails, the new canonical row rolls back too. Don't
   split create and apply across requests — that re-introduces the
   "orphan row exists but isn't linked to a draft" failure mode.
+- **Inline create DB hardening:** `_create_buyer`, `_create_nsn`, and
+  `_create_supplier` in `matchers.py` wrap their `.objects.create()` calls
+  in a nested `transaction.atomic()` (savepoint) + `try/except`. All
+  `IntegrityError` and unexpected `Exception` values are converted to
+  `MatcherError` so the existing `except MatcherError` handler in
+  `match_endpoint` catches them cleanly and returns a JSON 400. The nested
+  `transaction.atomic()` is NOT optional — without it, a DB error inside
+  the outer atomic block leaves the transaction in a rollback-only state
+  and causes a `TransactionManagementError` on commit. Do not remove it.
+- **`apply_match` packaging path null-safety:** The packaging path in
+  `apply_match` uses `data.get('packaging') or {}` followed by
+  `data['packaging'] = pkg` before writing supplier fields. This handles
+  two cases: (1) the `packaging` key is absent from `data`, and (2)
+  the key is present but its value is `None` (Pydantic serializes optional
+  dicts as null when unset). Do NOT revert to a bare `data.get('packaging')`
+  assignment — it will crash with TypeError when analysts add packaging
+  for the first time via the Match modal.
 
 ### Editor field semantics (do not regress)
 - **`canonical_contract_type_id` vs `contract_type`:** `contract_type` on

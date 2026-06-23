@@ -627,7 +627,7 @@
                     formaction="{% url 'intake:finalize_direct' draft.pk %}"
                     class="btn btn-warning"
                     {% if not lock_held_by_user %}disabled{% endif %}
-                    onclick="return confirm('Save and finalize {{ draft.contract_number }} now? The draft will be deleted on success.')">
+                    onclick="return confirm('Save and finalize {{ draft.contract_number }} now?')">
                 Save &amp; Finalize
             </button>
             <button type="submit"
@@ -1326,20 +1326,61 @@
             csrfToken: csrf.value,
         });
 
+        const autosaveUrl = "{% url 'intake:autosave_draft' draft.pk %}";
+
         document.addEventListener('click', function(ev) {
             const opener = ev.target.closest('[data-match-open]');
             if (!opener) return;
-            if (dirty) {
-                const ok = confirm(
-                    'You have unsaved changes in the form. Matching will reload ' +
-                    'the page and discard them. Continue?'
-                );
-                if (!ok) {
-                    ev.stopImmediatePropagation();
-                    ev.preventDefault();
+            if (!dirty) return;  // not dirty — let match_modal.js handle it normally
+
+            // Form is dirty: stop the event, auto-save, then open modal.
+            ev.stopImmediatePropagation();
+            ev.preventDefault();
+
+            (async function () {
+                opener.disabled = true;
+                const originalText = opener.textContent;
+                opener.textContent = 'Saving…';
+                try {
+                    const formData = new FormData(form);
+                    const resp = await fetch(autosaveUrl, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin',
+                    });
+                    let json = {};
+                    try { json = await resp.json(); } catch (_) {}
+
+                    if (!resp.ok || !json.ok) {
+                        alert(
+                            'Auto-save failed: ' +
+                            (json.error || 'Unknown error. Please save manually before matching.')
+                        );
+                        return;
+                    }
+
+                    dirty = false;
+
+                    // Manually invoke the match modal with the same data that
+                    // match_modal.js would have read from the opener's dataset.
+                    window.IntakeMatch.open({
+                        matchType: opener.dataset.matchType,
+                        targetPath: opener.dataset.targetPath,
+                        title: opener.dataset.matchTitle || opener.dataset.matchType,
+                        originalText: opener.dataset.matchOriginal || '',
+                        originalDescription: opener.dataset.matchOriginalDescription || '',
+                    });
+                } catch (err) {
+                    alert(
+                        'Auto-save failed: ' + err.message +
+                        '. Please save manually before matching.'
+                    );
+                } finally {
+                    opener.disabled = false;
+                    opener.textContent = originalText;
                 }
-            }
-        }, true);  // capture-phase so we run before IntakeMatch's handler
+            })();
+        }, true);  // capture-phase — runs before match_modal.js bubbling handler
 
         document.addEventListener('intake:match-applied', function(ev) {
             // Persist which CLINs are currently expanded so we can restore

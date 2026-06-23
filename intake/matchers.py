@@ -28,14 +28,17 @@ but the UI re-renders from `*_text`.
 """
 from __future__ import annotations
 
+import logging
 from typing import Callable
 
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 
 from contracts.models import Buyer, Contract, IdiqContract
 from products.models import Nsn
 from suppliers.models import Supplier
 
+logger = logging.getLogger(__name__)
 
 MATCH_TYPES = ('buyer', 'idiq', 'nsn', 'supplier', 'contract')
 
@@ -209,7 +212,19 @@ def _create_buyer(payload: dict) -> int:
         raise MatcherError(
             f'A buyer named {description!r} already exists — search for it instead.'
         )
-    buyer = Buyer.objects.create(description=description)
+    try:
+        with transaction.atomic():
+            buyer = Buyer.objects.create(description=description)
+    except IntegrityError:
+        raise MatcherError(
+            f'A buyer named {description!r} could not be created — it may already '
+            'exist. Try searching for it instead.'
+        )
+    except Exception as exc:
+        logger.exception(
+            'Unexpected error creating Buyer description=%r', description
+        )
+        raise MatcherError(f'Could not create buyer: {exc}') from exc
     return buyer.id
 
 
@@ -220,7 +235,21 @@ def _create_nsn(payload: dict) -> int:
         raise MatcherError(
             f'NSN {nsn_code!r} already exists — search for it instead.'
         )
-    nsn = Nsn.objects.create(nsn_code=nsn_code, description=description or None)
+    try:
+        with transaction.atomic():
+            nsn = Nsn.objects.create(
+                nsn_code=nsn_code, description=description or None
+            )
+    except IntegrityError:
+        raise MatcherError(
+            f'NSN {nsn_code!r} could not be created — it may already exist. '
+            'Try searching for it instead.'
+        )
+    except Exception as exc:
+        logger.exception(
+            'Unexpected error creating NSN nsn_code=%r', nsn_code
+        )
+        raise MatcherError(f'Could not create NSN: {exc}') from exc
     return nsn.id
 
 
@@ -232,7 +261,19 @@ def _create_supplier(payload: dict) -> int:
         raise MatcherError(
             f'A supplier with CAGE {cage!r} already exists — search by CAGE instead.'
         )
-    supplier = Supplier.objects.create(name=name, cage_code=cage)
+    try:
+        with transaction.atomic():
+            supplier = Supplier.objects.create(name=name, cage_code=cage)
+    except IntegrityError:
+        raise MatcherError(
+            f'A supplier with CAGE {cage!r} could not be created — it may already '
+            'exist. Try searching by CAGE instead.'
+        )
+    except Exception as exc:
+        logger.exception(
+            'Unexpected error creating Supplier name=%r cage=%r', name, cage
+        )
+        raise MatcherError(f'Could not create supplier: {exc}') from exc
     return supplier.id
 
 
@@ -307,7 +348,8 @@ def apply_match(data: dict, target_path: str, match_type: str, record_id: int) -
         return data
 
     if head == 'packaging' and len(parts) == 1 and match_type == 'supplier':
-        pkg = data.setdefault('packaging', {})
+        pkg = data.get('packaging') or {}
+        data['packaging'] = pkg
         pkg['packhouse_supplier_text'] = rec['text']
         pkg['packhouse_supplier_id'] = rec['id']
         if rec.get('cage'):
