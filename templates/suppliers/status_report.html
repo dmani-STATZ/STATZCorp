@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supplier Status Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <style>
+@media print {
+    .no-print { display: none !important; }
+    body { font-size: 10pt; }
+    .report-table th, .report-table td { font-size: 9pt; }
+    .page-break-before { page-break-before: always; }
+    .section-title { color: #c0392b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+@media screen {
+    body { background: #f4f4f4; }
+    .report-wrapper { background: #fff; max-width: 1200px; margin: 20px auto; padding: 30px 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+}
+.report-table { width: 100%; border-collapse: collapse; }
+.report-table th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    border-bottom: 2px solid #333;
+    padding: 6px 8px;
+    text-align: left;
+}
+.report-table td {
+    padding: 5px 8px;
+    vertical-align: top;
+    border-bottom: 1px solid #ddd;
+}
+.report-table tr { page-break-inside: avoid; }
+.report-table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+.section-title {
+    color: #c0392b;
+    font-weight: 700;
+    font-size: 1.4rem;
+    text-align: center;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+}
+.report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    border-bottom: 3px solid #333;
+    padding-bottom: 12px;
+}
+.report-header .company-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.report-header .meta {
+    text-align: right;
+    font-size: 0.8rem;
+    color: #555;
+}
+.supplier-name { font-weight: 500; }
+.poc-block { font-size: 0.88rem; line-height: 1.5; }
+.empty-section { color: #888; font-style: italic; padding: 12px 8px; }
+.col-supplier { width: 18%; }
+.col-poc     { width: 12%; }
+.col-email   { width: 16%; }
+.col-phone   { width: 10%; }
+.col-date    { width: 9%;  white-space: nowrap; }
+.col-notes   { width: 35%; }
+.print-btn-bar {
+    position: sticky;
+    top: 0;
+    background: #1a1a2e;
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 100;
+}
+    </style>
+</head>
+<body>
+
+<div class="print-btn-bar no-print">
+    <span style="flex:1; font-weight:600;">Supplier Status Report</span>
+    <button type="button" onclick="window.print()" class="btn btn-sm btn-light">🖨️ Print / Save as PDF</button>
+    <button type="button" onclick="window.close()" class="btn btn-sm btn-outline-light">✕ Close</button>
+</div>
+
+<div class="report-wrapper">
+
+    <div class="report-header">
+        <div>
+            <div class="company-name">STATZ Corp</div>
+            <div style="font-size:0.9rem; color:#555;">Supplier Status Report — Probation &amp; Conditional</div>
+        </div>
+        <div class="meta">
+            Generated: {{ generated_at|date:"M j, Y" }}<br>
+            {{ generated_at|date:"g:i A" }}
+        </div>
+    </div>
+
+    <div id="probation">
+        <div class="section-title">Probation</div>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th class="col-supplier">Supplier</th>
+                    <th class="col-poc">POC</th>
+                    <th class="col-email">Email</th>
+                    <th class="col-phone">Phone</th>
+                    <th class="col-date">Date Added</th>
+                    <th class="col-notes">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in probation_rows %}
+                <tr>
+                    <td class="supplier-name">{{ row.supplier.name }}</td>
+                    <td class="poc-block">
+                        {% for contact in row.primary_contacts %}
+                            {{ contact.name }}{% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </td>
+                    <td class="poc-block">
+                        {% for contact in row.primary_contacts %}
+                            {% if contact.email %}<a href="mailto:{{ contact.email }}" style="color:inherit;">{{ contact.email }}</a>{% endif %}{% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </td>
+                    <td class="poc-block">
+                        {% for contact in row.primary_contacts %}
+                            {{ contact.phone|default:'' }}{% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>{{ row.supplier.probation_on|date:"M j Y"|default:"—" }}</td>
+                    <td style="white-space: pre-wrap;">{{ row.supplier.notes|default:'' }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="empty-section">No suppliers currently on Probation.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="page-break-before" style="margin-top: 48px;" id="conditional"></div>
+
+    <div>
+        <div class="section-title">Conditional</div>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th class="col-supplier">Supplier</th>
+                    <th class="col-poc">POC</th>
+                    <th class="col-email">Email</th>
+                    <th class="col-phone">Phone</th>
+                    <th class="col-date">Date Added</th>
+                    <th class="col-notes">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in conditional_rows %}
+                <tr>
+                    <td class="supplier-name">{{ row.supplier.name }}</td>
+                    <td class="poc-block">
+                        {% for contact in row.primary_contacts %}
+                            {{ contact.name }}{% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </td>
+                    <td class="poc-block">
+                        {% for contact in row.primary_contacts %}
+                            {% if contact.email %}<a href="mailto:{{ contact.email }}" style="color:inherit;">{{ contact.email }}</a>{% endif %}{% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </td>
+                    <td class="poc-block">
+                        {% for contact in row.primary_contacts %}
+                            {{ contact.phone|default:'' }}{% if not forloop.last %}<br>{% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>{{ row.supplier.conditional_on|date:"M j Y"|default:"—" }}</td>
+                    <td style="white-space: pre-wrap;">{{ row.supplier.notes|default:'' }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="empty-section">No suppliers currently on Conditional.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+</body>
+</html>

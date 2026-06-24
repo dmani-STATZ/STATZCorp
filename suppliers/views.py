@@ -26,7 +26,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import urlparse
@@ -1309,3 +1309,55 @@ class SuppliersInfoByType(LoginRequiredMixin, ListView):
 
         context['type_label'] = label_map.get(slug, 'Suppliers')
         return context
+
+
+# Contact model note: Contact.name is a single TextField (not first_name/last_name).
+@login_required
+def status_report(request):
+    """
+    Combined Probation & Conditional supplier status report.
+    Renders a standalone print-ready HTML page (no base template).
+    Opened via window.open() from the supplier dashboard.
+
+    Probation section: archived=False, probation=True, ordered by name.
+    Conditional section: archived=False, conditional=True, ordered by name.
+
+    Primary contacts (is_primary=True) are fetched in two bulk queries
+    (one per section) to avoid N+1. Multiple primary contacts per supplier
+    are stacked in the same table cell.
+    """
+    def build_section(qs):
+        """
+        Takes a Supplier queryset, returns a list of dicts:
+          { 'supplier': <Supplier>, 'primary_contacts': [<Contact>, ...] }
+        Fetches all primary contacts in ONE query (no N+1).
+        """
+        supplier_list = list(qs.order_by('name'))
+        supplier_ids = [s.id for s in supplier_list]
+
+        contact_qs = Contact.objects.filter(
+            supplier_id__in=supplier_ids,
+            is_primary=True,
+        ).order_by('supplier_id')
+
+        contacts_map = {}
+        for contact in contact_qs:
+            contacts_map.setdefault(contact.supplier_id, []).append(contact)
+
+        return [
+            {
+                'supplier': s,
+                'primary_contacts': contacts_map.get(s.id, []),
+            }
+            for s in supplier_list
+        ]
+
+    probation_qs = Supplier.objects.filter(archived=False, probation=True)
+    conditional_qs = Supplier.objects.filter(archived=False, conditional=True)
+
+    context = {
+        'probation_rows': build_section(probation_qs),
+        'conditional_rows': build_section(conditional_qs),
+        'generated_at': timezone.now(),
+    }
+    return render(request, 'suppliers/status_report.html', context)

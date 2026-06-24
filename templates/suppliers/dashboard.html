@@ -4,7 +4,14 @@
 {% block body %}
 <div class="container mx-auto py-6 space-y-6">
   <div class="card card-padded shadow-sm md:p-6">
-    <div class="flex justify-end mb-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <button
+        type="button"
+        class="btn btn-outline-secondary btn-sm"
+        onclick="window.open('{% url 'suppliers:status_report' %}', 'supplierStatusReport', 'width=1300,height=850,scrollbars=yes,resizable=yes')"
+        title="Open Probation &amp; Conditional Status Report">
+        <i class="bi bi-file-earmark-text me-1"></i>Status Report
+      </button>
       <a href="{% url 'suppliers:supplier_create' %}" class="inline-flex items-center px-4 py-2 rounded-lg text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 shadow">
         + Add Supplier
       </a>

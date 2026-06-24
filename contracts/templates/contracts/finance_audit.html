@@ -265,11 +265,29 @@
                                             {% for clin_row in clin_splits_by_company|get_item:row.company_name %}
                                             <tr data-split-id="{{ clin_row.split_id }}">
                                                 <td class="ps-4 text-body-secondary small">{{ clin_row.item_number }}</td>
-                                                <td class="text-end small">{% if clin_row.split_value is not None %}${{ clin_row.split_value|floatformat:2 }}{% else %}—{% endif %}</td>
+                                                <td class="text-end small">
+                                                    {% if clin_row.raw_split_value is not None %}
+                                                        ${{ clin_row.raw_split_value|floatformat:2 }}
+                                                    {% elif clin_row.split_value is not None %}
+                                                        ${{ clin_row.split_value|floatformat:2 }}
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+                                                </td>
                                                 <td class="text-end small">{% if clin_row.split_paid is not None %}${{ clin_row.split_paid|floatformat:2 }}{% else %}—{% endif %}</td>
                                                 <td></td>
                                             </tr>
                                             {% endfor %}
+                                            {% with pkg_share=packaging_share_per_company|get_item:row.company_name %}
+                                            {% if pkg_share %}
+                                            <tr class="text-danger">
+                                                <td class="ps-4 small fst-italic">Packaging</td>
+                                                <td class="text-end small">&minus;${{ pkg_share|floatformat:2 }}</td>
+                                                <td></td>
+                                                <td></td>
+                                            </tr>
+                                            {% endif %}
+                                            {% endwith %}
                                         </tbody>
                                     </table>
                                 </td>

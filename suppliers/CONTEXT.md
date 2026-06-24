@@ -56,6 +56,19 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 5. **List/create/edit/search (via `contracts.views.supplier_views`)** – `contracts` exposes `SupplierListView`, `SupplierSearchView`, `SupplierCreateView` (`suppliers/supplier_form.html`), and `SupplierUpdateView` (`suppliers/supplier_edit.html`) plus quick update/toggle/certification/classification management endpoints; these views import `suppliers.models` and reuse the templates/static assets defined here.
 6. **Helper endpoints** – `supplier_search_api` returns the top 15 matches for dashboard search/autocomplete; `SuppliersInfoByType` serves `/suppliers/info/<type_slug>/` with a paginated list filtered by `supplier_type.description`.
 
+## Views
+
+### status_report (GET `/suppliers/status-report/`)
+
+- **Auth:** `login_required`
+- **Purpose:** Renders a standalone, print-ready combined Probation & Conditional supplier status report. Opened via `window.open()` from the dashboard.
+- **Queries:**
+  - Probation: `Supplier.objects.filter(archived=False, probation=True).order_by('name')`
+  - Conditional: `Supplier.objects.filter(archived=False, conditional=True).order_by('name')`
+  - Primary contacts bulk-fetched in one query per section (no N+1).
+- **Template:** `suppliers/status_report.html` (standalone, no base template)
+- **Context vars:** `probation_rows`, `conditional_rows`, `generated_at`
+
 ## 7. Templates and UI Surface Area
 - `templates/suppliers/dashboard.html` – dashboard cards, supplier-type links, and inline JS that hits `/suppliers/search/` (JSON) to redirect to detail pages. The search input must be wrapped in a `<div>`, not a `<form>` (a form causes Enter to submit and bypass JS autocomplete). The inline script must register on `DOMContentLoaded` before querying `#supplier-search` and `#supplier-results`.
 - `templates/suppliers/supplier_detail.html` – two-column desktop layout: a 220px sticky left sidebar (`var(--company-primary)` background) with the current supplier name, a jump search (`#sidebar-supplier-search` → `/suppliers/search/`, min 2 characters, up to 8 results), and anchor nav with count badges (contacts, contracts, certifications, documents). Main content scrolls in `.supplier-detail-main` with anchored sections: `#section-overview` (status flag banners when probation/conditional/archived are true; supplier header and health gauge side by side at 60/40 via `col-7`/`col-5`; Contact & Web and Compliance & Status side by side at 65/35 via `col-8`/`col-4` with `#section-compliance` on the right column), `#section-contacts` (contacts as individual cards with alphabetical left-border color banding — A–F blue, G–L teal, M–R amber, S–Z purple; primary contact via `contact.is_primary` shows red border and **Primary** badge; RFQ email picker; contact groups), `#section-addresses`, `#section-contracts`, `#section-certs` (certifications and classifications locked side by side at 50/50 via `col-6`, no wrap), `#section-files`, `#section-notes`. Notes section has an Edit button (`#notes-edit-btn`) that opens a modal (`#notesEditModal`) POSTing to `contracts:supplier_update_notes`; scroll position is preserved via sessionStorage (`supplier_notes_scroll` key). IntersectionObserver scroll spy highlights the active sidebar link (≥30% visible). Conditional status banners use `var(--bs-danger)` / `var(--bs-warning)` / `var(--bs-secondary)` as appropriate. Prime displays `prime_display` when provided, otherwise `—` for a set integer with no label (template-level; no raw ID). Edit Supplier link removed; inline transaction modal editing retained. Hidden `#enrichment-panel` preserved.
@@ -95,7 +108,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 - `/suppliers/details/` → delegated supplier list (mirrors `contracts.views.SupplierListView`) and `/suppliers/search/page/` for the AJAX-backed search page.
 - `/suppliers/search/` → `supplier_search_api` (JSON) used by the dashboard search box and autocomplete UI.
 - `/suppliers/info/<type_slug>/` → `SuppliersInfoByType` with a per-type paginated list.
-- `/suppliers/autocomplete/`, `/suppliers/create/`, `/suppliers/<pk>/`, `/suppliers/<pk>/detail/`, `/suppliers/<pk>/enrich/run/`, `/suppliers/<pk>/enrich/`, `/suppliers/<pk>/apply-enrichment/`, `/suppliers/<pk>/edit/`, `/suppliers/ai-model/config/` → detail, enrichment, edits, and model config endpoints defined in `suppliers.urls`.
+- `/suppliers/autocomplete/`, `/suppliers/create/`, `/suppliers/<pk>/`, `/suppliers/<pk>/detail/`, `/suppliers/<pk>/enrich/run/`, `/suppliers/<pk>/enrich/`, `/suppliers/<pk>/apply-enrichment/`, `/suppliers/<pk>/edit/`, `/suppliers/ai-model/config/`, `/suppliers/status-report/` → detail, enrichment, edits, model config, and status report endpoints defined in `suppliers.urls`.
 - Additional `contracts` routes under `contracts/urls.py` expose `/suppliers/` (list), `/supplier/<pk>/` (detail/edit/create), `/supplier/<pk>/toggle-flag/`, `/supplier/<pk>/update-*` (selects, compliance, files, address), `/supplier/<pk>/contact/...`, `/supplier/<pk>/certification/...`, `/supplier/<pk>/classification/...`, `/supplier/search/`, and autocomplete/admin tooling; these call into `contracts.views.supplier_views`.
 - `POST /contracts/supplier/<pk>/update-notes/` → `contracts:supplier_update_notes` — saves `Supplier.notes` (empty string clears notes), returns JSON `{"ok": true}` plus the supplier detail payload fields used by the list view.
 

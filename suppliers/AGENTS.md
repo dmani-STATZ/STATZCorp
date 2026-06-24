@@ -258,6 +258,35 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - Modifying `OpenRouterModelSetting` migrations (singleton risk)
 - Adding fields to `Supplier` without updating `contracts/forms.py`
 
+## Reports
+
+### Status Report (Probation & Conditional)
+
+- **View:** `suppliers/views.py` → `status_report()`
+- **URL:** `/suppliers/status-report/` (`name='status_report'`, namespace=`suppliers`)
+- **Template:** `suppliers/templates/suppliers/status_report.html`
+
+**Data flow:**
+
+- Supplier fields used: `name`, `archived`, `probation`, `conditional`, `probation_on`, `conditional_on`, `notes`
+- Contact fields used: `is_primary`, `name` (single field — not `first_name`/`last_name`), `email`, `phone`
+- Contact model: `suppliers.models.Contact` (`db_table`: `contracts_contact`)
+- Contact FK to Supplier: `contact.supplier_id` (`related_name='contacts'`)
+
+**Key constraints:**
+
+- N+1 avoided via bulk contact fetch (one query per section)
+- No company filter applied (report is company-agnostic; matches dashboard behavior)
+- Opened via `window.open()` from `dashboard.html` — do NOT redirect or use modals
+- Template is standalone HTML (no base template inheritance)
+
+**When modifying this view:**
+
+- Keep `build_section()` helper self-contained to avoid touching the Contact query path
+- If `Supplier` gains a company FK, add company filter here matching the list view
+
+---
+
 ## 16. Release Notes (Changelog) Rules
 
 Product release notes are file-based. The markdown files are the **source of truth** (the DB is just a cache). When generating a release note, you MUST adhere to these strict validation rules, or the system will skip the file on deployment.

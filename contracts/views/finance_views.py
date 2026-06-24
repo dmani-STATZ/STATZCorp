@@ -59,6 +59,7 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context['adj_gross_contract'] = Decimal('0.00')
         context['packaging'] = None
         context['packaging_deduction'] = Decimal('0.00')
+        context['packaging_share_per_company'] = {}
         context['charges_deduction'] = Decimal('0.00')
         context['level_charges'] = []
         context['payment_activity_rollup'] = []
@@ -96,16 +97,41 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 clin_splits_by_company = {}
                 for split in ClinSplit.objects.filter(
                     clin__contract=self.object
-                ).select_related('clin').order_by('company_name', 'clin__item_number'):
+                ).select_related('clin').prefetch_related(
+                    'clin__finance_lines'
+                ).order_by('company_name', 'clin__item_number'):
                     cname = split.company_name
                     if cname not in clin_splits_by_company:
                         clin_splits_by_company[cname] = []
+
+                    clin = split.clin
+                    wawf_val = Decimal(str(clin.wawf_payment or 0))
+                    item_val = Decimal(str(clin.item_value or 0))
+                    income = wawf_val if wawf_val != Decimal('0') else item_val
+                    quote_val = Decimal(str(clin.quote_value or 0))
+                    paid_val = Decimal(str(clin.paid_amount or 0))
+                    cost = paid_val if paid_val != Decimal('0') else quote_val
+                    gross = income - cost
+                    fin_costs = sum(
+                        Decimal(str(fl.amount_billed or 0))
+                        for fl in clin.finance_lines.all()
+                    )
+                    clin_raw_gp = gross - fin_costs
+                    pct = split.percentage
+                    if pct is not None:
+                        raw_split_value = (
+                            clin_raw_gp * pct / Decimal('100')
+                        ).quantize(Decimal('0.01'))
+                    else:
+                        raw_split_value = None
+
                     clin_splits_by_company[cname].append({
                         'split_id': split.id,
-                        'item_number': split.clin.item_number,
+                        'item_number': clin.item_number,
                         'split_value': split.split_value,
                         'split_paid': split.split_paid,
-                        'percentage': split.percentage,
+                        'percentage': pct,
+                        'raw_split_value': raw_split_value,
                     })
                 context['clin_splits_by_company'] = clin_splits_by_company
                 context['log_split_paid_url'] = reverse(
@@ -182,6 +208,19 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
 
                 context['packaging'] = packaging_context
                 context['packaging_deduction'] = packaging_deduction
+
+                packaging_share_per_company = {}
+                if packaging_deduction:
+                    for company_name, rows in clin_splits_by_company.items():
+                        pct = next(
+                            (r['percentage'] for r in rows if r['percentage'] is not None),
+                            None,
+                        )
+                        if pct is not None:
+                            packaging_share_per_company[company_name] = (
+                                packaging_deduction * pct / Decimal('100')
+                            ).quantize(Decimal('0.01'))
+                context['packaging_share_per_company'] = packaging_share_per_company
 
                 charges_deduction = Decimal('0.00')
                 level_charges = list(self.object.level_charges.all())

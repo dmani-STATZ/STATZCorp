@@ -133,6 +133,16 @@ def create_contract_from_payload(payload: dict, user: User) -> ContractCreationR
             modified_by=user,
         )
 
+    # Auto-recalc split values now that packaging and charges exist.
+    # Only runs when splits are present; no-ops gracefully otherwise.
+    # This ensures the Finance Audit shows packaging-adjusted values
+    # immediately after finalization without requiring a manual Recalc.
+    has_splits = any(
+        row.get('splits') for row in (payload.get('clins') or [])
+    )
+    if has_splits:
+        recalc_split_values(contract)
+
     return ContractCreationResult(
         contract=contract,
         clins_by_item_number=clins_by_item_number,
@@ -491,6 +501,137 @@ def _seed_payment_history(contract, payload: dict, clins: list) -> None:
                 created_by=created_by,
                 modified_by=created_by,
             )
+
+
+# ---------------------------------------------------------------------------
+# Split recalculation
+# ---------------------------------------------------------------------------
+
+
+def recalc_split_values(contract) -> int:
+    """Recompute ClinSplit.split_value for every split on the contract.
+
+    Uses the same formula as the recalc_splits view:
+      contract_adj_gross = Σ(CLIN adj_gross) - packaging_deduction
+                           - charges_deduction
+
+    Distributes each company's total proportionally across its CLINs
+    by CLIN item_value weight. Last row absorbs rounding remainder.
+    CLINs with no item_value are weighted equally. Companies with no
+    percentage set are skipped (their split_value is left unchanged).
+
+    Returns the number of ClinSplit rows updated.
+
+    Must be called inside an active transaction when used at contract
+    creation time (create_contract_from_payload already provides one).
+    """
+    from collections import defaultdict
+    from django.db.models import Prefetch
+
+    clins = list(
+        Clin.objects.filter(contract=contract).prefetch_related(
+            Prefetch('splits', queryset=ClinSplit.objects.all()),
+            'finance_lines',
+        )
+    )
+
+    # Σ CLIN adj_gross — mirrors split_views.recalc_splits inline calc
+    total_clin_adj_gross = Decimal('0.00')
+    for clin in clins:
+        wawf_val = Decimal(str(clin.wawf_payment or 0))
+        item_val = Decimal(str(clin.item_value or 0))
+        income = wawf_val if wawf_val != Decimal('0') else item_val
+        quote_val = Decimal(str(clin.quote_value or 0))
+        paid_val = Decimal(str(clin.paid_amount or 0))
+        cost = paid_val if paid_val != Decimal('0') else quote_val
+        gross = income - cost
+        fin_costs = sum(
+            Decimal(str(fl.amount_billed or 0))
+            for fl in clin.finance_lines.all()
+        )
+        total_clin_adj_gross += gross - fin_costs
+
+    # Packaging deduction — same COALESCE as Contract.adjusted_gross
+    packaging_deduction = Decimal('0.00')
+    try:
+        pkg = contract.packaging
+        if pkg.amount_paid and Decimal(str(pkg.amount_paid)) != Decimal('0'):
+            packaging_deduction = Decimal(str(pkg.amount_paid))
+        elif pkg.quote_amount and Decimal(str(pkg.quote_amount)) != Decimal('0'):
+            packaging_deduction = Decimal(str(pkg.quote_amount))
+    except Exception:
+        pass
+
+    # Contract-level charges deduction
+    charges_deduction = Decimal('0.00')
+    for charge in contract.level_charges.all():
+        bp = charge.billed_paid_amount
+        if bp is not None and Decimal(str(bp)) != Decimal('0'):
+            charges_deduction += Decimal(str(bp))
+        else:
+            charges_deduction += Decimal(str(charge.estimated_amount or 0))
+
+    contract_adj_gross = (
+        total_clin_adj_gross - packaging_deduction - charges_deduction
+    )
+
+    # Group splits by company across all CLINs
+    splits_by_company: dict = defaultdict(list)
+    for clin in clins:
+        for split in clin.splits.all():
+            splits_by_company[split.company_name].append(split)
+
+    if not splits_by_company:
+        return 0
+
+    # Determine percentage per company
+    # (first non-null percentage on any ClinSplit row for that company)
+    company_percentages = {}
+    for company, splits in splits_by_company.items():
+        pct = next(
+            (s.percentage for s in splits if s.percentage is not None),
+            None,
+        )
+        company_percentages[company] = pct
+
+    updated_count = 0
+    for company, splits in splits_by_company.items():
+        pct = company_percentages.get(company)
+        if pct is None:
+            # No percentage set — leave split_value unchanged for this company
+            continue
+
+        company_total = (pct / Decimal('100.0')) * contract_adj_gross
+
+        # Distribute proportionally by CLIN item_value
+        weights = [Decimal(str(s.clin.item_value or 0)) for s in splits]
+        total_weight = sum(weights)
+
+        if total_weight == Decimal('0'):
+            # No item_values — distribute equally
+            n = len(splits)
+            base = (company_total / Decimal(n)).quantize(Decimal('0.01'))
+            allocated = [base] * n
+            allocated[-1] += company_total - sum(allocated)
+        else:
+            allocated = []
+            running = Decimal('0')
+            for i, weight in enumerate(weights):
+                if i == len(weights) - 1:
+                    allocated.append(company_total - running)
+                else:
+                    share = (
+                        weight / total_weight * company_total
+                    ).quantize(Decimal('0.01'))
+                    allocated.append(share)
+                    running += share
+
+        for split, sv in zip(splits, allocated):
+            split.split_value = sv
+            split.save(update_fields=['split_value', 'modified_at'])
+            updated_count += 1
+
+    return updated_count
 
 
 # ---------------------------------------------------------------------------
