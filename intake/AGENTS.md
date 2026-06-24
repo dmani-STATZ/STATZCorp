@@ -86,7 +86,8 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
 - **ClinSplit** rows are created from per-CLIN `splits` (company_name +
   percentage). `split_value` is computed in finalize as
   `planned_gp × percentage / 100` (quantized to cents), not pulled from
-  the draft. The editor renders the live value for analyst feedback.
+  the draft. The editor renders live split totals in the contract-level
+  **Contract GP Split** table (`#contract-split-section`).
 - **CLIN price translation at finalization:** Intake JSON `item_value` is the
   government per-unit price and `unit_price` is the supplier per-unit quote
   (see ingest/editor notes below — do not swap those keys in draft JSON).
@@ -145,9 +146,23 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   silently dropped at POST time, not flagged at validate time.
 - Nested keys (`clin-i-fin-j-*`, `clin-i-split-j-*`) require entries in
   `_NESTED_ROW_KEY` (regex) and `_NESTED_BUCKET` (allowlist map). The CLIN
-  card template uses `__CLINIDX__` and the sub-templates use
-  `__CLINIDX__` + `__FINIDX__` / `__SPLITIDX__`; the JS engine in
-  `draft_edit.html` substitutes them on row add.
+  card template uses `__CLINIDX__` and the finance sub-template uses
+  `__CLINIDX__` + `__FINIDX__`; the JS engine in `draft_edit.html`
+  substitutes them on row add. GP splits are contract-level — see below.
+- **Contract-level GP Split UI:** Per-CLIN split rows (`.clin-split-tbody`,
+  `tpl-clin-split`) are removed. Splits live in `#contract-split-section` /
+  `#contract-split-table`. Each company is a `.contract-split-company-group`
+  tbody with `data-children-id` linking to its collapsible children tbody.
+  `addClinSplit(card)` (triggered by `[data-add-clin-split]` in any CLIN
+  card) appends to `#contract-split-table` via `tpl-contract-split` (uses
+  placeholder attributes `data-children-id-tpl` / `contract-split-children-tpl`
+  — wired manually in JS, not via `applyTemplate()`). `recalcContractSplits()`
+  rebuilds child rows and company totals; must **not** be called from
+  `recalcClin()` (infinite recursion). Call it from `recalcAll()`, input/click
+  handlers, and after add/remove split. `injectPerClinSplitInputs()` generates
+  per-CLIN hidden POST fields at submit time — call it before any AJAX
+  `FormData(form)` build (`save-finalize`, autosave on dirty match open).
+  Standard form submit hooks it automatically.
 - All write endpoints (`save_draft`, `mark_ready`, `cancel_draft`) MUST hold
   the soft lock and MUST call `assert_holds` before writing. The
   `test_save_rejects_when_user_lost_lock` test exists specifically to catch

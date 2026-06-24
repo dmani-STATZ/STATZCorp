@@ -568,6 +568,66 @@
             </div>
         </div>
 
+        <!-- ============================================================== -->
+        <!-- CONTRACT-LEVEL GP SPLIT                                        -->
+        <!-- ============================================================== -->
+        <div class="card mb-3" id="contract-split-section">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Contract GP Split</h5>
+
+                <div id="contract-split-empty"
+                     class="text-muted small mb-2{% if contract_splits %} d-none{% endif %}">
+                    No splits defined. Use <strong>+ Add Split</strong> in a CLIN
+                    card above.
+                </div>
+
+                <table class="table table-sm mb-0" id="contract-split-table"
+                       {% if not contract_splits %}style="display:none"{% endif %}>
+                    <thead class="table-light">
+                        <tr>
+                            <th>Company</th>
+                            <th style="width:110px">%</th>
+                            <th class="text-end" style="width:160px">Total Split Value</th>
+                            <th style="width:48px"></th>
+                        </tr>
+                    </thead>
+
+                    {% for sp in contract_splits %}
+                    {# --- Company header tbody (one per company) --- #}
+                    <tbody class="contract-split-company-group"
+                           data-children-id="split-children-{{ forloop.counter }}">
+                        <tr class="contract-split-company-row" style="cursor:pointer">
+                            <td>
+                                <input type="text"
+                                       class="form-control form-control-sm contract-split-company"
+                                       value="{{ sp|get_item:'company_name'|default:'' }}"
+                                       placeholder="Company name">
+                            </td>
+                            <td>
+                                <input type="number" step="0.01" max="100" min="0"
+                                       class="form-control form-control-sm contract-split-pct"
+                                       value="{{ sp|get_item:'percentage'|default:'' }}"
+                                       placeholder="0">
+                            </td>
+                            <td class="text-end align-middle contract-split-total">$0.00</td>
+                            <td class="align-middle">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        data-remove-contract-split>🗑</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                    {# --- Collapsible children tbody (default closed) --- #}
+                    <tbody class="collapse"
+                           id="split-children-{{ forloop.counter }}">
+                        {# Populated by recalcContractSplits() on load and on recalc #}
+                    </tbody>
+                    {% endfor %}
+
+                </table>
+            </div>
+        </div>
+
         {# ---- GP Summary (read-only, calculated live) ---- #}
         <div class="card card-padded shadow-sm mb-4 border-info">
             <h2 class="text-xl font-semibold mb-2">GP Summary</h2>
@@ -677,7 +737,7 @@
     {% include 'intake/_match_modal.html' %}
 </div>
 
-{# Off-DOM templates. JS substitutes __CLINIDX__, __FINIDX__, __SPLITIDX__ as needed. #}
+{# Off-DOM templates. JS substitutes __CLINIDX__, __FINIDX__ as needed. #}
 <template id="tpl-clin-card">
     <div class="card mb-3 clin-card" data-clin-idx="__CLINIDX__">
         <div class="card-header d-flex justify-content-between align-items-center bg-light">
@@ -783,7 +843,7 @@
                 <button type="button" class="btn btn-sm btn-outline-success" data-add-clin-split>+ Add Split</button>
             </div>
             <div class="mb-2">Planned GP: <strong class="clin-planned-gp">$0.00</strong></div>
-            <div class="clin-split-tbody mb-0"></div>
+            {# Split rows are now in the contract-level split table below all CLINs #}
         </div>
     </div>
 </template>
@@ -817,34 +877,33 @@
     </div>
 </template>
 
-<template id="tpl-clin-split">
-    <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-light" data-split-idx="__SPLITIDX__">
-        <div style="flex: 3;">
-            <label class="label small mb-1">Company</label>
-            <input type="text" data-name="clin-__CLINIDX__-split-__SPLITIDX__-company_name"
-                   class="form-control form-control-sm"
-                   placeholder="Company name">
-        </div>
-        <div style="flex: 1;">
-            <label class="label small mb-1">%</label>
-            <input type="number" step="0.01" max="100"
-                   data-name="clin-__CLINIDX__-split-__SPLITIDX__-percentage"
-                   class="form-control form-control-sm clin-split-pct"
-                   placeholder="0">
-        </div>
-        <div style="flex: 1;">
-            <label class="label small mb-1">Split Value</label>
-            <input type="text" readonly
-                   class="form-control form-control-sm clin-split-value"
-                   value="$0.00">
-        </div>
-        <div class="pt-3">
-            <button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>
-                🗑
-            </button>
-        </div>
-    </div>
+<template id="tpl-contract-split">
+    <tbody class="contract-split-company-group"
+           data-children-id-tpl="CHILDREN_ID_PLACEHOLDER">
+        <tr class="contract-split-company-row" style="cursor:pointer">
+            <td>
+                <input type="text"
+                       class="form-control form-control-sm contract-split-company"
+                       placeholder="Company name">
+            </td>
+            <td>
+                <input type="number" step="0.01" max="100" min="0"
+                       class="form-control form-control-sm contract-split-pct"
+                       placeholder="0">
+            </td>
+            <td class="text-end align-middle contract-split-total">$0.00</td>
+            <td class="align-middle">
+                <button type="button"
+                        class="btn btn-sm btn-outline-danger"
+                        data-remove-contract-split>🗑</button>
+            </td>
+        </tr>
+    </tbody>
+    <tbody class="collapse contract-split-children-tpl">
+        {# Populated by recalcContractSplits() #}
+    </tbody>
 </template>
+
 <template id="tpl-pair">
     <tr data-row="pair">
         <td class="p-1">
@@ -873,7 +932,7 @@
 (function() {
     // Counters keep newly added rows from colliding with server-rendered
     // indexes. We don't care about gaps; the backend reindexes on save.
-    const counters = {clin: 1000, pair: 1000};
+    const counters = {clin: 1000, pair: 1000, contractSplit: 1000};
     const removePackagingUrl = "{% url 'intake:remove_packaging' draft.pk %}";
     // Per-CLIN sub-counters for finance lines and splits, keyed by CLIN idx.
     const subCounters = {};
@@ -957,6 +1016,7 @@
             ev.preventDefault();
             hidePackaging();
             recalcGpSummary();
+            recalcContractSplits();
         });
     }
 
@@ -1048,31 +1108,58 @@
     }
 
     function addClinSplit(card) {
-        const tbody = card.querySelector('.clin-split-tbody');
-        if (!tbody) return;
+        const table  = document.getElementById('contract-split-table');
+        const emptyMsg = document.getElementById('contract-split-empty');
+        if (!table) return;
 
-        const existingRows = tbody.querySelectorAll('[data-split-idx]');
-        const existingCount = existingRows.length;
+        const existingGroups = table.querySelectorAll(
+            '.contract-split-company-group');
+        const existingCount = existingGroups.length;
 
-        // Add the new row via the existing machinery.
-        addClinSubRow(card, 'split');
+        const tpl = document.getElementById('tpl-contract-split');
+        if (!tpl) return;
 
+        const idx = ++counters.contractSplit;
+        const childrenId = 'split-children-' + idx;
+
+        const frag = tpl.content.cloneNode(true);
+
+        // Wire up the group tbody's data-children-id
+        const groupTbody = frag.querySelector('.contract-split-company-group');
+        groupTbody.dataset.childrenId = childrenId;
+        groupTbody.removeAttribute('data-children-id-tpl');
+
+        // Wire up the children tbody's id
+        const childrenTbody = frag.querySelector('.contract-split-children-tpl');
+        childrenTbody.id = childrenId;
+        childrenTbody.classList.remove('contract-split-children-tpl');
+
+        table.appendChild(frag);
+
+        // Auto-fill defaults (same UX rules as before)
+        const allGroups = table.querySelectorAll('.contract-split-company-group');
         if (existingCount === 0) {
-            // First split ever — pre-fill STATZ at 100%.
-            const newRow = tbody.querySelectorAll('[data-split-idx]')[0];
-            if (newRow) {
-                const companyInput = newRow.querySelector('[name$="-company_name"], [data-name$="-company_name"]');
-                const pctInput = newRow.querySelector('.clin-split-pct');
-                if (companyInput) companyInput.value = 'STATZ';
-                if (pctInput) pctInput.value = '100';
+            // First split ever: STATZ at 100%
+            const newGroup = allGroups[allGroups.length - 1];
+            if (newGroup) {
+                const co  = newGroup.querySelector('.contract-split-company');
+                const pct = newGroup.querySelector('.contract-split-pct');
+                if (co)  co.value  = 'STATZ';
+                if (pct) pct.value = '100';
             }
         } else if (existingCount === 1) {
-            // Second split added — drop first to 50%, leave new blank.
-            const firstRow = existingRows[0];
-            const firstPct = firstRow.querySelector('.clin-split-pct');
+            // Second split: drop the first to 50%, leave new blank
+            const firstGroup = existingGroups[0];
+            const firstPct = firstGroup.querySelector('.contract-split-pct');
             if (firstPct) firstPct.value = '50';
         }
-        // 2+ existing splits — no auto-adjustment.
+        // 3+ splits: no auto-adjustment
+
+        // Show table, hide empty message
+        table.style.display = '';
+        if (emptyMsg) emptyMsg.classList.add('d-none');
+
+        recalcContractSplits();
     }
 
     function addClinSubRow(card, kind) {
@@ -1102,6 +1189,12 @@
         if (signed && n < 0) return '−' + formatted;
         return (n < 0 ? '−' : '') + formatted;
     }
+    function escHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
 
     function recalcClin(card) {
         const itemValue = parseNum(card.querySelector('.clin-item-value')?.value);
@@ -1125,12 +1218,6 @@
             gp.classList.toggle('text-success', plannedGp >= 0);
             gp.classList.toggle('text-danger', plannedGp < 0);
         }
-        // Per-split value = plannedGp × pct / 100
-        card.querySelectorAll('.clin-split-tbody [data-split-idx]').forEach(row => {
-            const pct = parseNum(row.querySelector('.clin-split-pct')?.value);
-            const sv = row.querySelector('.clin-split-value');
-            if (sv) sv.value = money(plannedGp * pct / 100);
-        });
         // Update header summary text from current inputs.
         const itemNum = card.querySelector('.clin-item-number')?.value || '—';
         card.querySelector('.clin-header-item-number').textContent = itemNum;
@@ -1195,38 +1282,153 @@
             }
         }
 
-        // --- Auto-populate Planned Split from all CLIN split rows ---
+        // --- Auto-populate Planned Split from contract-level split rows ---
         const plannedSplitInput = document.querySelector('[name="f_planned_split"]');
         if (plannedSplitInput) {
-            // Collect all split entries across all CLINs, aggregate by
-            // company name, then sum percentages into a plain total.
-            // If no splits exist, leave the field as-is.
-            const splitTotals = {};  // company_name -> total percentage
-            document.querySelectorAll('#clin-stack .clin-card').forEach(function(card) {
-                card.querySelectorAll('.clin-split-tbody [data-split-idx]').forEach(function(row) {
-                    const companyInput = row.querySelector('[name$="-company_name"]');
-                    const pctInput = row.querySelector('.clin-split-pct');
-                    const company = (companyInput?.value || '').trim();
-                    const pct = parseNum(pctInput?.value);
-                    if (company) {
-                        splitTotals[company] = (splitTotals[company] || 0) + pct;
-                    }
-                });
+            let totalPct = 0;
+            document.querySelectorAll(
+                '#contract-split-table .contract-split-company-group'
+            ).forEach(function(group) {
+                totalPct += parseNum(
+                    group.querySelector('.contract-split-pct')?.value);
             });
-
-            const entries = Object.entries(splitTotals);
-            if (entries.length > 0) {
-                const totalPct = entries.reduce(function(sum, e) {
-                    return sum + e[1];
-                }, 0);
+            if (totalPct > 0) {
                 plannedSplitInput.value = totalPct.toFixed(0);
             }
         }
     }
 
-    function recalcAll() { recalcGpSummary(); }
+    function recalcContractSplits() {
+        const table = document.getElementById('contract-split-table');
+        if (!table) return;
+
+        // Gather current per-CLIN GP values by calling recalcClin on each
+        // card. recalcClin is idempotent — safe to call multiple times.
+        var clinEntries = [];
+        document.querySelectorAll('#clin-stack .clin-card').forEach(
+            function(card) {
+                var gp      = recalcClin(card);
+                var itemNum = (card.querySelector('.clin-item-number')
+                              ?.value || '—').trim();
+                clinEntries.push({ itemNum: itemNum, gp: gp });
+            }
+        );
+
+        // Get packaging amount
+        var pkgInput = document.querySelector('[name="pkg-quote_amount"]');
+        var pkgAmt   = pkgInput ? parseNum(pkgInput.value) : 0;
+        var hasPkg   = pkgAmt > 0;
+
+        // Rebuild child rows for each company group
+        table.querySelectorAll('.contract-split-company-group').forEach(
+            function(groupTbody) {
+                var companyRow = groupTbody.querySelector(
+                    '.contract-split-company-row');
+                if (!companyRow) return;
+
+                var pct        = parseNum(
+                    companyRow.querySelector('.contract-split-pct')?.value);
+                var childrenId = groupTbody.dataset.childrenId;
+                var childTbody = childrenId
+                    ? document.getElementById(childrenId)
+                    : null;
+                if (!childTbody) return;
+
+                // Clear old child rows
+                childTbody.innerHTML = '';
+                var companyTotal = 0;
+
+                // Per-CLIN child rows
+                clinEntries.forEach(function(entry) {
+                    var clinShare = entry.gp * pct / 100;
+                    companyTotal += clinShare;
+                    var tr = document.createElement('tr');
+                    tr.className = 'contract-split-child-row text-muted';
+                    tr.innerHTML =
+                        '<td class="ps-4 small">— CLIN ' +
+                            escHtml(entry.itemNum) + '</td>' +
+                        '<td></td>' +
+                        '<td class="text-end small">' +
+                            money(clinShare) + '</td>' +
+                        '<td></td>';
+                    childTbody.appendChild(tr);
+                });
+
+                // Packaging child row (proportional deduction)
+                if (hasPkg) {
+                    var pkgShare  = pkgAmt * pct / 100;
+                    companyTotal -= pkgShare;
+                    var tr = document.createElement('tr');
+                    tr.className = 'contract-split-pkg-row text-danger';
+                    tr.innerHTML =
+                        '<td class="ps-4 small">— Packaging</td>' +
+                        '<td></td>' +
+                        '<td class="text-end small">\u2212' +
+                            money(pkgShare) + '</td>' +
+                        '<td></td>';
+                    childTbody.appendChild(tr);
+                }
+
+                // Update company total cell
+                var totalCell = companyRow.querySelector(
+                    '.contract-split-total');
+                if (totalCell) totalCell.textContent = money(companyTotal);
+            }
+        );
+    }
+
+    function recalcAll() {
+        recalcGpSummary();
+        recalcContractSplits();
+    }
 
     document.addEventListener('click', function(ev) {
+        var contractRowClick = ev.target.closest('.contract-split-company-row');
+        if (contractRowClick &&
+            !ev.target.closest('input, button, select, a')) {
+            ev.preventDefault();
+            var groupTbody  = contractRowClick.closest(
+                '.contract-split-company-group');
+            if (!groupTbody) return;
+            var childrenId  = groupTbody.dataset.childrenId;
+            var childTbody  = childrenId
+                ? document.getElementById(childrenId)
+                : null;
+            if (childTbody) {
+                // Use Bootstrap Collapse API (independent — no data-bs-parent)
+                var bsCollapse = bootstrap.Collapse.getOrCreateInstance(
+                    childTbody, { toggle: false });
+                bsCollapse.toggle();
+            }
+            return;
+        }
+        var rmContractSplitBtn = ev.target.closest(
+            '[data-remove-contract-split]');
+        if (rmContractSplitBtn) {
+            ev.preventDefault();
+            var groupTbody = rmContractSplitBtn.closest(
+                '.contract-split-company-group');
+            if (groupTbody) {
+                var childrenId = groupTbody.dataset.childrenId;
+                if (childrenId) {
+                    var childTbody = document.getElementById(childrenId);
+                    if (childTbody) childTbody.remove();
+                }
+                groupTbody.remove();
+            }
+            var table    = document.getElementById('contract-split-table');
+            var emptyMsg = document.getElementById('contract-split-empty');
+            var remaining = table
+                ? table.querySelectorAll('.contract-split-company-group').length
+                : 0;
+            if (remaining === 0) {
+                if (table)    table.style.display = 'none';
+                if (emptyMsg) emptyMsg.classList.remove('d-none');
+            }
+            recalcContractSplits();
+            recalcGpSummary();
+            return;
+        }
         const addClinBtn = ev.target.closest('[data-add-clin]');
         if (addClinBtn) { ev.preventDefault(); addClinCard(); return; }
         const rmClinBtn = ev.target.closest('[data-remove-clin]');
@@ -1251,31 +1453,32 @@
         if (addFinBtn) {
             ev.preventDefault();
             const card = addFinBtn.closest('.clin-card');
-            if (card) { addClinSubRow(card, 'fin'); recalcClin(card); recalcGpSummary(); }
+            if (card) { addClinSubRow(card, 'fin'); recalcClin(card); recalcGpSummary(); recalcContractSplits(); }
             return;
         }
         const addSplitBtn = ev.target.closest('[data-add-clin-split]');
         if (addSplitBtn) {
             ev.preventDefault();
             const card = addSplitBtn.closest('.clin-card');
-            if (card) { addClinSplit(card); recalcClin(card); }
+            if (card) addClinSplit(card);
             return;
         }
         const rmSubBtn = ev.target.closest('[data-remove-sub-row]');
         if (rmSubBtn) {
             ev.preventDefault();
-            const row = rmSubBtn.closest('[data-fin-idx], [data-split-idx]');
+            const row = rmSubBtn.closest('[data-fin-idx]');
             const card = rmSubBtn.closest('.clin-card');
             if (row) row.remove();
             if (card) recalcClin(card);
             recalcGpSummary();
+            recalcContractSplits();
             return;
         }
         const recalcBtn = ev.target.closest('[data-recalc-clin]');
         if (recalcBtn) {
             ev.preventDefault();
             const card = recalcBtn.closest('.clin-card');
-            if (card) { recalcClin(card); recalcGpSummary(); }
+            if (card) { recalcClin(card); recalcGpSummary(); recalcContractSplits(); }
             return;
         }
         // Handles adding rows for IDIQ pair rows (and any other table row types).
@@ -1302,14 +1505,23 @@
 
     // Live recalc on any input within a CLIN card OR the packaging quote field.
     document.addEventListener('input', function(ev) {
+        var inContractSplit = ev.target.closest('.contract-split-company-row');
+        if (inContractSplit) {
+            recalcContractSplits();
+            recalcGpSummary();
+            return;
+        }
         const card = ev.target.closest('.clin-card');
         if (card) {
             recalcClin(card);
             recalcGpSummary();
+            recalcContractSplits();
             return;
         }
         if (ev.target.name === 'pkg-quote_amount') {
             recalcGpSummary();
+            recalcContractSplits();
+            return;
         }
     });
 
@@ -1352,6 +1564,9 @@
                 const originalText = opener.textContent;
                 opener.textContent = 'Saving…';
                 try {
+                    if (typeof window.injectPerClinSplitInputs === 'function') {
+                        window.injectPerClinSplitInputs();
+                    }
                     const formData = new FormData(form);
                     const resp = await fetch(autosaveUrl, {
                         method: 'POST',
@@ -1534,6 +1749,9 @@
 
                 // Serialize the full edit form — finalize_direct_view needs
                 // all draft field values (it saves + finalizes in one round trip).
+                if (typeof window.injectPerClinSplitInputs === 'function') {
+                    window.injectPerClinSplitInputs();
+                }
                 const formData = new FormData(form);
 
                 fetch(finalizeUrl, {
@@ -1617,6 +1835,60 @@
         bootRecalc();
         restoreOpenClins();
     }
+
+    (function () {
+        var editorForm = document.querySelector('form[method="post"]');
+        if (!editorForm) return;
+
+        function injectPerClinSplitInputs() {
+            // Remove previously injected inputs to prevent duplicates
+            editorForm.querySelectorAll(
+                'input[data-injected-split]'
+            ).forEach(function (el) { el.remove(); });
+
+            var companyGroups = document.querySelectorAll(
+                '#contract-split-table .contract-split-company-group');
+            if (!companyGroups.length) return;
+
+            document.querySelectorAll('#clin-stack .clin-card').forEach(
+                function (card) {
+                    var clinIdx = card.dataset.clinIdx;
+                    if (!clinIdx) return;
+
+                    companyGroups.forEach(function (group, j) {
+                        var co  = (group.querySelector(
+                            '.contract-split-company')?.value || '').trim();
+                        var pct = (group.querySelector(
+                            '.contract-split-pct')?.value || '').trim();
+
+                        function makeHidden(name, val) {
+                            var inp = document.createElement('input');
+                            inp.type = 'hidden';
+                            inp.name = name;
+                            inp.value = val;
+                            inp.dataset.injectedSplit = '1';
+                            editorForm.appendChild(inp);
+                        }
+
+                        makeHidden(
+                            'clin-' + clinIdx + '-split-' + j +
+                            '-company_name', co);
+                        makeHidden(
+                            'clin-' + clinIdx + '-split-' + j +
+                            '-percentage', pct);
+                    });
+                }
+            );
+        }
+
+        // Standard form submit
+        editorForm.addEventListener('submit', function () {
+            injectPerClinSplitInputs();
+        });
+
+        // Expose for the AJAX pre-save path (finalize / mark-ready buttons)
+        window.injectPerClinSplitInputs = injectPerClinSplitInputs;
+    }());
 })();
 
 </script>

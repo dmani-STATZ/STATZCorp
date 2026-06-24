@@ -279,38 +279,6 @@
         <div class="mb-2">
             Planned GP: <strong class="clin-planned-gp">$0.00</strong>
         </div>
-        <div class="clin-split-tbody mb-0">
-        {% for sp in clin|get_item:'splits'|default_if_none:'' %}
-            <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-light" data-split-idx="{{ forloop.counter0 }}">
-                <div style="flex: 3;">
-                    <label class="label small mb-1">Company</label>
-                    <input type="text"
-                           name="clin-{{ idx }}-split-{{ forloop.counter0 }}-company_name"
-                           value="{{ sp|get_item:'company_name'|default:'' }}"
-                           class="form-control form-control-sm"
-                           placeholder="Company name">
-                </div>
-                <div style="flex: 1;">
-                    <label class="label small mb-1">%</label>
-                    <input type="number" step="0.01" max="100"
-                           name="clin-{{ idx }}-split-{{ forloop.counter0 }}-percentage"
-                           value="{{ sp|get_item:'percentage'|default:'' }}"
-                           class="form-control form-control-sm clin-split-pct"
-                           placeholder="0">
-                </div>
-                <div style="flex: 1;">
-                    <label class="label small mb-1">Split Value</label>
-                    <input type="text" readonly
-                           class="form-control form-control-sm clin-split-value"
-                           value="$0.00">
-                </div>
-                <div class="pt-3">
-                    <button type="button" class="btn btn-sm btn-outline-danger" data-remove-sub-row>
-                        🗑
-                    </button>
-                </div>
-            </div>
-        {% endfor %}
-        </div>
+        {# Split rows are now in the contract-level split table below all CLINs #}
     </div>
 </div>

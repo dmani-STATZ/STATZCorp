@@ -217,6 +217,13 @@ def _editor_context(draft: DraftContract, user) -> dict:
             supplier_flags[str(_sup.pk)] = flags
 
     pkg_data = data.get('packaging') or {}
+    clins = data.get('clins') or []
+    contract_splits = []
+    for clin in clins:
+        splits = clin.get('splits') or []
+        if splits:
+            contract_splits = splits
+            break
     idiq_alert_note = ''
     if draft.contract_type == 'DO':
         parent_idiq_id = (draft.data or {}).get('parent_idiq_id')
@@ -230,7 +237,8 @@ def _editor_context(draft: DraftContract, user) -> dict:
         'supplier_flags': supplier_flags,
         'idiq_alert_note': idiq_alert_note,
         # Pre-extracted lists keep the template loop-friendly without filters.
-        'clins': data.get('clins') or [],
+        'clins': clins,
+        'contract_splits': contract_splits,
         'finance_lines': data.get('finance_lines') or [],
         'packaging': pkg_data,
         'pkg_has_data': any([

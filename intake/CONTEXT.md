@@ -119,7 +119,7 @@ finalization — analyst-selected, optional), `plan_gross` (optional decimal;
 planned gross value), `planned_split` (optional string; planned split
 assignment). Both fields are auto-populated live in the editor: `plan_gross` is
 set to Net Contract GP (sum of CLIN GPs minus packaging quote) and
-`planned_split` is derived from all CLIN split rows as a plain
+`planned_split` is derived from contract-level split percentages as a plain
 summed percentage total (e.g. "100"). Both remain user-editable. `nist` (optional bool; NIST flag on Contract), `contractor_name`,
 `contractor_cage`, and related fields. `contractor_name` and
 `contractor_cage` are parser provenance only — they round-trip in JSON but
@@ -195,6 +195,25 @@ before computing GP.
 
 Split rows derive `split_value = planned_gp × percentage / 100` at
 finalization (the editor shows it live; the value is not POSTed).
+
+**Contract-level GP Split (editor):** Split percentages are shared across
+all CLINs on a contract — analysts enter them once, not per CLIN. The
+**+ Add Split** button remains inside each CLIN card but adds rows to the
+shared **Contract GP Split** table (`#contract-split-section`,
+`#contract-split-table`) rendered just above GP Summary. Each company uses
+a two-tbody structure for Bootstrap 5 collapse: `.contract-split-company-group`
+(header tbody with `data-children-id`) plus a collapsible children tbody
+(default collapsed). Clicking the company row (not an input or button)
+toggles child rows; multiple companies may be expanded simultaneously.
+Child rows show each CLIN's contribution (`CLIN GP × company %`). When
+`pkg-quote_amount > 0`, a packaging child row shows the proportional
+deduction (`packaging × company % / 100`) as a negative value.
+Company total = Σ(CLIN GP × %) − (packaging × %). At POST time,
+`injectPerClinSplitInputs()` generates hidden inputs
+`clin-{clinIdx}-split-{j}-company_name` / `-percentage` for every CLIN,
+preserving the existing per-CLIN backend format. `finalize.py` computes
+`ClinSplit.split_value = planned_gp × percentage / 100` per CLIN
+unchanged; packaging deduction is display-layer only.
 
 ## Matcher (Phase 2b)
 A single endpoint `intake:match` (`POST /intake/drafts/<pk>/match/`) handles
