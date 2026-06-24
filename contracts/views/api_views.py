@@ -635,25 +635,27 @@ def contract_day_counts(request):
 
     awards = (
         Contract.objects
-        .filter(award_date__date__gte=start_date, award_date__date__lte=end_date)
-        .values('award_date__date')
+        .filter(award_date__gte=start_date, award_date__lte=end_date)
+        .values('award_date')
         .annotate(c=Count('id'))
     )
     dues = (
         Contract.objects
-        .filter(due_date__date__gte=start_date, due_date__date__lte=end_date)
-        .values('due_date__date')
+        .filter(due_date__gte=start_date, due_date__lte=end_date)
+        .values('due_date')
         .annotate(c=Count('id'))
     )
 
     result = {}
     for row in awards:
-        key = row['award_date__date'].isoformat()
-        result.setdefault(key, {'awards': 0, 'dues': 0})
-        result[key]['awards'] = row['c']
+        if row['award_date']:
+            key = row['award_date'].isoformat()
+            result.setdefault(key, {'awards': 0, 'dues': 0})
+            result[key]['awards'] = row['c']
     for row in dues:
-        key = row['due_date__date'].isoformat()
-        result.setdefault(key, {'awards': 0, 'dues': 0})
-        result[key]['dues'] = row['c']
+        if row['due_date']:
+            key = row['due_date'].isoformat()
+            result.setdefault(key, {'awards': 0, 'dues': 0})
+            result[key]['dues'] = row['c']
 
     return JsonResponse({'counts': result})
