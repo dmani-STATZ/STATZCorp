@@ -142,8 +142,8 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   the template must POST it under the right prefix and the field name must
   be in the matching allowlist set in `forms_parse.py`. Valid prefixes:
   `f_*` (scalar), `clin-i-*`, `clin-i-fin-j-*`, `clin-i-split-j-*`,
-  `pkg-*`, `pair-i-*` (IDIQ only). Skip either step and the field is
-  silently dropped at POST time, not flagged at validate time.
+  `csplit-j-*`, `pkg-*`, `pair-i-*` (IDIQ only). Skip either step and the
+  field is silently dropped at POST time, not flagged at validate time.
 - Nested keys (`clin-i-fin-j-*`, `clin-i-split-j-*`) require entries in
   `_NESTED_ROW_KEY` (regex) and `_NESTED_BUCKET` (allowlist map). The CLIN
   card template uses `__CLINIDX__` and the finance sub-template uses
@@ -159,10 +159,11 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   — wired manually in JS, not via `applyTemplate()`). `recalcContractSplits()`
   rebuilds child rows and company totals; must **not** be called from
   `recalcClin()` (infinite recursion). Call it from `recalcAll()`, input/click
-  handlers, and after add/remove split. `injectPerClinSplitInputs()` generates
-  per-CLIN hidden POST fields at submit time — call it before any AJAX
-  `FormData(form)` build (`save-finalize`, autosave on dirty match open).
-  Standard form submit hooks it automatically.
+  handlers, and after add/remove split. Contract-level splits post as
+  `csplit-{j}-company_name` / `csplit-{j}-percentage`. `forms_parse.parse_post`
+  parses these via `_CSPLIT_KEY` and sets `clin['splits']` on every
+  materialized CLIN. No JS injection step exists — the inputs are named
+  and submit normally with the form.
 - All write endpoints (`save_draft`, `mark_ready`, `cancel_draft`) MUST hold
   the soft lock and MUST call `assert_holds` before writing. The
   `test_save_rejects_when_user_lost_lock` test exists specifically to catch

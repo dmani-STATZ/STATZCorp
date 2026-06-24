@@ -93,7 +93,8 @@ schema:
 | `f_<scalar>`                        | top-level scalar (incl. `f_sales_class_id`) |
 | `clin-<i>-<field>`                  | `clins[i]`                      |
 | `clin-<i>-fin-<j>-<field>`          | `clins[i].finance_lines[j]`     |
-| `clin-<i>-split-<j>-<field>`        | `clins[i].splits[j]`            |
+| `clin-<i>-split-<j>-<field>`        | `clins[i].splits[j]` (legacy)   |
+| `csplit-<j>-<field>`                | all `clins[*].splits[j]`        |
 | `pkg-<field>`                       | `packaging` (singleton)         |
 | `pair-<i>-<field>`                  | `approved_pairs[i]` (IDIQ only) |
 | `chg-<i>-<field>`                   | `level_charges[i]`              |
@@ -208,10 +209,14 @@ toggles child rows; multiple companies may be expanded simultaneously.
 Child rows show each CLIN's contribution (`CLIN GP × company %`). When
 `pkg-quote_amount > 0`, a packaging child row shows the proportional
 deduction (`packaging × company % / 100`) as a negative value.
-Company total = Σ(CLIN GP × %) − (packaging × %). At POST time,
-`injectPerClinSplitInputs()` generates hidden inputs
-`clin-{clinIdx}-split-{j}-company_name` / `-percentage` for every CLIN,
-preserving the existing per-CLIN backend format. `finalize.py` computes
+Company total = Σ(CLIN GP × %) − (packaging × %). Contract-level splits
+are submitted via named form inputs `csplit-{j}-company_name` and
+`csplit-{j}-percentage`. Django-rendered company rows use
+`{{ forloop.counter0 }}` as j. JS-added rows have names assigned by
+`addClinSplit()` using the pre-append company count as j.
+`forms_parse.py` parses these under `_CSPLIT_KEY` / `CSPLIT_FIELDS` and
+distributes the result to every CLIN's `splits` list before the dict is
+returned. No injection mechanism is used. `finalize.py` computes
 `ClinSplit.split_value = planned_gp × percentage / 100` per CLIN
 unchanged; packaging deduction is display-layer only.
 

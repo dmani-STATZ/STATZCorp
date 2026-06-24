@@ -1,7 +1,7 @@
 ---
 id: 2026-06-24-contract-level-splits
 title: Contract-level GP split with packaging deduction
-published: false
+published: true
 publish_date: 2026-06-24
 tags: [improved, contracts]
 critical: false
@@ -19,3 +19,8 @@ detail lines.
 When a contract includes packaging, each company's share of the
 packaging cost is automatically deducted from their split total,
 so the values shown reflect the actual net profit being allocated.
+
+**Bug fix (same release):** Contract split percentages were not being
+saved due to a silent failure in the dynamic input injection
+mechanism. Splits now use standard named form inputs and submit
+reliably on every save path.

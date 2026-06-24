@@ -8,7 +8,8 @@ Key naming convention used by `draft_edit.html`:
     f_<scalar>                      top-level scalar
     clin-<i>-<field>                CLIN row i, AWD/PO/DO/INTERNAL
     clin-<i>-fin-<j>-<field>        per-CLIN finance line j on CLIN i
-    clin-<i>-split-<j>-<field>      per-CLIN GP split j on CLIN i
+    clin-<i>-split-<j>-<field>      per-CLIN GP split j on CLIN i (legacy)
+    csplit-<j>-<field>              contract-level GP split j → all CLINs
     pkg-<field>                     packaging (singleton)
     pair-<i>-<field>                IDIQ approved_pairs row i
 
@@ -57,6 +58,7 @@ PKG_FIELDS = {
     'quote_amount', 'notes',
 }
 CHARGE_FIELDS = {'label', 'estimated_amount'}
+CSPLIT_FIELDS = {'company_name', 'percentage'}
 PAIR_FIELDS = {
     'nsn_text', 'nsn_id', 'nsn_description',
     'supplier_text', 'supplier_id', 'cage',
@@ -70,6 +72,7 @@ _ROW_KEY = re.compile(r'^(clin|pair)-(\d+)-(.+)$')
 _NESTED_ROW_KEY = re.compile(r'^clin-(\d+)-(fin|split)-(\d+)-(.+)$')
 _PKG_KEY = re.compile(r'^pkg-(.+)$')
 _CHG_KEY = re.compile(r'^chg-(\d+)-(.+)$')
+_CSPLIT_KEY = re.compile(r'^csplit-(\d+)-(.+)$')
 _SCALAR_KEY = re.compile(r'^f_(.+)$')
 
 _ROW_BUCKET = {
@@ -117,6 +120,7 @@ def parse_post(post) -> dict:
     nested: dict[int, dict[str, dict[int, dict]]] = {}
     pkg: dict = {}
     charge_rows: dict[int, dict] = {}
+    csplit_rows: dict[int, dict] = {}
 
     for key, raw in post.items():
         if key in ('csrfmiddlewaretoken', 'action'):
@@ -162,6 +166,14 @@ def parse_post(post) -> dict:
                 charge_rows.setdefault(idx, {})[field] = _coerce(raw)
             continue
 
+        m = _CSPLIT_KEY.match(key)
+        if m:
+            idx   = int(m.group(1))
+            field = m.group(2)
+            if field in CSPLIT_FIELDS:
+                csplit_rows.setdefault(idx, {})[field] = _coerce(raw)
+            continue
+
         m = _SCALAR_KEY.match(key)
         if m:
             field = m.group(1)
@@ -205,6 +217,19 @@ def parse_post(post) -> dict:
                     ordered.append(row)
             if ordered:
                 out['clins'][pos][bucket_name] = ordered
+
+    # Apply contract-level splits to every CLIN. The csplit-j-* fields
+    # are the authoritative split source for the contract-level split UI.
+    # Only apply if we actually received any csplit fields.
+    if csplit_rows and out.get('clins'):
+        contract_splits_ordered = []
+        for sub_idx in sorted(csplit_rows):
+            row = csplit_rows[sub_idx]
+            if any(v not in (None, '') for v in row.values()):
+                contract_splits_ordered.append(row)
+        if contract_splits_ordered:
+            for clin in out['clins']:
+                clin['splits'] = contract_splits_ordered
 
     if any(v not in (None, '') for v in pkg.values()):
         out['packaging'] = pkg

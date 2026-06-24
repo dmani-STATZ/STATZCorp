@@ -40,7 +40,7 @@
 </style>
 
 <div class="w-[95%] mx-auto px-4 py-6">
-
+<!--
     {% if messages %}
     <div class="mb-4">
         {% for message in messages %}
@@ -48,7 +48,7 @@
         {% endfor %}
     </div>
     {% endif %}
-
+-->
     <div class="row-between mb-4">
         <div>
             <h1 class="text-2xl font-bold">
@@ -600,12 +600,14 @@
                             <td>
                                 <input type="text"
                                        class="form-control form-control-sm contract-split-company"
+                                       name="csplit-{{ forloop.counter0 }}-company_name"
                                        value="{{ sp|get_item:'company_name'|default:'' }}"
                                        placeholder="Company name">
                             </td>
                             <td>
                                 <input type="number" step="0.01" max="100" min="0"
                                        class="form-control form-control-sm contract-split-pct"
+                                       name="csplit-{{ forloop.counter0 }}-percentage"
                                        value="{{ sp|get_item:'percentage'|default:'' }}"
                                        placeholder="0">
                             </td>
@@ -1136,6 +1138,18 @@
 
         table.appendChild(frag);
 
+        // Assign csplit-{j}-* names so inputs submit with the form.
+        // Use existingCount (captured before append) as the index for
+        // this new row — it equals the 0-based position of the new row.
+        const newGroup = table.querySelectorAll(
+            '.contract-split-company-group')[existingCount];
+        if (newGroup) {
+            const coInp  = newGroup.querySelector('.contract-split-company');
+            const pctInp = newGroup.querySelector('.contract-split-pct');
+            if (coInp)  coInp.name  = 'csplit-' + existingCount + '-company_name';
+            if (pctInp) pctInp.name = 'csplit-' + existingCount + '-percentage';
+        }
+
         // Auto-fill defaults (same UX rules as before)
         const allGroups = table.querySelectorAll('.contract-split-company-group');
         if (existingCount === 0) {
@@ -1564,9 +1578,6 @@
                 const originalText = opener.textContent;
                 opener.textContent = 'Saving…';
                 try {
-                    if (typeof window.injectPerClinSplitInputs === 'function') {
-                        window.injectPerClinSplitInputs();
-                    }
                     const formData = new FormData(form);
                     const resp = await fetch(autosaveUrl, {
                         method: 'POST',
@@ -1749,9 +1760,6 @@
 
                 // Serialize the full edit form — finalize_direct_view needs
                 // all draft field values (it saves + finalizes in one round trip).
-                if (typeof window.injectPerClinSplitInputs === 'function') {
-                    window.injectPerClinSplitInputs();
-                }
                 const formData = new FormData(form);
 
                 fetch(finalizeUrl, {
@@ -1835,60 +1843,6 @@
         bootRecalc();
         restoreOpenClins();
     }
-
-    (function () {
-        var editorForm = document.querySelector('form[method="post"]');
-        if (!editorForm) return;
-
-        function injectPerClinSplitInputs() {
-            // Remove previously injected inputs to prevent duplicates
-            editorForm.querySelectorAll(
-                'input[data-injected-split]'
-            ).forEach(function (el) { el.remove(); });
-
-            var companyGroups = document.querySelectorAll(
-                '#contract-split-table .contract-split-company-group');
-            if (!companyGroups.length) return;
-
-            document.querySelectorAll('#clin-stack .clin-card').forEach(
-                function (card) {
-                    var clinIdx = card.dataset.clinIdx;
-                    if (!clinIdx) return;
-
-                    companyGroups.forEach(function (group, j) {
-                        var co  = (group.querySelector(
-                            '.contract-split-company')?.value || '').trim();
-                        var pct = (group.querySelector(
-                            '.contract-split-pct')?.value || '').trim();
-
-                        function makeHidden(name, val) {
-                            var inp = document.createElement('input');
-                            inp.type = 'hidden';
-                            inp.name = name;
-                            inp.value = val;
-                            inp.dataset.injectedSplit = '1';
-                            editorForm.appendChild(inp);
-                        }
-
-                        makeHidden(
-                            'clin-' + clinIdx + '-split-' + j +
-                            '-company_name', co);
-                        makeHidden(
-                            'clin-' + clinIdx + '-split-' + j +
-                            '-percentage', pct);
-                    });
-                }
-            );
-        }
-
-        // Standard form submit
-        editorForm.addEventListener('submit', function () {
-            injectPerClinSplitInputs();
-        });
-
-        // Expose for the AJAX pre-save path (finalize / mark-ready buttons)
-        window.injectPerClinSplitInputs = injectPerClinSplitInputs;
-    }());
 })();
 
 </script>
