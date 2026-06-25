@@ -155,9 +155,8 @@ def recalc_splits(request, contract_pk):
 
     contract = get_object_or_404(Contract.objects.filter(company=company), pk=contract_pk)
 
-    # Pre-flight: validate that all companies have a percentage set
-    # and that they sum to ~100. recalc_split_values() skips companies
-    # with no percentage rather than erroring, so we guard here first.
+    # recalc_split_values() skips companies with no percentage rather than
+    # erroring, so resolve/auto-assign NULLs here before delegating.
     splits_by_company = defaultdict(list)
     for clin in Clin.objects.filter(contract=contract).prefetch_related('splits'):
         for split in clin.splits.all():
@@ -177,26 +176,73 @@ def recalc_splits(request, contract_pk):
             (s.percentage for s in splits if s.percentage is not None), None)
         company_percentages[company_name] = pct
 
-    companies_no_pct = [c for c, p in company_percentages.items() if p is None]
-    if companies_no_pct:
+    # --- Percentage resolution ---
+    # Separate companies into those with an explicit percentage and those without.
+    all_companies = list(company_percentages.keys())
+    null_companies = [c for c in all_companies if company_percentages[c] is None]
+    set_companies = [c for c in all_companies if company_percentages[c] is not None]
+    auto_assigned: list[str] = []
+
+    if not all_companies:
+        # No splits at all on this contract — nothing to do.
+        return JsonResponse({'success': True, 'updated_splits': 0, 'skipped_clins': []})
+
+    if not set_companies:
+        # Case A: Nobody has a percentage set → distribute 100% equally.
+        n = len(all_companies)
+        base_pct = (Decimal('100.0') / Decimal(n)).quantize(Decimal('0.01'))
+        remainder = Decimal('100.00') - base_pct * n
+        for i, company in enumerate(all_companies):
+            # First company absorbs any rounding remainder so total is exact 100.
+            company_percentages[company] = base_pct + (remainder if i == 0 else Decimal('0'))
+        auto_assigned = list(all_companies)
+
+    elif null_companies:
+        # Case B: Some companies have a percentage, some don't.
+        # Only valid if the existing percentages leave headroom for the NULL ones.
+        allocated_pct = sum(company_percentages[c] for c in set_companies)
+
+        if allocated_pct >= Decimal('100.00'):
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    f'Cannot auto-assign percentages: the companies with explicit '
+                    f'percentages ({", ".join(set_companies)}) already account for '
+                    f'{allocated_pct}% — no headroom remains for '
+                    f'{", ".join(null_companies)}. '
+                    f'Adjust percentages so they sum to less than 100% before recalculating.'
+                ),
+                'updated_splits': 0,
+                'skipped_clins': [],
+            })
+
+        # Distribute remaining headroom equally among the NULL companies.
+        remaining_pct = Decimal('100.00') - allocated_pct
+        n_null = len(null_companies)
+        base_null_pct = (remaining_pct / Decimal(n_null)).quantize(Decimal('0.01'))
+        remainder = remaining_pct - base_null_pct * n_null
+        for i, company in enumerate(null_companies):
+            company_percentages[company] = base_null_pct + (remainder if i == 0 else Decimal('0'))
+        auto_assigned = list(null_companies)
+
+    # Case C: All companies have percentages — validate they sum to ~100%.
+    total_pct = sum(company_percentages[c] for c in all_companies)
+    if not (Decimal('99.9') <= total_pct <= Decimal('100.1')):
         return JsonResponse({
             'success': False,
-            'error': (f'Some companies have no percentage set: '
-                      f'{", ".join(companies_no_pct)}. '
-                      f'Set percentages for all companies before recalculating.'),
+            'error': (
+                f'Company percentages sum to {total_pct}%, not 100%. '
+                f'Adjust percentages before recalculating.'
+            ),
             'updated_splits': 0,
             'skipped_clins': [],
         })
 
-    total_pct = sum(company_percentages.values())
-    if not (Decimal('99.9') <= total_pct <= Decimal('100.1')):
-        return JsonResponse({
-            'success': False,
-            'error': (f'Company percentages sum to {total_pct}%, not 100%. '
-                      f'Adjust percentages before recalculating.'),
-            'updated_splits': 0,
-            'skipped_clins': [],
-        })
+    for company_name in auto_assigned:
+        ClinSplit.objects.filter(
+            clin__contract=contract,
+            company_name=company_name,
+        ).update(percentage=company_percentages[company_name])
 
     updated = recalc_split_values(contract)
 
