@@ -141,7 +141,7 @@ def _result_to_data(result: AwardParseResult) -> dict:
             'raw_extraction': result.pdf_parse_notes or None,
         },
     }
-    # AWD/PO/DO: CLINs + packaging
+    # AWD/PO/DO: CLINs + optional Packaging charge row in level_charges
     if result.clins:
         data['clins'] = [
             _clin_to_dict(c, result.contract_supplier_name)
@@ -165,10 +165,16 @@ def _result_to_data(result: AwardParseResult) -> dict:
         _sup_cage = (result.contract_supplier_cage or '').strip().upper()
         _same_as_supplier = bool(_pkg_cage and _sup_cage and _pkg_cage == _sup_cage)
         if not _same_as_supplier:
-            data['packaging'] = {
-                'packhouse_cage': result.packhouse_cage or None,
-                'packhouse_supplier_text': result.contract_packhouse_name or None,
-            }
+            level_charges = data.setdefault('level_charges', [])
+            level_charges.append({
+                'label': 'Packaging',
+                'estimated_amount': None,
+                'supplier_text': result.contract_packhouse_name or None,
+                'supplier_id': None,
+                'cage': result.packhouse_cage or None,
+                'invoice_number': None,
+                'payment_date': None,
+            })
     # DO: parent IDIQ reference
     if result.idiq_contract_number:
         data['parent_idiq_contract_number'] = result.idiq_contract_number

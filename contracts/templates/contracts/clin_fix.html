@@ -112,7 +112,6 @@
      data-draft-save-url="{% url 'contracts:clin_fix_draft_save' contract.pk %}"
      data-draft-delete-url="{% url 'contracts:clin_fix_draft_delete' contract.pk %}"
      data-parent-options-url="{% url 'contracts:clin_fix_parent_options' contract.pk %}"
-     data-has-packaging="{% if has_packaging %}1{% else %}0{% endif %}"
      data-contract-number="{{ contract.contract_number|default:contract.pk }}"
      id="clin-fix-root">
 
@@ -290,8 +289,7 @@
                                     <select class="form-select form-select-sm destination-select clin-fix-destination"
                                             data-clin-id="{{ clin.id }}">
                                         <option value="default">Leave as CLIN</option>
-                                        <option value="packaging"
-                                            {% if has_packaging %}disabled title="Contract already has packaging"{% endif %}>
+                                        <option value="packaging">
                                             Convert to Packaging
                                         </option>
                                         <option value="finance_line">Convert to Finance Line</option>

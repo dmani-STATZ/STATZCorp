@@ -68,6 +68,11 @@ class ContractLevelChargeDraft(BaseModel):
 
     label: Optional[str] = None
     estimated_amount: Optional[Decimal] = None
+    supplier_id: Optional[int] = None
+    supplier_text: Optional[str] = None
+    cage: Optional[str] = None
+    invoice_number: Optional[str] = None
+    payment_date: Optional[date] = None
 
 
 # ---------------------------------------------------------------------------

@@ -406,6 +406,26 @@ class ContractLevelCharge(AuditModel):
         null=True, blank=True,
         help_text="Actual billed/paid amount. Leave blank until invoice is settled."
     )
+    supplier = models.ForeignKey(
+        'suppliers.Supplier',
+        on_delete=models.PROTECT,
+        related_name='level_charges',
+        null=True,
+        blank=True,
+        help_text="Optional. Populate only when this charge is paid to a different supplier "
+                  "than the main contract supplier (e.g. a packhouse for packaging fees)."
+    )
+    payment_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date the charge was paid."
+    )
+    invoice_number = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Supplier invoice number for this charge."
+    )
 
     class Meta:
         db_table = 'contracts_contractlevelcharge'
@@ -1771,7 +1791,7 @@ class ClinReclassificationLog(models.Model):
     recoverable if needed. Original Clin rows are hard-deleted after conversion.
     """
     DESTINATION_CHOICES = [
-        ('packaging', 'Contract Packaging'),
+        ('packaging', 'Supplier Charge (Packaging)'),
         ('finance_line', 'Contract Finance Line'),
         ('partial_shipment', 'Partial Shipment'),
         ('deleted', 'Deleted (Garbage Row)'),
@@ -1829,7 +1849,7 @@ class ClinReclassificationDraft(models.Model):
     overwrite each other.
     """
     DESTINATION_CHOICES = [
-        ('packaging', 'Contract Packaging'),
+        ('packaging', 'Supplier Charge (Packaging)'),
         ('finance_line', 'Contract Finance Line'),
         ('partial_shipment', 'Partial Shipment'),
         ('deleted', 'Deleted (Garbage Row)'),

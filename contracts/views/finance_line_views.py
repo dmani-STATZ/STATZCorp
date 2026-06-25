@@ -2,16 +2,26 @@ import json
 import logging
 from decimal import Decimal, InvalidOperation
 
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from django.db.models import Sum
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_http_methods
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Clin, ClinShipment, ContractFinanceLine, FinanceLinePayment
+from ..models import Clin, ClinShipment, Contract, ContractFinanceLine, ContractLevelCharge, FinanceLinePayment
+from suppliers.models import Supplier
 
 logger = logging.getLogger(__name__)
+
+
+def _active_company_or_403(request):
+    company = getattr(request, 'active_company', None)
+    if company is None:
+        raise PermissionDenied("An active company is required.")
+    return company
 
 
 def _contract_finance_line_company_qs(request):
@@ -564,4 +574,71 @@ def set_clin_unit_prices(request, clin_id):
         'success': True,
         'unit_price': str(clin.unit_price) if clin.unit_price is not None else None,
         'price_per_unit': str(clin.price_per_unit) if clin.price_per_unit is not None else None,
+    })
+
+
+@conditional_login_required
+@require_http_methods(["POST"])
+def add_contract_level_charge(request, contract_pk):
+    company = _active_company_or_403(request)
+    contract = get_object_or_404(Contract, pk=contract_pk, company=company)
+
+    label = request.POST.get("label", "").strip()
+    estimated_amount = request.POST.get("estimated_amount", "").strip()
+    supplier_id = request.POST.get("supplier_id") or None
+
+    if not label:
+        return JsonResponse({"success": False, "error": "Label is required."}, status=400)
+    if not estimated_amount:
+        return JsonResponse({"success": False, "error": "Estimated amount is required."}, status=400)
+
+    try:
+        amount = Decimal(estimated_amount)
+    except Exception:
+        return JsonResponse({"success": False, "error": "Invalid amount."}, status=400)
+
+    supplier = None
+    if supplier_id:
+        supplier = get_object_or_404(Supplier, pk=supplier_id)
+
+    charge = ContractLevelCharge.objects.create(
+        contract=contract,
+        label=label,
+        estimated_amount=amount,
+        supplier=supplier,
+    )
+
+    return JsonResponse({
+        "success": True,
+        "charge_id": charge.id,
+        "label": charge.label,
+        "supplier_name": charge.supplier.name if charge.supplier else "",
+        "estimated_amount": str(charge.estimated_amount),
+    })
+
+
+@conditional_login_required
+@require_http_methods(["POST"])
+def delete_contract_level_charge(request, charge_pk):
+    company = _active_company_or_403(request)
+    charge = get_object_or_404(
+        ContractLevelCharge, pk=charge_pk, contract__company=company
+    )
+    charge.delete()
+    return JsonResponse({"success": True})
+
+
+@conditional_login_required
+@require_http_methods(["GET"])
+def charge_detail_panel(request, charge_pk):
+    company = _active_company_or_403(request)
+    charge = get_object_or_404(
+        ContractLevelCharge.objects.select_related("supplier", "contract"),
+        pk=charge_pk,
+        contract__company=company,
+    )
+    content_type_id = ContentType.objects.get_for_model(ContractLevelCharge).id
+    return render(request, "contracts/partials/charge_detail_panel.html", {
+        "charge": charge,
+        "content_type_id": content_type_id,
     })

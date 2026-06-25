@@ -185,7 +185,8 @@ class FormParseTests(TestCase):
         self.assertEqual(len(out['clins']), 2)
         self.assertEqual(out['clins'][0]['item_number'], '0001')
         self.assertEqual(out['clins'][1]['item_number'], '0003')
-        self.assertEqual(out['packaging']['packhouse_cage'], '12345')
+        # Legacy pkg-* POST keys are ignored — packaging merged into level_charges.
+        self.assertNotIn('packaging', out)
 
     def test_all_blank_rows_dropped(self):
         post = {
@@ -686,7 +687,9 @@ class FinalizationTests(TestCase):
             with transaction.atomic():
                 finalize_draft(draft, self.alice)
 
-    def test_awd_creates_packaging_when_packhouse_matched(self):
+    def test_awd_creates_packaging_charge_when_legacy_packaging_present(self):
+        from contracts.models import ContractLevelCharge
+
         draft = self._ready_awd()
         draft.data['packaging'] = {
             'packhouse_supplier_id': self.supplier2.id,
@@ -696,9 +699,12 @@ class FinalizationTests(TestCase):
         draft.save()
         with transaction.atomic():
             target = finalize_draft(draft, self.alice)
-        pkg = ContractPackaging.objects.get(contract=target)
-        self.assertEqual(pkg.packhouse_id, self.supplier2.id)
-        self.assertEqual(str(pkg.quote_amount), '99.50')
+        charge = ContractLevelCharge.objects.get(contract=target, label='Packaging')
+        self.assertEqual(charge.supplier_id, self.supplier2.id)
+        self.assertEqual(str(charge.estimated_amount), '99.50')
+        self.assertFalse(
+            ContractPackaging.objects.filter(contract=target).exists()
+        )
 
     def test_idiq_happy_path_creates_explicit_pair_details(self):
         draft = DraftContract.objects.create(
@@ -1102,18 +1108,22 @@ class IngestUnitTests(TestCase):
             draft = ingest_pdf(b'fake', original_filename='supplier_none.pdf')
         self.assertIsNone(draft.data['clins'][0]['supplier_text'])
 
-    def test_packhouse_name_populates_packaging_block(self):
+    def test_packhouse_name_populates_packaging_charge_row(self):
         result = _stub_parse_result(
             packhouse_cage='4M107',
             contract_packhouse_name='GREENE METAL PRODUCTS, INC.',
         )
         with patch('intake.ingest.parse_award_pdf', return_value=result):
             draft = ingest_pdf(b'fake', original_filename='packhouse.pdf')
-        self.assertEqual(draft.data['packaging']['packhouse_cage'], '4M107')
+        charges = draft.data['level_charges']
+        self.assertEqual(len(charges), 1)
+        self.assertEqual(charges[0]['label'], 'Packaging')
+        self.assertEqual(charges[0]['cage'], '4M107')
         self.assertEqual(
-            draft.data['packaging']['packhouse_supplier_text'],
+            charges[0]['supplier_text'],
             'GREENE METAL PRODUCTS, INC.',
         )
+        self.assertIsNone(draft.data.get('packaging'))
 
     def test_missing_contract_number_rejected(self):
         result = _stub_parse_result(contract_number=None)
@@ -1193,7 +1203,7 @@ class IngestUnitTests(TestCase):
         self.assertIsNone(draft.data.get('sales_class_id'))
 
     def test_packaging_suppressed_when_packhouse_cage_matches_supplier_cage(self):
-        """Parser must not populate packaging when packhouse CAGE == supplier CAGE."""
+        """Parser must not append Packaging charge when packhouse CAGE == supplier CAGE."""
         from intake.ingest import _result_to_data
 
         result = _stub_parse_result(
@@ -1203,11 +1213,11 @@ class IngestUnitTests(TestCase):
             contract_packhouse_name='MALONES CNC MACHINING INC',
         )
         data = _result_to_data(result)
-        self.assertNotIn('packaging', data,
-            "packaging must not be populated when packhouse CAGE matches supplier CAGE")
+        self.assertNotIn('level_charges', data,
+            "Packaging charge must not be added when packhouse CAGE matches supplier CAGE")
 
     def test_packaging_populated_when_packhouse_cage_differs(self):
-        """Parser must populate packaging when packhouse CAGE differs from supplier CAGE."""
+        """Parser must append Packaging charge when packhouse CAGE differs from supplier CAGE."""
         from intake.ingest import _result_to_data
 
         result = _stub_parse_result(
@@ -1217,12 +1227,13 @@ class IngestUnitTests(TestCase):
             contract_packhouse_name='ACME PACKAGING CO',
         )
         data = _result_to_data(result)
-        self.assertIn('packaging', data,
-            "packaging must be populated when packhouse CAGE differs from supplier CAGE")
-        self.assertEqual(data['packaging']['packhouse_cage'], '9Z123')
+        self.assertIn('level_charges', data,
+            "Packaging charge must be added when packhouse CAGE differs from supplier CAGE")
+        self.assertEqual(data['level_charges'][0]['cage'], '9Z123')
+        self.assertEqual(data['level_charges'][0]['label'], 'Packaging')
 
     def test_packaging_populated_when_supplier_cage_is_none(self):
-        """If supplier CAGE is unknown, do not suppress packaging."""
+        """If supplier CAGE is unknown, do not suppress Packaging charge."""
         from intake.ingest import _result_to_data
 
         result = _stub_parse_result(
@@ -1231,7 +1242,7 @@ class IngestUnitTests(TestCase):
             contract_packhouse_name='ACME PACKAGING CO',
         )
         data = _result_to_data(result)
-        self.assertIn('packaging', data)
+        self.assertIn('level_charges', data)
 
 
 class RemovePackagingApiTests(TestCase):

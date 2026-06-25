@@ -34,6 +34,7 @@ from ..models import (
     ClinShipment,
     Contract,
     ContractFinanceLine,
+    ContractLevelCharge,
     ContractPackaging,
     FinanceLinePayment,
     Note,
@@ -165,9 +166,6 @@ def _validate_conversions(contract, conversions):
     contract_clin_ids = set(clin_qs.values_list('id', flat=True))
     converted_ids = {c.get('clin_id') for c in conversions}
 
-    packaging_count = sum(1 for c in conversions if c.get('destination_type') == 'packaging')
-    has_existing_packaging = hasattr(contract, 'packaging') and contract.packaging is not None
-
     for conv in conversions:
         clin_id = conv.get('clin_id')
         dest = conv.get('destination_type')
@@ -186,11 +184,7 @@ def _validate_conversions(contract, conversions):
         clin = clin_qs.get(id=clin_id)
 
         if dest == 'packaging':
-            # 2. Packaging exists
-            if has_existing_packaging:
-                errors.append((clin_id, "Contract already has packaging. Edit the existing record instead of creating a new one."))
-                continue
-            # 3. Income-side guard
+            # Income-side guard
             if _is_nonzero(clin.item_value) or _is_nonzero(clin.wawf_payment):
                 errors.append((
                     clin_id,
@@ -254,10 +248,6 @@ def _validate_conversions(contract, conversions):
                 errors.append((clin_id, "Reason is required when deleting a CLIN."))
                 continue
 
-    # 7. Multiple packaging guard
-    if packaging_count > 1:
-        errors.append((None, "Only one CLIN can be converted to packaging in a single save."))
-
     return errors
 
 
@@ -298,24 +288,28 @@ def _delete_payment_history_for_clin(clin):
 
 
 def _convert_to_packaging(clin, contract, staged_data, user):
-    today = timezone.now().date()
-    item_type_display = clin.get_item_type_display() if clin.item_type else 'None'
-    note_text = (
-        f"Migrated from CLIN {clin.item_number} on {today}. "
-        f"Original item_type: {item_type_display or 'None'}."
-    )
-    packaging = ContractPackaging.objects.create(
+    """
+    Convert a legacy packaging CLIN to a ContractLevelCharge row with
+    label='Packaging'. ContractPackaging is no longer the target — it is
+    being phased out in favour of ContractLevelCharge.
+
+    Field mapping:
+      clin.supplier      → ContractLevelCharge.supplier
+      clin.quote_value   → ContractLevelCharge.estimated_amount
+      clin.paid_amount   → ContractLevelCharge.billed_paid_amount (None if zero)
+      clin.paid_date     → ContractLevelCharge.payment_date
+      invoice_number     → None (not available from source CLIN)
+    """
+    charge = ContractLevelCharge.objects.create(
         contract=contract,
-        packhouse=clin.supplier,
-        quote_amount=clin.quote_value,
-        amount_paid=clin.paid_amount,
+        label='Packaging',
+        supplier=clin.supplier,
+        estimated_amount=clin.quote_value,
+        billed_paid_amount=clin.paid_amount if clin.paid_amount else None,
         payment_date=clin.paid_date,
         invoice_number=None,
-        notes=note_text,
-        created_by=user,
-        modified_by=user,
     )
-    return packaging.id
+    return charge.id
 
 
 def _convert_to_finance_line(clin, contract, staged_data, parent_clin_id, user):
@@ -482,7 +476,8 @@ def clin_fix_page(request, pk):
         for r in clin_rows
     ]
 
-    has_packaging = hasattr(contract, 'packaging') and contract.packaging is not None
+    # ContractLevelCharge allows multiple packaging rows — no longer need to block
+    has_packaging = False
 
     context = {
         'contract': contract,

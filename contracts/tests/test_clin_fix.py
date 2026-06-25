@@ -21,6 +21,7 @@ from contracts.models import (
     Company,
     Contract,
     ContractFinanceLine,
+    ContractLevelCharge,
     ContractPackaging,
     ContractStatus,
     FinanceLinePayment,
@@ -116,20 +117,23 @@ class ClinFixConversionTests(ClinFixBaseTest):
         self.assertTrue(body['success'])
         self.assertEqual(body['conversion_count'], 1)
 
-        # Packaging created
-        pkg = ContractPackaging.objects.get(contract=contract)
-        self.assertEqual(pkg.packhouse_id, supplier.id)
-        self.assertEqual(pkg.quote_amount, Decimal('1500.00'))
-        self.assertEqual(pkg.amount_paid, Decimal('1500.00'))
-        self.assertIsNotNone(pkg.payment_date)
-        self.assertIn('Migrated from CLIN 0010', pkg.notes or '')
+        # ContractLevelCharge created (not ContractPackaging)
+        charge = ContractLevelCharge.objects.get(contract=contract, label='Packaging')
+        self.assertEqual(charge.supplier_id, supplier.id)
+        self.assertEqual(charge.estimated_amount, Decimal('1500.00'))
+        self.assertEqual(charge.billed_paid_amount, Decimal('1500.00'))
+        self.assertIsNotNone(charge.payment_date)
+        self.assertIsNone(charge.invoice_number)
 
-        # Log row exists with full snapshot
+        # No ContractPackaging created
+        self.assertFalse(ContractPackaging.objects.filter(contract=contract).exists())
+
+        # Log row still exists with correct destination_type and destination_id
         log = ClinReclassificationLog.objects.get(
             contract=contract, original_clin_id=clin.id
         )
         self.assertEqual(log.destination_type, 'packaging')
-        self.assertEqual(log.destination_id, pkg.id)
+        self.assertEqual(log.destination_id, charge.id)
         self.assertIsNotNone(log.original_data)
         self.assertEqual(log.original_data.get('item_number'), '0010')
 
@@ -325,32 +329,6 @@ class ClinFixConversionTests(ClinFixBaseTest):
 @override_settings(REQUIRE_LOGIN=False)
 class ClinFixValidationTests(ClinFixBaseTest):
 
-    def test_validation_blocks_packaging_when_exists(self):
-        supplier = _create_supplier()
-        contract = _create_contract(self.company, 'C-PE')
-        _create_clin(contract, item_number='0001', item_value=Decimal('1'))
-        clin = _create_clin(contract, item_number='0099', supplier=supplier)
-        ContractPackaging.objects.create(contract=contract, packhouse=supplier)
-
-        url = reverse('contracts:clin_fix_save', args=[contract.pk])
-        payload = {'conversions': [{
-            'clin_id': clin.id,
-            'destination_type': 'packaging',
-            'staged_data': {},
-        }]}
-        resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
-        self.assertEqual(resp.status_code, 400)
-        body = resp.json()
-        self.assertFalse(body['success'])
-        self.assertTrue(any('already has packaging' in e['error'].lower() for e in body['errors']))
-
-        # No conversion happened
-        self.assertTrue(Clin.objects.filter(id=clin.id).exists())
-        self.assertEqual(
-            ClinReclassificationLog.objects.filter(original_clin_id=clin.id).count(),
-            0,
-        )
-
     def test_validation_blocks_packaging_with_income_side(self):
         supplier = _create_supplier()
         contract = _create_contract(self.company, 'C-PI')
@@ -446,11 +424,11 @@ class ClinFixValidationTests(ClinFixBaseTest):
         ]}
         resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
         self.assertEqual(resp.status_code, 400)
-        # Multiple-packaging guard or income guard fires before any commit
+        # Income-side guard fires before any commit
         self.assertTrue(Clin.objects.filter(id=c1.id).exists())
         self.assertTrue(Clin.objects.filter(id=c2.id).exists())
         self.assertTrue(Clin.objects.filter(id=c3.id).exists())
-        self.assertEqual(ContractPackaging.objects.filter(contract=contract).count(), 0)
+        self.assertEqual(ContractLevelCharge.objects.filter(contract=contract).count(), 0)
         self.assertEqual(
             ClinReclassificationLog.objects.filter(contract=contract).count(),
             0,

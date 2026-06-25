@@ -1,0 +1,172 @@
+<div class="p-3 h-100">
+
+  <div class="d-flex justify-content-end mb-3">
+    <button type="button"
+            class="btn btn-sm btn-outline-danger js-delete-charge"
+            data-charge-id="{{ charge.id }}"
+            data-contract-id="{{ charge.contract_id }}">
+      Delete Charge
+    </button>
+  </div>
+
+  <div class="row g-4">
+
+    <div class="col-6">
+      <p class="text-muted small text-uppercase fw-semibold mb-2">Charge Details</p>
+      <table class="table table-sm table-borderless mb-0 small">
+        <tbody>
+
+          <tr>
+            <td class="text-muted pe-3" style="white-space:nowrap; width:45%;">
+              <button type="button"
+                      class="btn btn-link btn-sm p-0 text-start text-muted"
+                      onclick="openTransactionsEditModal(
+                        window.levelChargeContentTypeId,
+                        {{ charge.id }},
+                        'label'
+                      )">
+                Type / Label
+              </button>
+            </td>
+            <td>{{ charge.label|default:"—" }}</td>
+          </tr>
+
+          <tr>
+            <td class="text-muted pe-3" style="white-space:nowrap;">
+              <button type="button"
+                      class="btn btn-link btn-sm p-0 text-start text-muted"
+                      onclick="openTransactionsEditModal(
+                        window.levelChargeContentTypeId,
+                        {{ charge.id }},
+                        'supplier'
+                      )">
+                Supplier
+              </button>
+            </td>
+            <td>
+              {% if charge.supplier %}
+                {{ charge.supplier.name }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="text-muted pe-3" style="white-space:nowrap;">
+              <button type="button"
+                      class="btn btn-link btn-sm p-0 text-start text-muted"
+                      onclick="openTransactionsEditModal(
+                        window.levelChargeContentTypeId,
+                        {{ charge.id }},
+                        'estimated_amount'
+                      )">
+                Quote / Estimated
+              </button>
+            </td>
+            <td>
+              {% if charge.estimated_amount %}
+                ${{ charge.estimated_amount|floatformat:2 }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col-6">
+      <p class="text-muted small text-uppercase fw-semibold mb-2">&nbsp;</p>
+      <table class="table table-sm table-borderless mb-0 small">
+        <tbody>
+
+          <tr>
+            <td class="text-muted pe-3" style="white-space:nowrap; width:45%;">
+              <button type="button"
+                      class="btn btn-link btn-sm p-0 text-start text-muted"
+                      onclick="openTransactionsEditModal(
+                        window.levelChargeContentTypeId,
+                        {{ charge.id }},
+                        'billed_paid_amount'
+                      )">
+                Paid Amount
+              </button>
+            </td>
+            <td>
+              {% if charge.billed_paid_amount %}
+                ${{ charge.billed_paid_amount|floatformat:2 }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="text-muted pe-3" style="white-space:nowrap;">
+              <button type="button"
+                      class="btn btn-link btn-sm p-0 text-start text-muted"
+                      onclick="openTransactionsEditModal(
+                        window.levelChargeContentTypeId,
+                        {{ charge.id }},
+                        'payment_date'
+                      )">
+                Payment Date
+              </button>
+            </td>
+            <td>
+              {{ charge.payment_date|date:"m/d/Y"|default:"—" }}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="text-muted pe-3" style="white-space:nowrap;">
+              <button type="button"
+                      class="btn btn-link btn-sm p-0 text-start text-muted"
+                      onclick="openTransactionsEditModal(
+                        window.levelChargeContentTypeId,
+                        {{ charge.id }},
+                        'invoice_number'
+                      )">
+                Invoice #
+              </button>
+            </td>
+            <td>{{ charge.invoice_number|default:"—" }}</td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll('.js-delete-charge').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (!confirm('Delete this charge? This cannot be undone.')) return;
+      var chargeId = btn.dataset.chargeId;
+      fetch('/contracts/api/level-charges/' + chargeId + '/delete/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)[1],
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.success) {
+            var row = document.querySelector(
+              '.charge-list-row[data-charge-id="' + chargeId + '"]'
+            );
+            if (row) row.remove();
+            var panel = document.getElementById('clin-details-content');
+            if (panel) panel.innerHTML = '';
+          }
+        });
+    });
+  });
+})();
+</script>

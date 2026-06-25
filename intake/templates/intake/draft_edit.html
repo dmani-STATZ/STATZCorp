@@ -444,73 +444,6 @@
 
         {# ---- CLINs (AWD / PO / DO / INTERNAL) ---- #}
         {% if draft.contract_type == 'AWD' or draft.contract_type == 'PO' or draft.contract_type == 'DO' or draft.contract_type == 'INTERNAL' %}
-        <div class="mb-4" id="pkg-add-wrap"{% if pkg_has_data %} style="display:none"{% endif %}>
-            <button type="button" class="btn btn-sm btn-outline-success" id="btn-add-packaging">
-                + Add Packaging
-            </button>
-        </div>
-        <div class="card card-padded shadow-sm mb-4" id="packaging-card"
-             {% if not pkg_has_data %}style="display:none"{% endif %}>
-            <div class="row-between mb-3">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <h2 class="text-xl font-semibold mb-0">Packaging</h2>
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-danger" id="btn-remove-packaging">
-                    Remove Packaging
-                </button>
-            </div>
-            <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <label class="label block mb-1">Packhouse CAGE</label>
-                    <input type="text" name="pkg-packhouse_cage"
-                           value="{{ packaging|get_item:'packhouse_cage'|default:'' }}"
-                           class="form-control">
-                </div>
-                <div class="col-span-2">
-                    <label class="label block mb-1">Packhouse Supplier</label>
-                    <div class="input-group input-group-sm">
-                        <input type="text" name="pkg-packhouse_supplier_text"
-                               value="{{ packaging|get_item:'packhouse_supplier_text'|default:'' }}"
-                               class="form-control">
-                        <button type="button" class="btn btn-outline-primary"
-                                data-match-open data-match-type="supplier"
-                                data-target-path="packaging"
-                                data-match-title="Packhouse Supplier"
-                                data-match-original="{{ packaging|get_item:'packhouse_supplier_text'|default:'' }}">
-                            Match
-                        </button>
-                    </div>
-                    <input type="hidden" name="pkg-packhouse_supplier_id"
-                           value="{{ packaging|get_item:'packhouse_supplier_id'|default:'' }}">
-                    {% with sid=packaging|get_item:'packhouse_supplier_id' %}
-                        {% if sid %}
-                            {% with flags=supplier_flags|get_item:sid %}
-                                {% if flags.probation %}
-                                    <span class="badge bg-success mt-1 supplier-flag-probation">matched #{{ sid }}</span>
-                                {% elif flags.conditional %}
-                                    <span class="badge bg-success mt-1 supplier-flag-conditional">matched #{{ sid }}</span>
-                                {% else %}
-                                    <span class="badge bg-success mt-1">matched #{{ sid }}</span>
-                                {% endif %}
-                            {% endwith %}
-                        {% endif %}
-                    {% endwith %}
-                </div>
-                <div>
-                    <label class="label block mb-1">Quote Amount</label>
-                    <input type="number" step="0.01" name="pkg-quote_amount"
-                           value="{{ packaging|get_item:'quote_amount'|default:'' }}"
-                           class="form-control">
-                </div>
-                <div class="col-span-2">
-                    <label class="label block mb-1">Notes</label>
-                    <input type="text" name="pkg-notes"
-                           value="{{ packaging|get_item:'notes'|default:'' }}"
-                           class="form-control">
-                </div>
-            </div>
-        </div>
-
         {# ---- Contract Level Charges ---- #}
         {% if not charges_has_data %}
         <div class="mb-4" id="charges-add-wrap">
@@ -529,8 +462,8 @@
             </div>
             <div id="charges-tbody">
             {% for charge in level_charges %}
-                <div class="d-flex align-items-center gap-2 mb-2 charges-row">
-                    <div style="flex: 2;">
+                <div class="d-flex align-items-start gap-2 mb-2 charges-row charge-row flex-wrap">
+                    <div style="flex: 2; min-width: 140px;">
                         <label class="label small mb-1">Label</label>
                         <input type="text"
                                name="chg-{{ forloop.counter0 }}-label"
@@ -538,12 +471,66 @@
                                class="form-control form-control-sm"
                                placeholder="e.g. GSI Fee, Estimated Freight">
                     </div>
-                    <div style="flex: 1;">
+                    <div style="flex: 1; min-width: 120px;">
                         <label class="label small mb-1">Estimated Amount</label>
                         <input type="number" step="0.01"
                                name="chg-{{ forloop.counter0 }}-estimated_amount"
                                value="{{ charge|get_item:'estimated_amount'|default:'' }}"
                                class="form-control form-control-sm charge-amount">
+                    </div>
+                    <div style="flex: 2; min-width: 160px;">
+                        <label class="label small mb-1">Supplier
+                            <span class="text-muted">(optional)</span>
+                        </label>
+                        <div class="input-group input-group-sm">
+                            <input type="text"
+                                   name="chg-{{ forloop.counter0 }}-supplier_text"
+                                   value="{{ charge|get_item:'supplier_text'|default:'' }}"
+                                   class="form-control form-control-sm charge-supplier-text">
+                            <button type="button" class="btn btn-outline-primary btn-sm charge-match-btn"
+                                    data-match-open data-match-type="supplier"
+                                    data-target-path="charge:{{ forloop.counter0 }}:supplier"
+                                    data-match-title="Charge Supplier"
+                                    data-match-original="{{ charge|get_item:'supplier_text'|default:'' }}">M</button>
+                        </div>
+                        <input type="hidden"
+                               name="chg-{{ forloop.counter0 }}-supplier_id"
+                               value="{{ charge|get_item:'supplier_id'|default:'' }}">
+                        {% with sid=charge|get_item:'supplier_id' %}
+                            {% if sid %}
+                                {% with flags=supplier_flags|get_item:sid %}
+                                    {% if flags.probation %}
+                                        <span class="badge bg-success mt-1 supplier-flag-probation">matched #{{ sid }}</span>
+                                    {% elif flags.conditional %}
+                                        <span class="badge bg-success mt-1 supplier-flag-conditional">matched #{{ sid }}</span>
+                                    {% else %}
+                                        <span class="badge bg-success mt-1">matched #{{ sid }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                    <div style="flex: 1; min-width: 90px;">
+                        <label class="label small mb-1">CAGE <span class="text-muted">(optional)</span></label>
+                        <input type="text"
+                               name="chg-{{ forloop.counter0 }}-cage"
+                               value="{{ charge|get_item:'cage'|default:'' }}"
+                               class="form-control form-control-sm charge-cage-input"
+                               placeholder="e.g. 0XA52"
+                               maxlength="10">
+                    </div>
+                    <div style="flex: 1; min-width: 120px;">
+                        <label class="label small mb-1">Invoice # <span class="text-muted">(optional)</span></label>
+                        <input type="text" class="form-control form-control-sm"
+                               name="chg-{{ forloop.counter0 }}-invoice_number"
+                               value="{{ charge|get_item:'invoice_number'|default:'' }}"
+                               placeholder="Supplier invoice #">
+                    </div>
+                    <div style="flex: 1; min-width: 130px;">
+                        <label class="label small mb-1">Payment Date <span class="text-muted">(optional)</span></label>
+                        <input type="date" class="form-control form-control-sm"
+                               name="chg-{{ forloop.counter0 }}-payment_date"
+                               value="{{ charge|get_item:'payment_date'|default:'' }}">
                     </div>
                     <div class="d-flex align-items-end pb-1">
                         <button type="button" class="btn btn-sm btn-outline-danger btn-remove-charge-row"></button>
@@ -935,7 +922,6 @@
     // Counters keep newly added rows from colliding with server-rendered
     // indexes. We don't care about gaps; the backend reindexes on save.
     const counters = {clin: 1000, pair: 1000, contractSplit: 1000};
-    const removePackagingUrl = "{% url 'intake:remove_packaging' draft.pk %}";
     // Per-CLIN sub-counters for finance lines and splits, keyed by CLIN idx.
     const subCounters = {};
 
@@ -981,45 +967,19 @@
         recalcAll();
     }
 
-    function initPackagingToggle() {
-        const addWrap = document.getElementById('pkg-add-wrap');
-        const card = document.getElementById('packaging-card');
-        const btnAdd = document.getElementById('btn-add-packaging');
-        const btnRemove = document.getElementById('btn-remove-packaging');
-        if (!card) return;
-
-        function showPackaging() {
-            card.style.display = '';
-            if (addWrap) addWrap.style.display = 'none';
-        }
-        function hidePackaging() {
-            card.style.display = 'none';
-            card.querySelectorAll('[name^="pkg-"]').forEach(el => { el.value = ''; });
-            if (addWrap) addWrap.style.display = '';
-
-            // Persist the removal to the server so a page reload does not
-            // resurrect the packaging card.
-            fetch(removePackagingUrl, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            }).catch(function(err) {
-                console.warn('remove_packaging_api failed:', err);
-            });
-        }
-
-        if (btnAdd) btnAdd.addEventListener('click', function(ev) {
-            ev.preventDefault();
-            showPackaging();
+    function getPackagingAmount() {
+        let pkgAmt = 0;
+        document.querySelectorAll('#charges-tbody .charge-row').forEach(function(row) {
+            const labelInput = row.querySelector('[name$="-label"]');
+            if (!labelInput || labelInput.value.trim().toLowerCase() !== 'packaging') {
+                return;
+            }
+            const amtInput = row.querySelector('.charge-amount');
+            if (amtInput) {
+                pkgAmt = parseNum(amtInput.value);
+            }
         });
-        if (btnRemove) btnRemove.addEventListener('click', function(ev) {
-            ev.preventDefault();
-            hidePackaging();
-            recalcGpSummary();
-            recalcContractSplits();
-        });
+        return pkgAmt;
     }
 
     function initChargesToggle() {
@@ -1056,18 +1016,47 @@
             btnAddChargeRow.addEventListener('click', () => {
                 const idx = chargeRowCount++;
                 const row = document.createElement('div');
-                row.className = 'd-flex align-items-center gap-2 mb-2 charges-row';
+                row.className = 'd-flex align-items-start gap-2 mb-2 charges-row charge-row flex-wrap';
                 row.innerHTML = `
-                    <div style="flex: 2;">
+                    <div style="flex: 2; min-width: 140px;">
                         <label class="label small mb-1">Label</label>
                         <input type="text" name="chg-${idx}-label"
                                class="form-control form-control-sm"
                                placeholder="e.g. GSI Fee, Estimated Freight">
                     </div>
-                    <div style="flex: 1;">
+                    <div style="flex: 1; min-width: 120px;">
                         <label class="label small mb-1">Estimated Amount</label>
                         <input type="number" step="0.01" name="chg-${idx}-estimated_amount"
                                class="form-control form-control-sm charge-amount">
+                    </div>
+                    <div style="flex: 2; min-width: 160px;">
+                        <label class="label small mb-1">Supplier <span class="text-muted">(optional)</span></label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" name="chg-${idx}-supplier_text"
+                                   class="form-control form-control-sm charge-supplier-text">
+                            <button type="button" class="btn btn-outline-primary btn-sm charge-match-btn"
+                                    data-match-open data-match-type="supplier"
+                                    data-target-path="charge:${idx}:supplier"
+                                    data-match-title="Charge Supplier">M</button>
+                        </div>
+                        <input type="hidden" name="chg-${idx}-supplier_id" value="">
+                    </div>
+                    <div style="flex: 1; min-width: 90px;">
+                        <label class="label small mb-1">CAGE <span class="text-muted">(optional)</span></label>
+                        <input type="text" name="chg-${idx}-cage"
+                               class="form-control form-control-sm charge-cage-input"
+                               placeholder="e.g. 0XA52" maxlength="10">
+                    </div>
+                    <div style="flex: 1; min-width: 120px;">
+                        <label class="label small mb-1">Invoice # <span class="text-muted">(optional)</span></label>
+                        <input type="text" name="chg-${idx}-invoice_number"
+                               class="form-control form-control-sm"
+                               placeholder="Supplier invoice #">
+                    </div>
+                    <div style="flex: 1; min-width: 130px;">
+                        <label class="label small mb-1">Payment Date <span class="text-muted">(optional)</span></label>
+                        <input type="date" name="chg-${idx}-payment_date"
+                               class="form-control form-control-sm">
                     </div>
                     <div class="d-flex align-items-end pb-1">
                         <button type="button" class="btn btn-sm btn-outline-danger btn-remove-charge-row"></button>
@@ -1102,10 +1091,12 @@
 
     function reindexChargeRows() {
         document.querySelectorAll('#charges-tbody .charges-row').forEach((row, i) => {
-            const labelInput = row.querySelector('input[name$="-label"]');
-            if (labelInput) labelInput.name = `chg-${i}-label`;
-            const amtInput = row.querySelector('input[name$="-estimated_amount"]');
-            if (amtInput) amtInput.name = `chg-${i}-estimated_amount`;
+            row.querySelectorAll('[name^="chg-"]').forEach((el) => {
+                const suffix = el.name.replace(/^chg-\d+-/, '');
+                el.name = `chg-${i}-${suffix}`;
+            });
+            const matchBtn = row.querySelector('[data-target-path^="charge:"], [data-target-path^="level_charge:"]');
+            if (matchBtn) matchBtn.dataset.targetPath = `charge:${i}:supplier`;
         });
     }
 
@@ -1257,16 +1248,22 @@
         });
         const sumEl = document.getElementById('gp-sum');
         if (sumEl) sumEl.textContent = money(total);
-        const pkgInput = document.querySelector('[name="pkg-quote_amount"]');
-        const pkgAmt = pkgInput ? parseNum(pkgInput.value) : 0;
+        const pkgAmt = getPackagingAmount();
         const pkgEl = document.getElementById('gp-packaging');
         const pkgDisplay = pkgAmt === 0 ? '$0.00' : money(-pkgAmt);
         if (pkgEl) pkgEl.textContent = pkgDisplay;
 
         let chargesDeduction = 0;
-        document.querySelectorAll('.charge-amount').forEach(input => {
-            const v = parseFloat(input.value);
-            if (!isNaN(v)) chargesDeduction += v;
+        document.querySelectorAll('#charges-tbody .charge-row').forEach(function(row) {
+            const labelInput = row.querySelector('[name$="-label"]');
+            if (labelInput && labelInput.value.trim().toLowerCase() === 'packaging') {
+                return;
+            }
+            const amtInput = row.querySelector('.charge-amount');
+            if (amtInput) {
+                const v = parseFloat(amtInput.value);
+                if (!isNaN(v)) chargesDeduction += v;
+            }
         });
 
         // Update the charges deduction display cell
@@ -1329,8 +1326,7 @@
         );
 
         // Get packaging amount
-        var pkgInput = document.querySelector('[name="pkg-quote_amount"]');
-        var pkgAmt   = pkgInput ? parseNum(pkgInput.value) : 0;
+        var pkgAmt   = getPackagingAmount();
         var hasPkg   = pkgAmt > 0;
 
         // Rebuild child rows for each company group
@@ -1517,7 +1513,7 @@
         }
     });
 
-    // Live recalc on any input within a CLIN card OR the packaging quote field.
+    // Live recalc on CLIN cards, contract splits, or charge rows.
     document.addEventListener('input', function(ev) {
         var inContractSplit = ev.target.closest('.contract-split-company-row');
         if (inContractSplit) {
@@ -1532,7 +1528,7 @@
             recalcContractSplits();
             return;
         }
-        if (ev.target.name === 'pkg-quote_amount') {
+        if (ev.target.closest('.charge-row')) {
             recalcGpSummary();
             recalcContractSplits();
             return;
@@ -1831,20 +1827,37 @@
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             init();
-            initPackagingToggle();
             initChargesToggle();
             bootRecalc();
             restoreOpenClins();
         });
     } else {
         init();
-        initPackagingToggle();
         initChargesToggle();
         bootRecalc();
         restoreOpenClins();
     }
 })();
 
+</script>
+
+<script>
+// Pre-fill match modal with CAGE value when Match button is clicked on a charge row
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-match-open][data-match-type="supplier"]');
+    if (!btn) return;
+    var targetPath = btn.dataset.targetPath || '';
+    if (!targetPath.startsWith('charge:') && !targetPath.startsWith('level_charge:')) return;
+
+    var row = btn.closest('.charge-row');
+    if (!row) return;
+    var cageInput = row.querySelector('.charge-cage-input');
+    var supplierText = row.querySelector('.charge-supplier-text');
+
+    if (cageInput && cageInput.value.trim() && (!supplierText || !supplierText.value.trim())) {
+        btn.dataset.matchOriginal = cageInput.value.trim();
+    }
+}, true);
 </script>
 
 <!-- IDIQ Alert Note Modal (Intake) -->

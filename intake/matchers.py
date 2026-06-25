@@ -356,6 +356,17 @@ def apply_match(data: dict, target_path: str, match_type: str, record_id: int) -
             pkg['packhouse_cage'] = rec['cage']
         return data
 
+    if head in ('level_charge', 'charge') and len(parts) == 3:
+        idx = int(parts[1])
+        slot = parts[2]
+        row = _ensure_row(data, 'level_charges', idx)
+        if slot == 'supplier' and match_type == 'supplier':
+            row['supplier_text'] = rec['text']
+            row['supplier_id'] = rec['id']
+            if rec.get('cage'):
+                row['cage'] = rec['cage']
+            return data
+
     # Indexed list slots ---------------------------------------------------
     if head == 'clin' and len(parts) == 3:
         idx = int(parts[1])
@@ -415,6 +426,14 @@ def clear_match(data: dict, target_path: str) -> dict:
     if head == 'packaging':
         pkg = data.get('packaging') or {}
         pkg.pop('packhouse_supplier_id', None)
+        return data
+
+    if head in ('level_charge', 'charge') and len(parts) == 3:
+        idx = int(parts[1])
+        slot = parts[2]
+        rows = data.get('level_charges') or []
+        if idx < len(rows) and slot == 'supplier':
+            rows[idx].pop('supplier_id', None)
         return data
 
     if head == 'clin' and len(parts) == 3:

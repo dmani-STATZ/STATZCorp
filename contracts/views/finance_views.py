@@ -62,6 +62,7 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context['packaging_share_per_company'] = {}
         context['charges_deduction'] = Decimal('0.00')
         context['level_charges'] = []
+        context['level_charge_content_type_id'] = ContentType.objects.get_for_model(ContractLevelCharge).id
         context['payment_activity_rollup'] = []
         context['payment_activity_page'] = None
         context['payment_activity_total'] = 0
@@ -223,7 +224,9 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 context['packaging_share_per_company'] = packaging_share_per_company
 
                 charges_deduction = Decimal('0.00')
-                level_charges = list(self.object.level_charges.all())
+                level_charges = list(
+                    self.object.level_charges.select_related('supplier').order_by('id')
+                )
                 for charge in level_charges:
                     if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
                         charges_deduction += Decimal(str(charge.billed_paid_amount))

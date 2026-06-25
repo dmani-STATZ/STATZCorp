@@ -21,6 +21,7 @@
     window.contractContentTypeId = {{ contract_content_type_id }};
     window.contractId = {{ contract.id }};
     window.clinContentTypeId = {{ clin_content_type_id }};
+    window.levelChargeContentTypeId = {{ level_charge_content_type_id }};
     window.recalcSplitsUrl = "{% url 'contracts:recalc_splits' contract.id %}";
     window.logSplitPaidUrl = "{{ log_split_paid_url }}";
 
@@ -311,114 +312,6 @@
                 </div>{# end .py-2.px-3 inner wrapper for splits #}
             </div>
         </div>{# end Split Summary card #}
-
-        {# Packaging card — separate card, below splits #}
-        {% if packaging %}
-        <div class="card shadow-sm" id="packaging-finance-card">
-            <div class="card-header py-2 small fw-semibold d-flex justify-content-between align-items-center">
-                <span>Packaging</span>
-                <button type="button"
-                        class="btn btn-link btn-sm p-0 text-body-secondary"
-                        id="packagingFinanceDetailsBtn"
-                        title="View / edit packaging details">
-                    Details →
-                </button>
-            </div>
-            <div class="card-body py-2 px-3">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <a href="{% url 'suppliers:supplier_detail' packaging.packhouse.id %}"
-                       class="fw-semibold text-body text-decoration-none small">
-                        {{ packaging.packhouse.name }}
-                    </a>
-                    {% if packaging.packhouse.cage_code %}
-                    <span class="text-body-secondary small">— {{ packaging.packhouse.cage_code }}</span>
-                    {% endif %}
-                    <span class="ms-auto d-flex gap-3 align-items-center">
-                        <button type="button"
-                                class="btn btn-link p-0 text-danger small fw-semibold"
-                                onclick="event.stopPropagation(); openPaymentHistoryPopup('contract_packaging', '{{ packaging.id }}', 'packaging_quote', 'finance_audit', {{ packaging.quote_amount|default:'0' }})">
-                            Q: {% if packaging.quote_amount %}-${{ packaging.quote_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
-                        </button>
-                        <button type="button"
-                                class="btn btn-link p-0 text-danger small fw-semibold"
-                                onclick="event.stopPropagation(); openPaymentHistoryPopup('contract_packaging', '{{ packaging.id }}', 'packaging_paid', 'finance_audit', {{ packaging.amount_paid|default:'0' }})">
-                            Pd: {% if packaging.amount_paid %}-${{ packaging.amount_paid|floatformat:2|intcomma }}{% else %}—{% endif %}
-                        </button>
-                    </span>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        {# Contract Charges card — below Packaging #}
-        <div class="card shadow-sm mt-3" id="contract-charges-card">
-            <div class="card-header py-2 small fw-semibold">
-                <span>Contract Charges</span>
-            </div>
-            <div class="card-body py-2 px-3">
-                {% if not level_charges %}
-                <p class="text-body-secondary small mb-0">No charges on this contract.</p>
-                {% else %}
-                <div class="table-responsive">
-                    <table class="table table-sm table-borderless mb-0 align-middle text-start" style="font-size: 0.85rem;">
-                        <thead>
-                            <tr class="border-bottom text-muted" style="font-size: 0.75rem;">
-                                <th class="pb-1" style="width: 40%;">Label</th>
-                                <th class="pb-1 text-end" style="width: 20%;">Estimated</th>
-                                <th class="pb-1 text-end" style="width: 25%;">Billed / Paid</th>
-                                <th class="pb-1 text-end" style="width: 15%;">Variance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for charge in level_charges %}
-                            <tr data-charge-id="{{ charge.id }}">
-                                <td class="py-1 text-truncate" title="{{ charge.label }}">{{ charge.label }}</td>
-                                <td class="py-1 text-end">${{ charge.estimated_amount|floatformat:2|intcomma }}</td>
-                                <td class="py-1 text-end position-relative">
-                                    <div class="charge-display-wrapper d-inline-block cursor-pointer text-decoration-underline text-primary" style="cursor: pointer;"
-                                         onclick="startEditCharge('{{ charge.id }}', '{{ charge.billed_paid_amount|default_if_none:'' }}')">
-                                        <span class="billed-paid-value-text">
-                                            {% if charge.billed_paid_amount is not None %}${{ charge.billed_paid_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
-                                        </span>
-                                    </div>
-                                    <div class="charge-edit-wrapper d-none">
-                                        <div class="input-group input-group-sm" style="width: 7.5rem; flex-wrap: nowrap;">
-                                            <span class="input-group-text p-1" style="font-size: 0.75rem;">$</span>
-                                            <input type="number" step="0.01" class="form-control form-control-sm p-1 charge-edit-input" style="font-size: 0.75rem;" value="{{ charge.billed_paid_amount|default_if_none:'' }}">
-                                            <button class="btn btn-primary btn-sm px-1 py-0 save-charge-btn" type="button" onclick="saveChargeEdit('{{ charge.id }}', this)">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16">
-                                                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/>
-                                                </svg>
-                                            </button>
-                                            <button class="btn btn-secondary btn-sm px-1 py-0 cancel-charge-btn" type="button" onclick="cancelChargeEdit('{{ charge.id }}')">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" class="bi bi-x-lg" viewBox="0 0 16 16">
-                                                    <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="py-1 text-end variance-value-cell fw-semibold">
-                                    {% if charge.variance is not None %}
-                                        {% if charge.variance > 0 %}
-                                            <span class="text-success">${{ charge.variance|floatformat:2|intcomma }}</span>
-                                        {% elif charge.variance < 0 %}
-                                            <span class="text-danger">-${{ charge.variance|abs_value|floatformat:2|intcomma }}</span>
-                                        {% else %}
-                                            <span>$0.00</span>
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% endif %}
-            </div>
-        </div>
 
         </div>{# end middle column wrapper #}
 
@@ -854,6 +747,48 @@
                         </tr>
                     </tbody>
                         {% endfor %}
+                        {% if level_charges %}
+                    <tbody id="level-charges-tbody">
+                      <tr class="table-secondary">
+                        <td colspan="13" class="ps-3 py-1 small fw-semibold text-muted">
+                          Supplier Charges
+                        </td>
+                      </tr>
+                      {% for charge in level_charges %}
+                      <tr class="level-charge-row" data-charge-id="{{ charge.id }}">
+                        <td class="text-muted small ps-3">—</td>
+                        <td>
+                          {{ charge.label }}
+                        </td>
+                        <td class="small">
+                          {% if charge.supplier %}{{ charge.supplier.name }}{% else %}—{% endif %}
+                        </td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td class="text-end">
+                          <button type="button" class="btn btn-link btn-sm p-0 text-end"
+                                  onclick="openTransactionsEditModal(window.levelChargeContentTypeId, {{ charge.id }}, 'estimated_amount')">
+                            ${{ charge.estimated_amount|floatformat:2 }}
+                          </button>
+                        </td>
+                        <td class="text-end">
+                          <button type="button" class="btn btn-link btn-sm p-0 text-end"
+                                  onclick="openTransactionsEditModal(window.levelChargeContentTypeId, {{ charge.id }}, 'billed_paid_amount')">
+                            {% if charge.billed_paid_amount %}
+                              ${{ charge.billed_paid_amount|floatformat:2 }}
+                            {% else %}—{% endif %}
+                          </button>
+                        </td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td class="text-center small text-muted">no shipments</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                        {% endif %}
                         {% if clins %}
                     <tbody>
                         <tr class="table-secondary fw-semibold small" data-totals-row="true">
@@ -887,75 +822,6 @@
 
     {% endif %}
 </div>
-
-{% if packaging %}
-<div class="modal fade" id="packagingFinanceModal" tabindex="-1" aria-labelledby="packagingFinanceModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="packagingFinanceModalLabel">
-          Packaging — {{ packaging.packhouse.name }}
-          {% if packaging.packhouse.cage_code %}
-          <span class="text-body-secondary fs-6 fw-normal ms-2">{{ packaging.packhouse.cage_code }}</span>
-          {% endif %}
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-
-        {# Row 1: Quote and Paid — PaymentHistory popup triggers #}
-        <div class="row g-3 mb-3">
-          <div class="col-md-6">
-            <label class="form-label small text-body-secondary text-uppercase fw-semibold" style="font-size:0.7rem">Quote Amount</label>
-            <p class="fw-semibold text-danger mb-0">
-              {% if packaging.quote_amount %}-${{ packaging.quote_amount|floatformat:2|intcomma }}{% else %}—{% endif %}
-            </p>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small text-body-secondary text-uppercase fw-semibold" style="font-size:0.7rem">Amount Paid</label>
-            <p class="fw-semibold text-danger mb-0">
-              {% if packaging.amount_paid %}-${{ packaging.amount_paid|floatformat:2|intcomma }}{% else %}—{% endif %}
-            </p>
-          </div>
-        </div>
-
-        {# Row 2: Invoice # — inline editable #}
-        <div class="row g-3 mb-3">
-          <div class="col-md-6">
-            <label class="form-label small text-body-secondary text-uppercase fw-semibold" style="font-size:0.7rem">Invoice #</label>
-            <div class="d-flex align-items-center gap-2" id="packaging-invoice-display-row">
-              <span id="packaging-invoice-display" class="small">{{ packaging.invoice_number|default:"—" }}</span>
-              <button type="button" class="btn btn-link btn-sm p-0 text-body-secondary" style="font-size:0.72rem"
-                      onclick="openPackagingInvoiceEdit()">Edit</button>
-            </div>
-            <div class="d-none" id="packaging-invoice-edit-row">
-              <div class="input-group input-group-sm">
-                <input type="text" class="form-control form-control-sm" id="packaging-invoice-input"
-                       value="{{ packaging.invoice_number|default:'' }}"
-                       maxlength="100" placeholder="Invoice number">
-                <button class="btn btn-sm btn-primary" type="button" id="packaging-invoice-save-btn">Save</button>
-                <button class="btn btn-sm btn-secondary" type="button" onclick="closePackagingInvoiceEdit()">Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {# Row 3: Notes — read-only in this modal #}
-        {% if packaging.notes %}
-        <div class="mb-2">
-          <label class="form-label small text-body-secondary text-uppercase fw-semibold" style="font-size:0.7rem">Notes</label>
-          <p class="small mb-0">{{ packaging.notes }}</p>
-        </div>
-        {% endif %}
-
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
 
 {# Set CLIN unit prices (fallback for legacy CLINs missing per-unit prices) #}
 <div class="modal fade" id="setUnitPriceModal" tabindex="-1"
@@ -1718,6 +1584,11 @@ window.financeShipmentsByClin = {
     window.onTransactionSaved = function(data) {
         if (!data || !data.success) return;
 
+        if (data.content_type_id === window.levelChargeContentTypeId) {
+            window.location.reload();
+            return;
+        }
+
         // CLIN-level edits (Slice 1): refresh the affected CLIN row and summary.
         if (data.content_type_id === window.clinContentTypeId && data.object_id) {
             if (typeof refreshClinRow === 'function') {
@@ -2072,176 +1943,7 @@ window.financeShipmentsByClin = {
             window.openNotesPopup();
         });
     }
-
-    // Inline edit for Contract level charges
-    window.startEditCharge = function(chargeId, value) {
-        const row = document.querySelector(`tr[data-charge-id="${chargeId}"]`);
-        if (!row) return;
-        row.querySelector('.charge-display-wrapper').classList.add('d-none');
-        row.querySelector('.charge-edit-wrapper').classList.remove('d-none');
-        row.querySelector('.charge-edit-input').focus();
-    };
-
-    window.cancelChargeEdit = function(chargeId) {
-        const row = document.querySelector(`tr[data-charge-id="${chargeId}"]`);
-        if (!row) return;
-        row.querySelector('.charge-display-wrapper').classList.remove('d-none');
-        row.querySelector('.charge-edit-wrapper').classList.add('d-none');
-    };
-
-    window.saveChargeEdit = function(chargeId, btn) {
-        const row = document.querySelector(`tr[data-charge-id="${chargeId}"]`);
-        if (!row) return;
-        const input = row.querySelector('.charge-edit-input');
-        const value = input.value.trim();
-
-        input.disabled = true;
-        btn.disabled = true;
-
-        fetch(`/contracts/api/contract-level-charge/${chargeId}/update/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            },
-            body: JSON.stringify({
-                field: 'billed_paid_amount',
-                value: value === '' ? null : value
-            })
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.error || 'Failed to update charge');
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                const displayVal = data.billed_paid_amount !== null
-                    ? `$${parseFloat(data.billed_paid_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : '—';
-                row.querySelector('.billed-paid-value-text').textContent = displayVal;
-
-                const varianceCell = row.querySelector('.variance-value-cell');
-                if (data.variance !== null) {
-                    const varianceVal = parseFloat(data.variance);
-                    const formattedVariance = Math.abs(varianceVal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    
-                    let spanClass = '';
-                    let prefix = '';
-                    if (varianceVal > 0) {
-                        spanClass = 'text-success';
-                    } else if (varianceVal < 0) {
-                        spanClass = 'text-danger';
-                        prefix = '-';
-                    }
-                    
-                    varianceCell.innerHTML = `<span class="${spanClass}">${prefix}$${formattedVariance}</span>`;
-                } else {
-                    varianceCell.innerHTML = `<span class="text-muted">—</span>`;
-                }
-
-                row.querySelector('.charge-display-wrapper').classList.remove('d-none');
-                row.querySelector('.charge-edit-wrapper').classList.add('d-none');
-
-                input.value = data.billed_paid_amount !== null ? data.billed_paid_amount : '';
-                row.querySelector('.charge-display-wrapper').setAttribute('onclick', `startEditCharge('${chargeId}', '${data.billed_paid_amount !== null ? data.billed_paid_amount : ''}')`);
-
-                refreshContractSummary();
-            }
-        })
-        .catch(error => {
-            console.error('Error saving charge:', error);
-            if (window.notify) {
-                window.notify('error', error.message);
-            } else {
-                alert(error.message);
-            }
-        })
-        .finally(() => {
-            input.disabled = false;
-            btn.disabled = false;
-        });
-    };
 })();
 </script>
-
-{% if packaging %}
-<script>
-// Packaging details modal + inline edits — Finance Audit
-(function () {
-    var packagingId = '{{ packaging.id }}';
-    if (!packagingId) return;
-
-    var detailsBtn = document.getElementById('packagingFinanceDetailsBtn');
-    var packagingModal = null;
-    if (detailsBtn) {
-        detailsBtn.addEventListener('click', function () {
-            if (!packagingModal) {
-                packagingModal = new bootstrap.Modal(document.getElementById('packagingFinanceModal'));
-            }
-            packagingModal.show();
-        });
-    }
-
-    function savePackagingFinanceField(field, value, displayEl, formatFn) {
-        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        fetch('/contracts/api/packaging/' + packagingId + '/update-finance/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRFToken': csrfToken,
-            },
-            body: 'field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(value),
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.success) {
-                displayEl.textContent = formatFn ? formatFn(value) : (value || '—');
-                if (window.notify) window.notify('success', 'Saved', 2000);
-            } else {
-                if (window.notify) window.notify('error', data.error || 'Save failed', 3000);
-            }
-        })
-        .catch(function() {
-            if (window.notify) window.notify('error', 'Save failed', 3000);
-        });
-    }
-
-    window.openPackagingInvoiceEdit = function() {
-        document.getElementById('packaging-invoice-edit-row').classList.remove('d-none');
-        document.getElementById('packaging-invoice-display-row').classList.add('d-none');
-    };
-    window.closePackagingInvoiceEdit = function() {
-        document.getElementById('packaging-invoice-edit-row').classList.add('d-none');
-        document.getElementById('packaging-invoice-display-row').classList.remove('d-none');
-    };
-    var invoiceSaveBtn = document.getElementById('packaging-invoice-save-btn');
-    if (invoiceSaveBtn) {
-        invoiceSaveBtn.addEventListener('click', function() {
-            var val = document.getElementById('packaging-invoice-input').value.trim();
-            savePackagingFinanceField('invoice_number', val,
-                document.getElementById('packaging-invoice-display'), null);
-            window.closePackagingInvoiceEdit();
-        });
-    }
-
-    // After PaymentHistory popup saves quote or paid, reload so adj_gross,
-    // packaging variance row, and card-face Q/Pd values update from the server.
-    var origUpdateCellValue = window.updateCellValue;
-    window.updateCellValue = function(arg0, arg1, arg2, arg3) {
-        var fieldType = (arg3 !== undefined) ? arg2 : arg1;
-        if (fieldType === 'packaging_quote' || fieldType === 'packaging_paid') {
-            window.location.reload();
-            return true;
-        }
-        if (origUpdateCellValue) return origUpdateCellValue(arg0, arg1, arg2, arg3);
-        return false;
-    };
-})();
-</script>
-{% endif %}
 {% endif %}
 {% endblock %}

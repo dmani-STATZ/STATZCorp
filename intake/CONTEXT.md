@@ -132,7 +132,7 @@ set by the parser and drives schema routing. CONTRACT TYPE
 `contracts.ContractType` and is written to `Contract.contract_type` at
 finalization.
 
-> **Supplier flag chips (2026-06-03):** _editor_context pre-fetches a supplier_flags dict {supplier_id (int or str): {'probation': bool, 'conditional': bool}} for all matched supplier IDs found in CLIN, packaging, and approved_pairs JSON. Templates apply .supplier-flag-probation (red) or .supplier-flag-conditional (yellow) from components.css wherever matched supplier badges appear. Unmatched suppliers (no supplier_id) show plain text  no chip. Probation wins over conditional. Key type must be consistent between supplier_flags dict and template get_item filter calls.
+> **Supplier flag chips (2026-06-03):** _editor_context pre-fetches a supplier_flags dict {supplier_id (int or str): {'probation': bool, 'conditional': bool}} for all matched supplier IDs found in CLIN, level_charges, and approved_pairs JSON. Templates apply .supplier-flag-probation (red) or .supplier-flag-conditional (yellow) from components.css wherever matched supplier badges appear. Unmatched suppliers (no supplier_id) show plain text  no chip. Probation wins over conditional. Key type must be consistent between supplier_flags dict and template get_item filter calls.
 
 CLIN data shape (per-CLIN JSON keys, see `DraftClin` in `schemas.py`):
 
@@ -152,27 +152,30 @@ CLIN data shape (per-CLIN JSON keys, see `DraftClin` in `schemas.py`):
 - Nested children: `finance_lines: [{line_type, amount, notes}]`,
   `splits: [{company_name, percentage}]`
 
-Packaging: hidden in the editor until the analyst clicks **+ Add Packaging**,
-or auto-shown on load when any of `packhouse_supplier_text`,
-`packhouse_supplier_id`, `quote_amount`, or `notes` is pre-filled. The
-section sits above the CLIN stack. **Remove Packaging** clears all `pkg-*`
-inputs so the next save drops the packaging block from JSON.
+Packaging: **Deprecated in Intake as of 2026-06-24.** The Packaging section has been
+merged into Contract Level Charges. New drafts write packaging costs as a
+ContractLevelCharge row with label='Packaging' and an optional supplier FK. Old drafts
+that still have data['packaging'] are converted to a charge row on editor load and on
+finalization. data['packaging'] is cleared on the next save of the draft.
+ContractPackaging model remains alive in the rest of the application for historical
+data pending a TSQL migration.
 - **Packaging same-CAGE suppression** — `_result_to_data` in `ingest.py` skips
-  populating `data['packaging']` when the packhouse CAGE matches the contract
+  appending a Packaging charge row when the packhouse CAGE matches the contract
   supplier CAGE. Domain rule: same CAGE means the supplier bundles packaging.
-  Parser extraction code is preserved. Analysts can still add packaging manually.
-- **Remove Packaging persistence** — `remove_packaging_api` view persists the
-  removal server-side via AJAX so the packaging card does not reappear on reload.
-  `pkg-add-wrap` is always rendered in the template; toggled via JS `display` only.
+  Parser extraction code is preserved. Analysts can still add a Packaging charge
+  manually via Contract Level Charges.
 
-Contract Level Charges: hidden in the editor until the analyst clicks
-+ Add Contract Level Charges, or auto-shown on load when
-level_charges is non-empty in the draft data. Each row has a label
-(free text, e.g. "GSI Fee") and estimated_amount (decimal). Rows are
-added with the + Add Line button and removed individually with .
-The entire section is removed with Remove Charges which also clears
-all rows. POST keys are chg-<i>-label and chg-<i>-estimated_amount.
+Contract Level Charges: hidden until analyst clicks + Add Contract Level Charges, or
+auto-shown on load when level_charges is non-empty OR data['packaging'] has content
+(auto-converted). Each row has: label (required, free text), estimated_amount (required
+decimal), supplier_text + supplier_id (optional, set via Match button using the
+charge:N:supplier target-path), cage (optional, pre-fills Match modal search),
+invoice_number (optional), payment_date (optional). POST keys per row:
+chg-<i>-label, chg-<i>-estimated_amount, chg-<i>-supplier_text, chg-<i>-supplier_id,
+chg-<i>-cage, chg-<i>-invoice_number, chg-<i>-payment_date.
 billed_paid_amount is NOT captured at intake — that is Finance Audit only.
+Matchers: charge:N:supplier (and legacy level_charge:N:supplier) handled in
+intake/matchers.py apply_match and clear_match.
 
 PO Number is display-only in the editor (`Assigned at finalization`). It is
 minted during finalization for AWD, PO, DO, and INTERNAL contract types via
@@ -206,10 +209,10 @@ a two-tbody structure for Bootstrap 5 collapse: `.contract-split-company-group`
 (header tbody with `data-children-id`) plus a collapsible children tbody
 (default collapsed). Clicking the company row (not an input or button)
 toggles child rows; multiple companies may be expanded simultaneously.
-Child rows show each CLIN's contribution (`CLIN GP × company %`). When
-`pkg-quote_amount > 0`, a packaging child row shows the proportional
-deduction (`packaging × company % / 100`) as a negative value.
-Company total = Σ(CLIN GP × %) − (packaging × %). Contract-level splits
+Child rows show each CLIN's contribution (`CLIN GP × company %`). When a charge
+row with label "Packaging" has estimated_amount > 0, a packaging child row shows
+the proportional deduction (`packaging × company % / 100`) as a negative value.
+Company total = Σ(CLIN GP × %) − (packaging × %) − (other charges × %).
 are submitted via named form inputs `csplit-{j}-company_name` and
 `csplit-{j}-percentage`. Django-rendered company rows use
 `{{ forloop.counter0 }}` as j. JS-added rows have names assigned by
@@ -277,6 +280,9 @@ For AWD/PO/DO/INTERNAL contract creation, among other fields:
 In the **Mapping Rules** section under `AWD / PO / DO / INTERNAL`:
 - `data.level_charges[i].label` → `ContractLevelCharge.label`
 - `data.level_charges[i].estimated_amount` → `ContractLevelCharge.estimated_amount`
+- `data.level_charges[i].supplier_id` → `ContractLevelCharge.supplier` (optional)
+- `data.level_charges[i].invoice_number` → `ContractLevelCharge.invoice_number` (optional)
+- `data.level_charges[i].payment_date` → `ContractLevelCharge.payment_date` (optional)
 
 Supported types: **AWD, PO, DO, IDIQ, INTERNAL, MOD, AMD**.
 

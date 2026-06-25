@@ -170,33 +170,17 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   regressions here — don't disable it without thinking.
 - **Supplier flag display rule (intake):** Intake is JSON-backed — there are no live Supplier ORM objects in the template. `_editor_context` builds `supplier_flags` (one DB query, `only('id','probation','conditional')`) and passes it to the template. Templates use `supplier_flags|get_item:sid` to look up flags. Apply `.supplier-flag-probation` for probation, `.supplier-flag-conditional` for conditional-only, no class for neither. Only apply when `supplier_id` is non-null. Never query Supplier inside a template — always use the pre-built `supplier_flags` context variable.
 
-### Packaging suppression (same-CAGE rule)
-- `intake/ingest.py::_result_to_data` skips populating `data['packaging']` when
-  `result.packhouse_cage` (uppercased, stripped) equals `result.contract_supplier_cage`
-  (uppercased, stripped). This reflects the domain rule: when the packhouse and
-  supplier share a CAGE, packaging is bundled into the supplier quote — no separate
-  packhouse entry is needed.
-- The extraction code in `intake/pdf_parser.py` (`_extract_packaging_party`,
-  `packaging_cage` field on `AwardParseResult`) is intentionally preserved.
-  Analysts change their minds. Do not remove parser extraction logic.
-- Analysts retain full manual control. The "Remove Packaging" / "+ Add Packaging"
-  UI path is always available regardless of CAGE comparison results.
-- The "Same as supplier" badge has been removed from `draft_edit.html`. The
-  suppression happens at parse time so the badge is never needed.
-
-### Remove Packaging persistence
-- `remove_packaging_api` view (`intake/views.py`) at
-  `POST /intake/drafts/<pk>/remove-packaging/` (`intake:remove_packaging`).
-  Requires the user to hold the soft lock. Pops `packaging` from `draft.data`
-  and saves. Returns JSON `{"ok": true/false}`.
-- `hidePackaging()` in `draft_edit.html` calls this endpoint via `fetch()` after
-  clearing the DOM. The `removePackagingUrl` JS variable is injected from a
-  Django `{% url %}` tag in the same `<script>` block — do not move it to an
-  external file.
-- `pkg-add-wrap` (`div#pkg-add-wrap`) is always rendered in the template.
-  Visibility is controlled via `style="display:none"` toggled by `hidePackaging()`
-  / `showPackaging()`. Do NOT revert to a `{% if not pkg_has_data %}` conditional
-  render — that is the root cause of the button-disappearing bug.
+### Packaging merged into Contract Level Charges (2026-06-24)
+- The standalone Packaging editor section is removed. Packaging costs are captured
+  as a `level_charges` row with label='Packaging'.
+- `intake/ingest.py::_result_to_data` appends a pre-populated Packaging charge
+  row (cage + supplier_text) to `data['level_charges']` when packhouse differs
+  from contract supplier CAGE. Same-CAGE suppression still applies.
+- Legacy `data['packaging']` in old drafts is converted on editor load
+  (`_convert_packaging_to_charge_if_present` in views.py) and at finalization
+  (`_get_charges_for_finalize` in finalize.py). Both are idempotent.
+- `parse_post` no longer writes `data['packaging']` — saving clears legacy packaging.
+- `remove_packaging_api` remains for backward compat but the UI no longer calls it.
 
 ### Matcher changes (Phase 2b/2c)
 - **Auto-save on match open:** The capture-phase dirty-form guard in
@@ -317,7 +301,12 @@ manually. Do NOT use contractor_cage / contractor_name (Block 9 prime
 contractor) as supplier fallback — they are different entities.
 
 **Packhouse drill-down:** Same pattern. Contract-level "PLACE OF INSPECTION
-FOR PACKAGING" is the default. CLIN-level overrides per CLIN.
+FOR PACKAGING" is the default. CLIN-level overrides per CLIN. Packhouse drill-down
+result is now written to `data['level_charges']` as a pre-populated Packaging row
+(label='Packaging', cage from packhouse_cage, supplier_text from
+contract_packhouse_name, estimated_amount=None). `data['packaging']` is no longer
+written by ingest for new PDFs. Old drafts with `data['packaging']` are handled
+by backward-compat conversion in views.py and finalize.py.
 
 **IDIQ supplier extraction:** `_extract_idiq_supplier_via_claude_api`
 sends Section B text to the Claude API (same pattern as
@@ -456,6 +445,15 @@ After model changes:
   schema (all keys are Optional). That is intentional — drafts may be very
   bare at queue time. Don't add `required=True` keys to root schemas without
   a clear ingestion guarantee.
+- `data['packaging']` may still exist in old drafts. `_convert_packaging_to_charge_if_present()`
+  in views.py merges it into the level_charges list for display. `_get_charges_for_finalize()`
+  in finalize.py merges it at finalization time. Both are idempotent (check for existing
+  'Packaging' label row before prepending). Do NOT remove data['packaging'] handling
+  until confirmed all drafts have been resaved or finalized.
+- `intake/matchers.py` retains the `head == 'packaging'` branch in apply_match and clear_match
+  for backward compat with old drafts. Do not remove it.
+- ContractPackaging is never created by Intake finalize. Only ContractLevelCharge rows
+  are created. Processing finalize is unchanged and may still create ContractPackaging.
 - `DraftContract.save()` re-validates every save. A schema bug surfaces as
   a save failure on previously-valid records. Migrations that touch existing
   rows must round-trip through `validate_data`.

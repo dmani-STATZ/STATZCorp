@@ -57,7 +57,10 @@ PKG_FIELDS = {
     'packhouse_cage', 'packhouse_supplier_text', 'packhouse_supplier_id',
     'quote_amount', 'notes',
 }
-CHARGE_FIELDS = {'label', 'estimated_amount'}
+CHARGE_FIELDS = {
+    'label', 'estimated_amount', 'supplier_id', 'supplier_text',
+    'cage', 'invoice_number', 'payment_date',
+}
 CSPLIT_FIELDS = {'company_name', 'percentage'}
 PAIR_FIELDS = {
     'nsn_text', 'nsn_id', 'nsn_description',
@@ -231,8 +234,7 @@ def parse_post(post) -> dict:
             for clin in out['clins']:
                 clin['splits'] = contract_splits_ordered
 
-    if any(v not in (None, '') for v in pkg.values()):
-        out['packaging'] = pkg
+    # Legacy pkg-* POST keys are ignored — packaging is merged into level_charges.
 
     charges = [
         row for row in (

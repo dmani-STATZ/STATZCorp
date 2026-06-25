@@ -210,6 +210,13 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
             contract.get_sharepoint_relative_path() or ''
         )
 
+        from django.contrib.contenttypes.models import ContentType as DjangoContentType
+        from ..models import ContractLevelCharge
+        context['level_charges'] = contract.level_charges.select_related('supplier').order_by('id')
+        context['level_charge_content_type_id'] = DjangoContentType.objects.get_for_model(
+            ContractLevelCharge
+        ).id
+
         return context
 
 

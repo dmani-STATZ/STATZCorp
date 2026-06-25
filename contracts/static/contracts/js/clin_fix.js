@@ -95,7 +95,6 @@
         draftDelete: rootEl.dataset.draftDeleteUrl,
         parentOptions: rootEl.dataset.parentOptionsUrl,
     };
-    var hasPackaging = rootEl.dataset.hasPackaging === '1';
     var contractNumber = rootEl.dataset.contractNumber || '';
 
     /** state[clinId] = { destination_type, staged_data, parent_clin_id, pending_save } */

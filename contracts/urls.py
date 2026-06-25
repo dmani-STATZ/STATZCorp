@@ -6,9 +6,12 @@ from .views import partner_reconciliation_views
 from .views.payment_forecast_views import PaymentForecastView, upsert_payment_plan
 from .views.finance_views import FinanceAuditView, finance_audit_summary_api, finance_audit_clin_api
 from .views.finance_line_views import (
+    add_contract_level_charge,
     add_finance_line,
     add_partial_finance_line,
     add_partial_shipment,
+    charge_detail_panel,
+    delete_contract_level_charge,
     delete_finance_line,
     get_finance_line_payments,
     get_finance_lines,
@@ -703,6 +706,21 @@ urlpatterns = [
     path("api/finance-audit/<int:contract_id>/summary/", finance_audit_summary_api, name="finance_audit_summary_api"),
     path("api/finance-audit/<int:contract_id>/clin/<int:clin_id>/", finance_audit_clin_api, name="finance_audit_clin_api"),
     path('api/contract-level-charge/<int:charge_id>/update/', views.update_contract_level_charge, name='update_contract_level_charge'),
+    path(
+        "api/contract/<int:contract_pk>/level-charges/add/",
+        add_contract_level_charge,
+        name="level-charge-add",
+    ),
+    path(
+        "api/level-charges/<int:charge_pk>/delete/",
+        delete_contract_level_charge,
+        name="level-charge-delete",
+    ),
+    path(
+        "api/level-charges/<int:charge_pk>/detail/",
+        charge_detail_panel,
+        name="level-charge-detail",
+    ),
     path("api/finance-lines/add/", add_finance_line, name="finance_line_add"),
     path(
         "api/finance-lines/clin/<int:clin_id>/",

@@ -7,7 +7,7 @@ from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 
-from contracts.models import ClinSplit, ClinShipment, Clin, Contract
+from contracts.models import ClinSplit, ClinShipment, Clin, Contract, ContractLevelCharge
 from suppliers.models import Supplier
 from .models import Transaction
 from .middleware import get_current_user
@@ -42,6 +42,12 @@ TRACKED = [
     (Clin, "uom"),
     (ClinShipment, "pod_date"),
     (ClinSplit, "split_paid"),
+    (ContractLevelCharge, "label"),
+    (ContractLevelCharge, "supplier"),
+    (ContractLevelCharge, "estimated_amount"),
+    (ContractLevelCharge, "billed_paid_amount"),
+    (ContractLevelCharge, "payment_date"),
+    (ContractLevelCharge, "invoice_number"),
     # Supplier (supplier detail page)
     (Supplier, "name"),
     (Supplier, "cage_code"),
@@ -165,6 +171,23 @@ def store_old_state(sender, instance, **kwargs):
             if row is not None:
                 old_state[key] = {
                     "split_paid": _serialize(row.get("split_paid")),
+                }
+        except Exception:
+            pass
+    elif sender is ContractLevelCharge:
+        try:
+            row = ContractLevelCharge.objects.filter(pk=instance.pk).values(
+                "label", "supplier_id", "estimated_amount",
+                "billed_paid_amount", "payment_date", "invoice_number"
+            ).first()
+            if row is not None:
+                old_state[key] = {
+                    "label": _serialize(row.get("label")),
+                    "supplier": _serialize(row.get("supplier_id")),
+                    "estimated_amount": _serialize(row.get("estimated_amount")),
+                    "billed_paid_amount": _serialize(row.get("billed_paid_amount")),
+                    "payment_date": _serialize(row.get("payment_date")),
+                    "invoice_number": _serialize(row.get("invoice_number")),
                 }
         except Exception:
             pass

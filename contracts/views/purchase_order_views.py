@@ -10,7 +10,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import CompanyPOProfile, Contract, Clin, PurchaseOrder, POLineItem
+from ..models import CompanyPOProfile, Contract, Clin, ContractLevelCharge, PurchaseOrder, POLineItem
 from suppliers.models import Supplier
 
 logger = logging.getLogger('django')
@@ -79,6 +79,25 @@ def _seed_po_lines_from_clins(po, contract):
             purchase_order=po, sort_order=order,
             activity=_build_line_activity(clin),
             qty=qty, rate=rate, amount=amount,
+        )
+
+    charges = ContractLevelCharge.objects.filter(
+        contract=contract
+    ).select_related('supplier').order_by('id')
+
+    for charge in charges:
+        order += 1
+        if charge.supplier:
+            activity = f"{charge.label} — {charge.supplier.name}"
+        else:
+            activity = charge.label
+        POLineItem.objects.create(
+            purchase_order=po,
+            sort_order=order,
+            activity=activity,
+            qty=None,
+            rate=None,
+            amount=charge.estimated_amount,
         )
 
 

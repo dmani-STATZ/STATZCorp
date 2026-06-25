@@ -35,9 +35,13 @@ AWD / PO / DO / INTERNAL
   clins[i].finance_lines     → ContractFinanceLine (per-CLIN)
   clins[i].splits            → ClinSplit (per-CLIN; split_value computed
                                 from percentage × planned_gp / 100)
-  packaging.*                → ContractPackaging (only if packhouse_supplier_id)
+  packaging.*                → LEGACY: merged into ContractLevelCharge at finalize
+                                (Intake no longer passes packaging to the service)
   data.level_charges[i].label           → ContractLevelCharge.label
   data.level_charges[i].estimated_amount  → ContractLevelCharge.estimated_amount
+  data.level_charges[i].supplier_id       → ContractLevelCharge.supplier (optional)
+  data.level_charges[i].invoice_number    → ContractLevelCharge.invoice_number (optional)
+  data.level_charges[i].payment_date      → ContractLevelCharge.payment_date (optional)
   data.finance_lines         → LEGACY: pre-redesign drafts only. Attached to
                                 the first CLIN as a compat shim.
 
@@ -177,8 +181,8 @@ def _draft_to_service_payload(draft: DraftContract, kind: str) -> dict:
             _draft_clin_to_payload(c, draft.contract_number)
             for c in (data.get('clins') or [])
         ],
-        'packaging': data.get('packaging'),
-        'level_charges': data.get('level_charges') or [],
+        'packaging': None,
+        'level_charges': _get_charges_for_finalize(data),
         'seed_payment_history': False,
         # INTERNAL: intake stores `notes` as a single string; pass through.
         'notes': data.get('notes') if kind == 'INTERNAL' else None,
@@ -323,7 +327,7 @@ def _resolve_sales_class(data: dict):
 def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
     result = _call_service(_draft_to_service_payload(draft, 'AWD'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
-    _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
+    _apply_level_charges(result.contract, _get_charges_for_finalize(draft.data or {}))
     _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 
@@ -347,7 +351,7 @@ def _finalize_do(draft: DraftContract, user: User) -> Contract:
         )
     result = _call_service(payload, user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
-    _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
+    _apply_level_charges(result.contract, _get_charges_for_finalize(draft.data or {}))
     _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 
@@ -367,7 +371,7 @@ def _finalize_internal(draft: DraftContract, user: User) -> Contract:
     """
     result = _call_service(_draft_to_service_payload(draft, 'INTERNAL'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
-    _apply_level_charges(result.contract, (draft.data or {}).get('level_charges') or [])
+    _apply_level_charges(result.contract, _get_charges_for_finalize(draft.data or {}))
     _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 
@@ -480,6 +484,35 @@ def _apply_legacy_root_finance_lines(
         )
 
 
+def _get_charges_for_finalize(data: dict) -> list:
+    """Return level_charges to create as ContractLevelCharge rows.
+
+    Merges legacy data['packaging'] into the list if present.
+    """
+    charges = list(data.get('level_charges') or [])
+    packaging = data.get('packaging') or {}
+
+    if packaging and (
+        packaging.get('packhouse_supplier_text')
+        or packaging.get('packhouse_supplier_id')
+        or packaging.get('quote_amount')
+    ):
+        if not any(
+            c.get('label', '').strip().lower() == 'packaging' for c in charges
+        ):
+            charges = [{
+                'label': 'Packaging',
+                'estimated_amount': packaging.get('quote_amount') or None,
+                'supplier_id': packaging.get('packhouse_supplier_id') or None,
+                'supplier_text': packaging.get('packhouse_supplier_text') or None,
+                'cage': packaging.get('packhouse_cage') or None,
+                'invoice_number': None,
+                'payment_date': None,
+            }] + charges
+
+    return charges
+
+
 def _apply_level_charges(
     contract: Contract, level_charges: list
 ) -> None:
@@ -506,9 +539,27 @@ def _apply_level_charges(
                 raw_amount, contract.contract_number,
             )
             continue
+
+        supplier = None
+        supplier_id = row.get('supplier_id')
+        if supplier_id:
+            from suppliers.models import Supplier
+            try:
+                supplier = Supplier.objects.get(pk=supplier_id)
+            except Supplier.DoesNotExist:
+                logger.warning(
+                    'Skipping level charge supplier_id=%s (not found) on contract %s',
+                    supplier_id, contract.contract_number,
+                )
+
+        invoice_number = (row.get('invoice_number') or '').strip() or None
+        payment_date = row.get('payment_date') or None
+
         ContractLevelCharge.objects.create(
             contract=contract,
             label=label,
             estimated_amount=amount,
-            # billed_paid_amount intentionally omitted (null) — Finance Audit fills this
+            supplier=supplier,
+            invoice_number=invoice_number,
+            payment_date=payment_date,
         )

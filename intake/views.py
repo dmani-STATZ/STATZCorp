@@ -185,12 +185,48 @@ def update_draft_company(request, pk: int):
 # ---------------------------------------------------------------------------
 
 
+def _convert_packaging_to_charge_if_present(data: dict) -> list:
+    """If data['packaging'] has content, prepend it as a level_charges row.
+
+    Does NOT modify data in place — returns the charges list for display only.
+    The actual data['packaging'] key is cleared on the next save (parse_post).
+    """
+    charges = list(data.get('level_charges') or [])
+    packaging = data.get('packaging') or {}
+
+    if not packaging:
+        return charges
+
+    has_packaging_content = any([
+        packaging.get('packhouse_supplier_text'),
+        packaging.get('packhouse_supplier_id'),
+        packaging.get('quote_amount'),
+    ])
+    if not has_packaging_content:
+        return charges
+
+    if any(c.get('label', '').strip().lower() == 'packaging' for c in charges):
+        return charges
+
+    packaging_charge = {
+        'label': 'Packaging',
+        'estimated_amount': packaging.get('quote_amount', ''),
+        'supplier_text': packaging.get('packhouse_supplier_text', ''),
+        'supplier_id': packaging.get('packhouse_supplier_id', ''),
+        'cage': packaging.get('packhouse_cage', ''),
+        'invoice_number': '',
+        'payment_date': '',
+    }
+    return [packaging_charge] + charges
+
+
 def _editor_context(draft: DraftContract, user) -> dict:
     """Shared context for the editor — bound to current draft state."""
     from contracts.models import ContractType, SalesClass, SpecialPaymentTerms
     from suppliers.models import Supplier as SupplierModel
 
     data = draft.data or {}
+    level_charges = _convert_packaging_to_charge_if_present(data)
     
     # Collect all matched supplier IDs from JSON data
     _supplier_ids = set()
@@ -198,9 +234,10 @@ def _editor_context(draft: DraftContract, user) -> dict:
         _sid = _clin.get('supplier_id')
         if _sid:
             _supplier_ids.add(int(_sid))
-    _pkg_sid = (data.get('packaging') or {}).get('packhouse_supplier_id')
-    if _pkg_sid:
-        _supplier_ids.add(int(_pkg_sid))
+    for _charge in level_charges:
+        _sid = _charge.get('supplier_id')
+        if _sid:
+            _supplier_ids.add(int(_sid))
     for _pair in data.get('approved_pairs') or []:
         _sid = _pair.get('supplier_id')
         if _sid:
@@ -216,7 +253,6 @@ def _editor_context(draft: DraftContract, user) -> dict:
             supplier_flags[_sup.pk] = flags
             supplier_flags[str(_sup.pk)] = flags
 
-    pkg_data = data.get('packaging') or {}
     clins = data.get('clins') or []
     contract_splits = []
     for clin in clins:
@@ -240,15 +276,8 @@ def _editor_context(draft: DraftContract, user) -> dict:
         'clins': clins,
         'contract_splits': contract_splits,
         'finance_lines': data.get('finance_lines') or [],
-        'packaging': pkg_data,
-        'pkg_has_data': any([
-            pkg_data.get('packhouse_supplier_text'),
-            pkg_data.get('packhouse_supplier_id'),
-            pkg_data.get('quote_amount'),
-            pkg_data.get('notes'),
-        ]),
-        'level_charges': data.get('level_charges') or [],
-        'charges_has_data': bool(data.get('level_charges')),
+        'level_charges': level_charges,
+        'charges_has_data': bool(level_charges),
         'sales_classes': SalesClass.objects.all().order_by('sales_team'),
         'contract_types': ContractType.objects.all().order_by('description'),
         'approved_pairs': data.get('approved_pairs') or [],
