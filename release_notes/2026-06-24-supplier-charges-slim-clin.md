@@ -1,7 +1,7 @@
 ---
 id: 2026-06-24-supplier-charges-slim-clin
 title: Supplier Charges Now Visible as Contract Line Items
-published: false
+published: true
 publish_date: 2026-06-24
 tags: [new, contracts]
 critical: false

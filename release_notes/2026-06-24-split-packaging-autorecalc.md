@@ -1,7 +1,7 @@
 ---
 id: 2026-06-24-split-packaging-autorecalc
 title: Split values now account for packaging at contract creation
-published: false
+published: true
 publish_date: 2026-06-24
 tags: [fixed, finance]
 critical: false

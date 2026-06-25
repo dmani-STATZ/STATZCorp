@@ -1,7 +1,7 @@
 ---
 id: 2026-06-25-draft-edit-ux-pass
 title: "Draft Editor UX Pass — CLC Layout, Match Buttons, CLIN Accordion"
-published: false
+published: true
 publish_date: 2026-06-25
 tags: [improved, contracts]
 critical: false
