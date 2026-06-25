@@ -2729,6 +2729,18 @@ document.addEventListener('DOMContentLoaded', function() {
     var resultsEl = document.getElementById('chargeSupplierResults');
     var searchTimer = null;
 
+    var addChargeModal = document.getElementById('addChargeModal');
+    if (addChargeModal) {
+        addChargeModal.addEventListener('show.bs.modal', function () {
+            if (displayInput && hiddenInput && !displayInput.value) {
+                {% if main_supplier %}
+                displayInput.value = "{{ main_supplier.name|escapejs }}";
+                hiddenInput.value = "{{ main_supplier.id }}";
+                {% endif %}
+            }
+        });
+    }
+
     if (displayInput && resultsEl) {
         displayInput.addEventListener('input', function () {
             hiddenInput.value = '';

@@ -89,20 +89,20 @@
                         <input type="text" name="f_buyer_text"
                                value="{{ data|get_item:'buyer_text'|default:'' }}"
                                class="form-control">
-                        <button type="button" class="btn btn-outline-primary"
+                        {% with bid=data|get_item:'buyer_id' %}
+                        <button type="button"
+                                class="btn {% if bid %}btn-success{% else %}btn-outline-primary{% endif %}"
                                 data-match-open
                                 data-match-type="buyer"
                                 data-target-path="buyer"
                                 data-match-title="Buyer"
                                 data-match-original="{{ data|get_item:'buyer_text'|default:'' }}">
-                            Match
+                            {% if bid %}✓ Matched{% else %}Match{% endif %}
                         </button>
+                        {% endwith %}
                     </div>
                     <input type="hidden" name="f_buyer_id"
                            value="{{ data|get_item:'buyer_id'|default:'' }}">
-                    {% with bid=data|get_item:'buyer_id' %}
-                        {% if bid %}<span class="badge bg-success mt-1">matched #{{ bid }}</span>{% endif %}
-                    {% endwith %}
                 </div>
                 <div>
                     <label class="label block mb-1">AWARD DATE</label>
@@ -131,20 +131,20 @@
                         <input type="text" name="f_parent_idiq_contract_number"
                                value="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}"
                                class="form-control">
-                        <button type="button" class="btn btn-outline-primary"
+                        {% with pid=data|get_item:'parent_idiq_id' %}
+                        <button type="button"
+                                class="btn {% if pid %}btn-success{% else %}btn-outline-primary{% endif %}"
                                 data-match-open
                                 data-match-type="idiq"
                                 data-target-path="parent_idiq"
                                 data-match-title="IDIQ Contract"
                                 data-match-original="{{ data|get_item:'parent_idiq_contract_number'|default:'' }}">
-                            Match
+                            {% if pid %}✓ Matched{% else %}Match{% endif %}
                         </button>
+                        {% endwith %}
                     </div>
                     <input type="hidden" name="f_parent_idiq_id"
                            value="{{ data|get_item:'parent_idiq_id'|default:'' }}">
-                    {% with pid=data|get_item:'parent_idiq_id' %}
-                        {% if pid %}<span class="badge bg-success mt-1">matched #{{ pid }}</span>{% endif %}
-                    {% endwith %}
                     {% else %}
                     <div></div>
                     {% endif %}
@@ -171,20 +171,20 @@
                         <input type="text" name="f_buyer_text"
                                value="{{ data|get_item:'buyer_text'|default:'' }}"
                                class="form-control">
-                        <button type="button" class="btn btn-outline-primary"
+                        {% with bid=data|get_item:'buyer_id' %}
+                        <button type="button"
+                                class="btn {% if bid %}btn-success{% else %}btn-outline-primary{% endif %}"
                                 data-match-open
                                 data-match-type="buyer"
                                 data-target-path="buyer"
                                 data-match-title="Buyer"
                                 data-match-original="{{ data|get_item:'buyer_text'|default:'' }}">
-                            Match
+                            {% if bid %}✓ Matched{% else %}Match{% endif %}
                         </button>
+                        {% endwith %}
                     </div>
                     <input type="hidden" name="f_buyer_id"
                            value="{{ data|get_item:'buyer_id'|default:'' }}">
-                    {% with bid=data|get_item:'buyer_id' %}
-                        {% if bid %}<span class="badge bg-success mt-1">matched #{{ bid }}</span>{% endif %}
-                    {% endwith %}
                 </div>
                 <div>
                     <label class="label block mb-1">SALES CLASS</label>
@@ -339,29 +339,36 @@
                             <div class="input-group input-group-sm">
                                 <input type="text" name="pair-{{ forloop.counter0 }}-nsn_text"
                                     value="{{ pair|get_item:'nsn_text'|default:'' }}" class="form-control form-control-sm">
-                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                {% with nid=pair|get_item:'nsn_id' %}
+                                <button type="button"
+                                        class="btn {% if nid %}btn-success{% else %}btn-outline-primary{% endif %} btn-sm"
                                         data-match-open data-match-type="nsn"
                                         data-target-path="approved_pair:{{ forloop.counter0 }}:nsn"
                                         data-match-title="NSN"
-                                        data-match-original="{{ pair|get_item:'nsn_text'|default:'' }}">M</button>
+                                        data-match-original="{{ pair|get_item:'nsn_text'|default:'' }}">
+                                    {% if nid %}✓ Matched{% else %}Match{% endif %}
+                                </button>
+                                {% endwith %}
                             </div>
                             <input type="hidden" name="pair-{{ forloop.counter0 }}-nsn_id"
                                 value="{{ pair|get_item:'nsn_id'|default:'' }}">
                             <input type="hidden" name="pair-{{ forloop.counter0 }}-nsn_description"
                                 value="{{ pair|get_item:'nsn_description'|default:'' }}">
-                            {% with nid=pair|get_item:'nsn_id' %}
-                                {% if nid %}<span class="badge bg-success mt-1">matched #{{ nid }}</span>{% endif %}
-                            {% endwith %}
                         </td>
                         <td class="p-1">
                             <div class="input-group input-group-sm">
                                 <input type="text" name="pair-{{ forloop.counter0 }}-supplier_text"
                                     value="{{ pair|get_item:'supplier_text'|default:'' }}" class="form-control form-control-sm">
-                                <button type="button" class="btn btn-outline-primary btn-sm"
+                                {% with sid=pair|get_item:'supplier_id' %}
+                                <button type="button"
+                                        class="btn {% if sid %}btn-success{% else %}btn-outline-primary{% endif %} btn-sm"
                                         data-match-open data-match-type="supplier"
                                         data-target-path="approved_pair:{{ forloop.counter0 }}:supplier"
                                         data-match-title="Supplier"
-                                        data-match-original="{{ pair|get_item:'supplier_text'|default:'' }}">M</button>
+                                        data-match-original="{{ pair|get_item:'supplier_text'|default:'' }}">
+                                    {% if sid %}✓ Matched{% else %}Match{% endif %}
+                                </button>
+                                {% endwith %}
                             </div>
                             <input type="hidden" name="pair-{{ forloop.counter0 }}-supplier_id"
                                 value="{{ pair|get_item:'supplier_id'|default:'' }}">
@@ -371,11 +378,9 @@
                                 {% if sid %}
                                     {% with flags=supplier_flags|get_item:sid %}
                                         {% if flags.probation %}
-                                            <span class="badge bg-success mt-1 supplier-flag-probation">matched #{{ sid }}</span>
+                                            <span class="badge mt-1 supplier-flag-probation">⚠ Probation</span>
                                         {% elif flags.conditional %}
-                                            <span class="badge bg-success mt-1 supplier-flag-conditional">matched #{{ sid }}</span>
-                                        {% else %}
-                                            <span class="badge bg-success mt-1">matched #{{ sid }}</span>
+                                            <span class="badge mt-1 supplier-flag-conditional">◎ Conditional</span>
                                         {% endif %}
                                     {% endwith %}
                                 {% endif %}
@@ -413,19 +418,19 @@
                         <input type="text" name="f_parent_contract_number"
                                value="{{ data|get_item:'parent_contract_number'|default:'' }}"
                                class="form-control">
-                        <button type="button" class="btn btn-outline-primary"
+                        {% with pcid=data|get_item:'parent_contract_id' %}
+                        <button type="button"
+                                class="btn {% if pcid %}btn-success{% else %}btn-outline-primary{% endif %}"
                                 data-match-open data-match-type="contract"
                                 data-target-path="parent_contract"
                                 data-match-title="Parent Contract"
                                 data-match-original="{{ data|get_item:'parent_contract_number'|default:'' }}">
-                            Match
+                            {% if pcid %}✓ Matched{% else %}Match{% endif %}
                         </button>
+                        {% endwith %}
                     </div>
                     <input type="hidden" name="f_parent_contract_id"
                            value="{{ data|get_item:'parent_contract_id'|default:'' }}">
-                    {% with pcid=data|get_item:'parent_contract_id' %}
-                        {% if pcid %}<span class="badge bg-success mt-1">matched #{{ pcid }}</span>{% endif %}
-                    {% endwith %}
                 </div>
                 <div>
                     <label class="label block mb-1">Mod Number</label>
@@ -462,83 +467,92 @@
             </div>
             <div id="charges-tbody">
             {% for charge in level_charges %}
-                <div class="d-flex align-items-start gap-2 mb-2 charges-row charge-row flex-wrap">
-                    <div style="flex: 2; min-width: 140px;">
-                        <label class="label small mb-1">Label</label>
-                        <input type="text"
-                               name="chg-{{ forloop.counter0 }}-label"
-                               value="{{ charge|get_item:'label'|default:'' }}"
-                               class="form-control form-control-sm"
-                               placeholder="e.g. GSI Fee, Estimated Freight">
-                    </div>
-                    <div style="flex: 1; min-width: 120px;">
-                        <label class="label small mb-1">Estimated Amount</label>
-                        <input type="number" step="0.01"
-                               name="chg-{{ forloop.counter0 }}-estimated_amount"
-                               value="{{ charge|get_item:'estimated_amount'|default:'' }}"
-                               class="form-control form-control-sm charge-amount">
-                    </div>
-                    <div style="flex: 2; min-width: 160px;">
-                        <label class="label small mb-1">Supplier
-                            <span class="text-muted">(optional)</span>
-                        </label>
-                        <div class="input-group input-group-sm">
+                <div class="charges-row charge-row border rounded p-2 mb-2">
+                    <!-- Row 1: Label | Supplier | CAGE | Delete -->
+                    <div class="d-flex gap-2 mb-2 align-items-end flex-wrap">
+                        <div style="flex: 2; min-width: 140px;">
+                            <label class="label small mb-1">Label</label>
                             <input type="text"
-                                   name="chg-{{ forloop.counter0 }}-supplier_text"
-                                   value="{{ charge|get_item:'supplier_text'|default:'' }}"
-                                   class="form-control form-control-sm charge-supplier-text">
-                            <button type="button" class="btn btn-outline-primary btn-sm charge-match-btn"
-                                    data-match-open data-match-type="supplier"
-                                    data-target-path="charge:{{ forloop.counter0 }}:supplier"
-                                    data-match-title="Charge Supplier"
-                                    data-match-original="{{ charge|get_item:'supplier_text'|default:'' }}">M</button>
+                                   name="chg-{{ forloop.counter0 }}-label"
+                                   value="{{ charge|get_item:'label'|default:'' }}"
+                                   class="form-control form-control-sm"
+                                   placeholder="e.g. GSI Fee, Estimated Freight">
                         </div>
-                        <input type="hidden"
-                               name="chg-{{ forloop.counter0 }}-supplier_id"
-                               value="{{ charge|get_item:'supplier_id'|default:'' }}">
-                        {% with sid=charge|get_item:'supplier_id' %}
+                        <div style="flex: 2; min-width: 160px;">
+                            <label class="label small mb-1">Supplier <span class="text-muted">(optional)</span></label>
+                            {% with sid=charge|get_item:'supplier_id' %}
+                            <div class="input-group input-group-sm">
+                                <input type="text"
+                                       class="form-control form-control-sm charge-supplier-text"
+                                       name="chg-{{ forloop.counter0 }}-supplier_text"
+                                       value="{{ charge|get_item:'supplier_text'|default:'' }}">
+                                <button type="button"
+                                        class="btn btn-sm {% if sid %}btn-success{% else %}btn-outline-primary{% endif %} charge-match-btn"
+                                        data-match-open
+                                        data-match-type="supplier"
+                                        data-target-path="charge:{{ forloop.counter0 }}:supplier"
+                                        data-match-title="Charge Supplier"
+                                        data-match-original="{{ charge|get_item:'supplier_text'|default:'' }}">
+                                    {% if sid %}✓ Matched{% else %}Match{% endif %}
+                                </button>
+                            </div>
+                            <input type="hidden"
+                                   name="chg-{{ forloop.counter0 }}-supplier_id"
+                                   value="{{ sid|default:'' }}">
                             {% if sid %}
                                 {% with flags=supplier_flags|get_item:sid %}
                                     {% if flags.probation %}
-                                        <span class="badge bg-success mt-1 supplier-flag-probation">matched #{{ sid }}</span>
+                                        <span class="badge mt-1 supplier-flag-probation">⚠ Probation</span>
                                     {% elif flags.conditional %}
-                                        <span class="badge bg-success mt-1 supplier-flag-conditional">matched #{{ sid }}</span>
-                                    {% else %}
-                                        <span class="badge bg-success mt-1">matched #{{ sid }}</span>
+                                        <span class="badge mt-1 supplier-flag-conditional">◎ Conditional</span>
                                     {% endif %}
                                 {% endwith %}
                             {% endif %}
-                        {% endwith %}
+                            {% endwith %}
+                        </div>
+                        <div style="flex: 1; min-width: 90px;">
+                            <label class="label small mb-1">CAGE <span class="text-muted">(optional)</span></label>
+                            <input type="text"
+                                   class="form-control form-control-sm charge-cage-input"
+                                   name="chg-{{ forloop.counter0 }}-cage"
+                                   value="{{ charge|get_item:'cage'|default:'' }}"
+                                   placeholder="e.g. 0XA52"
+                                   maxlength="10">
+                        </div>
+                        <div class="d-flex align-items-end pb-1">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger btn-remove-charge-row">×</button>
+                        </div>
                     </div>
-                    <div style="flex: 1; min-width: 90px;">
-                        <label class="label small mb-1">CAGE <span class="text-muted">(optional)</span></label>
-                        <input type="text"
-                               name="chg-{{ forloop.counter0 }}-cage"
-                               value="{{ charge|get_item:'cage'|default:'' }}"
-                               class="form-control form-control-sm charge-cage-input"
-                               placeholder="e.g. 0XA52"
-                               maxlength="10">
-                    </div>
-                    <div style="flex: 1; min-width: 120px;">
-                        <label class="label small mb-1">Invoice # <span class="text-muted">(optional)</span></label>
-                        <input type="text" class="form-control form-control-sm"
-                               name="chg-{{ forloop.counter0 }}-invoice_number"
-                               value="{{ charge|get_item:'invoice_number'|default:'' }}"
-                               placeholder="Supplier invoice #">
-                    </div>
-                    <div style="flex: 1; min-width: 130px;">
-                        <label class="label small mb-1">Payment Date <span class="text-muted">(optional)</span></label>
-                        <input type="date" class="form-control form-control-sm"
-                               name="chg-{{ forloop.counter0 }}-payment_date"
-                               value="{{ charge|get_item:'payment_date'|default:'' }}">
-                    </div>
-                    <div class="d-flex align-items-end pb-1">
-                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-charge-row"></button>
+                    <!-- Row 2: Estimated Amount | Invoice # | Payment Date -->
+                    <div class="d-flex gap-2 align-items-end flex-wrap">
+                        <div style="flex: 1; min-width: 120px;">
+                            <label class="label small mb-1">Estimated Amount</label>
+                            <input type="number" step="0.01"
+                                   name="chg-{{ forloop.counter0 }}-estimated_amount"
+                                   value="{{ charge|get_item:'estimated_amount'|default:'' }}"
+                                   class="form-control form-control-sm charge-amount">
+                        </div>
+                        <div style="flex: 1; min-width: 120px;">
+                            <label class="label small mb-1">Invoice # <span class="text-muted">(optional)</span></label>
+                            <input type="text"
+                                   class="form-control form-control-sm"
+                                   name="chg-{{ forloop.counter0 }}-invoice_number"
+                                   value="{{ charge|get_item:'invoice_number'|default:'' }}"
+                                   placeholder="Supplier invoice #">
+                        </div>
+                        <div style="flex: 1; min-width: 130px;">
+                            <label class="label small mb-1">Payment Date <span class="text-muted">(optional)</span></label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   name="chg-{{ forloop.counter0 }}-payment_date"
+                                   value="{{ charge|get_item:'payment_date'|default:'' }}">
+                        </div>
                     </div>
                 </div>
             {% endfor %}
             </div>
-            <button type="button" class="btn btn-sm btn-outline-success mt-2" id="btn-add-charge-row">
+            <button type="button" class="btn btn-sm btn-outline-success mt-2 w-auto" id="btn-add-charge-row">
                 + Add Line
             </button>
         </div>
@@ -959,11 +973,21 @@
         applyTemplate(frag, {'__CLINIDX__': idx});
         const card = frag.querySelector('.clin-card');
         card.dataset.clinIdx = idx;
-        const body = card.querySelector('.clin-card-body');
-        const label = card.querySelector('.clin-toggle-label');
-        if (body) body.classList.add('d-none');
-        if (label) label.textContent = '▼ Expand';
         stack.appendChild(frag);
+        // Accordion: collapse all other cards, then expand the new one
+        document.querySelectorAll('.clin-card').forEach(function (otherCard) {
+            if (otherCard === card) return;
+            const otherBody = otherCard.querySelector('.clin-card-body');
+            const otherLabel = otherCard.querySelector('[data-clin-toggle] .clin-toggle-label');
+            if (otherBody && !otherBody.classList.contains('d-none')) {
+                otherBody.classList.add('d-none');
+                if (otherLabel) otherLabel.textContent = '▼ Expand';
+            }
+        });
+        const newBody = card.querySelector('.clin-card-body');
+        const newLabel = card.querySelector('[data-clin-toggle] .clin-toggle-label');
+        if (newBody) newBody.classList.remove('d-none');
+        if (newLabel) newLabel.textContent = '▲ Collapse';
         recalcAll();
     }
 
@@ -1016,50 +1040,59 @@
             btnAddChargeRow.addEventListener('click', () => {
                 const idx = chargeRowCount++;
                 const row = document.createElement('div');
-                row.className = 'd-flex align-items-start gap-2 mb-2 charges-row charge-row flex-wrap';
+                row.className = 'charges-row charge-row border rounded p-2 mb-2';
                 row.innerHTML = `
-                    <div style="flex: 2; min-width: 140px;">
-                        <label class="label small mb-1">Label</label>
-                        <input type="text" name="chg-${idx}-label"
-                               class="form-control form-control-sm"
-                               placeholder="e.g. GSI Fee, Estimated Freight">
-                    </div>
-                    <div style="flex: 1; min-width: 120px;">
-                        <label class="label small mb-1">Estimated Amount</label>
-                        <input type="number" step="0.01" name="chg-${idx}-estimated_amount"
-                               class="form-control form-control-sm charge-amount">
-                    </div>
-                    <div style="flex: 2; min-width: 160px;">
-                        <label class="label small mb-1">Supplier <span class="text-muted">(optional)</span></label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" name="chg-${idx}-supplier_text"
-                                   class="form-control form-control-sm charge-supplier-text">
-                            <button type="button" class="btn btn-outline-primary btn-sm charge-match-btn"
-                                    data-match-open data-match-type="supplier"
-                                    data-target-path="charge:${idx}:supplier"
-                                    data-match-title="Charge Supplier">M</button>
+                    <!-- Row 1: Label | Supplier | CAGE | Delete -->
+                    <div class="d-flex gap-2 mb-2 align-items-end flex-wrap">
+                        <div style="flex: 2; min-width: 140px;">
+                            <label class="label small mb-1">Label</label>
+                            <input type="text" name="chg-${idx}-label"
+                                   class="form-control form-control-sm"
+                                   placeholder="e.g. GSI Fee, Estimated Freight">
                         </div>
-                        <input type="hidden" name="chg-${idx}-supplier_id" value="">
+                        <div style="flex: 2; min-width: 160px;">
+                            <label class="label small mb-1">Supplier <span class="text-muted">(optional)</span></label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="chg-${idx}-supplier_text"
+                                       class="form-control form-control-sm charge-supplier-text">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary charge-match-btn"
+                                        data-match-open
+                                        data-match-type="supplier"
+                                        data-target-path="charge:${idx}:supplier"
+                                        data-match-title="Charge Supplier">Match</button>
+                            </div>
+                            <input type="hidden" name="chg-${idx}-supplier_id" value="">
+                        </div>
+                        <div style="flex: 1; min-width: 90px;">
+                            <label class="label small mb-1">CAGE <span class="text-muted">(optional)</span></label>
+                            <input type="text" name="chg-${idx}-cage"
+                                   class="form-control form-control-sm charge-cage-input"
+                                   placeholder="e.g. 0XA52" maxlength="10">
+                        </div>
+                        <div class="d-flex align-items-end pb-1">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger btn-remove-charge-row">×</button>
+                        </div>
                     </div>
-                    <div style="flex: 1; min-width: 90px;">
-                        <label class="label small mb-1">CAGE <span class="text-muted">(optional)</span></label>
-                        <input type="text" name="chg-${idx}-cage"
-                               class="form-control form-control-sm charge-cage-input"
-                               placeholder="e.g. 0XA52" maxlength="10">
-                    </div>
-                    <div style="flex: 1; min-width: 120px;">
-                        <label class="label small mb-1">Invoice # <span class="text-muted">(optional)</span></label>
-                        <input type="text" name="chg-${idx}-invoice_number"
-                               class="form-control form-control-sm"
-                               placeholder="Supplier invoice #">
-                    </div>
-                    <div style="flex: 1; min-width: 130px;">
-                        <label class="label small mb-1">Payment Date <span class="text-muted">(optional)</span></label>
-                        <input type="date" name="chg-${idx}-payment_date"
-                               class="form-control form-control-sm">
-                    </div>
-                    <div class="d-flex align-items-end pb-1">
-                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-charge-row"></button>
+                    <!-- Row 2: Estimated Amount | Invoice # | Payment Date -->
+                    <div class="d-flex gap-2 align-items-end flex-wrap">
+                        <div style="flex: 1; min-width: 120px;">
+                            <label class="label small mb-1">Estimated Amount</label>
+                            <input type="number" step="0.01" name="chg-${idx}-estimated_amount"
+                                   class="form-control form-control-sm charge-amount">
+                        </div>
+                        <div style="flex: 1; min-width: 120px;">
+                            <label class="label small mb-1">Invoice # <span class="text-muted">(optional)</span></label>
+                            <input type="text" name="chg-${idx}-invoice_number"
+                                   class="form-control form-control-sm"
+                                   placeholder="Supplier invoice #">
+                        </div>
+                        <div style="flex: 1; min-width: 130px;">
+                            <label class="label small mb-1">Payment Date <span class="text-muted">(optional)</span></label>
+                            <input type="date" name="chg-${idx}-payment_date"
+                                   class="form-control form-control-sm">
+                        </div>
                     </div>
                 `;
                 // Wire remove button
@@ -1452,11 +1485,27 @@
         if (toggleBtn) {
             ev.preventDefault();
             const card = toggleBtn.closest('.clin-card');
-            if (!card) return;
-            const body = card.querySelector('.clin-card-body');
+            const body = card ? card.querySelector('.clin-card-body') : null;
             const label = toggleBtn.querySelector('.clin-toggle-label');
-            const collapsed = body.classList.toggle('d-none');
-            if (label) label.textContent = collapsed ? '▼ Expand' : '▲ Collapse';
+            if (!body) return;
+
+            const isExpanding = body.classList.contains('d-none');
+
+            if (isExpanding) {
+                // Accordion: collapse all other CLIN cards before expanding this one
+                document.querySelectorAll('.clin-card').forEach(function (otherCard) {
+                    if (otherCard === card) return;
+                    const otherBody = otherCard.querySelector('.clin-card-body');
+                    const otherLabel = otherCard.querySelector('[data-clin-toggle] .clin-toggle-label');
+                    if (otherBody && !otherBody.classList.contains('d-none')) {
+                        otherBody.classList.add('d-none');
+                        if (otherLabel) otherLabel.textContent = '▼ Expand';
+                    }
+                });
+            }
+
+            body.classList.toggle('d-none');
+            if (label) label.textContent = body.classList.contains('d-none') ? '▼ Expand' : '▲ Collapse';
             return;
         }
         const addFinBtn = ev.target.closest('[data-add-clin-fin]');
@@ -1803,16 +1852,15 @@
     }
 
     function restoreOpenClins() {
-        const raw = sessionStorage.getItem('intake_open_clins');
-        if (!raw) return;
+        const savedOpenClins = JSON.parse(sessionStorage.getItem('intake_open_clins') || '[]');
         sessionStorage.removeItem('intake_open_clins');
-        let openIdxs;
-        try { openIdxs = JSON.parse(raw); } catch(e) { return; }
-        openIdxs.forEach(function(idx) {
+        // Cap to the first saved index only (accordion: one open at a time)
+        const idxToRestore = savedOpenClins.length > 0 ? [savedOpenClins[0]] : [];
+        idxToRestore.forEach(function (idx) {
             const card = document.querySelector('.clin-card[data-clin-idx="' + idx + '"]');
             if (!card) return;
             const body = card.querySelector('.clin-card-body');
-            const label = card.querySelector('.clin-toggle-label');
+            const label = card.querySelector('[data-clin-toggle] .clin-toggle-label');
             if (body) body.classList.remove('d-none');
             if (label) label.textContent = '▲ Collapse';
         });

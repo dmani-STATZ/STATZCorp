@@ -116,18 +116,20 @@
                     <input type="text" name="clin-{{ idx }}-nsn_text"
                            value="{{ clin|get_item:'nsn_text'|default:'' }}"
                            class="form-control form-control-sm">
-                    <button type="button" class="btn btn-outline-primary btn-sm"
+                    {% with nid=clin|get_item:'nsn_id' %}
+                    <button type="button"
+                            class="btn {% if nid %}btn-success{% else %}btn-outline-primary{% endif %} btn-sm"
                             data-match-open data-match-type="nsn"
                             data-target-path="clin:{{ idx }}:nsn"
                             data-match-title="NSN"
                             data-match-original="{{ clin|get_item:'nsn_text'|default:'' }}"
-                            data-match-original-description="{{ clin|get_item:'nsn_description'|default:'' }}">Match</button>
+                            data-match-original-description="{{ clin|get_item:'nsn_description'|default:'' }}">
+                        {% if nid %}✓ Matched{% else %}Match{% endif %}
+                    </button>
+                    {% endwith %}
                 </div>
                 <input type="hidden" name="clin-{{ idx }}-nsn_id"
                        value="{{ clin|get_item:'nsn_id'|default:'' }}">
-                {% with nid=clin|get_item:'nsn_id' %}
-                    {% if nid %}<span class="badge bg-success mt-1">matched #{{ nid }}</span>{% endif %}
-                {% endwith %}
                 {% with nd=clin|get_item:'nsn_description' %}
                     {% if nd %}<div class="small text-muted mt-1">{{ nd }}</div>{% endif %}
                 {% endwith %}
@@ -171,30 +173,31 @@
         <div class="grid grid-cols-3 gap-3 mb-3">
             <div class="col-span-2">
                 <label class="label block mb-1">Supplier</label>
+                {% with sid=clin|get_item:'supplier_id' %}
                 <div class="input-group input-group-sm">
                     <input type="text" name="clin-{{ idx }}-supplier_text"
                            value="{{ clin|get_item:'supplier_text'|default:'' }}"
                            class="form-control form-control-sm">
-                    <button type="button" class="btn btn-outline-primary btn-sm"
+                    <button type="button"
+                            class="btn {% if sid %}btn-success{% else %}btn-outline-primary{% endif %} btn-sm"
                             data-match-open data-match-type="supplier"
                             data-target-path="clin:{{ idx }}:supplier"
                             data-match-title="Supplier"
-                            data-match-original="{{ clin|get_item:'supplier_text'|default:'' }}">Match</button>
+                            data-match-original="{{ clin|get_item:'supplier_text'|default:'' }}">
+                        {% if sid %}✓ Matched{% else %}Match{% endif %}
+                    </button>
                 </div>
                 <input type="hidden" name="clin-{{ idx }}-supplier_id"
-                       value="{{ clin|get_item:'supplier_id'|default:'' }}">
-                {% with sid=clin|get_item:'supplier_id' %}
-                    {% if sid %}
-                        {% with flags=supplier_flags|get_item:sid %}
-                            {% if flags.probation %}
-                                <span class="badge bg-success mt-1 supplier-flag-probation">matched #{{ sid }}</span>
-                            {% elif flags.conditional %}
-                                <span class="badge bg-success mt-1 supplier-flag-conditional">matched #{{ sid }}</span>
-                            {% else %}
-                                <span class="badge bg-success mt-1">matched #{{ sid }}</span>
-                            {% endif %}
-                        {% endwith %}
-                    {% endif %}
+                       value="{{ sid|default:'' }}">
+                {% if sid %}
+                    {% with flags=supplier_flags|get_item:sid %}
+                        {% if flags.probation %}
+                            <span class="badge mt-1 supplier-flag-probation">⚠ Probation</span>
+                        {% elif flags.conditional %}
+                            <span class="badge mt-1 supplier-flag-conditional">◎ Conditional</span>
+                        {% endif %}
+                    {% endwith %}
+                {% endif %}
                 {% endwith %}
             </div>
             <div>

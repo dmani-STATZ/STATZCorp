@@ -146,6 +146,25 @@ button.finance-audit-payment-note:hover {
     cursor: pointer;
 }
 
+.supplier-group-header td {
+    background-color: var(--bs-secondary-bg);
+    letter-spacing: 0.03em;
+}
+
+.supplier-group-subtotal td {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.grand-total-row td {
+    border-top: 2px solid var(--bs-border-color);
+    background-color: var(--bs-secondary-bg);
+}
+
+tfoot .grand-total-row td {
+    position: sticky;
+    bottom: 0;
+}
+
 .badge-sm { font-size: 9px; font-weight: 500; padding: 1px 6px; border-radius: 999px; }
 .b-paid { background: #EAF3DE; color: #3B6D11; }
 .b-partial { background: #FAEEDA; color: #854F0B; }

@@ -173,6 +173,11 @@ charge:N:supplier target-path), cage (optional, pre-fills Match modal search),
 invoice_number (optional), payment_date (optional). POST keys per row:
 chg-<i>-label, chg-<i>-estimated_amount, chg-<i>-supplier_text, chg-<i>-supplier_id,
 chg-<i>-cage, chg-<i>-invoice_number, chg-<i>-payment_date.
+**CLC row layout (2026-06-25):** Each charge row uses a two-sub-row layout.
+Row 1: Label, Supplier (with Match btn), CAGE, delete button.
+Row 2: Estimated Amount, Invoice #, Payment Date. The charge row outer div carries
+classes `charges-row charge-row border rounded p-2 mb-2`. The JS-generated new-row
+innerHTML in the `btn-add-charge-row` handler mirrors this layout exactly.
 billed_paid_amount is NOT captured at intake — that is Finance Audit only.
 Matchers: charge:N:supplier (and legacy level_charge:N:supplier) handled in
 intake/matchers.py apply_match and clear_match.
@@ -266,6 +271,22 @@ When the form is dirty, it auto-saves via AJAX to `intake:autosave_draft`
 (`POST /intake/drafts/<pk>/autosave/`) before opening the modal, so no
 unsaved edits are lost. If the auto-save fails (validation error, lock
 lost), the error is shown in an alert and the modal does not open.
+
+**Match button state (2026-06-25):** All `[data-match-open]` buttons in the editor
+use a two-state design. Unmatched: `btn-outline-primary` "Match". Matched (ID
+present): `btn-success` "✓ Matched". The standalone `badge bg-success "matched #ID"`
+pill is removed from all match sites. For supplier matches only: a flag-only chip
+(`supplier-flag-probation` or `supplier-flag-conditional`) renders below the button
+when the matched supplier carries a flag; no chip renders for clean matches. Non-
+supplier match types (buyer, NSN, IDIQ, contract) never render a chip. The page
+reloads after every match apply, so button state is always authoritative from
+server-side template render.
+
+**CLIN accordion (2026-06-25):** Only one CLIN card may be expanded at a time.
+The `[data-clin-toggle]` handler collapses all other `.clin-card` elements before
+expanding the clicked card. New CLINs added via `[data-add-clin]` auto-expand and
+collapse all others. SessionStorage CLIN restore (post-match reload) is capped to
+the first saved index only.
 
 ## Finalization (Phase 3)
 `intake/finalize.py` shreds a Ready-for-Review draft into canonical

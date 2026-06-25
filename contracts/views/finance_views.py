@@ -33,6 +33,113 @@ def safe_float(value):
         logger.warning(f"Error converting value to float: {value}, Error: {str(e)}")
         return 0.0
 
+
+def build_finance_audit_supplier_groups(clins_list, level_charges):
+    """Group Finance Audit CLINs and level charges by supplier with subtotals."""
+    main_supplier = None
+    main_supplier_id = None
+    for clin in clins_list:
+        if clin.supplier_id:
+            main_supplier = clin.supplier
+            main_supplier_id = clin.supplier_id
+            break
+
+    main_key = main_supplier_id or 0
+    groups = {}
+
+    def _get_or_create_group(key, supplier_obj):
+        if key not in groups:
+            groups[key] = {
+                'supplier': supplier_obj,
+                'clins': [],
+                'charges': [],
+            }
+        return groups[key]
+
+    _get_or_create_group(main_key, main_supplier)
+    for clin in clins_list:
+        groups[main_key]['clins'].append(clin)
+
+    for charge in level_charges:
+        if charge.supplier_id is None or charge.supplier_id == main_supplier_id:
+            groups[main_key]['charges'].append(charge)
+        else:
+            _get_or_create_group(charge.supplier_id, charge.supplier)
+            groups[charge.supplier_id]['charges'].append(charge)
+
+    supplier_groups = []
+    if main_key in groups:
+        supplier_groups.append(groups.pop(main_key))
+    supplier_groups.extend(groups.values())
+
+    zero = Decimal('0.00')
+
+    def _charge_effective_amount(charge):
+        if (
+            charge.billed_paid_amount is not None
+            and Decimal(str(charge.billed_paid_amount)) != zero
+        ):
+            return Decimal(str(charge.billed_paid_amount))
+        return Decimal(str(charge.estimated_amount or 0))
+
+    for group in supplier_groups:
+        clin_quote = sum(
+            (Decimal(str(c.quote_value or 0)) for c in group['clins']),
+            zero,
+        )
+        clin_paid = sum(
+            (Decimal(str(c.paid_amount or 0)) for c in group['clins']),
+            zero,
+        )
+        clin_iv = sum(
+            (Decimal(str(c.item_value or 0)) for c in group['clins']),
+            zero,
+        )
+        clin_cpay = sum(
+            (Decimal(str(c.wawf_payment or 0)) for c in group['clins']),
+            zero,
+        )
+        clin_ag = sum((c.adjusted_gross for c in group['clins']), zero)
+        chg_quote = sum(
+            (Decimal(str(ch.estimated_amount or 0)) for ch in group['charges']),
+            zero,
+        )
+        chg_paid = sum(
+            (
+                Decimal(str(ch.billed_paid_amount or 0))
+                for ch in group['charges']
+                if ch.billed_paid_amount is not None
+            ),
+            zero,
+        )
+
+        group['sub_quote'] = clin_quote + chg_quote
+        group['sub_paid'] = clin_paid + chg_paid
+        group['sub_iv'] = clin_iv
+        group['sub_cpay'] = clin_cpay
+        chg_ag_deduction = sum(
+            (_charge_effective_amount(ch) for ch in group['charges']),
+            zero,
+        )
+        group['sub_ag'] = clin_ag - chg_ag_deduction
+        group['chg_ag_deduction'] = chg_ag_deduction
+
+    grand_quote = sum((g['sub_quote'] for g in supplier_groups), zero)
+    grand_paid = sum((g['sub_paid'] for g in supplier_groups), zero)
+    grand_iv = sum((g['sub_iv'] for g in supplier_groups), zero)
+    grand_cpay = sum((g['sub_cpay'] for g in supplier_groups), zero)
+    grand_ag = sum((g['sub_ag'] for g in supplier_groups), zero)
+
+    return {
+        'supplier_groups': supplier_groups,
+        'grand_quote': grand_quote,
+        'grand_paid': grand_paid,
+        'grand_iv': grand_iv,
+        'grand_cpay': grand_cpay,
+        'grand_ag': grand_ag,
+        'main_supplier': main_supplier,
+    }
+
 @method_decorator(login_required, name='dispatch')
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
@@ -77,6 +184,13 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
             'wawf_payment': zero,
             'adj_gross': zero,
         }
+        context['supplier_groups'] = []
+        context['grand_quote'] = zero
+        context['grand_paid'] = zero
+        context['grand_iv'] = zero
+        context['grand_cpay'] = zero
+        context['grand_ag'] = zero
+        context['main_supplier'] = None
 
         try:
             if self.object:
@@ -346,6 +460,11 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                         or abs(clin.shipment_item_value_delta) <= Decimal('0.01')
                     )
 
+                grouped = build_finance_audit_supplier_groups(
+                    clins_list, level_charges
+                )
+                context.update(grouped)
+
         except Exception as e:
             logger.error(f"Error in FinanceAuditView: {str(e)}")
             messages.error(self.request, 'An error occurred while loading the page.')
@@ -380,7 +499,10 @@ def finance_audit_summary_api(request, contract_id):
             pass
 
         charges_deduction = Decimal('0.00')
-        for charge in contract.level_charges.all():
+        level_charges = list(
+            contract.level_charges.select_related('supplier').order_by('id')
+        )
+        for charge in level_charges:
             if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
                 charges_deduction += Decimal(str(charge.billed_paid_amount))
             else:
@@ -417,6 +539,8 @@ def finance_audit_summary_api(request, contract_id):
         contract_value_delta = clin_item_value_sum - contract_value
         contract_value_balanced = abs(contract_value_delta) <= Decimal('0.01')
 
+        grouped = build_finance_audit_supplier_groups(clins_list, level_charges)
+
         ct_contract = ContentType.objects.get_for_model(Contract)
         ct_clin = ContentType.objects.get_for_model(Clin)
         clin_ids = list(Clin.objects.filter(contract=contract).values_list('id', flat=True))
@@ -443,6 +567,11 @@ def finance_audit_summary_api(request, contract_id):
             'contract_value_balanced': contract_value_balanced,
             'payment_activity_total': total_count,
             'charges_deduction': str(charges_deduction),
+            'grand_quote': str(grouped['grand_quote']),
+            'grand_paid': str(grouped['grand_paid']),
+            'grand_iv': str(grouped['grand_iv']),
+            'grand_cpay': str(grouped['grand_cpay']),
+            'grand_ag': str(grouped['grand_ag']),
         })
     except Exception as e:
         logger.error(f"Error in finance_audit_summary_api: {str(e)}")

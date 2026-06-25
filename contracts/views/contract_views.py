@@ -217,6 +217,13 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
             ContractLevelCharge
         ).id
 
+        main_supplier = None
+        for clin in clins:
+            if clin.supplier_id:
+                main_supplier = clin.supplier
+                break
+        context['main_supplier'] = main_supplier
+
         return context
 
 

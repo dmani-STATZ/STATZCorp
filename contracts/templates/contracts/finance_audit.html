@@ -193,8 +193,8 @@
                             <path d="M4 10.781c.148 1.667 1.513 2.85 3.591 3.003V15h1.043v-1.216c2.27-.179 3.678-1.438 3.678-3.3 0-1.59-.947-2.51-2.956-3.028l-.722-.187V3.467c1.122.11 1.879.714 2.07 1.616h1.47c-.166-1.6-1.54-2.748-3.54-2.875V1H7.591v1.233c-1.939.23-3.27 1.472-3.27 3.156 0 1.454.966 2.483 2.661 2.917l.61.162v4.031c-1.149-.17-1.94-.8-2.131-1.718H4zm3.391-3.836c-1.043-.263-1.6-.825-1.6-1.616 0-.944.704-1.641 1.8-1.828v3.495l-.2-.05zm1.591 1.872c1.287.323 1.852.859 1.852 1.769 0 1.097-.826 1.828-2.2 1.939V8.73l.348.086z"/>
                         </svg>Adj Gross
                     </span>
-                    <span class="fw-bold finance-summary-value text-success fs-6" id="adj-gross-display">
-                        ${{ adj_gross_contract|floatformat:2|intcomma }}
+                    <span class="fw-bold finance-summary-value fs-6 {% if grand_ag < 0 %}text-danger{% else %}text-success{% endif %}" id="adj-gross-display">
+                        {% if grand_ag < 0 %}-{% endif %}${{ grand_ag|abs_value|floatformat:2|intcomma }}
                     </span>
                 </div>
 
@@ -396,8 +396,25 @@
                             <th class="text-center">Finance</th>
                         </tr>
                     </thead>
-                        {% for clin in clins %}
+                    {% if not clins and not level_charges %}
                     <tbody>
+                        <tr>
+                            <td colspan="13" class="text-center text-body-secondary py-4">No CLINs found for this contract</td>
+                        </tr>
+                    </tbody>
+                    {% else %}
+                    {% for group in supplier_groups %}
+                    <tbody>
+                      <tr class="table-secondary supplier-group-header">
+                        <td colspan="13" class="ps-2 py-1 fw-semibold small">
+                          {% if group.supplier %}
+                            {{ group.supplier.name }}
+                          {% else %}
+                            <span class="text-muted">No Supplier</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                      {% for clin in group.clins %}
                         <tr class="clin-finance-audit-row" data-clin-id="{{ clin.id }}" data-clin-uom="{{ clin.uom|default:'' }}">
                             <td>
                                 <a href="{% url 'contracts:clin_detail' clin.id %}"
@@ -578,7 +595,69 @@
                                 </div>
                             </td>
                         </tr>
+                      {% endfor %}
+                      {% for charge in group.charges %}
+                      <tr class="level-charge-row" data-charge-id="{{ charge.id }}">
+                        <td class="text-muted ps-3">—</td>
+                        <td>{{ charge.label }}</td>
+                        <td></td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td class="text-end">
+                          <span role="button" tabindex="0"
+                                class="text-primary text-decoration-underline"
+                                onclick="openTransactionsEditModal(
+                                  window.levelChargeContentTypeId,
+                                  {{ charge.id }},
+                                  'estimated_amount'
+                                )">
+                            ${{ charge.estimated_amount|floatformat:2|intcomma }}
+                          </span>
+                        </td>
+                        <td class="text-end">
+                          <span role="button" tabindex="0"
+                                class="text-primary text-decoration-underline"
+                                onclick="openTransactionsEditModal(
+                                  window.levelChargeContentTypeId,
+                                  {{ charge.id }},
+                                  'billed_paid_amount'
+                                )">
+                            {% if charge.billed_paid_amount %}
+                              ${{ charge.billed_paid_amount|floatformat:2|intcomma }}
+                            {% else %}—{% endif %}
+                          </span>
+                        </td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td class="text-end text-danger">
+                          {% if charge.billed_paid_amount %}
+                            -${{ charge.billed_paid_amount|floatformat:2|intcomma }}
+                          {% else %}
+                            -${{ charge.estimated_amount|floatformat:2|intcomma }}
+                          {% endif %}
+                        </td>
+                        <td class="text-center">no shipments</td>
+                      </tr>
+                      {% endfor %}
+                      <tr class="supplier-group-subtotal fw-semibold border-top">
+                        <td colspan="7" class="text-end small text-muted pe-2">
+                          {{ group.supplier.name|default:"No Supplier" }} Subtotal
+                        </td>
+                        <td class="text-end">${{ group.sub_quote|floatformat:2|intcomma }}</td>
+                        <td class="text-end">${{ group.sub_paid|floatformat:2|intcomma }}</td>
+                        <td class="text-end">${{ group.sub_iv|floatformat:2|intcomma }}</td>
+                        <td class="text-end">${{ group.sub_cpay|floatformat:2|intcomma }}</td>
+                        <td class="text-end">
+                          <span class="fw-semibold {% if group.sub_ag < 0 %}text-danger{% else %}text-success{% endif %}">
+                            {% if group.sub_ag < 0 %}-{% endif %}${{ group.sub_ag|abs_value|floatformat:2|intcomma }}
+                          </span>
+                        </td>
+                        <td></td>
+                      </tr>
                     </tbody>
+                    {% for clin in group.clins %}
                     <tbody id="partials-accordion-{{ clin.id }}"
                            data-partials-for="{{ clin.id }}"
                            style="display:none;"
@@ -740,77 +819,29 @@
                         {% endif %}
                         {% endwith %}
                     </tbody>
-                        {% empty %}
-                    <tbody>
-                        <tr>
-                            <td colspan="13" class="text-center text-body-secondary py-4">No CLINs found for this contract</td>
-                        </tr>
-                    </tbody>
-                        {% endfor %}
-                        {% if level_charges %}
-                    <tbody id="level-charges-tbody">
-                      <tr class="table-secondary">
-                        <td colspan="13" class="ps-3 py-1 small fw-semibold text-muted">
-                          Supplier Charges
+                    {% endfor %}
+                    {% endfor %}
+                    <tfoot>
+                      <tr class="grand-total-row fw-bold border-top-2">
+                        <td colspan="7" class="text-end pe-2">Grand Total</td>
+                        <td class="text-end" data-totals-field="quote_value">${{ grand_quote|floatformat:2|intcomma }}</td>
+                        <td class="text-end" data-totals-field="paid_amount">${{ grand_paid|floatformat:2|intcomma }}</td>
+                        <td class="text-end" data-totals-field="item_value">
+                          ${{ grand_iv|floatformat:2|intcomma }}
+                          {% if not contract_value_balanced %}
+                          <div class="small text-warning fw-normal">
+                            ≠ ${{ contract.contract_value|floatformat:2|intcomma }}
+                          </div>
+                          {% endif %}
                         </td>
+                        <td class="text-end" data-totals-field="wawf_payment">${{ grand_cpay|floatformat:2|intcomma }}</td>
+                        <td class="text-end fw-bold {% if grand_ag < 0 %}text-danger{% else %}text-success{% endif %}" data-totals-field="adj_gross">
+                          {% if grand_ag < 0 %}-{% endif %}${{ grand_ag|abs_value|floatformat:2|intcomma }}
+                        </td>
+                        <td></td>
                       </tr>
-                      {% for charge in level_charges %}
-                      <tr class="level-charge-row" data-charge-id="{{ charge.id }}">
-                        <td class="text-muted small ps-3">—</td>
-                        <td>
-                          {{ charge.label }}
-                        </td>
-                        <td class="small">
-                          {% if charge.supplier %}{{ charge.supplier.name }}{% else %}—{% endif %}
-                        </td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td class="text-end">
-                          <button type="button" class="btn btn-link btn-sm p-0 text-end"
-                                  onclick="openTransactionsEditModal(window.levelChargeContentTypeId, {{ charge.id }}, 'estimated_amount')">
-                            ${{ charge.estimated_amount|floatformat:2 }}
-                          </button>
-                        </td>
-                        <td class="text-end">
-                          <button type="button" class="btn btn-link btn-sm p-0 text-end"
-                                  onclick="openTransactionsEditModal(window.levelChargeContentTypeId, {{ charge.id }}, 'billed_paid_amount')">
-                            {% if charge.billed_paid_amount %}
-                              ${{ charge.billed_paid_amount|floatformat:2 }}
-                            {% else %}—{% endif %}
-                          </button>
-                        </td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td class="text-center small text-muted">no shipments</td>
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-                        {% endif %}
-                        {% if clins %}
-                    <tbody>
-                        <tr class="table-secondary fw-semibold small" data-totals-row="true">
-                            <td colspan="7" class="text-end pe-2">Totals</td>
-                            <td class="text-end" data-totals-field="quote_value">${{ clin_totals.quote_value|floatformat:2|intcomma }}</td>
-                            <td class="text-end" data-totals-field="paid_amount">${{ clin_totals.paid_amount|floatformat:2|intcomma }}</td>
-                            <td class="text-end fw-semibold" data-totals-field="item_value">
-                                ${{ clin_totals.item_value|floatformat:2 }}
-                                {% if not contract_value_balanced %}
-                                <div class="small text-warning">
-                                    ≠ ${{ contract.contract_value|floatformat:2|intcomma }}
-                                </div>
-                                {% endif %}
-                            </td>
-                            <td class="text-end" data-totals-field="wawf_payment">${{ clin_totals.wawf_payment|floatformat:2|intcomma }}</td>
-                            <td class="text-end fw-semibold {% if clin_totals.adj_gross > 0 %}text-success{% elif clin_totals.adj_gross < 0 %}text-danger{% endif %}" data-totals-field="adj_gross">
-                                ${{ clin_totals.adj_gross|floatformat:2|intcomma }}
-                            </td>
-                            <td></td>
-                        </tr>
-                    </tbody>
-                        {% endif %}
+                    </tfoot>
+                    {% endif %}
                 </table>
             </div>
         </div>
@@ -1250,7 +1281,14 @@ function refreshContractSummary() {
 
             const adjGrossEl = document.querySelector('#adj-gross-display');
             if (adjGrossEl) {
-                adjGrossEl.textContent = `$${parseFloat(data.adj_gross_contract).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                const adjGross = parseFloat(
+                    data.grand_ag !== undefined ? data.grand_ag : data.adj_gross_contract
+                );
+                const formatted = `$${Math.abs(adjGross).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                adjGrossEl.textContent = adjGross < 0 ? `-${formatted}` : formatted;
+                adjGrossEl.className = adjGross < 0
+                    ? 'fw-bold finance-summary-value fs-6 text-danger'
+                    : 'fw-bold finance-summary-value fs-6 text-success';
             }
 
             const chargesDisplay = document.getElementById('contract-charges-display');
@@ -1261,7 +1299,7 @@ function refreshContractSummary() {
                     : '$0.00';
             }
 
-            const totalsRow = document.querySelector('tr[data-totals-row="true"]');
+            const totalsRow = document.querySelector('.grand-total-row');
             if (totalsRow) {
                 const fmt = v => `$${parseFloat(v).toLocaleString('en-US',
                     { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1272,18 +1310,32 @@ function refreshContractSummary() {
                 const wp = totalsRow.querySelector('[data-totals-field="wawf_payment"]');
                 const ag = totalsRow.querySelector('[data-totals-field="adj_gross"]');
 
-                if (qv) qv.textContent = fmt(data.clin_totals.quote_value);
-                if (pa) pa.textContent = fmt(data.clin_totals.paid_amount);
-                if (iv) iv.textContent = fmt(data.clin_totals.item_value);
-                if (wp) wp.textContent = fmt(data.clin_totals.wawf_payment);
+                const grandQuote = data.grand_quote !== undefined
+                    ? data.grand_quote
+                    : data.clin_totals.quote_value;
+                const grandPaid = data.grand_paid !== undefined
+                    ? data.grand_paid
+                    : data.clin_totals.paid_amount;
+
+                if (qv) qv.textContent = fmt(grandQuote);
+                if (pa) pa.textContent = fmt(grandPaid);
+                if (iv) {
+                    iv.textContent = fmt(data.grand_iv !== undefined
+                        ? data.grand_iv
+                        : data.clin_totals.item_value);
+                }
+                if (wp) wp.textContent = fmt(data.grand_cpay !== undefined
+                    ? data.grand_cpay
+                    : data.clin_totals.wawf_payment);
                 if (ag) {
-                    const adjGross = parseFloat(data.clin_totals.adj_gross);
-                    ag.textContent = fmt(adjGross);
-                    ag.className = adjGross > 0
-                        ? 'text-end fw-semibold text-success'
-                        : adjGross < 0
-                            ? 'text-end fw-semibold text-danger'
-                            : 'text-end fw-semibold';
+                    const adjGross = parseFloat(
+                        data.grand_ag !== undefined ? data.grand_ag : data.clin_totals.adj_gross
+                    );
+                    const absFmt = `$${Math.abs(adjGross).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    ag.textContent = adjGross < 0 ? `-${absFmt}` : absFmt;
+                    ag.className = adjGross < 0
+                        ? 'text-end text-danger fw-bold'
+                        : 'text-end text-success fw-bold';
                 }
             }
 
