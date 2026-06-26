@@ -101,7 +101,7 @@ def build_finance_audit_supplier_groups(clins_list, level_charges):
         )
         clin_ag = sum((c.adjusted_gross for c in group['clins']), zero)
         chg_quote = sum(
-            (Decimal(str(ch.estimated_amount or 0)) for ch in group['charges']),
+            (Decimal(str(ch.estimated_amount or 0)) for ch in group['charges'] if ch.action_type == 'charge'),
             zero,
         )
         chg_paid = sum(
@@ -118,7 +118,7 @@ def build_finance_audit_supplier_groups(clins_list, level_charges):
         group['sub_iv'] = clin_iv
         group['sub_cpay'] = clin_cpay
         chg_ag_deduction = sum(
-            (_charge_effective_amount(ch) for ch in group['charges']),
+            (_charge_effective_amount(ch) for ch in group['charges'] if ch.action_type == 'charge'),
             zero,
         )
         group['sub_ag'] = clin_ag - chg_ag_deduction
@@ -342,6 +342,8 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                     self.object.level_charges.select_related('supplier').order_by('id')
                 )
                 for charge in level_charges:
+                    if charge.action_type != 'charge':
+                        continue
                     if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
                         charges_deduction += Decimal(str(charge.billed_paid_amount))
                     else:
@@ -503,6 +505,8 @@ def finance_audit_summary_api(request, contract_id):
             contract.level_charges.select_related('supplier').order_by('id')
         )
         for charge in level_charges:
+            if charge.action_type != 'charge':
+                continue
             if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
                 charges_deduction += Decimal(str(charge.billed_paid_amount))
             else:

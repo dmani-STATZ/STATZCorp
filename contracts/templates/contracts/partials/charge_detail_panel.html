@@ -32,6 +32,17 @@
           </tr>
 
           <tr>
+            <td class="text-muted pe-3" style="white-space:nowrap;">Action Type</td>
+            <td>
+              {% if charge.action_type == 'advance' %}
+                <span class="badge bg-warning text-dark">CIA Advance</span>
+              {% else %}
+                <span class="text-muted">Charge</span>
+              {% endif %}
+            </td>
+          </tr>
+
+          <tr>
             <td class="text-muted pe-3" style="white-space:nowrap;">
               <button type="button"
                       class="btn btn-link btn-sm p-0 text-start text-muted"

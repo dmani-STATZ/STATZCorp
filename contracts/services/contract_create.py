@@ -564,7 +564,7 @@ def recalc_split_values(contract) -> int:
 
     # Contract-level charges deduction
     charges_deduction = Decimal('0.00')
-    for charge in contract.level_charges.all():
+    for charge in contract.level_charges.filter(action_type='charge'):
         bp = charge.billed_paid_amount
         if bp is not None and Decimal(str(bp)) != Decimal('0'):
             charges_deduction += Decimal(str(bp))

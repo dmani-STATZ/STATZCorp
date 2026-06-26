@@ -586,6 +586,8 @@ def add_contract_level_charge(request, contract_pk):
     label = request.POST.get("label", "").strip()
     estimated_amount = request.POST.get("estimated_amount", "").strip()
     supplier_id = request.POST.get("supplier_id") or None
+    action_type_raw = request.POST.get("action_type", "charge").strip()
+    action_type = action_type_raw if action_type_raw in ('charge', 'advance') else 'charge'
 
     if not label:
         return JsonResponse({"success": False, "error": "Label is required."}, status=400)
@@ -601,12 +603,24 @@ def add_contract_level_charge(request, contract_pk):
     if supplier_id:
         supplier = get_object_or_404(Supplier, pk=supplier_id)
 
-    charge = ContractLevelCharge.objects.create(
-        contract=contract,
-        label=label,
-        estimated_amount=amount,
-        supplier=supplier,
-    )
+    if action_type == 'advance':
+        # CIA: amount is what was paid, not an estimate
+        charge = ContractLevelCharge.objects.create(
+            contract=contract,
+            label=label,
+            action_type='advance',
+            estimated_amount=Decimal('0.00'),
+            billed_paid_amount=amount,
+            supplier=supplier,
+        )
+    else:
+        charge = ContractLevelCharge.objects.create(
+            contract=contract,
+            label=label,
+            action_type='charge',
+            estimated_amount=amount,
+            supplier=supplier,
+        )
 
     return JsonResponse({
         "success": True,
@@ -614,6 +628,8 @@ def add_contract_level_charge(request, contract_pk):
         "label": charge.label,
         "supplier_name": charge.supplier.name if charge.supplier else "",
         "estimated_amount": str(charge.estimated_amount),
+        "billed_paid_amount": str(charge.billed_paid_amount or ''),
+        "action_type": charge.action_type,
     })
 
 

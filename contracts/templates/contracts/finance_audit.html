@@ -10,6 +10,13 @@
 {% block extra_head %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'contracts/css/components.css' %}?v={{ cache_version }}">
+<style>
+.cia-paid-cell {
+    background-color: rgba(253, 126, 20, 0.15);
+    border-left: 3px solid #fd7e14;
+    border-right: 3px solid #fd7e14;
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -374,7 +381,15 @@
     <div class="card shadow-sm mt-4">
         <div class="card-header py-2 small fw-semibold">
             <span>CLINs</span>
-            <span class="text-body-secondary fw-normal ms-2">Add shipments and costs on each row</span>
+            <div class="d-flex justify-content-between align-items-center mb-1 mt-1">
+                <span class="small text-muted fw-normal">Add shipments and costs on each row</span>
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#addClaModal">
+                    + Add CLA
+                </button>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -509,12 +524,14 @@
                             </td>
                             <td class="text-center">
                                 <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center finance-workbench-actions">
+                                    <!-- 
                                     <button type="button"
                                             class="btn btn-sm btn-outline-secondary js-open-add-partial"
                                             data-clin-id="{{ clin.id }}"
                                             title="Add shipment (logistics only)">
                                         + Shipment
-                                    </button>
+                                    </button> 
+                                    -->
                                     <button type="button"
                                             class="btn btn-sm btn-outline-secondary js-open-add-finance-line"
                                             data-clin-id="{{ clin.id }}"
@@ -764,24 +781,33 @@
                       {% for charge in group.charges %}
                       <tr class="level-charge-row" data-charge-id="{{ charge.id }}">
                         <td class="text-muted ps-3">—</td>
-                        <td>{{ charge.label }}</td>
+                        <td>
+                          {% if charge.action_type == 'advance' %}
+                            <span class="badge bg-warning text-dark me-1" style="font-size:0.7em;">CIA</span>
+                          {% endif %}
+                          {{ charge.label }}
+                        </td>
                         <td></td>
                         <td>—</td>
                         <td>—</td>
                         <td>—</td>
                         <td>—</td>
                         <td class="text-end">
-                          <span role="button" tabindex="0"
-                                class="text-primary text-decoration-underline"
-                                onclick="openTransactionsEditModal(
-                                  window.levelChargeContentTypeId,
-                                  {{ charge.id }},
-                                  'estimated_amount'
-                                )">
-                            ${{ charge.estimated_amount|floatformat:2|intcomma }}
-                          </span>
+                          {% if charge.action_type == 'advance' %}
+                            —
+                          {% else %}
+                            <span role="button" tabindex="0"
+                                  class="text-primary text-decoration-underline"
+                                  onclick="openTransactionsEditModal(
+                                    window.levelChargeContentTypeId,
+                                    {{ charge.id }},
+                                    'estimated_amount'
+                                  )">
+                              ${{ charge.estimated_amount|floatformat:2|intcomma }}
+                            </span>
+                          {% endif %}
                         </td>
-                        <td class="text-end">
+                        <td class="text-end{% if charge.action_type == 'advance' %} cia-paid-cell{% endif %}">
                           <span role="button" tabindex="0"
                                 class="text-primary text-decoration-underline"
                                 onclick="openTransactionsEditModal(
@@ -796,14 +822,18 @@
                         </td>
                         <td>—</td>
                         <td>—</td>
-                        <td class="text-end text-danger">
-                          {% if charge.billed_paid_amount %}
-                            -${{ charge.billed_paid_amount|floatformat:2|intcomma }}
+                        <td class="text-end {% if charge.action_type != 'advance' %}text-danger{% endif %}">
+                          {% if charge.action_type == 'advance' %}
+                            —
                           {% else %}
-                            -${{ charge.estimated_amount|floatformat:2|intcomma }}
+                            {% if charge.billed_paid_amount %}
+                              -${{ charge.billed_paid_amount|floatformat:2|intcomma }}
+                            {% else %}
+                              -${{ charge.estimated_amount|floatformat:2|intcomma }}
+                            {% endif %}
                           {% endif %}
                         </td>
-                        <td class="text-center">no shipments</td>
+                        <td class="text-center">-</td>
                       </tr>
                       {% endfor %}
                       <tr class="supplier-group-subtotal fw-semibold border-top">
@@ -922,6 +952,55 @@
             </div>
         </div>
     </div>
+</div>
+
+{# Add Contract Level Action modal — Finance Audit #}
+<div class="modal fade" id="addClaModal" tabindex="-1" aria-labelledby="addClaModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title small" id="addClaModalLabel">Add Contract Action</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="addClaError" class="alert alert-danger d-none small py-2"></div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Action Type <span class="text-danger">*</span></label>
+          <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" name="claActionType" id="claTypeCharge" value="charge" checked>
+            <label class="btn btn-outline-secondary btn-sm" for="claTypeCharge">Charge</label>
+            <input type="radio" class="btn-check" name="claActionType" id="claTypeAdvance" value="advance">
+            <label class="btn btn-outline-warning btn-sm" for="claTypeAdvance">CIA Advance</label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="claLabel" class="form-label small fw-semibold">
+            Label <span class="text-danger">*</span>
+          </label>
+          <input type="text" class="form-control form-control-sm" id="claLabel"
+                 placeholder="e.g. GSI Fee, CIA Payment">
+        </div>
+
+        <div class="mb-3">
+          <label for="claAmount" class="form-label small fw-semibold" id="claAmountLabel">
+            Estimated Amount <span class="text-danger">*</span>
+          </label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control" id="claAmount"
+                   step="0.01" min="0.01" placeholder="0.00">
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm btn-primary" id="addClaSubmitBtn">Save</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -1997,6 +2076,75 @@ window.financeShipmentsByClin = {
             window.openNotesPopup();
         });
     }
+})();
+</script>
+<script>
+(function () {
+  // Toggle label between Estimated Amount / Amount Paid based on action type
+  document.querySelectorAll('input[name="claActionType"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      var lbl = document.getElementById('claAmountLabel');
+      if (this.value === 'advance') {
+        lbl.textContent = 'Amount Paid \u002A';  // "Amount Paid *"
+      } else {
+        lbl.textContent = 'Estimated Amount \u002A';
+      }
+    });
+  });
+
+  document.getElementById('addClaSubmitBtn').addEventListener('click', function () {
+    var actionType = document.querySelector('input[name="claActionType"]:checked').value;
+    var label = document.getElementById('claLabel').value.trim();
+    var amount = document.getElementById('claAmount').value.trim();
+    var errEl = document.getElementById('addClaError');
+    errEl.classList.add('d-none');
+
+    if (!label || !amount) {
+      errEl.textContent = 'Label and amount are required.';
+      errEl.classList.remove('d-none');
+      return;
+    }
+
+    var fd = new FormData();
+    fd.append('label', label);
+    fd.append('estimated_amount', amount);
+    fd.append('action_type', actionType);
+    fd.append('csrfmiddlewaretoken', document.cookie.match(/csrftoken=([^;]+)/)[1]);
+
+    document.getElementById('addClaSubmitBtn').disabled = true;
+
+    fetch('{% url "contracts:level-charge-add" contract.pk %}', {
+      method: 'POST',
+      body: fd,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        document.getElementById('addClaSubmitBtn').disabled = false;
+        if (data.success) {
+          bootstrap.Modal.getInstance(document.getElementById('addClaModal')).hide();
+          window.location.reload();
+        } else {
+          errEl.textContent = data.error || 'Failed to save.';
+          errEl.classList.remove('d-none');
+        }
+      })
+      .catch(function () {
+        document.getElementById('addClaSubmitBtn').disabled = false;
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.classList.remove('d-none');
+      });
+  });
+
+  // Reset modal on close
+  document.getElementById('addClaModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('claLabel').value = '';
+    document.getElementById('claAmount').value = '';
+    document.getElementById('claTypeCharge').checked = true;
+    document.getElementById('claAmountLabel').textContent = 'Estimated Amount *';
+    document.getElementById('addClaError').classList.add('d-none');
+    document.getElementById('addClaSubmitBtn').disabled = false;
+  });
 })();
 </script>
 {% endif %}

@@ -198,7 +198,7 @@ class Contract(AuditModel):
 
         where:
         charges_deduction = SUM(COALESCE(charge.billed_paid_amount, charge.estimated_amount))
-        across all ContractLevelCharge rows for the contract.
+        across ContractLevelCharge rows where action_type='charge' (CIA advances excluded).
 
         packaging_deduction = COALESCE(amount_paid, quote_amount, 0) — the full packaging
         cost is deducted from adj gross. If paid, use the actual paid amount. If not yet
@@ -234,7 +234,7 @@ class Contract(AuditModel):
             pass
 
         charges_deduction = Decimal('0.00')
-        for charge in self.level_charges.all():
+        for charge in self.level_charges.filter(action_type='charge'):
             if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
                 charges_deduction += Decimal(str(charge.billed_paid_amount))
             else:
@@ -400,6 +400,16 @@ class ContractLevelCharge(AuditModel):
         related_name='level_charges',
     )
     label = models.CharField(max_length=100)
+    ACTION_TYPE_CHOICES = [
+        ('charge', 'Charge'),
+        ('advance', 'CIA Advance'),
+    ]
+    action_type = models.CharField(
+        max_length=20,
+        choices=ACTION_TYPE_CHOICES,
+        default='charge',
+        help_text="'charge' deducts from adj_gross. 'advance' is a CIA pre-payment tracked separately.",
+    )
     estimated_amount = models.DecimalField(max_digits=10, decimal_places=2)
     billed_paid_amount = models.DecimalField(
         max_digits=10, decimal_places=2,

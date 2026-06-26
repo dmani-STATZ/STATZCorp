@@ -43,6 +43,7 @@ TRACKED = [
     (ClinShipment, "pod_date"),
     (ClinSplit, "split_paid"),
     (ContractLevelCharge, "label"),
+    (ContractLevelCharge, "action_type"),
     (ContractLevelCharge, "supplier"),
     (ContractLevelCharge, "estimated_amount"),
     (ContractLevelCharge, "billed_paid_amount"),
@@ -177,12 +178,13 @@ def store_old_state(sender, instance, **kwargs):
     elif sender is ContractLevelCharge:
         try:
             row = ContractLevelCharge.objects.filter(pk=instance.pk).values(
-                "label", "supplier_id", "estimated_amount",
+                "label", "action_type", "supplier_id", "estimated_amount",
                 "billed_paid_amount", "payment_date", "invoice_number"
             ).first()
             if row is not None:
                 old_state[key] = {
                     "label": _serialize(row.get("label")),
+                    "action_type": _serialize(row.get("action_type")),
                     "supplier": _serialize(row.get("supplier_id")),
                     "estimated_amount": _serialize(row.get("estimated_amount")),
                     "billed_paid_amount": _serialize(row.get("billed_paid_amount")),
