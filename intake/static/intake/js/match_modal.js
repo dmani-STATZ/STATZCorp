@@ -280,9 +280,15 @@
             const opener = ev.target.closest('[data-match-open]');
             if (opener) {
                 ev.preventDefault();
+                // Use DOM-position-resolved path for approved_pair targets so a
+                // JS-added row (counter index 1001+) doesn't send a stale large index
+                // to _ensure_row, which would pad approved_pairs with ~1000 empty dicts.
+                var resolvedPath = (typeof window._intakeResolvePairTargetPath === 'function')
+                    ? window._intakeResolvePairTargetPath(opener)
+                    : opener.dataset.targetPath;
                 open({
                     matchType: opener.dataset.matchType,
-                    targetPath: opener.dataset.targetPath,
+                    targetPath: resolvedPath,
                     title: opener.dataset.matchTitle || opener.dataset.matchType,
                     originalText: opener.dataset.matchOriginal || '',
                     originalDescription: opener.dataset.matchOriginalDescription || '',

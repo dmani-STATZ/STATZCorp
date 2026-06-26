@@ -395,7 +395,7 @@ class MatcherUnitTests(TestCase):
         self.assertEqual(data['buyer_id'], self.buyer.id)
 
     def test_apply_clin_nsn_extends_list(self):
-        data = {}
+        data = {'clins': [{}, {}]}
         apply_match(data, 'clin:2:nsn', 'nsn', self.nsn.id)
         self.assertEqual(len(data['clins']), 3)
         self.assertEqual(data['clins'][2]['nsn_id'], self.nsn.id)

@@ -3,7 +3,7 @@ id: 2026-06-26-clin-fix-contract-level-charge
 title: "CLIN Fix: Convert to Contract Level Cost"
 published: true
 publish_date: 2026-06-26
-tags: {improved, contracts}
+tags: [improved, contracts]
 critical: false
 ---
 

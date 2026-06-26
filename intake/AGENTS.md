@@ -215,6 +215,17 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   it is a free-text field on IdiqContractDetails only.
   - `approved_pair:<i>:nsn` — writes NSN fields into `approved_pairs[i]`
   - `approved_pair:<i>:supplier` — writes supplier fields into `approved_pairs[i]`
+- **`approved_pair` target_path DOM resolution (do not revert):** The JS
+  row counter for IDIQ pairs starts at 1000 to avoid colliding with
+  server-rendered field names. This means JS-added rows carry stale large
+  indices in `data-target-path`. `draft_edit.html` defines
+  `window._intakeResolvePairTargetPath(opener)` — called from both the
+  capture-phase autosave handler AND from `match_modal.js`'s init listener —
+  to rewrite `approved_pair:<stale>:<slot>` to `approved_pair:<domIdx>:<slot>`
+  before the modal opens. `_ensure_row` in `matchers.py` has a matching
+  server-side guard (`effective_idx = min(idx, len(rows))`). Do NOT remove
+  either side of this fix; they are complementary. Do NOT change the pair
+  counter start value without also updating this documentation.
 - `match_endpoint` saves via `draft.save()` which re-validates the whole
   payload. A schema change that tightens an Optional → Required will
   break previously-saved drafts on the next match. Keep matcher writes

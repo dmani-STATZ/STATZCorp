@@ -939,6 +939,29 @@
     // Per-CLIN sub-counters for finance lines and splits, keyed by CLIN idx.
     const subCounters = {};
 
+    // Resolve the actual DOM position of an IDIQ pair row at click time,
+    // rather than using the counter-based index baked into data-target-path.
+    // Counter-based indices (1001+) passed to _ensure_row cause it to pad
+    // approved_pairs with ~1000 empty dicts. DOM position is always correct.
+    // Exposed as window._intakeResolvePairTargetPath so match_modal.js can
+    // call it for non-dirty clicks without a circular dependency.
+    window._intakeResolvePairTargetPath = function(opener) {
+        var tp = (opener && opener.dataset && opener.dataset.targetPath) || '';
+        if (!tp.startsWith('approved_pair:')) return tp;
+        var pairRow = opener.closest('[data-row="pair"]');
+        if (!pairRow) return tp;
+        var tbody = pairRow.closest('tbody');
+        if (!tbody) return tp;
+        var rows = Array.prototype.slice.call(
+            tbody.querySelectorAll('[data-row="pair"]')
+        );
+        var domIdx = rows.indexOf(pairRow);
+        if (domIdx < 0) return tp;
+        var parts = tp.split(':');
+        // parts[0]='approved_pair', parts[1]=stale_counter_idx, parts[2]='nsn'|'supplier'
+        return 'approved_pair:' + domIdx + ':' + parts[2];
+    };
+
     function nextSub(clinIdx, kind) {
         const key = clinIdx + ':' + kind;
         subCounters[key] = (subCounters[key] || 1000) + 1;
@@ -1552,6 +1575,7 @@
             const frag = tpl.content.cloneNode(true);
             applyTemplate(frag, {'__IDX__': idx});
             table.querySelector('tbody').appendChild(frag);
+            dirty = true;  // Ensure autosave fires before any match on this new row.
             return;
         }
         const rmRowBtn = ev.target.closest('[data-remove-row]');
@@ -1646,7 +1670,8 @@
                     // match_modal.js would have read from the opener's dataset.
                     window.IntakeMatch.open({
                         matchType: opener.dataset.matchType,
-                        targetPath: opener.dataset.targetPath,
+                        // Resolve by DOM position, not stale counter-based index.
+                        targetPath: window._intakeResolvePairTargetPath(opener),
                         title: opener.dataset.matchTitle || opener.dataset.matchType,
                         originalText: opener.dataset.matchOriginal || '',
                         originalDescription: opener.dataset.matchOriginalDescription || '',

@@ -487,3 +487,16 @@ PDF upload creates folder — `upload_pdfs` calls `create_draft_sharepoint_folde
 - Templates extend `contracts/contract_base.html`.
 - No signal coupling. No `transactions` audit hooks on `DraftContract` —
   drafts are pre-canonical and out of scope for audit history.
+
+## Footguns / Known Pitfalls
+
+- **IDIQ pair match target_path must use DOM position, not JS counter index.**
+  The `data-add-row="pair"` JS handler assigns counter-based row indices
+  (1001, 1002, …). These indices are baked into each new row's
+  `data-target-path="approved_pair:N:nsn"`. If N is passed literally to
+  `_ensure_row`, it pads `approved_pairs` with ~1000 empty dicts.
+  Fix: `draft_edit.html` exposes `window._intakeResolvePairTargetPath(opener)`
+  which rewrites the path using the row's actual DOM position in `#pair-table
+  tbody`. Both the capture-phase dirty handler and `match_modal.js` call this
+  before invoking `window.IntakeMatch.open()`. `_ensure_row` also has a
+  server-side clamp (`effective_idx = min(idx, len(rows))`) as a safety net.

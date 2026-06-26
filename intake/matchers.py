@@ -305,11 +305,20 @@ def create_record(match_type: str, payload: dict) -> int:
 
 
 def _ensure_row(data: dict, list_key: str, idx: int) -> dict:
-    """Get-or-extend a list of dicts under data[list_key]. Returns the row dict."""
+    """Get-or-extend a list of dicts under data[list_key]. Returns the row dict.
+
+    Safety clamp: if idx is beyond the current list length, treat it as
+    "append to end" rather than padding with potentially hundreds of empty
+    dicts. This prevents the JS counter-based index (1001+) from inflating
+    approved_pairs when a stale target_path reaches the endpoint.
+    For valid server-rendered indices (idx < len), behaviour is unchanged.
+    """
     rows = data.setdefault(list_key, [])
-    while len(rows) <= idx:
+    # Clamp: an idx >= len means "the row doesn't exist yet; add it at end".
+    effective_idx = min(idx, len(rows))
+    while len(rows) <= effective_idx:
         rows.append({})
-    return rows[idx]
+    return rows[effective_idx]
 
 
 def apply_match(data: dict, target_path: str, match_type: str, record_id: int) -> dict:
