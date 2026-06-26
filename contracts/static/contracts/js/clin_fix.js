@@ -94,6 +94,7 @@
         draftSave: rootEl.dataset.draftSaveUrl,
         draftDelete: rootEl.dataset.draftDeleteUrl,
         parentOptions: rootEl.dataset.parentOptionsUrl,
+        supplierSearch: rootEl.dataset.supplierSearchUrl,
     };
     var contractNumber = rootEl.dataset.contractNumber || '';
 
@@ -174,8 +175,8 @@
         var dest = s ? s.destination_type : 'default';
 
         // Income-side red highlight when staged for a destination that
-        // disallows income side (packaging or finance_line).
-        var incomeWarn = staged && (dest === 'packaging' || dest === 'finance_line');
+        // disallows income side (contract_level_charge or finance_line).
+        var incomeWarn = staged && (dest === 'contract_level_charge' || dest === 'finance_line');
         var itemCell = row.querySelector('.js-item-val-cell');
         var wawfCell = row.querySelector('.js-wawf-cell');
         if (itemCell) {
@@ -270,34 +271,74 @@
         }).join('');
     }
 
-    function fillPackagingForm(data) {
-        var s = clinFixState[data.id] || { destination_type: 'packaging', staged_data: {} };
+    function fillContractLevelChargeForm(data) {
+        var s = clinFixState[data.id] || {
+            destination_type: 'contract_level_charge',
+            staged_data: {},
+        };
         var staged = s.staged_data || {};
-        $('pkg-packhouse').value = data.supplierName || '(none)';
-        $('pkg-quote').value = ('quote_amount' in staged ? staged.quote_amount
-                                : (data.serialized.quote_value || '')) || '';
-        $('pkg-paid').value = ('amount_paid' in staged ? staged.amount_paid
-                               : (data.serialized.paid_amount || '')) || '';
-        $('pkg-payment-date').value = staged.payment_date || data.serialized.paid_date || '';
-        $('pkg-invoice').value = staged.invoice_number || '';
 
-        var today = new Date().toISOString().slice(0, 10);
-        var itemTypeDisplay = data.serialized.item_type_display || 'None';
-        var defaultNote = 'Migrated from CLIN ' + data.itemNumber + ' on ' + today
-                        + '. Original item_type: ' + (itemTypeDisplay || 'None') + '.';
-        $('pkg-notes').value = ('notes' in staged && staged.notes !== null && staged.notes !== undefined)
-            ? staged.notes : defaultNote;
+        // --- Label dropdown ---
+        var labelSel = $('clc-label');
+        var VALID_LABELS = ['Packaging', 'GSI Fee', 'Freight', 'Other'];
+        var stagedLabel = staged.label || '';
+        labelSel.value = (VALID_LABELS.indexOf(stagedLabel) >= 0) ? stagedLabel : '';
+        toggleClcLabelOther(stagedLabel === 'Other');
+        $('clc-label-other').value = staged.label_other || '';
 
-        var warn = $('pkg-income-warning');
+        // --- Supplier autocomplete ---
+        // Pre-fill display from CLIN data; supplier_id from staged or from CLIN
+        var suppDisplay = $('clc-supplier-display');
+        var suppIdInput = $('clc-supplier-id');
+        if ('supplier_id' in staged) {
+            // User has explicitly staged a supplier (possibly null = cleared)
+            suppIdInput.value = staged.supplier_id || '';
+            // For display: if staged supplier_id matches the CLIN's supplier, use supplierName;
+            // if cleared, blank; if different, it was set by the autocomplete (display already set)
+            if (!staged.supplier_id) {
+                suppDisplay.value = '';
+            } else if (String(staged.supplier_id) === String(data.serialized.supplier_id)) {
+                suppDisplay.value = data.supplierName || '';
+            }
+            // If supplier_id differs from CLIN's (user picked a different supplier),
+            // the display name should already be in staged.supplier_display_name if we store it.
+            // Use it if present:
+            if (staged.supplier_display_name !== undefined) {
+                suppDisplay.value = staged.supplier_display_name || '';
+            }
+        } else {
+            // Default: pre-fill with CLIN's own supplier
+            suppDisplay.value = data.supplierName || '';
+            suppIdInput.value = data.serialized.supplier_id || '';
+        }
+
+        // --- Numeric / date fields ---
+        $('clc-estimated').value = ('estimated_amount' in staged)
+            ? (staged.estimated_amount || '')
+            : (data.serialized.quote_value || '');
+        $('clc-paid').value = ('billed_paid_amount' in staged)
+            ? (staged.billed_paid_amount || '')
+            : (data.serialized.paid_amount || '');
+        $('clc-payment-date').value = staged.payment_date || data.serialized.paid_date || '';
+        $('clc-invoice').value = staged.invoice_number || '';
+
+        // --- Income-side warning ---
+        var warn = $('clc-income-warning');
         if (warn) {
             if (data.itemValue || data.wawfPayment) {
                 warn.style.display = 'block';
-                warn.textContent = 'This CLIN has non-zero Item Value or WAWF Payment. ' +
-                    'Packaging entries must have no income side. The server will block this conversion.';
+                warn.textContent = 'This CLIN has non-zero Item Value or WAWF Payment. '
+                    + 'Contract Level Cost entries must have no income side. '
+                    + 'The server will block this conversion.';
             } else {
                 warn.style.display = 'none';
             }
         }
+    }
+
+    function toggleClcLabelOther(show) {
+        var wrap = $('clc-label-other-wrap');
+        if (wrap) wrap.style.display = show ? '' : 'none';
     }
 
     function fillFinanceLineForm(data) {
@@ -450,8 +491,8 @@
 
         setPaneTitle('CLIN ' + (data.itemNumber || clinId));
 
-        if (dest === 'packaging') {
-            fillPackagingForm(data);
+        if (dest === 'contract_level_charge') {
+            fillContractLevelChargeForm(data);
             showPaneState('C');
         } else if (dest === 'finance_line') {
             fillFinanceLineForm(data);
@@ -554,12 +595,16 @@
         var staged = {};
         var parentClinId = null;
 
-        if (dest === 'packaging') {
-            staged.quote_amount = $('pkg-quote').value === '' ? null : $('pkg-quote').value;
-            staged.amount_paid = $('pkg-paid').value === '' ? null : $('pkg-paid').value;
-            staged.payment_date = $('pkg-payment-date').value || null;
-            staged.invoice_number = $('pkg-invoice').value || null;
-            staged.notes = $('pkg-notes').value || null;
+        } else if (dest === 'contract_level_charge') {
+            var labelVal = ($('clc-label') ? $('clc-label').value : '');
+            staged.label = labelVal;
+            staged.label_other = ($('clc-label-other') ? $('clc-label-other').value : '');
+            staged.supplier_id = ($('clc-supplier-id') ? $('clc-supplier-id').value : '') || null;
+            staged.supplier_display_name = ($('clc-supplier-display') ? $('clc-supplier-display').value : '');
+            staged.estimated_amount = ($('clc-estimated') ? $('clc-estimated').value : '') || null;
+            staged.billed_paid_amount = ($('clc-paid') ? $('clc-paid').value : '') || null;
+            staged.payment_date = ($('clc-payment-date') ? $('clc-payment-date').value : '') || null;
+            staged.invoice_number = ($('clc-invoice') ? $('clc-invoice').value : '') || null;
         } else if (dest === 'finance_line') {
             var lt = $('fl-line-type').value;
             if (lt === 'Other') {
@@ -681,6 +726,93 @@
         setRowParentCleared(clinId, false);
     }
 
+    // ── CLC Supplier Autocomplete ──────────────────────────────────────
+    (function () {
+        var displayInput = null;
+        var idInput = null;
+        var resultsBox = null;
+        var clearBtn = null;
+        var searchTimer = null;
+
+        function initClcSupplier() {
+            displayInput = $('clc-supplier-display');
+            idInput = $('clc-supplier-id');
+            resultsBox = $('clc-supplier-results');
+            clearBtn = $('clc-supplier-clear');
+            if (!displayInput) return;
+
+            displayInput.addEventListener('input', function () {
+                var q = displayInput.value.trim();
+                if (searchTimer) clearTimeout(searchTimer);
+                if (q.length < 2) { hideResults(); return; }
+                searchTimer = setTimeout(function () { doSearch(q); }, 200);
+            });
+
+            displayInput.addEventListener('blur', function () {
+                // Small delay so click on result registers first
+                setTimeout(hideResults, 200);
+            });
+
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function () {
+                    displayInput.value = '';
+                    idInput.value = '';
+                    hideResults();
+                    syncPaneToState();
+                    if (activeClinId) saveDraft(activeClinId);
+                });
+            }
+        }
+
+        function doSearch(q) {
+            fetch(urls.supplierSearch + '?q=' + encodeURIComponent(q), {
+                credentials: 'same-origin',
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) { showResults(data.results || data); })
+            .catch(function () { hideResults(); });
+        }
+
+        function showResults(items) {
+            if (!resultsBox) return;
+            if (!items || items.length === 0) { hideResults(); return; }
+            resultsBox.innerHTML = items.slice(0, 10).map(function (item) {
+                var id = item.id || item.supplier_id || '';
+                var name = item.name || item.supplier_name || '';
+                return '<div class="px-2 py-1 clc-supp-option" '
+                    + 'style="cursor:pointer;font-size:0.85rem;" '
+                    + 'data-id="' + id + '" '
+                    + 'data-name="' + name.replace(/"/g, '&quot;') + '">'
+                    + name
+                    + '</div>';
+            }).join('');
+            resultsBox.style.display = '';
+
+            // Delegate click
+            resultsBox.onclick = function (e) {
+                var opt = e.target.closest('.clc-supp-option');
+                if (!opt) return;
+                displayInput.value = opt.dataset.name;
+                idInput.value = opt.dataset.id;
+                hideResults();
+                syncPaneToState();
+                if (activeClinId) saveDraft(activeClinId);
+            };
+        }
+
+        function hideResults() {
+            if (resultsBox) resultsBox.style.display = 'none';
+        }
+
+        // Re-initialize whenever the pane swaps to State C
+        // Hook into showPaneState by wrapping it
+        var _origShowPaneState = showPaneState;
+        showPaneState = function (stateLetter) {
+            _origShowPaneState(stateLetter);
+            if (stateLetter === 'C') { initClcSupplier(); }
+        };
+    })();
+
     // Top-level change/input listener (delegated)
     document.addEventListener('change', function (e) {
         var destSel = e.target.closest('.clin-fix-destination');
@@ -691,6 +823,12 @@
         // Custom Other line-type wrap
         if (e.target && e.target.id === 'fl-line-type') {
             $('fl-line-type-other-wrap').style.display = (e.target.value === 'Other' ? 'block' : 'none');
+        }
+        if (e.target && e.target.id === 'clc-label') {
+            toggleClcLabelOther(e.target.value === 'Other');
+            syncPaneToState();
+            if (activeClinId) saveDraft(activeClinId);
+            return;
         }
         // Pane parent-CLIN dropdown — refresh mismatch warning
         if (e.target && e.target.id === 'ps-parent-clin' && activeClinId) {

@@ -22,6 +22,7 @@ from django.db import transaction
 from django.db.models import Count, Max
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
@@ -43,7 +44,7 @@ from ..models import (
 
 logger = logging.getLogger(__name__)
 
-VALID_DESTINATIONS = {'packaging', 'finance_line', 'partial_shipment', 'deleted'}
+VALID_DESTINATIONS = {'contract_level_charge', 'finance_line', 'partial_shipment', 'deleted'}
 
 
 # ---------------------------------------------------------------------------
@@ -183,16 +184,31 @@ def _validate_conversions(contract, conversions):
 
         clin = clin_qs.get(id=clin_id)
 
-        if dest == 'packaging':
-            # Income-side guard
+        if dest == 'contract_level_charge':
+            # Income-side guard — ContractLevelCharge is cost-only
             if _is_nonzero(clin.item_value) or _is_nonzero(clin.wawf_payment):
                 errors.append((
                     clin_id,
-                    "CLIN has non-zero item_value or wawf_payment — packaging entries "
-                    "should have no income side. Review and zero out before converting, "
-                    "or use a different destination."
+                    "CLIN has non-zero item_value or wawf_payment — contract level cost "
+                    "entries must have no income side. Review and zero out before "
+                    "converting, or choose a different destination."
                 ))
                 continue
+
+            # Label required
+            label = (staged.get('label') or '').strip()
+            ALLOWED_LABELS = {'Packaging', 'GSI Fee', 'Freight', 'Other'}
+            if not label:
+                errors.append((clin_id, "Label is required for Contract Level Cost."))
+                continue
+            if label not in ALLOWED_LABELS:
+                errors.append((clin_id, f"Invalid label '{label}'. Must be one of: {', '.join(sorted(ALLOWED_LABELS))}."))
+                continue
+            if label == 'Other':
+                label_other = (staged.get('label_other') or '').strip()
+                if not label_other:
+                    errors.append((clin_id, "Custom label text is required when 'Other' is selected."))
+                    continue
 
         elif dest == 'finance_line':
             # 4. Income-side guard
@@ -287,27 +303,76 @@ def _delete_payment_history_for_clin(clin):
     return count
 
 
-def _convert_to_packaging(clin, contract, staged_data, user):
+def _convert_to_contract_level_charge(clin, contract, staged_data, user):
     """
-    Convert a legacy packaging CLIN to a ContractLevelCharge row with
-    label='Packaging'. ContractPackaging is no longer the target — it is
-    being phased out in favour of ContractLevelCharge.
+    Convert a legacy CLIN to a ContractLevelCharge row.
 
     Field mapping:
-      clin.supplier      → ContractLevelCharge.supplier
-      clin.quote_value   → ContractLevelCharge.estimated_amount
-      clin.paid_amount   → ContractLevelCharge.billed_paid_amount (None if zero)
-      clin.paid_date     → ContractLevelCharge.payment_date
-      invoice_number     → None (not available from source CLIN)
+      label        → staged_data['label']; if 'Other', use staged_data['label_other']
+      supplier     → staged_data['supplier_id'] if present (None = cleared);
+                     falls back to clin.supplier if key absent from staged_data
+      estimated_amount   → staged_data['estimated_amount'] if present and non-empty,
+                           else clin.quote_value (or 0 if null)
+      billed_paid_amount → staged_data['billed_paid_amount'] if present and non-empty,
+                           None if the resolved value is zero;
+                           else clin.paid_amount if non-zero, else None
+      payment_date       → staged_data['payment_date'] if present and non-empty,
+                           else clin.paid_date
+      invoice_number     → staged_data['invoice_number'] stripped; None if blank
+    Income-side guard has already been enforced in _validate_conversions
+    before this function is called.
     """
+    from suppliers.models import Supplier
+
+    # --- Label ---
+    label = (staged_data.get('label') or '').strip()
+    if label == 'Other':
+        label = (staged_data.get('label_other') or '').strip()
+
+    # --- Supplier ---
+    if 'supplier_id' in staged_data:
+        sid = staged_data.get('supplier_id')
+        if sid:
+            try:
+                supplier = Supplier.objects.get(pk=int(sid))
+            except (Supplier.DoesNotExist, (ValueError, TypeError)):
+                supplier = clin.supplier
+        else:
+            supplier = None  # user explicitly cleared it
+    else:
+        supplier = clin.supplier  # default: keep CLIN's supplier
+
+    # --- Estimated amount ---
+    raw_est = staged_data.get('estimated_amount')
+    if raw_est not in (None, ''):
+        estimated_amount = Decimal(str(raw_est))
+    else:
+        estimated_amount = Decimal(str(clin.quote_value or '0.00'))
+
+    # --- Billed/paid amount ---
+    raw_paid = staged_data.get('billed_paid_amount')
+    if raw_paid not in (None, ''):
+        billed_val = Decimal(str(raw_paid))
+        billed_paid_amount = billed_val if billed_val != Decimal('0.00') else None
+    else:
+        billed_paid_amount = (
+            clin.paid_amount if _is_nonzero(clin.paid_amount) else None
+        )
+
+    # --- Payment date ---
+    payment_date = staged_data.get('payment_date') or clin.paid_date or None
+
+    # --- Invoice number ---
+    invoice_number = (staged_data.get('invoice_number') or '').strip() or None
+
     charge = ContractLevelCharge.objects.create(
         contract=contract,
-        label='Packaging',
-        supplier=clin.supplier,
-        estimated_amount=clin.quote_value,
-        billed_paid_amount=clin.paid_amount if clin.paid_amount else None,
-        payment_date=clin.paid_date,
-        invoice_number=None,
+        label=label,
+        supplier=supplier,
+        estimated_amount=estimated_amount,
+        billed_paid_amount=billed_paid_amount,
+        payment_date=payment_date,
+        invoice_number=invoice_number,
     )
     return charge.id
 
@@ -487,6 +552,7 @@ def clin_fix_page(request, pk):
         'parent_options_initial_json': json.dumps(parent_options_initial),
         'other_contract_drafts': other_contract_drafts,
         'has_packaging': has_packaging,
+        'supplier_search_url': reverse('suppliers:supplier_search_api'),
     }
     return render(request, 'contracts/clin_fix.html', context)
 
@@ -562,8 +628,8 @@ def clin_fix_save(request, pk):
 
                 # 4. Perform conversion
                 destination_id = None
-                if dest == 'packaging':
-                    destination_id = _convert_to_packaging(clin, contract, staged, request.user)
+                if dest == 'contract_level_charge':
+                    destination_id = _convert_to_contract_level_charge(clin, contract, staged, request.user)
                 elif dest == 'finance_line':
                     destination_id = _convert_to_finance_line(
                         clin, contract, staged, conv['parent_clin_id'], request.user,

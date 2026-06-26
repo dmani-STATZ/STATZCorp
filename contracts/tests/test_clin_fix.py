@@ -90,7 +90,7 @@ class ClinFixBaseTest(TestCase):
 @override_settings(REQUIRE_LOGIN=False)
 class ClinFixConversionTests(ClinFixBaseTest):
 
-    def test_clin_to_packaging_field_mapping(self):
+    def test_clin_to_contract_level_charge_field_mapping(self):
         supplier = _create_supplier()
         contract = _create_contract(self.company)
         clin = _create_clin(
@@ -108,8 +108,8 @@ class ClinFixConversionTests(ClinFixBaseTest):
         url = reverse('contracts:clin_fix_save', args=[contract.pk])
         payload = {'conversions': [{
             'clin_id': clin.id,
-            'destination_type': 'packaging',
-            'staged_data': {},
+            'destination_type': 'contract_level_charge',
+            'staged_data': {'label': 'Packaging'},
         }]}
         resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
         self.assertEqual(resp.status_code, 200, resp.content)
@@ -132,7 +132,7 @@ class ClinFixConversionTests(ClinFixBaseTest):
         log = ClinReclassificationLog.objects.get(
             contract=contract, original_clin_id=clin.id
         )
-        self.assertEqual(log.destination_type, 'packaging')
+        self.assertEqual(log.destination_type, 'contract_level_charge')
         self.assertEqual(log.destination_id, charge.id)
         self.assertIsNotNone(log.original_data)
         self.assertEqual(log.original_data.get('item_number'), '0010')
@@ -329,7 +329,7 @@ class ClinFixConversionTests(ClinFixBaseTest):
 @override_settings(REQUIRE_LOGIN=False)
 class ClinFixValidationTests(ClinFixBaseTest):
 
-    def test_validation_blocks_packaging_with_income_side(self):
+    def test_validation_blocks_contract_level_charge_with_income_side(self):
         supplier = _create_supplier()
         contract = _create_contract(self.company, 'C-PI')
         _create_clin(contract, item_number='0001', item_value=Decimal('1'))
@@ -343,8 +343,8 @@ class ClinFixValidationTests(ClinFixBaseTest):
         url = reverse('contracts:clin_fix_save', args=[contract.pk])
         payload = {'conversions': [{
             'clin_id': clin.id,
-            'destination_type': 'packaging',
-            'staged_data': {},
+            'destination_type': 'contract_level_charge',
+            'staged_data': {'label': 'Packaging'},
         }]}
         resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
         self.assertEqual(resp.status_code, 400)
@@ -408,8 +408,8 @@ class ClinFixValidationTests(ClinFixBaseTest):
         payload = {'conversions': [
             {
                 'clin_id': c1.id,
-                'destination_type': 'packaging',
-                'staged_data': {},
+                'destination_type': 'contract_level_charge',
+                'staged_data': {'label': 'Packaging'},
             },
             {
                 'clin_id': c2.id,
@@ -418,8 +418,8 @@ class ClinFixValidationTests(ClinFixBaseTest):
             },
             {
                 'clin_id': c3.id,
-                'destination_type': 'packaging',
-                'staged_data': {},
+                'destination_type': 'contract_level_charge',
+                'staged_data': {'label': 'Packaging'},
             },
         ]}
         resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
@@ -433,6 +433,62 @@ class ClinFixValidationTests(ClinFixBaseTest):
             ClinReclassificationLog.objects.filter(contract=contract).count(),
             0,
         )
+
+    def test_contract_level_charge_requires_label(self):
+        supplier = _create_supplier()
+        contract = _create_contract(self.company, 'C-LBL')
+        _create_clin(contract, item_number='0001', item_value=Decimal('1'))
+        clin = _create_clin(contract, item_number='0099', supplier=supplier)
+
+        url = reverse('contracts:clin_fix_save', args=[contract.pk])
+        payload = {'conversions': [{
+            'clin_id': clin.id,
+            'destination_type': 'contract_level_charge',
+            'staged_data': {},
+        }]}
+        resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+        body = resp.json()
+        self.assertFalse(body['success'])
+        self.assertTrue(any('label' in e['error'].lower() for e in body['errors']))
+
+    def test_contract_level_charge_other_requires_custom_text(self):
+        supplier = _create_supplier()
+        contract = _create_contract(self.company, 'C-OTH')
+        _create_clin(contract, item_number='0001', item_value=Decimal('1'))
+        clin = _create_clin(contract, item_number='0099', supplier=supplier)
+
+        url = reverse('contracts:clin_fix_save', args=[contract.pk])
+        payload = {'conversions': [{
+            'clin_id': clin.id,
+            'destination_type': 'contract_level_charge',
+            'staged_data': {'label': 'Other', 'label_other': ''},
+        }]}
+        resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(resp.status_code, 400)
+        body = resp.json()
+        self.assertFalse(body['success'])
+
+    def test_contract_level_charge_other_with_custom_text_succeeds(self):
+        supplier = _create_supplier()
+        contract = _create_contract(self.company, 'C-OT2')
+        _create_clin(contract, item_number='0001', item_value=Decimal('1'))
+        clin = _create_clin(contract, item_number='0099', supplier=supplier)
+
+        url = reverse('contracts:clin_fix_save', args=[contract.pk])
+        payload = {'conversions': [{
+            'clin_id': clin.id,
+            'destination_type': 'contract_level_charge',
+            'staged_data': {
+                'label': 'Other',
+                'label_other': 'Special Inspection Fee',
+            },
+        }]}
+        resp = self.client.post(url, data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+        charge = ContractLevelCharge.objects.get(contract=contract)
+        self.assertEqual(charge.label, 'Special Inspection Fee')
 
 
 @override_settings(REQUIRE_LOGIN=False)

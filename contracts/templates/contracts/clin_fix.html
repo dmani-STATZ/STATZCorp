@@ -112,6 +112,7 @@
      data-draft-save-url="{% url 'contracts:clin_fix_draft_save' contract.pk %}"
      data-draft-delete-url="{% url 'contracts:clin_fix_draft_delete' contract.pk %}"
      data-parent-options-url="{% url 'contracts:clin_fix_parent_options' contract.pk %}"
+     data-supplier-search-url="{{ supplier_search_url }}"
      data-contract-number="{{ contract.contract_number|default:contract.pk }}"
      id="clin-fix-root">
 
@@ -289,8 +290,8 @@
                                     <select class="form-select form-select-sm destination-select clin-fix-destination"
                                             data-clin-id="{{ clin.id }}">
                                         <option value="default">Leave as CLIN</option>
-                                        <option value="packaging">
-                                            Convert to Packaging
+                                        <option value="contract_level_charge">
+                                            Convert to Contract Level Cost
                                         </option>
                                         <option value="finance_line">Convert to Finance Line</option>
                                         <option value="partial_shipment">Convert to Partial Shipment</option>
@@ -335,37 +336,97 @@
                         <dl class="row mb-0" id="pane-default-fields"></dl>
                     </div>
 
-                    {# State C: Packaging #}
+                    {# State C: Contract Level Cost #}
                     <div data-pane-state="C" style="display:none;">
-                        <div class="text-muted small mb-2">Convert to Packaging</div>
-                        <div class="mb-2">
-                            <label class="form-label small">Packhouse (from supplier)</label>
-                            <input type="text" class="form-control form-control-sm" id="pkg-packhouse" readonly>
-                        </div>
+                        <div class="text-muted small mb-2">Convert to Contract Level Cost</div>
+
+                        {# Income-side warning — same pattern as old packaging pane #}
+                        <div id="clc-income-warning" class="alert alert-warning alert-sm py-1 px-2 small mb-2" style="display:none;"></div>
+
                         <div class="row g-2">
-                            <div class="col-6">
-                                <label class="form-label small">Quote Amount</label>
-                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="pkg-quote">
+
+                            {# Label dropdown #}
+                            <div class="col-12">
+                                <label class="form-label small">Charge Label <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm pane-input" id="clc-label">
+                                    <option value="">— select —</option>
+                                    <option value="Packaging">Packaging</option>
+                                    <option value="GSI Fee">GSI Fee</option>
+                                    <option value="Freight">Freight</option>
+                                    <option value="Other">Other…</option>
+                                </select>
                             </div>
-                            <div class="col-6">
-                                <label class="form-label small">Amount Paid</label>
-                                <input type="number" step="0.01" class="form-control form-control-sm pane-input" id="pkg-paid">
+
+                            {# Custom label — shown only when "Other" is selected #}
+                            <div class="col-12" id="clc-label-other-wrap" style="display:none;">
+                                <label class="form-label small">Custom Label <span class="text-danger">*</span></label>
+                                <input type="text"
+                                       class="form-control form-control-sm pane-input"
+                                       id="clc-label-other"
+                                       maxlength="100"
+                                       placeholder="Enter charge label…">
                             </div>
+
+                            {# Supplier autocomplete #}
+                            <div class="col-12">
+                                <label class="form-label small">Supplier</label>
+                                <div class="position-relative">
+                                    <input type="text"
+                                           class="form-control form-control-sm"
+                                           id="clc-supplier-display"
+                                           autocomplete="off"
+                                           placeholder="Search supplier…">
+                                    <input type="hidden" id="clc-supplier-id">
+                                    <div id="clc-supplier-results"
+                                         class="position-absolute w-100 bg-white border rounded shadow-sm z-3"
+                                         style="display:none; max-height:160px; overflow-y:auto; top:100%; left:0;">
+                                    </div>
+                                </div>
+                                <div class="mt-1">
+                                    <button type="button"
+                                            class="btn btn-link btn-sm p-0 text-secondary"
+                                            id="clc-supplier-clear"
+                                            style="font-size:0.75rem;">
+                                        Clear supplier
+                                    </button>
+                                </div>
+                            </div>
+
+                            {# Estimated Amount #}
+                            <div class="col-6">
+                                <label class="form-label small">Estimated Amount</label>
+                                <input type="number" step="0.01" min="0"
+                                       class="form-control form-control-sm pane-input"
+                                       id="clc-estimated">
+                            </div>
+
+                            {# Billed / Paid Amount #}
+                            <div class="col-6">
+                                <label class="form-label small">Billed / Paid Amount</label>
+                                <input type="number" step="0.01" min="0"
+                                       class="form-control form-control-sm pane-input"
+                                       id="clc-paid">
+                            </div>
+
+                            {# Payment Date #}
                             <div class="col-12">
                                 <label class="form-label small">Payment Date</label>
-                                <input type="date" class="form-control form-control-sm pane-input" id="pkg-payment-date">
+                                <input type="date"
+                                       class="form-control form-control-sm pane-input"
+                                       id="clc-payment-date">
                             </div>
+
+                            {# Invoice Number #}
                             <div class="col-12">
                                 <label class="form-label small">Invoice Number</label>
-                                <input type="text" class="form-control form-control-sm pane-input" id="pkg-invoice" placeholder="(optional)">
+                                <input type="text"
+                                       class="form-control form-control-sm pane-input"
+                                       id="clc-invoice"
+                                       placeholder="(optional)">
                             </div>
-                            <div class="col-12">
-                                <label class="form-label small">Notes (auto-generated, editable)</label>
-                                <textarea class="form-control form-control-sm pane-input" id="pkg-notes" rows="3"></textarea>
-                            </div>
-                        </div>
-                        <div class="alert alert-warning small mt-3 py-2 px-2" id="pkg-income-warning" style="display:none;"></div>
-                    </div>
+
+                        </div>{# /row g-2 #}
+                    </div>{# /State C #}
 
                     {# State D: Finance Line #}
                     <div data-pane-state="D" style="display:none;">

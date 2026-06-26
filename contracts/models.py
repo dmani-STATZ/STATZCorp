@@ -1791,7 +1791,7 @@ class ClinReclassificationLog(models.Model):
     recoverable if needed. Original Clin rows are hard-deleted after conversion.
     """
     DESTINATION_CHOICES = [
-        ('packaging', 'Supplier Charge (Packaging)'),
+        ('contract_level_charge', 'Contract Level Cost'),
         ('finance_line', 'Contract Finance Line'),
         ('partial_shipment', 'Partial Shipment'),
         ('deleted', 'Deleted (Garbage Row)'),
@@ -1808,7 +1808,7 @@ class ClinReclassificationLog(models.Model):
     original_data = models.JSONField(
         help_text="Full snapshot of the original Clin row data, including all fields."
     )
-    destination_type = models.CharField(max_length=20, choices=DESTINATION_CHOICES)
+    destination_type = models.CharField(max_length=25, choices=DESTINATION_CHOICES)
     destination_id = models.IntegerField(
         null=True, blank=True,
         help_text="ID of the new row created (ContractPackaging, ContractFinanceLine, or ClinShipment). Null for 'deleted'.",
@@ -1849,7 +1849,7 @@ class ClinReclassificationDraft(models.Model):
     overwrite each other.
     """
     DESTINATION_CHOICES = [
-        ('packaging', 'Supplier Charge (Packaging)'),
+        ('contract_level_charge', 'Contract Level Cost'),
         ('finance_line', 'Contract Finance Line'),
         ('partial_shipment', 'Partial Shipment'),
         ('deleted', 'Deleted (Garbage Row)'),
@@ -1870,7 +1870,7 @@ class ClinReclassificationDraft(models.Model):
         on_delete=models.CASCADE,
         related_name='+',
     )
-    destination_type = models.CharField(max_length=20, choices=DESTINATION_CHOICES)
+    destination_type = models.CharField(max_length=25, choices=DESTINATION_CHOICES)
     staged_data = models.JSONField(
         default=dict,
         help_text="Destination-specific field values entered by the user.",
