@@ -414,7 +414,9 @@
                           {% endif %}
                         </td>
                       </tr>
-                      {% for clin in group.clins %}
+                    </tbody>
+                    {% for clin in group.clins %}
+                    <tbody>
                         <tr class="clin-finance-audit-row" data-clin-id="{{ clin.id }}" data-clin-uom="{{ clin.uom|default:'' }}">
                             <td>
                                 <a href="{% url 'contracts:clin_detail' clin.id %}"
@@ -595,69 +597,7 @@
                                 </div>
                             </td>
                         </tr>
-                      {% endfor %}
-                      {% for charge in group.charges %}
-                      <tr class="level-charge-row" data-charge-id="{{ charge.id }}">
-                        <td class="text-muted ps-3">—</td>
-                        <td>{{ charge.label }}</td>
-                        <td></td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td class="text-end">
-                          <span role="button" tabindex="0"
-                                class="text-primary text-decoration-underline"
-                                onclick="openTransactionsEditModal(
-                                  window.levelChargeContentTypeId,
-                                  {{ charge.id }},
-                                  'estimated_amount'
-                                )">
-                            ${{ charge.estimated_amount|floatformat:2|intcomma }}
-                          </span>
-                        </td>
-                        <td class="text-end">
-                          <span role="button" tabindex="0"
-                                class="text-primary text-decoration-underline"
-                                onclick="openTransactionsEditModal(
-                                  window.levelChargeContentTypeId,
-                                  {{ charge.id }},
-                                  'billed_paid_amount'
-                                )">
-                            {% if charge.billed_paid_amount %}
-                              ${{ charge.billed_paid_amount|floatformat:2|intcomma }}
-                            {% else %}—{% endif %}
-                          </span>
-                        </td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td class="text-end text-danger">
-                          {% if charge.billed_paid_amount %}
-                            -${{ charge.billed_paid_amount|floatformat:2|intcomma }}
-                          {% else %}
-                            -${{ charge.estimated_amount|floatformat:2|intcomma }}
-                          {% endif %}
-                        </td>
-                        <td class="text-center">no shipments</td>
-                      </tr>
-                      {% endfor %}
-                      <tr class="supplier-group-subtotal fw-semibold border-top">
-                        <td colspan="7" class="text-end small text-muted pe-2">
-                          {{ group.supplier.name|default:"No Supplier" }} Subtotal
-                        </td>
-                        <td class="text-end">${{ group.sub_quote|floatformat:2|intcomma }}</td>
-                        <td class="text-end">${{ group.sub_paid|floatformat:2|intcomma }}</td>
-                        <td class="text-end">${{ group.sub_iv|floatformat:2|intcomma }}</td>
-                        <td class="text-end">${{ group.sub_cpay|floatformat:2|intcomma }}</td>
-                        <td class="text-end">
-                          <span class="fw-semibold {% if group.sub_ag < 0 %}text-danger{% else %}text-success{% endif %}">
-                            {% if group.sub_ag < 0 %}-{% endif %}${{ group.sub_ag|abs_value|floatformat:2|intcomma }}
-                          </span>
-                        </td>
-                        <td></td>
-                      </tr>
                     </tbody>
-                    {% for clin in group.clins %}
                     <tbody id="partials-accordion-{{ clin.id }}"
                            data-partials-for="{{ clin.id }}"
                            style="display:none;"
@@ -819,7 +759,69 @@
                         {% endif %}
                         {% endwith %}
                     </tbody>
-                    {% endfor %}
+                      {% endfor %}
+                    <tbody>
+                      {% for charge in group.charges %}
+                      <tr class="level-charge-row" data-charge-id="{{ charge.id }}">
+                        <td class="text-muted ps-3">—</td>
+                        <td>{{ charge.label }}</td>
+                        <td></td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td class="text-end">
+                          <span role="button" tabindex="0"
+                                class="text-primary text-decoration-underline"
+                                onclick="openTransactionsEditModal(
+                                  window.levelChargeContentTypeId,
+                                  {{ charge.id }},
+                                  'estimated_amount'
+                                )">
+                            ${{ charge.estimated_amount|floatformat:2|intcomma }}
+                          </span>
+                        </td>
+                        <td class="text-end">
+                          <span role="button" tabindex="0"
+                                class="text-primary text-decoration-underline"
+                                onclick="openTransactionsEditModal(
+                                  window.levelChargeContentTypeId,
+                                  {{ charge.id }},
+                                  'billed_paid_amount'
+                                )">
+                            {% if charge.billed_paid_amount %}
+                              ${{ charge.billed_paid_amount|floatformat:2|intcomma }}
+                            {% else %}—{% endif %}
+                          </span>
+                        </td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td class="text-end text-danger">
+                          {% if charge.billed_paid_amount %}
+                            -${{ charge.billed_paid_amount|floatformat:2|intcomma }}
+                          {% else %}
+                            -${{ charge.estimated_amount|floatformat:2|intcomma }}
+                          {% endif %}
+                        </td>
+                        <td class="text-center">no shipments</td>
+                      </tr>
+                      {% endfor %}
+                      <tr class="supplier-group-subtotal fw-semibold border-top">
+                        <td colspan="7" class="text-end small text-muted pe-2">
+                          {{ group.supplier.name|default:"No Supplier" }} Subtotal
+                        </td>
+                        <td class="text-end">${{ group.sub_quote|floatformat:2|intcomma }}</td>
+                        <td class="text-end">${{ group.sub_paid|floatformat:2|intcomma }}</td>
+                        <td class="text-end">${{ group.sub_iv|floatformat:2|intcomma }}</td>
+                        <td class="text-end">${{ group.sub_cpay|floatformat:2|intcomma }}</td>
+                        <td class="text-end">
+                          <span class="fw-semibold {% if group.sub_ag < 0 %}text-danger{% else %}text-success{% endif %}">
+                            {% if group.sub_ag < 0 %}-{% endif %}${{ group.sub_ag|abs_value|floatformat:2|intcomma }}
+                          </span>
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tbody>
                     {% endfor %}
                     <tfoot>
                       <tr class="grand-total-row fw-bold border-top-2">

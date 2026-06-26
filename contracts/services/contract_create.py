@@ -581,6 +581,32 @@ def recalc_split_values(contract) -> int:
         for split in clin.splits.all():
             splits_by_company[split.company_name].append(split)
 
+    all_company_names = list(splits_by_company.keys())
+    for company_name in all_company_names:
+        existing_clin_ids = {s.clin_id for s in splits_by_company[company_name]}
+        inherited_pct = next(
+            (
+                s.percentage
+                for s in splits_by_company[company_name]
+                if s.percentage is not None
+            ),
+            None,
+        )
+        for clin in clins:
+            if clin.id not in existing_clin_ids:
+                new_split = ClinSplit.objects.create(
+                    clin=clin,
+                    company_name=company_name,
+                    percentage=inherited_pct,
+                    split_value=Decimal('0.00'),
+                    split_paid=Decimal('0.00'),
+                )
+                new_split.clin = clin
+                splits_by_company[company_name].append(new_split)
+        splits_by_company[company_name].sort(
+            key=lambda s: s.clin.item_number
+        )
+
     if not splits_by_company:
         return 0
 
