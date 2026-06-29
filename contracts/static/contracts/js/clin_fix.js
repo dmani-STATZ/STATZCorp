@@ -595,7 +595,7 @@
         var staged = {};
         var parentClinId = null;
 
-        } else if (dest === 'contract_level_charge') {
+        if (dest === 'contract_level_charge') {
             var labelVal = ($('clc-label') ? $('clc-label').value : '');
             staged.label = labelVal;
             staged.label_other = ($('clc-label-other') ? $('clc-label-other').value : '');
