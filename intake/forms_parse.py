@@ -47,7 +47,8 @@ SCALAR_FIELDS = {
 }
 CLIN_FIELDS = {
     'item_number', 'item_type', 'nsn_text', 'nsn_id', 'nsn_description',
-    'supplier_text', 'supplier_id', 'order_qty', 'uom', 'unit_price',
+    'supplier_text', 'supplier_id', 'cage',
+    'order_qty', 'uom', 'unit_price',
     'item_value', 'due_date', 'supplier_due_date', 'special_payment_terms',
     'ia', 'fob',
 }

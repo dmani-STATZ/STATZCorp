@@ -199,6 +199,12 @@ _RE_DELIVER_FOB = re.compile(
 # CLIN line in extracted text (same page, earlier lines).
 _CLIN_DELIVERY_LOOKBACK = 8000
 _RE_ADO_DAYS = re.compile(r"(\d+)\s+DAYS\s+ADO", re.IGNORECASE)
+# Block 16 "Reference your" — DLA now embeds supplier CAGE after the date.
+# Pattern: "Offer/Quote dated 2026 MAR 10, 06MA8 LX26U3559"
+_RE_REF_YOUR_CAGE = re.compile(
+    r"Offer/Quote\s+dated\s+[^,\n]+,\s*([A-Z0-9]{5})\b",
+    re.IGNORECASE,
+)
 _RE_INSPECTION_POINT = re.compile(
     r"INSPECTION\s+POINT[:\s]+(\w+)",
     re.IGNORECASE,
@@ -367,6 +373,7 @@ class AwardParseResult:
     idiq_supplier_cage: Optional[str]
     idiq_supplier_part_number: Optional[str]
     contract_packhouse_name: Optional[str]
+    page1_reference_cage: Optional[str] = None
 
 
 def _strip_money(value: Optional[str]) -> Optional[str]:
@@ -883,6 +890,23 @@ def _extract_ado_days(page_one_text: str) -> Optional[int]:
         return int(m.group(1))
     except ValueError:
         return None
+
+
+def _extract_reference_cage(page_one_text: str) -> Optional[str]:
+    """
+    Extract the supplier CAGE code embedded in Block 16 'Reference your' on page 1.
+
+    DLA now populates this field as:
+      'Offer/Quote dated 2026 MAR 10, 06MA8 LX26U3559'
+    where the first 5-character alphanumeric token after the date+comma is the
+    supplier CAGE. This is NOT the prime contractor CAGE from Block 9.
+
+    Returns the CAGE uppercased, or None if the pattern is not present.
+    """
+    if not page_one_text:
+        return None
+    m = _RE_REF_YOUR_CAGE.search(page_one_text)
+    return m.group(1).upper() if m else None
 
 
 _RE_INSPECTION_SUPPLIES_LABEL = re.compile(
@@ -1946,6 +1970,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             idiq_supplier_cage=idiq_supplier_cage,
             idiq_supplier_part_number=idiq_supplier_part_number,
             contract_packhouse_name=contract_packhouse_name,
+            page1_reference_cage=_extract_reference_cage(page_one_text),
         )
     except Exception as exc:
         return AwardParseResult(

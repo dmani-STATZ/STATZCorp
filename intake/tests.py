@@ -1001,6 +1001,28 @@ class FinalizeViewTests(TestCase):
 # ---------------------------------------------------------------------------
 
 
+class ReferenceCAGEExtractionTests(TestCase):
+    def test_extracts_cage_from_standard_format(self):
+        page1 = "Offer/Quote dated 2026 MAR 10, 06MA8 LX26U3559 furnish the following"
+        from intake.pdf_parser import _extract_reference_cage
+        self.assertEqual(_extract_reference_cage(page1), "06MA8")
+
+    def test_returns_none_when_no_comma_after_date(self):
+        from intake.pdf_parser import _extract_reference_cage
+        self.assertIsNone(_extract_reference_cage("Offer/Quote dated 2026 MAR 10"))
+
+    def test_returns_none_on_empty_string(self):
+        from intake.pdf_parser import _extract_reference_cage
+        self.assertIsNone(_extract_reference_cage(""))
+
+    def test_uppercases_result(self):
+        from intake.pdf_parser import _extract_reference_cage
+        self.assertEqual(
+            _extract_reference_cage("Offer/Quote dated 2026 MAR 10, 3wgd1 QUOTE1"),
+            "3WGD1",
+        )
+
+
 def _stub_parse_result(**overrides) -> AwardParseResult:
     """A minimal AWD parse result. Override fields per test."""
     base = dict(
@@ -1046,6 +1068,7 @@ def _stub_parse_result(**overrides) -> AwardParseResult:
         idiq_supplier_name=None,
         idiq_supplier_cage=None,
         idiq_supplier_part_number=None,
+        page1_reference_cage=None,
     )
     base.update(overrides)
     return AwardParseResult(**base)
@@ -1107,6 +1130,32 @@ class IngestUnitTests(TestCase):
         with patch('intake.ingest.parse_award_pdf', return_value=result):
             draft = ingest_pdf(b'fake', original_filename='supplier_none.pdf')
         self.assertIsNone(draft.data['clins'][0]['supplier_text'])
+
+    def test_page1_reference_cage_populates_clin_cage_as_fallback(self):
+        """When no per-CLIN or contract-level cage is extracted, page1_reference_cage flows through."""
+        base_clin = _stub_parse_result().clins[0]
+        clin_no_cage = replace(base_clin, cage=None)
+        result = _stub_parse_result(
+            contract_supplier_cage=None,
+            page1_reference_cage='06MA8',
+            clins=[clin_no_cage],
+        )
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='ref_cage_test.pdf')
+        self.assertEqual(draft.data['clins'][0]['cage'], '06MA8')
+
+    def test_per_clin_cage_wins_over_page1_reference_cage(self):
+        """Per-CLIN cage takes priority over page1_reference_cage fallback."""
+        base_clin = _stub_parse_result().clins[0]
+        clin_with_cage = replace(base_clin, cage='A1B2C')
+        result = _stub_parse_result(
+            contract_supplier_cage=None,
+            page1_reference_cage='06MA8',
+            clins=[clin_with_cage],
+        )
+        with patch('intake.ingest.parse_award_pdf', return_value=result):
+            draft = ingest_pdf(b'fake', original_filename='priority_test.pdf')
+        self.assertEqual(draft.data['clins'][0]['cage'], 'A1B2C')
 
     def test_packhouse_name_populates_packaging_charge_row(self):
         result = _stub_parse_result(

@@ -143,7 +143,7 @@ CLIN data shape (per-CLIN JSON keys, see `DraftClin` in `schemas.py`):
   mapped from `ClinParseResult.inspection_point` at ingest — previously
   missing from `_clin_to_dict`; value is `'O'` or `'D'`),
   `fob` (O/D)
-- Supplier data: `supplier_text` + `supplier_id`, `supplier_due_date`,
+- Supplier data: `supplier_text` + `supplier_id`, **`cage`** (optional; pre-populated at ingest from a three-tier drill-down: per-CLIN PLACE OF INSPECTION CAGE → contract-level PLACE OF INSPECTION CAGE → Block 16 "Reference your" CAGE. Pre-fills the supplier Match modal search. Analyst cannot edit directly.), `supplier_due_date`,
   `special_payment_terms` (stringified PK), `unit_price` (supplier quote
   price — manual entry only, never populated from PDF ingest).
   `supplier_text` is pre-populated at ingest from the "PLACE OF INSPECTION
@@ -391,6 +391,8 @@ entry from the parsed supplier/CAGE/part_number when the parser
 successfully extracted it. The NSN side of the pair is left blank for
 analyst matching. The supplier_id is left null until the analyst uses
 the Match button in the editor.
+
+**Block 16 "Reference your" CAGE (2026-06-29):** `_extract_reference_cage(page_one_text)` extracts the supplier CAGE code from the DLA-added text in Block 16 ("Offer/Quote dated YYYY MON DD, {CAGE} {REF}"). Stored as `AwardParseResult.page1_reference_cage`. Used as third-tier fallback in `_clin_to_dict` (per-CLIN cage → contract_supplier_cage → page1_reference_cage) and in IDIQ approved_pairs cage. This is NOT the prime contractor CAGE from Block 9.
 
 `ingest_pdf(file, original_filename='...')` returns the new `DraftContract`
 or raises:

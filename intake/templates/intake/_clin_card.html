@@ -183,12 +183,16 @@
                             data-match-open data-match-type="supplier"
                             data-target-path="clin:{{ idx }}:supplier"
                             data-match-title="Supplier"
-                            data-match-original="{{ clin|get_item:'supplier_text'|default:'' }}">
+                            data-match-original="{{ clin|get_item:'supplier_text'|default:'' }}"
+                            data-match-cage="{{ clin|get_item:'cage'|default:'' }}">
                         {% if sid %}✓ Matched{% else %}Match{% endif %}
                     </button>
                 </div>
                 <input type="hidden" name="clin-{{ idx }}-supplier_id"
                        value="{{ sid|default:'' }}">
+                <input type="hidden" name="clin-{{ idx }}-cage"
+                       class="clin-cage-input"
+                       value="{{ clin|get_item:'cage'|default:'' }}">
                 {% if sid %}
                     {% with flags=supplier_flags|get_item:sid %}
                         {% if flags.probation %}

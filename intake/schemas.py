@@ -101,6 +101,7 @@ class DraftClin(BaseModel):
     nsn_description: Optional[str] = None
     supplier_text: Optional[str] = None
     supplier_id: Optional[int] = None
+    cage: Optional[str] = None
     order_qty: Optional[float] = None
     uom: Optional[str] = None
     unit_price: Optional[Decimal] = None

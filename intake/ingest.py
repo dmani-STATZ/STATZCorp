@@ -97,6 +97,8 @@ def _ia_from_clin_parse(c: ClinParseResult) -> Optional[str]:
 def _clin_to_dict(
     c: ClinParseResult,
     contract_supplier_name: Optional[str] = None,
+    contract_supplier_cage: Optional[str] = None,
+    page1_reference_cage: Optional[str] = None,
 ) -> dict:
     row = {
         'item_number': c.item_number,
@@ -112,6 +114,8 @@ def _clin_to_dict(
         'fob': c.fob,
         'ia': _ia_from_clin_parse(c),
         'supplier_text': c.supplier_name or contract_supplier_name or None,
+        # Drill-down: per-CLIN > contract-level > page 1 Block 16 fallback
+        'cage': (c.cage or contract_supplier_cage or page1_reference_cage or None),
     }
     if not (row.get('item_type') or '').strip():
         row['item_type'] = 'P'
@@ -144,7 +148,12 @@ def _result_to_data(result: AwardParseResult) -> dict:
     # AWD/PO/DO: CLINs + optional Packaging charge row in level_charges
     if result.clins:
         data['clins'] = [
-            _clin_to_dict(c, result.contract_supplier_name)
+            _clin_to_dict(
+                c,
+                contract_supplier_name=result.contract_supplier_name,
+                contract_supplier_cage=result.contract_supplier_cage,
+                page1_reference_cage=result.page1_reference_cage,
+            )
             for c in result.clins
         ]
         # Derive contract due_date as the earliest CLIN due_date.
@@ -202,7 +211,7 @@ def _result_to_data(result: AwardParseResult) -> dict:
         pair = {
             'supplier_text': result.idiq_supplier_name or '',
             'supplier_id': None,
-            'cage': result.idiq_supplier_cage or '',
+            'cage': result.idiq_supplier_cage or result.page1_reference_cage or None,
             'nsn_text': '',
             'nsn_id': None,
             'min_order_qty': '',

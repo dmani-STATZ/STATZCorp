@@ -312,12 +312,7 @@ parser and extended with intake-specific extraction logic.
 the parser grows new fields, update the mapping there AND add a test under
 `IngestUnitTests`. Don't sprinkle conversion logic in views.
 
-**Supplier drill-down:** The parser extracts supplier CAGE + name using a
-two-level drill-down. Contract-level "PLACE OF INSPECTION FOR SUPPLIES"
-establishes the default. CLIN-level occurrence overrides per CLIN. If
-neither level has the block, supplier fields are None and the analyst fills
-manually. Do NOT use contractor_cage / contractor_name (Block 9 prime
-contractor) as supplier fallback — they are different entities.
+**Supplier drill-down (three tiers now):** (1) Per-CLIN "PLACE OF INSPECTION FOR SUPPLIES" cage+name. (2) Contract-level "PLACE OF INSPECTION FOR SUPPLIES" cage+name. (3) `page1_reference_cage` — Block 16 "Reference your" CAGE extracted by `_extract_reference_cage(page_one_text)`. Tier 3 provides CAGE only (no name). `cage` is now a field on `DraftClin` (`Optional[str]`). Do NOT use `contractor_cage` (Block 9) as any tier of this drill-down.
 
 **Packhouse drill-down:** Same pattern. Contract-level "PLACE OF INSPECTION
 FOR PACKAGING" is the default. CLIN-level overrides per CLIN. Packhouse drill-down

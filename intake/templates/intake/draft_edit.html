@@ -814,9 +814,11 @@
                 <div class="col-span-2"><label class="label block mb-1">Supplier</label>
                     <div class="input-group input-group-sm">
                         <input type="text" data-name="clin-__CLINIDX__-supplier_text" class="form-control form-control-sm">
-                        <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="supplier" data-target-path="clin:__CLINIDX__:supplier" data-match-title="Supplier">Match</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-match-open data-match-type="supplier" data-target-path="clin:__CLINIDX__:supplier" data-match-title="Supplier" data-match-cage="">Match</button>
                     </div>
-                    <input type="hidden" data-name="clin-__CLINIDX__-supplier_id"></div>
+                    <input type="hidden" data-name="clin-__CLINIDX__-supplier_id">
+                    <input type="hidden" data-name="clin-__CLINIDX__-cage" class="clin-cage-input" value="">
+                </div>
                 <div><label class="label block mb-1">Supplier Due Date</label>
                     <input type="date" data-name="clin-__CLINIDX__-supplier_due_date" class="form-control form-control-sm"></div>
                 <div><label class="label block mb-1">Special Payment Terms</label>
@@ -1915,20 +1917,35 @@
 </script>
 
 <script>
-// Pre-fill match modal with CAGE value when Match button is clicked on a charge row
+// Pre-fill match modal with CAGE value when Match button is clicked on a charge or CLIN row
 document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-match-open][data-match-type="supplier"]');
     if (!btn) return;
     var targetPath = btn.dataset.targetPath || '';
-    if (!targetPath.startsWith('charge:') && !targetPath.startsWith('level_charge:')) return;
 
-    var row = btn.closest('.charge-row');
-    if (!row) return;
-    var cageInput = row.querySelector('.charge-cage-input');
-    var supplierText = row.querySelector('.charge-supplier-text');
+    if (targetPath.startsWith('charge:') || targetPath.startsWith('level_charge:')) {
+        var row = btn.closest('.charge-row');
+        if (!row) return;
+        var cageInput = row.querySelector('.charge-cage-input');
+        var supplierText = row.querySelector('.charge-supplier-text');
 
-    if (cageInput && cageInput.value.trim() && (!supplierText || !supplierText.value.trim())) {
-        btn.dataset.matchOriginal = cageInput.value.trim();
+        if (cageInput && cageInput.value.trim() && (!supplierText || !supplierText.value.trim())) {
+            btn.dataset.matchOriginal = cageInput.value.trim();
+        }
+        return;
+    }
+
+    if (targetPath.startsWith('clin:') && targetPath.endsWith(':supplier')) {
+        var card = btn.closest('.clin-card');
+        if (!card) return;
+        var supplierText = card.querySelector('[name$="-supplier_text"], [data-name$="-supplier_text"]');
+        if (supplierText && supplierText.value.trim()) return;
+
+        var cageInput = card.querySelector('.clin-cage-input');
+        var cage = (cageInput && cageInput.value.trim()) || (btn.dataset.matchCage || '').trim();
+        if (cage) {
+            btn.dataset.matchOriginal = cage;
+        }
     }
 }, true);
 </script>
