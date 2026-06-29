@@ -238,7 +238,11 @@ Actions:
 - `search` — read-only, no lock required. Supplier search automatically
   excludes archived suppliers (`archived=False`). Archived suppliers can
   still be matched by ID if already stored in a draft's JSON from before
-  archival.
+  archival. NSN search automatically normalizes a bare 13-digit query to
+  dashed canonical format (XXXX-XX-XXX-XXXX) before filtering, so analysts
+  do not need to type dashes to find a match. The `_normalize_nsn_code()`
+  helper in `matchers.py` is the single normalization point; it is also
+  applied in `_create_nsn()` before dedup check and storage.
 - `apply` — locks the row, writes `*_text` + `*_id` (+ `*_description` /
   `*_cage` where relevant) under the chosen path, saves through schema
   validation.

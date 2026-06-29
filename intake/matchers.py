@@ -29,6 +29,7 @@ but the UI re-renders from `*_text`.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Callable
 
 from django.db import IntegrityError, transaction
@@ -39,6 +40,31 @@ from products.models import Nsn
 from suppliers.models import Supplier
 
 logger = logging.getLogger(__name__)
+
+_NSN_BARE_DIGITS_RE = re.compile(r'^\d{13}$')
+
+
+def _normalize_nsn_code(value: str) -> str:
+    """
+    Convert an undashed 13-digit NSN to canonical DLA format (XXXX-XX-XXX-XXXX).
+
+    If `value` is already dashed, contains non-digit characters other than
+    dashes, or is not exactly 13 stripped digits, it is returned unchanged.
+    This handles standard Federal Stock Numbers only — S-codes, part numbers,
+    and partial search queries pass through untouched.
+
+    Examples:
+        '5995015690560'      → '5995-01-569-0560'
+        '5995-01-569-0560'   → '5995-01-569-0560'  (already canonical)
+        'S00000053'          → 'S00000053'           (service code — pass through)
+        '5995'               → '5995'                (partial — pass through)
+    """
+    digits = value.replace('-', '').replace(' ', '')
+    if _NSN_BARE_DIGITS_RE.match(digits):
+        # Re-format to XXXX-XX-XXX-XXXX regardless of whether dashes were present
+        return f"{digits[:4]}-{digits[4:6]}-{digits[6:9]}-{digits[9:]}"
+    return value
+
 
 MATCH_TYPES = ('buyer', 'idiq', 'nsn', 'supplier', 'contract')
 
@@ -78,9 +104,19 @@ def _search_idiq(q: str):
 
 
 def _search_nsn(q: str):
-    qs = Nsn.objects.filter(
-        Q(nsn_code__icontains=q) | Q(description__icontains=q)
-    )[:20]
+    normalized_q = _normalize_nsn_code(q)
+    # Build the filter with both the raw query and its normalized form.
+    # When the analyst types an undashed 13-digit NSN the two branches
+    # collapse to the same string; that is harmless — MSSQL deduplicates
+    # OR branches against the same predicate cheaply.
+    filter_q = (
+        Q(nsn_code__icontains=q)
+        | Q(description__icontains=q)
+    )
+    if normalized_q != q:
+        # User typed undashed digits — add a second NSN branch for the dashed form.
+        filter_q = filter_q | Q(nsn_code__icontains=normalized_q)
+    qs = Nsn.objects.filter(filter_q)[:20]
     return [
         {
             'id': n.id,
@@ -229,7 +265,11 @@ def _create_buyer(payload: dict) -> int:
 
 
 def _create_nsn(payload: dict) -> int:
-    nsn_code = _clean(payload.get('nsn_code'), required_field='NSN code')
+    raw_code = _clean(payload.get('nsn_code'), required_field='NSN code')
+    # Normalize to dashed canonical form before dedup check and storage.
+    # Prevents duplicate rows when the analyst types '5995015690560'
+    # while '5995-01-569-0560' already exists.
+    nsn_code = _normalize_nsn_code(raw_code)
     description = _clean(payload.get('description'))
     if Nsn.objects.filter(nsn_code__iexact=nsn_code).exists():
         raise MatcherError(

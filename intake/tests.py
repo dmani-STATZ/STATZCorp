@@ -2001,6 +2001,47 @@ class MatcherCreateUnitTests(TestCase):
         with self.assertRaises(MatcherError):
             create_record('nsn', {'description': 'orphan'})
 
+    # --- NSN normalization ---
+
+    def test_search_nsn_undashed_finds_dashed_record(self):
+        """13-digit undashed query must match a canonically dashed stored NSN."""
+        from intake.matchers import search
+        Nsn.objects.create(nsn_code='5995-01-569-0560', description='Cable Assy')
+        results = search('nsn', '5995015690560')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['text'], '5995-01-569-0560')
+
+    def test_search_nsn_dashed_still_works(self):
+        """Dashed query must still match — regression guard."""
+        from intake.matchers import search
+        Nsn.objects.create(nsn_code='5995-01-569-0560', description='Cable Assy')
+        results = search('nsn', '5995-01')
+        self.assertEqual(len(results), 1)
+
+    def test_create_nsn_normalizes_undashed_code(self):
+        """Creating an NSN with undashed digits must store canonical dashed form."""
+        from intake.matchers import create_record
+        pk = create_record('nsn', {'nsn_code': '5995015690560'})
+        nsn = Nsn.objects.get(pk=pk)
+        self.assertEqual(nsn.nsn_code, '5995-01-569-0560')
+
+    def test_create_nsn_dedup_catches_undashed_duplicate(self):
+        """Creating an undashed NSN that matches an existing dashed one must raise."""
+        from intake.matchers import create_record
+        Nsn.objects.create(nsn_code='5995-01-569-0560')
+        with self.assertRaises(MatcherError):
+            create_record('nsn', {'nsn_code': '5995015690560'})
+
+    def test_normalize_nsn_code_passthrough_service_code(self):
+        """S-codes must not be mangled."""
+        from intake.matchers import _normalize_nsn_code
+        self.assertEqual(_normalize_nsn_code('S00000053'), 'S00000053')
+
+    def test_normalize_nsn_code_already_dashed(self):
+        """Already-dashed input must return identical string."""
+        from intake.matchers import _normalize_nsn_code
+        self.assertEqual(_normalize_nsn_code('5995-01-569-0560'), '5995-01-569-0560')
+
     def test_supplier_create_requires_cage(self):
         from intake.matchers import create_record
         with self.assertRaises(MatcherError):

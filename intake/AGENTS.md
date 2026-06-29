@@ -5,6 +5,11 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
 ## Safe-Edit Rules
 
 ### Schema changes
+- **NSN code canonicalization:** `_normalize_nsn_code(value)` in `matchers.py`
+  is the single point of NSN dash-normalization. Call it on any user-supplied
+  NSN string before persistence or comparison. It is safe to call on S-codes,
+  part numbers, and partial strings — non-13-digit-digit strings pass through
+  unchanged. Do NOT add a second normalization path elsewhere.
 - **Never bypass `intake.schemas.validate_data` for stored JSON.** If a new
   field is needed, add it to the per-type Pydantic schema first, then write
   it. Untyped writes will silently round-trip the wrong shape and break the
