@@ -201,15 +201,31 @@ Run repo-wide search before any of these changes:
 - Signal-based automation exists in `transactions` and `users`; changing save paths or middleware can silently remove side effects.
 
 ## 10. Testing and Verification Expectations
-Test coverage is uneven:
+Test coverage is uneven but growing. Apps with real test suites:
 
-- `training/tests.py` has substantial coverage.
-- Most other app `tests.py` files are stubs.
+- `training` — substantial coverage (`training/tests.py`)
+- `intake` — lock semantics, schema validation, matcher, editor flow (`intake/tests.py`)
+- `contracts` — CLIN Fix tool (`contracts/tests/test_clin_fix.py`), contract create service (`contracts/tests/test_create_service.py`)
+- `reports` — minimal automated coverage; relies on manual verification flows
+
+Always run tests scoped to the app(s) you modified:
+
+```bash
+python manage.py test <app_name>
+# Examples:
+python manage.py test training
+python manage.py test intake
+python manage.py test contracts.tests.test_clin_fix
+python manage.py test contracts.tests.test_create_service
+```
+
+Do NOT run `python manage.py test training` as a universal catch-all for non-training changes.
 
 After behavior changes, expected verification is:
 
 - Run `python manage.py check`.
 - Run `python manage.py makemigrations --check` after model edits.
+- Run `python manage.py test <modified_app>` where the app has a real test suite.
 - Manually validate changed flows, including coupled apps.
 - Re-test permissions and company scoping after queryset/view/middleware changes.
 - Re-test admin pages after schema/form changes for registered models.
@@ -343,7 +359,7 @@ Orphaned `QueueContract` rows (`contract_number` empty) can be reconciled via **
 
 This project does not use Tailwind in any form. All styling uses Bootstrap 5 plus the project's three-file CSS architecture:
 
-- `static/css/theme-vars.css` — brand tokens for header and sidebar only: `--company-primary`, `--company-secondary`, `--header-height`. Spacelab Bootstrap 5.3 handles all other theming. Do not add surface, text, border, or button tokens here.
+- `static/css/theme-vars.css` — authoritative location for brand tokens (`--company-primary`, `--company-secondary`, `--header-height`) and light-mode Bootstrap text color overrides (`--bs-body-color`, `--bs-secondary-color`, `--bs-tertiary-color`). Keep light and dark scopes strictly separated: light-mode text tokens go under `[data-bs-theme="light"]` only; never override text colors inside `[data-bs-theme="dark"]`. Spacelab Bootstrap 5.3 handles all other theming.
 - `static/css/app-core.css` — all component, layout, and button styles
 - `static/css/utilities.css` — utility and helper classes
 

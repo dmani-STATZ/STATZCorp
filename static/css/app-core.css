@@ -1199,7 +1199,7 @@ textarea {
 }
 
 .reports-admin .muted {
-    color: #6b7280;
+    color: #3a3a3a;
 }
 
 .reports-scope .panel-box {
@@ -1224,7 +1224,7 @@ textarea {
 }
 
 .reports-scope .empty {
-    color: #6b7280;
+    color: #3a3a3a;
 }
 
 /* Reports admin: self-contained palette (dark overrides) */
@@ -1605,6 +1605,25 @@ main {
     color: var(--bs-body-color);
     border-color: var(--bs-border-color);
     border-bottom: 2px solid var(--bs-primary, #0d6efd);
+}
+
+/* Gov Actions / Log Fields panel — light mode text contrast fix */
+[data-bs-theme="light"] .gov-log-tab-btn:not(.active) {
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="light"] .gov-log-panel .text-gray-700,
+[data-bs-theme="light"] .gov-log-panel .text-gray-600,
+[data-bs-theme="light"] .gov-log-panel th {
+    color: #1a1a1a;
+}
+
+[data-bs-theme="light"] .gov-log-panel .text-gray-500 {
+    color: #3a3a3a;
+}
+
+[data-bs-theme="light"] .gov-log-panel table td {
+    color: #1a1a1a;
 }
 
 /* Notes popup: scroll row merges .app-tabs with the scroll area */

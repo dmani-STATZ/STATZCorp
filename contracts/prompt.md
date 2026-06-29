@@ -39,9 +39,6 @@ Every final prompt must follow this specific structural hierarchy:
 
 ### Precision Standards
 * **Zero Assumption:** The prompt must be so detailed that the coding agent does not have to "guess" or "invent" logic. Specify variable names, logic gates, and error handling.
-* **Tool Selection:**
-    * **Cursor:** Use for backend logic, database migrations, Python/Django services, and general code architecture.
-    * **Claude Code:** Use for UX/UI layouts, frontend styling, and complex dashboard components.
 * **Documentation Loop:** Every prompt **must** include a specific instruction for the agent to update `CONTEXT.md` (project state) and `AGENT.md` (active goals/tasks) within the sales app to ensure the project history remains accurate.
 
 ## 4. Technical Environment

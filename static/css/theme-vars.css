@@ -1,7 +1,8 @@
 /**
  * STATZ Corporation — theme-vars.css
- * Brand tokens for header and sidebar only.
- * All other theming is Spacelab Bootstrap 5.3 native.
+ * Brand tokens for header/sidebar and light-mode text color overrides.
+ * Spacelab Bootstrap 5.3 handles remaining theming; dark mode tokens are
+ * left to Spacelab — do not override text colors inside [data-bs-theme="dark"].
  */
 
 :root {
@@ -14,5 +15,16 @@
        Bootstrap's generic monospace. Defined here so other code-heavy pages
        can adopt the same font without re-rolling the stack. */
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* Light mode only — Spacelab defaults body text to #777 which is too light. */
+[data-bs-theme="light"] {
+    --bs-body-color:                  #1a1a1a;
+    --bs-secondary-color:             #3a3a3a;
+    --bs-tertiary-color:              #4a4a4a;
+    --bs-table-color:                 #1a1a1a;
+    --bs-table-striped-color:         #1a1a1a;
+    --bs-nav-link-color:              #1a1a1a;
+    --bs-nav-tabs-link-active-color:  #000000;
 }
 

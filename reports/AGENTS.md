@@ -99,7 +99,7 @@ All seven templates are production-built Bootstrap 5 UIs. Current template files
   - `reports:draft_iterate`
   - `reports:draft_promote`
   - `reports:draft_discard`
-- `reports:revoke_share` does not yet exist — the Revoke button in `share_report.html` is rendered disabled with a TODO comment.
+- `reports:revoke_share` — POST `/reports/share/<uuid:share_pk>/revoke/` — is fully implemented. Ownership check (`share.report.owner != request.user` → 403), `share.delete()`, redirect to `reports:share_report`. Keep it stable.
 
 ### Critical DOM IDs (JS depends on these in admin_queue.html)
 The admin queue is a 4-step wizard. All logic is in `window._w` (an object exposing wizard functions). Do not rename IDs without updating both the HTML and the script block:

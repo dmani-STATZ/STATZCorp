@@ -93,7 +93,6 @@ from .views import (
     add_note,
     delete_note,
     note_update,
-    api_add_note,
     list_content_types,
     get_combined_notes,
     # Reminder views
@@ -495,7 +494,6 @@ urlpatterns = [
     path("note/update/<int:pk>/", note_update, name="note_update"),
     path("note/<int:pk>/detail.json", note_views.note_detail_json, name="note_detail_json"),
     path("note/delete/<int:note_id>/", delete_note, name="delete_note"),
-    path("api/add-note/", api_add_note, name="api_add_note"),  # DEPRECATED — see note_views.api_add_note; no active callers
     path("api/content-types/", list_content_types, name="list_content_types"),
     # Reminder management
     path("reminders/", ReminderListView.as_view(), name="reminders_list"),

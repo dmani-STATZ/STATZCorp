@@ -81,7 +81,6 @@ from .note_views import (
     add_note,
     delete_note,
     note_update,
-    api_add_note,
     list_content_types,
     get_combined_notes,
 )

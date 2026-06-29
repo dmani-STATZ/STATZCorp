@@ -111,7 +111,7 @@ def add_note(request, content_type_id, object_id):
                 note.note_tag = 'finance'
             note.save()
 
-            # Optional reminder creation (mirrors old api_add_note behavior).
+            # Optional reminder creation when checkbox is set.
             create_reminder = request.POST.get('create_reminder') == 'on'
             if create_reminder:
                 reminder_title = request.POST.get('reminder_title', '').strip()
@@ -491,117 +491,6 @@ def notes_popup_tab(request, contract_id, tab_type, clin_id=None):
         'tab_type': tab_type,
         'clin_id': clin_id,
     })
-
-
-@conditional_login_required
-def api_add_note(request):
-    """
-    API endpoint to add a note with an optional reminder.
-    This is used by the note modal dialog.
-    """
-    # DEPRECATED: This endpoint is no longer called by any template or JS in the app.
-    # All note creation (including reminder attachment) now goes through `add_note`.
-    # This function is retained temporarily to avoid breaking bookmarked URLs.
-    # Planned removal: next cleanup pass.
-
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
-    
-    # Get form data
-    content_type_id = request.POST.get('content_type_id')
-    object_id = request.POST.get('object_id')
-    note_text = request.POST.get('note')
-    create_reminder = request.POST.get('create_reminder') == 'on'
-    
-    # Store the referring URL for redirection
-    referring_url = request.POST.get('referring_url') or request.META.get('HTTP_REFERER', '/')
-    
-    # Validate required fields
-    missing_fields = []
-    if not content_type_id:
-        missing_fields.append('content_type_id')
-    if not object_id:
-        missing_fields.append('object_id')
-    if not note_text:
-        missing_fields.append('note')
-    
-    if missing_fields:
-        error_msg = f"Missing required fields: {', '.join(missing_fields)}"
-        messages.error(request, error_msg)
-        return redirect(referring_url)
-    
-    try:
-        # Get content type and object
-        try:
-            content_type = ContentType.objects.get(id=content_type_id)
-        except ContentType.DoesNotExist:
-            error_msg = f'Content type with id {content_type_id} does not exist'
-            messages.error(request, error_msg)
-            return redirect(referring_url)
-        
-        # Get the model class
-        model_class = content_type.model_class()
-        if model_class is None:
-            error_msg = f'Could not get model class for content type {content_type}'
-            messages.error(request, error_msg)
-            return redirect(referring_url)
-        
-        try:
-            qs = model_class.objects
-            if any(f.name == 'company' for f in model_class._meta.fields):
-                qs = qs.filter(company=request.active_company)
-            content_object = qs.get(id=object_id)
-            if content_object is None:
-                error_msg = f'Object with id {object_id} does not exist'
-                messages.error(request, error_msg)
-                return redirect(referring_url)
-        except Exception as e:
-            error_msg = f'Error retrieving object: {str(e)}'
-            messages.error(request, error_msg)
-            return redirect(referring_url)
-        
-        # Create note
-        note = Note.objects.create(
-            content_type=content_type,
-            object_id=object_id,
-            note=note_text,
-            created_by=request.user
-        )
-        
-        # Create reminder if requested
-        if create_reminder:
-            reminder_title = request.POST.get('reminder_title')
-            reminder_text = request.POST.get('reminder_text')
-            reminder_date_str = request.POST.get('reminder_date')
-            
-            if all([reminder_title, reminder_date_str]):
-                try:
-                    # Parse reminder date
-                    reminder_date = timezone.datetime.fromisoformat(reminder_date_str)
-                    
-                    # Create reminder
-                    reminder = Reminder.objects.create(
-                        reminder_title=reminder_title,
-                        reminder_text=reminder_text or '',
-                        reminder_date=reminder_date,
-                        reminder_user=request.user,
-                        reminder_completed=False,
-                        note=note,
-                        company=getattr(request, 'active_company', None)
-                    )
-                except Exception:
-                    # Don't fail the note creation if reminder creation errors
-                    pass
-        
-        # Add success message
-        messages.success(request, 'Note added successfully.')
-        
-        # Always redirect back to the referring page
-        return redirect(referring_url)
-        
-    except Exception as e:
-        messages.error(request, f'An error occurred: {str(e)}')
-        return redirect(referring_url)
 
 
 @conditional_login_required
