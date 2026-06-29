@@ -53,28 +53,36 @@ _GRID_TABLE_ID = "ctl00_cph1_grdAwardSearch"
 # These are the exact suffixes DLA uses (including the "Contact" misspelling).
 _SUFFIX_TO_KEY: dict[str, str] = {
     "_lblDeliveryOrder": "Delivery_Order_Number",
+    "_lblDeliveryOrderCounter": "Delivery_Order_Counter",
+    "_lblLastModPostingDate": "Last_Mod_Posting_Date",
     "_lblAwardDate": "Award_Date",
+    "_lblPostedDate": "Posted_Date",
     "_lblCage": "Awardee_CAGE_Code",
     "_lblTotalContactPrice": "Total_Contract_Price",  # DLA misspells "Contact"
     "_lblNsn": "NSN_Part_Number",
     "_lblNomenclature": "Nomenclature",
     "_lblPurchaseRequest": "Purchase_Request",
+    "_lblSolicitation": "Solicitation",
 }
 
 # The sentinel suffix used to identify data rows.
 _ROW_ANCHOR_SUFFIX = "_lblAwardBasicNumber"
 
-# All 8 required output keys.
+# Keys consumed by import_aw_records (nightly scraper + hot poll).
 REQUIRED_KEYS: frozenset[str] = frozenset(
     [
         "Award_Basic_Number",
         "Delivery_Order_Number",
+        "Delivery_Order_Counter",
+        "Last_Mod_Posting_Date",
         "Award_Date",
+        "Posted_Date",
         "Awardee_CAGE_Code",
         "Total_Contract_Price",
         "NSN_Part_Number",
         "Nomenclature",
         "Purchase_Request",
+        "Solicitation",
     ]
 )
 

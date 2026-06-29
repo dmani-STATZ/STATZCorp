@@ -192,6 +192,22 @@ class DibbsAwardMod(models.Model):
         blank=True,
         related_name="mods",
     )
+    matched_contract = models.ForeignKey(
+        "contracts.Contract",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="dibbs_mods",
+        db_index=True,
+    )
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    acknowledged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acknowledged_dibbs_mods",
+    )
 
     class Meta:
         db_table = "dibbs_award_mod"

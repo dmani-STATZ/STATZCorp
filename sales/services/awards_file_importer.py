@@ -123,6 +123,15 @@ def _read_batch_counters(batch: AwardImportBatch) -> dict:
     }
 
 
+def is_dibbs_mod_record(record: dict) -> bool:
+    """
+    True when the row should follow the MOD path in usp_process_award_staging.
+
+    Mirrors Step 2 classification: non-empty Last_Mod_Posting_Date → MOD.
+    """
+    return bool((record.get("Last_Mod_Posting_Date") or "").strip())
+
+
 def import_aw_records(
     records: list[dict],
     batch: AwardImportBatch,
@@ -133,6 +142,13 @@ def import_aw_records(
     Converts raw scraper dicts to AwardRow objects,
     stages them, calls proc, returns result dict.
     """
+    from sales.services.contract_mods import (
+        active_company_cage_codes,
+        match_new_mods_after_import,
+        max_dibbs_award_mod_id,
+    )
+
+    before_max_mod_id = max_dibbs_award_mod_id()
     rows = []
     warnings = []
     for d in records:
@@ -168,6 +184,10 @@ def import_aw_records(
     stage_id = uuid.uuid4()
     _stage_rows(rows, batch, stage_id, aw_file_date)
     _call_proc(stage_id)
+    match_new_mods_after_import(
+        before_max_mod_id=before_max_mod_id,
+        active_cages=active_company_cage_codes(),
+    )
     batch.refresh_from_db()
     batch.row_count = len(records)
     batch.save(update_fields=["row_count"])
@@ -205,9 +225,20 @@ def import_aw_file(
         we_won_count=0,
     )
 
+    from sales.services.contract_mods import (
+        active_company_cage_codes,
+        match_new_mods_after_import,
+        max_dibbs_award_mod_id,
+    )
+
+    before_max_mod_id = max_dibbs_award_mod_id()
     stage_id = uuid.uuid4()
     _stage_rows(parse_result.rows, batch, stage_id, parse_result.award_date)
     _call_proc(stage_id)
+    match_new_mods_after_import(
+        before_max_mod_id=before_max_mod_id,
+        active_cages=active_company_cage_codes(),
+    )
     counters = _read_batch_counters(batch)
 
     base = {

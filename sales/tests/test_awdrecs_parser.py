@@ -143,6 +143,9 @@ class TestParseAwdrecsWithRows(unittest.TestCase):
                 f"Row {i} Total_Contract_Price not 'See Award Doc': {row['Total_Contract_Price']!r}",
             )
 
+    def test_last_mod_posting_date_extracted(self):
+        self.assertEqual(self.rows[0]["Last_Mod_Posting_Date"], "06-02-2026")
+
 
 # ---------------------------------------------------------------------------
 # EMPTY_HTML — no ctl00_cph1_grdAwardSearch table → []

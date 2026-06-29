@@ -484,6 +484,7 @@
                             <td class="text-end">
                                 <span class="value-cell {% if clin.has_shipments %}has-shipments{% endif %}"
                                       role="button" tabindex="0"
+                                      title="Item value ledger — log commissions and costs; entries sum to this total"
                                       data-clin="{{ clin.id }}"
                                       data-type="item_value"
                                       data-value="{{ clin.item_value|floatformat:2 }}"
@@ -1757,8 +1758,19 @@ window.financeShipmentsByClin = {
             const clinId = this.dataset.clin;
             const fieldType = this.dataset.type;
 
-            // Set-once contract facts -> direct edit via the Transactions modal.
-            if (fieldType === 'item_value' || fieldType === 'quote_value') {
+            // Pre-flight 2026-06-26: 32 PaymentHistory item_value rows on CLIN entities; 1 non-zero delta
+            // (clin_id=10004, SPE8E9-26-V-1326, ledger $58374 vs stored $50760, delta $7614) — manual cleanup decision.
+            // Item Value → Payment History popup (Cori: ledger of commissions + costs that sum to total)
+            if (fieldType === 'item_value') {
+                const currentValue = this.dataset.value || '0.00';
+                if (typeof openPaymentHistoryPopup === 'function') {
+                    openPaymentHistoryPopup('clin', clinId, 'item_value', 'finance_audit', currentValue);
+                }
+                return;
+            }
+
+            // Quote Value → direct field edit via the Transactions modal (unchanged)
+            if (fieldType === 'quote_value') {
                 if (typeof openTransactionsEditModal === 'function' && window.clinContentTypeId) {
                     openTransactionsEditModal(window.clinContentTypeId, clinId, fieldType);
                 }

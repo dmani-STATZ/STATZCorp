@@ -795,6 +795,47 @@
             </div>
         </div>
     </div>
+
+    <!-- DIBBS Modifications -->
+    <div class="card card-padded !p-2 mt-2 mb-2">
+        <h2 class="text-lg font-bold text-gray-800 mb-2">Modifications</h2>
+        {% if contract_mods %}
+        <div class="list-group list-group-flush" id="contract-mods-list">
+            {% for mod in contract_mods %}
+            <div class="list-group-item px-0 py-2 d-flex flex-wrap align-items-center justify-content-between gap-2"
+                 id="contract-mod-row-{{ mod.pk }}"
+                 data-mod-pk="{{ mod.pk }}">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="fw-semibold small">{{ mod.label }} · {{ mod.mod_date|date:"M j, Y" }}</span>
+                    {% if mod.mod_contract_price is not None %}
+                    <span class="text-muted small">${{ mod.mod_contract_price }}</span>
+                    {% endif %}
+                    {% if mod.award_record_url %}
+                    <a href="{{ mod.award_record_url }}" target="_blank" rel="noopener" class="small">
+                        View on DIBBS ↗
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="contract-mod-ack ms-auto">
+                    {% if mod.acknowledged_at %}
+                    <span class="text-success small contract-mod-acknowledged">
+                        ✓ Acknowledged by {{ mod.acknowledged_by_name }} · {{ mod.acknowledged_at|date:"M j, Y" }}
+                    </span>
+                    {% else %}
+                    <button type="button"
+                            class="btn btn-success btn-sm js-acknowledge-contract-mod"
+                            data-ack-url="{% url 'sales:acknowledge_contract_mod' mod.pk %}">
+                        Acknowledge
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-center text-muted py-2 small mb-0">No modifications</p>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Include Note Modal -->
@@ -2832,6 +2873,53 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
         });
     }
+})();
+</script>
+<script>
+(function () {
+    function getCsrfToken() {
+        var match = document.cookie.match(/csrftoken=([^;]+)/);
+        return match ? match[1] : '';
+    }
+
+    function formatAckDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.js-acknowledge-contract-mod');
+        if (!btn || btn.disabled) return;
+        var url = btn.getAttribute('data-ack-url');
+        if (!url) return;
+        btn.disabled = true;
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCsrfToken(),
+            },
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var row = btn.closest('[data-mod-pk]');
+                var ackCell = row ? row.querySelector('.contract-mod-ack') : null;
+                if (ackCell && data.acknowledged_at) {
+                    ackCell.innerHTML =
+                        '<span class="text-success small contract-mod-acknowledged">✓ Acknowledged by ' +
+                        (data.acknowledged_by || '') + ' · ' +
+                        formatAckDate(data.acknowledged_at) +
+                        '</span>';
+                } else {
+                    btn.disabled = false;
+                }
+            })
+            .catch(function () {
+                btn.disabled = false;
+            });
+    });
 })();
 </script>
 {% endblock %}

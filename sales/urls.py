@@ -5,6 +5,7 @@ from django.urls import path
 from django.views.generic import RedirectView
 from .views import rfq as views_rfq
 from .views.awards_wins import awards_wins
+from .views.contract_mods import acknowledge_contract_mod_view
 from .views import (
     dashboard,
     import_upload,
@@ -286,4 +287,9 @@ urlpatterns = [
     path("entity/cage/<str:cage_code>/no-quote/add/", entity_no_quote_add, name="entity_no_quote_add"),
     path("entity/cage/<str:cage_code>/", entity_lookup, name="entity_cage_lookup"),
     path("dibbs-notices/api/", dibbs_notices_api, name="dibbs_notices_api"),
+    path(
+        "contract-mods/<int:pk>/acknowledge/",
+        acknowledge_contract_mod_view,
+        name="acknowledge_contract_mod",
+    ),
 ]

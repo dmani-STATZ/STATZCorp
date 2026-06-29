@@ -222,14 +222,15 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 ### `sales` — DIBBS Procurement Workflow
 **Purpose:** Solicitation triage → RFQ dispatch → quote capture → BQ export; DIBBS award file imports; Tier 1–3 supplier matching; saved filter presets.
 
-**Owns:** `Solicitation`, `SolicitationLine`, `SupplierRFQ`, `GovernmentBid`, `DibbsAward`, `DibbsNotice`, `NsnProcurementHistory`, `SavedFilter`, `MassPassLog`, `SolPackaging`, `SAMEntityCache`
+**Owns:** `Solicitation`, `SolicitationLine`, `SupplierRFQ`, `GovernmentBid`, `DibbsAward`, `DibbsAwardMod`, `DibbsNotice`, `NsnProcurementHistory`, `SavedFilter`, `MassPassLog`, `SolPackaging`, `SAMEntityCache`
 
 **Consumes from other apps:**
 - `suppliers.Supplier` — RFQ targets, quotes
 - `contracts.Clin` — Tier 1 NSN scoring via SQL view `dibbs_supplier_nsn_scored`
 - `products.Nsn` — NSN matching, approved-source lookup
 
-**Other apps consume from it:** Nothing — terminal system
+**Other apps consume from it:**
+- `contracts` — reads matched `DibbsAwardMod` rows via `sales/services/contract_mods.py` (`mods_for_contract`) for the Modifications section on the contract management page; acknowledgement via `POST /sales/contract-mods/<pk>/acknowledge/`
 
 **URL prefix:** `/sales/`
 
@@ -248,6 +249,8 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
      - Storage & Reconciliation: Inserts batches into `AwardImportBatch` with source `SOURCE_HOT_POLL` (`"hot_poll"`). This batch source is never touched by the nightly `scrape_awards` reconciliation.
      - Schedule: Every 15 minutes during the WebJob business-hours window (6 AM–5 PM CT).
      - Backstop: The nightly `scrape_awards` continues unchanged as the full-day backstop for all contractors, and naturally dedupes hot-poll captured awards by award number.
+  - **Mod leak gate (hot poll):** `parse_awdrecs_html` must populate `Last_Mod_Posting_Date` (and related AW columns) so `import_aw_records` → `usp_process_award_staging` classifies MOD rows into `dibbs_award_mod` instead of `dibbs_award`. Rows with a populated mod posting date must not enter `WeWonAward` / Intake draft injection.
+  - **`DibbsAwardMod` contract link:** `matched_contract` (FK → `contracts.Contract`, exact `contract_number` match via `contracts/services/contract_number.normalize_contract_number`), `acknowledged_at`, `acknowledged_by`. Matching runs after each `import_aw_records` / `import_aw_file` when `awardee_cage` is in active `CompanyCAGE` **or** `sales/constants.py::PARTNER_CAGES` (currently ETP / `64W95`). Backfill (`0052`) iterates `contracts.Contract` — not CAGE-filtered — so partner-managed contracts are included when the contract number exists in DB. Contract-page display: `sales/services/contract_mods.py` (`mods_for_contract`, `build_award_record_url`).
   3. `check_dibbs_notices` (1440 min / daily): Scrapes `www.dibbs.bsm.dla.mil` homepage for public DIBBS Notices using `make_www_session()` (requests only — no Playwright). Upserts new rows into `DibbsNotice` via `get_or_create` on `(title, posted_date)`; never overwrites existing rows.
 - `DibbsNotice` rows are keyed on `(title, posted_date)`. Use `get_or_create` only. `external_url` is resolved to absolute URL at scrape time and stored; never re-updated. Do not use Playwright for notice scraping — `make_www_session()` is sufficient.
 

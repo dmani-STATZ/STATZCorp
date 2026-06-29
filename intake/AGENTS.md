@@ -411,6 +411,12 @@ canonical `Contract.contract_number`.
   WebJob piggyback (`queue_we_won_drafts`), immediately after
   `queue_we_won_awards`. Do not add a separate scrape path; the daily job
   already owns Playwright and batch-scoped we-won filtering.
+- **Modification rows are gated out of Intake:** Rows with a populated
+  `Last_Mod_Posting_Date` are classified as MODs in `usp_process_award_staging`
+  and land in `dibbs_award_mod` only — they never become `DibbsAward` rows,
+  never appear in `WeWonAward`, and never receive `DraftContract` skeletons.
+  The hot-poll parser (`sales/services/awdrecs_parser.py`) must extract mod
+  posting date so daytime polls follow the same gate as nightly AW imports.
 
 ### DIBBS PDF Fetch (On-Demand)
 
