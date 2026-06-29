@@ -454,6 +454,7 @@ Partner Commission Reconciliation matching normalizes contract numbers using `no
 
 ## Recent completions
 
+- **Dashboard open contract count (2026-06-29):** `total_contracts` is already injected by `ContractsDashboardView` and is available in `contract_lifecycle_dashboard.html` for future dashboard header additions.
 - **Dashboard period boundaries (2026-05-28):** `get_period_boundaries()` in `contracts/views/dashboard_views.py` now calls `timezone.localtime(now)` as its first step to prevent UTC-offset boundary bleed. `_start_end_of_day()` updated to return `date` objects for compatibility with `DateField` range filters (post migration 0054).
 
 ## Recent fixes
