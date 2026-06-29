@@ -176,6 +176,61 @@ def mods_for_contract(contract: Contract) -> list[ContractModItem]:
     return items
 
 
+def rematch_unmatched_mods() -> dict:
+    """
+    One-shot utility: attempt to match DibbsAwardMod rows where
+    matched_contract is NULL.
+
+    Called after the DB cleanup script strips the '\u00bb' artifact from
+    award_basic_number / delivery_order_number.  Normalizes both the mod's
+    contract identifier and the stored Contract.contract_number for
+    comparison.
+
+    Returns a summary dict:
+      { 'examined': int, 'matched': int, 'still_unmatched': int }
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Build a lookup of all contracts keyed by their normalized number.
+    contracts_by_norm = {
+        normalize_contract_number(c.contract_number): c
+        for c in Contract.objects.only('id', 'contract_number').iterator()
+    }
+
+    unmatched_qs = DibbsAwardMod.objects.filter(
+        matched_contract__isnull=True
+    ).only('id', 'award_basic_number', 'delivery_order_number')
+
+    examined = 0
+    matched = 0
+
+    for mod in unmatched_qs.iterator():
+        examined += 1
+        raw = mod.delivery_order_number.strip() or mod.award_basic_number.strip()
+        if not raw:
+            continue
+        norm = normalize_contract_number(raw)
+        contract = contracts_by_norm.get(norm)
+        if contract:
+            DibbsAwardMod.objects.filter(pk=mod.pk).update(
+                matched_contract=contract
+            )
+            matched += 1
+
+    still_unmatched = examined - matched
+    logger.info(
+        'rematch_unmatched_mods: examined=%d matched=%d still_unmatched=%d',
+        examined, matched, still_unmatched,
+    )
+    return {
+        'examined': examined,
+        'matched': matched,
+        'still_unmatched': still_unmatched,
+    }
+
+
 def acknowledge_contract_mod(mod: DibbsAwardMod, user: User) -> DibbsAwardMod:
     """
     Stamp acknowledgement on ``mod`` when not already acknowledged (idempotent).

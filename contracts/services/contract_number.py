@@ -32,6 +32,15 @@ def normalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
     if not s:
         return None
 
+    # Strip trailing DIBBS HTML navigation artifact (U+00BB '\u00bb') that can
+    # survive into stored values from legacy hot-poll scrape runs.
+    # Example: 'SPE4A626FZ3PY \u00bb' (len=15) → 'SPE4A626FZ3PY' (len=13).
+    _bb = s.find('\u00bb')
+    if _bb != -1:
+        s = s[:_bb].rstrip()
+    if not s:
+        return None
+
     if "-" in s:
         if _RE_DASHED_DLA.match(s):
             return s

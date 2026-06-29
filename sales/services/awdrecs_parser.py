@@ -95,6 +95,33 @@ def _clean(text: str) -> str:
     return text.replace("\xa0", "").strip()
 
 
+# Matches '\u00bb' (RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK) and everything
+# after it, including any preceding whitespace.  Applied only to contract-number-
+# adjacent fields; must NOT be applied to free-text fields like Nomenclature.
+_CONTRACT_ARTIFACT_RE = re.compile(r'\s*\u00bb.*$', re.DOTALL)
+
+
+def _clean_contract_field(text: str) -> str:
+    """
+    Like _clean(), but also strips trailing DIBBS HTML navigation artifacts.
+
+    DIBBS AwdRecs renders '\u00bb Award/Basic Package View' after contract number
+    cells.  In some HTML variants this appears as a direct text node rather
+    than inside a nested span, causing it to be captured by get_text().
+    This helper removes the artifact before the value is staged or stored.
+    """
+    return _CONTRACT_ARTIFACT_RE.sub('', _clean(text)).strip()
+
+
+# Keys whose values are contract number identifiers and must have HTML
+# navigation artifacts stripped.  Free-text fields (Nomenclature, NSN, etc.)
+# are intentionally excluded.
+_CONTRACT_FIELD_KEYS = frozenset({
+    "Delivery_Order_Number",
+    "Delivery_Order_Counter",
+})
+
+
 def _span_text(span: Tag) -> str:
     """Extract visible text from a <span>, normalising whitespace and &nbsp;."""
     return _clean(span.get_text(separator=" ", strip=True))
@@ -107,7 +134,7 @@ def _extract_award_basic_number(span: Tag) -> str:
     The span structure is:
         <span id="..._lblAwardBasicNumber">
             <img ...>              ← spacer image — ignored
-            SPE4A525P5041 \\n      ← this is the direct text node we want
+            SPE4A525P5041 \n      ← this is the direct text node we want
             <br>
             <img ...>              ← spacer image — ignored
             <span style="font-size:9px;">
@@ -117,13 +144,15 @@ def _extract_award_basic_number(span: Tag) -> str:
             </span>
         </span>
 
-    Strategy:
-    1. Iterate direct children; accumulate NavigableString nodes that are NOT
-       inside the nested <span> child; stop at the <br> or when hitting the
-       nested <span>.
-    2. Join the collected text fragments, strip, return.
-    3. Cross-check against the anchor href ``contract=`` param if present.
-       If both exist and disagree, prefer the span text and log a warning.
+    Some DIBBS HTML variants omit the font-size:9px wrapper span and place
+    '\u00bb' directly as a text node — or omit the <br> separator.  This
+    function handles both variants by:
+      1. Collecting leading NavigableString nodes up to the first <br>,
+         <span>, or <a> tag, then stripping DIBBS navigation artifacts via
+         _clean_contract_field().
+      2. Cross-checking against the href `contract=` param (always clean).
+         When both values are present and disagree, the href value wins
+         because it comes from the URL and never contains HTML artifacts.
     """
     # Step 1: collect leading text nodes (direct children only).
     text_parts: list[str] = []
@@ -131,35 +160,34 @@ def _extract_award_basic_number(span: Tag) -> str:
         if isinstance(child, NavigableString):
             text_parts.append(str(child))
         elif isinstance(child, Tag):
-            if child.name in ("img",):
+            if child.name == "img":
                 continue  # skip spacer images
-            if child.name in ("br",):
-                break  # stop at <br> — everything useful is before it
-            if child.name == "span":
-                break  # stop before the nested link sub-span
-    parsed_text = _clean("".join(text_parts))
+            # Stop at <br>, <span>, or <a> — everything useful is before them.
+            break
+    parsed_text = _clean_contract_field("".join(text_parts))
 
     # Step 2: fallback / cross-check via anchor href.
     href_contract: str = ""
-    nested_span = span.find("span")
-    if nested_span:
-        a_tag = nested_span.find("a", href=True)
-        if a_tag:
-            href = a_tag.get("href", "")
-            try:
-                qs = parse_qs(urlparse(href).query)
-                href_contract = qs.get("contract", [""])[0].strip()
-            except Exception:
-                pass
+    a_tag = span.find("a", href=True)
+    if a_tag:
+        href = a_tag.get("href", "")
+        try:
+            qs = parse_qs(urlparse(href).query)
+            href_contract = qs.get("contract", [""])[0].strip()
+        except Exception:
+            pass
 
     if parsed_text and href_contract:
         if parsed_text != href_contract:
             logger.warning(
                 "parse_awdrecs_html: Award_Basic_Number mismatch — "
-                "span text %r vs href contract param %r; using span text.",
+                "span text %r vs href contract param %r; using href value.",
                 parsed_text,
                 href_contract,
             )
+            # href_contract comes from the URL query string and is always
+            # free of HTML rendering artifacts — prefer it on mismatch.
+            return href_contract
         return parsed_text
 
     # If one is empty, return whichever is non-empty.
@@ -217,7 +245,12 @@ def parse_awdrecs_html(html: str) -> list[dict]:
             if span is None:
                 row[key] = ""
             else:
-                row[key] = _clean(span.get_text(separator=" ", strip=True))
+                raw = span.get_text(separator=" ", strip=True)
+                row[key] = (
+                    _clean_contract_field(raw)
+                    if key in _CONTRACT_FIELD_KEYS
+                    else _clean(raw)
+                )
 
         # Guarantee all 8 required keys are present (should already be true above).
         for key in REQUIRED_KEYS:

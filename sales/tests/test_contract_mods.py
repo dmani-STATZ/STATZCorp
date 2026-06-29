@@ -20,6 +20,7 @@ from sales.services.contract_mods import (
     build_award_record_url,
     match_dibbs_award_mod,
     mods_for_contract,
+    rematch_unmatched_mods,
 )
 from sales.tests.test_awdrecs_parser import WITH_ROWS_HTML
 
@@ -197,6 +198,34 @@ class ContractModMatchingTests(TestCase):
         matched = match_new_mods_after_import(before_max_mod_id=before_id)
         mod.refresh_from_db()
         self.assertEqual(matched, 1)
+        self.assertEqual(mod.matched_contract_id, self.contract.id)
+
+
+class RematchUnmatchedModsTests(TestCase):
+    def setUp(self):
+        self.company = Company.objects.create(
+            name="Rematch Co", slug="rematch-co", is_active=True
+        )
+        self.contract = Contract.objects.create(
+            company=self.company,
+            contract_number="SPE4A6-26-F-Z3PY",
+        )
+
+    def test_rematch_links_mod_with_legacy_artifact(self):
+        award = DibbsAward.objects.create(
+            sol_number="SOL-ART",
+            notice_id="N-ART",
+            award_date=date.today(),
+            award_basic_number="SPE4A626FZ3PY",
+        )
+        mod = DibbsAwardMod.objects.create(
+            award=award,
+            award_basic_number=f"SPE4A626FZ3PY \u00bb",
+            mod_date=date.today(),
+        )
+        result = rematch_unmatched_mods()
+        mod.refresh_from_db()
+        self.assertEqual(result["matched"], 1)
         self.assertEqual(mod.matched_contract_id, self.contract.id)
 
 

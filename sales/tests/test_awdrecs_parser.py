@@ -52,6 +52,72 @@ WITH_ROWS_HTML = """
 
 EMPTY_HTML = "<html><body><p>No records found.</p></body></html>"
 
+# Variant where » appears as a direct text node (no font-size:9px wrapper span).
+ARTIFACT_MISMATCH_HTML = """
+<html><body>
+<table id="ctl00_cph1_grdAwardSearch" cellspacing="0" cellpadding="4">
+<tr>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblRowNum">1</span></td>
+  <td>
+    <span id="ctl00_cph1_grdAwardSearch_ctl03_lblAwardBasicNumber">
+      SPE4A626FZ3PY \u00bb
+      <a href="AwdRec.aspx?contract=SPE4A626FZ3PY&amp;dlv=&amp;cnt=">
+        Award/Basic Package View
+      </a>
+    </span>
+  </td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblDeliveryOrder"></span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblDeliveryOrderCounter">&nbsp;</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblLastModPostingDate"></span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblCage">3WGD1</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblTotalContactPrice">100.00</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblAwardDate">06-02-2026</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblPostedDate">06-02-2026</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblNsn">1234567890123</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblNomenclature">WIDGET</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblPurchaseRequest"></span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblSolicitation"></span></td>
+</tr>
+</table>
+</body></html>
+"""
+
+# Delivery order cell with trailing » artifact in get_text() output.
+DO_ARTIFACT_HTML = """
+<html><body>
+<table id="ctl00_cph1_grdAwardSearch" cellspacing="0" cellpadding="4">
+<tr>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblRowNum">1</span></td>
+  <td>
+    <span id="ctl00_cph1_grdAwardSearch_ctl03_lblAwardBasicNumber">
+      SPE4A623D5431
+    </span>
+  </td>
+  <td>
+    <span id="ctl00_cph1_grdAwardSearch_ctl03_lblDeliveryOrder">
+      SPE4A626F197K \u00bb
+      <span style="font-size:9px;">
+        <a href="AwdRec.aspx?contract=SPE4A623D5431&amp;dlv=SPE4A626F197K&amp;cnt=17">
+          View
+        </a>
+      </span>
+    </span>
+  </td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblDeliveryOrderCounter">17</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblLastModPostingDate"></span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblCage">3WGD1</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblTotalContactPrice">100.00</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblAwardDate">06-02-2026</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblPostedDate">06-02-2026</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblNsn">1234567890123</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblNomenclature">WIDGET</span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblPurchaseRequest"></span></td>
+  <td><span id="ctl00_cph1_grdAwardSearch_ctl03_lblSolicitation"></span></td>
+</tr>
+</table>
+</body></html>
+"""
+
 
 # ---------------------------------------------------------------------------
 # WITH_ROWS_HTML — CAGE 3WGD1, has awards today
@@ -145,6 +211,18 @@ class TestParseAwdrecsWithRows(unittest.TestCase):
 
     def test_last_mod_posting_date_extracted(self):
         self.assertEqual(self.rows[0]["Last_Mod_Posting_Date"], "06-02-2026")
+
+
+class TestParseAwdrecsArtifactStripping(unittest.TestCase):
+    def test_mismatch_prefers_href_contract_param(self):
+        rows = parse_awdrecs_html(ARTIFACT_MISMATCH_HTML)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["Award_Basic_Number"], "SPE4A626FZ3PY")
+
+    def test_delivery_order_strips_artifact(self):
+        rows = parse_awdrecs_html(DO_ARTIFACT_HTML)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["Delivery_Order_Number"], "SPE4A626F197K")
 
 
 # ---------------------------------------------------------------------------
