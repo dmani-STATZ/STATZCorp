@@ -1,7 +1,7 @@
 ---
 id: 2026-06-26-finance-audit-split-shipment-fixes
 title: "Finance Audit: Split breakdown and shipment row fixes"
-published: false
+published: true
 publish_date: 2026-06-26
 tags: [fixed, finance]
 critical: false

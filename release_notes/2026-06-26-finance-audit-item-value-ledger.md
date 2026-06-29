@@ -1,7 +1,7 @@
 ---
 id: 2026-06-26-finance-audit-item-value-ledger
 title: Finance Audit — Item Value now supports ledger entries
-published: false
+published: true
 publish_date: 2026-06-26
 tags: [improved, finance]
 critical: false

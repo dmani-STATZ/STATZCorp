@@ -1,7 +1,7 @@
 ---
 id: 2026-06-28-contract-mods-section
 title: Contract modifications now appear on the contract page
-published: false
+published: true
 publish_date: 2026-06-28
 tags: [new, contracts]
 critical: false
