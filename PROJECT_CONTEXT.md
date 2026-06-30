@@ -550,6 +550,13 @@ The `tags` array will fail validation if it does not contain exactly two items:
 
 ---
 
+## Completed migrations and fixes
+
+- **Migration 0061 MSSQL deadlock fix (v2):** Root cause was `.iterator()` holding an open server-side cursor while INSERT commands fired on the same pyodbc connection. Fix: materialize contracts via `list(queryset.values(...))` before any writes, then `bulk_create` in batches of 500 inside a single atomic block.
+- **Migration 0052 MSSQL deadlock fix:** Root cause was `Contract.objects.iterator()` holding an open server-side cursor while `DibbsAwardMod.objects.get()` fired on the same pyodbc connection. Fix: materialize unmatched mods and contracts via `list(...)` / pre-built dicts before any secondary DB reads or writes, then `bulk_update` in batches of 500 inside a single atomic block. Idempotent on retry (`matched_contract__isnull=True` filter + skip already-set FKs).
+
+---
+
 ## Recently completed features
 
 Partner Commission Reconciliation: Upload a partner's Excel commission
