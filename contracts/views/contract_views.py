@@ -45,7 +45,7 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
     context_object_name = 'contract'
 
     def get_queryset(self):
-        return super().get_queryset().select_related('idiq_contract', 'status', 'company')
+        return super().get_queryset().select_related('idiq_contract', 'status', 'company', 'closed_by')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

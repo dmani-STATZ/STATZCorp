@@ -151,7 +151,7 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         if self.kwargs.get('pk'):
             company = self.get_active_company()
             qs = Contract.objects.select_related(
-                'buyer', 'contract_type', 'status', 'idiq_contract', 'company'
+                'buyer', 'contract_type', 'status', 'idiq_contract', 'company', 'closed_by'
             ).filter(company=company)
             return get_object_or_404(qs, pk=self.kwargs['pk'])
         return None

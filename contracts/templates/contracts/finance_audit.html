@@ -66,6 +66,12 @@
                     Due {{ contract.due_date|date:"m/d/Y"|default:"—" }}
                     <span class="text-body-secondary">·</span>
                     {{ contract.contract_type|default:"—" }}
+                    {% if contract.status.description == 'Closed' %}
+                    <span class="text-body-secondary">·</span>
+                    Closed {{ contract.date_closed|date:"m/d/Y"|default:"—" }}
+                    <span class="text-body-secondary">·</span>
+                    by {{ contract.closed_by.get_full_name|default:contract.closed_by.username|default:"—" }}
+                    {% endif %}
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 flex-shrink-0 align-items-center">

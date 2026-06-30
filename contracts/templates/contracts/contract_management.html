@@ -288,6 +288,19 @@
                         </p>
                         <p id="contract-solicitation-type-value" class="font-medium text-sm">{{ contract.solicitation_type|default:"N/A" }}</p>
                     </div>
+
+                    <div class="field-group">
+                        <p class="text-xs text-gray-600">Closed By</p>
+                        <p id="contract-closed-by-value" class="font-medium text-sm">
+                            {% if contract.status.description == 'Closed' and contract.closed_by %}{{ contract.closed_by.get_full_name|default:contract.closed_by.username }}{% else %}—{% endif %}
+                        </p>
+                    </div>
+                    <div class="field-group">
+                        <p class="text-xs text-gray-600">Closed On</p>
+                        <p id="contract-closed-on-value" class="font-medium text-sm">
+                            {% if contract.status.description == 'Closed' and contract.date_closed %}{{ contract.date_closed|date:"M d, Y" }}{% else %}—{% endif %}
+                        </p>
+                    </div>
                 </div>
                 <!-- Contract Controls: Expedite (top) + NIST (below) -->
                 <div class="shrink-0 flex flex-col gap-2 border-l border-gray-200 pl-3">
