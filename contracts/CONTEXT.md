@@ -397,6 +397,7 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 
 ## Completed migrations and fixes
 
+- **Dashboard active-supplier TRY_CAST guard (2026-06-30):** The contracts dashboard active-supplier metric now uses SQL Server `TRY_CAST` (via `numeric_item_annotation()` in `dashboard_views.py`) so non-numeric `Clin.item_number` values (e.g. `0001AA`) are excluded instead of raising `DataError 22018` on production MSSQL.
 - **Migration 0061 MSSQL deadlock fix (v2):** Root cause was .iterator() holding an open server-side cursor while INSERT commands fired on the same pyodbc connection. Fix: materialize contracts via list(queryset.values(...)) before any writes, then bulk_create in batches of 500 inside a single atomic block.
 
 ## 18. Safe Modification Guidance for Future Developers / AI Agents

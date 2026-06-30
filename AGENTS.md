@@ -86,6 +86,7 @@ last_run_at     — None (null — task will run on first heartbeat)
 
 ## 4. Global Safe-Edit Rules
 - **MSSQL / pyodbc data migrations (no MARS):** SQL Server via `mssql-django` cannot hold an open server-side read cursor while another command runs on the same connection. In `RunPython` migrations, never use `.iterator()` or iterate a lazy queryset while calling `.get()`, `.save()`, `.create()`, or `bulk_create`/`bulk_update` on the same connection. Materialize reads first with `list(queryset.values(...))` or `list(queryset.only(...))`, build in-memory lookup dicts, then batch writes (≤500 per batch inside `transaction.atomic()`). See `contracts/migrations/0061_backfill_contract_status_history.py` and `sales/migrations/0052_backfill_dibbs_award_mod_matched_contract.py`.
+- **CI vendor guard — varchar `Cast` annotations:** Any `Cast(...)` annotation on a `CharField` that may contain non-numeric data must use the `TRY_CAST` vendor-guard pattern (`connection.vendor == 'microsoft'` → `TryCastInteger`, else `Cast`) and filter `__isnull=False` before numeric comparisons. SQLite's permissive `CAST` will not catch conversion failures in CI. Canonical example: `numeric_item_annotation()` in `contracts/views/dashboard_views.py`.
 - Keep changes scoped to the requested behavior. Do not do opportunistic cleanup in unrelated files.
 - Edit in the owning app first, then update downstream consumers in the same change.
 - Before renaming shared fields, URL names, templates, or JSON keys, run repo-wide search and update all call sites.

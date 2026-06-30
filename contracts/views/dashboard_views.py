@@ -2,7 +2,8 @@ from django.shortcuts import render
 from django.views.generic import TemplateView
 from django.utils.decorators import method_decorator
 from django.utils import timezone
-from django.db.models import Q, Count, Sum, F, Value, CharField, IntegerField, OuterRef, Subquery
+from django.db import connection
+from django.db.models import Q, Count, Sum, F, Value, CharField, IntegerField, OuterRef, Subquery, Func
 from django.db.models.functions import Cast, Coalesce
 from django.utils.safestring import mark_safe
 from datetime import timedelta, datetime
@@ -14,6 +15,37 @@ from ..models import Contract, Clin, Reminder, CanceledReason
 from users.user_settings import UserSettings
 import csv
 from django.http import HttpResponse
+
+
+class TryCastInteger(Func):
+    """
+    SQL Server's TRY_CAST returns NULL on failed conversion instead of
+    raising a DataError, unlike CAST. Use this for any varchar->int
+    annotation on fields known to contain non-numeric values (e.g.
+    Clin.item_number, which can hold values like '0001AA').
+
+    SQLite (used in CI) does not support TRY_CAST and does not need it,
+    since SQLite's CAST silently coerces invalid strings rather than
+    raising — see `numeric_item_annotation()` below for the vendor guard.
+    """
+    function = 'TRY_CAST'
+    template = '%(function)s(%(expressions)s AS int)'
+    output_field = IntegerField()
+
+
+def numeric_item_annotation():
+    """
+    Returns the correct Cast/TryCast expression for converting
+    Clin.item_number (CharField) to an integer, depending on DB vendor.
+
+    SQL Server: uses TRY_CAST, which returns NULL instead of raising
+    DataError 22018 on non-numeric values like '0001AA'.
+    SQLite (CI): falls back to standard Cast, since TRY_CAST is not
+    a SQLite function and SQLite's CAST does not raise on bad input.
+    """
+    if connection.vendor == 'microsoft':
+        return TryCastInteger('item_number')
+    return Cast('item_number', output_field=IntegerField())
 
 
 def get_period_boundaries(now):
@@ -348,15 +380,21 @@ class ContractLifecycleDashboardView(TemplateView):
         buyer_breakdown = {row['buyer_name']: row['total'] for row in buyer_breakdown_qs}
         
         # Get active suppliers (suppliers with open contracts and CLINs with item_number < 0990)
-        # First convert item_number to a numeric value for comparison
-        # Get suppliers with open contracts and specific CLIN conditions
+        # NOTE: filter below uses numeric_item__lt=99, not 990, as the comment states.
+        # This predates this fix and is left unchanged pending confirmation of intended threshold.
+        # First convert item_number to a numeric value for comparison.
+        # Some item_number values are non-numeric (e.g. '0001AA') and must not crash
+        # the query on SQL Server, which raises DataError 22018 on CAST failure
+        # (unlike SQLite, which silently coerces). Use TRY_CAST on SQL Server and
+        # exclude rows that fail conversion via numeric_item__isnull=False.
         active_suppliers = Clin.objects.filter(
             contract__status__description='Open',
             contract__date_canceled__isnull=True,
             company=self.request.active_company
         ).annotate(
-            numeric_item=Cast('item_number', output_field=IntegerField())
+            numeric_item=numeric_item_annotation()
         ).filter(
+            numeric_item__isnull=False,
             numeric_item__lt=99  # Only include CLINs with item_number < 0990
         ).values(
             'supplier_id',
