@@ -4,7 +4,7 @@ from django.db.models import Sum
 from contracts.models import Contract, ClinSplit, PartnerReconciliation, PartnerReconciliationRow
 from contracts.utils.excel_utils import load_workbook
 from django.db import transaction
-from contracts.services.dfas_matcher import normalize_contract_number
+from contracts.services.dfas_matcher import strip_contract_number_dashes
 
 def _safe_decimal(value):
     """
@@ -176,19 +176,21 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
                 )
                 .order_by()
             )
-            statz_by_contract_number = {
-                normalize_contract_number(row['clin__contract__contract_number']): row
-                for row in partner_splits_qs
-            }
+            statz_by_contract_number = {}
+            for row in partner_splits_qs:
+                key = strip_contract_number_dashes(row['clin__contract__contract_number'])
+                if key is not None:
+                    statz_by_contract_number[key] = row
         except Exception as e:
             raise Exception(f"STEP 1 FAILED (ClinSplit query): {e}") from e
 
         try:
             # Step 2 — Also build a lookup of Contract objects by contract_number for FK assignment
-            contracts_by_number = {
-                normalize_contract_number(c.contract_number): c
-                for c in Contract.objects.filter(company=company)
-            }
+            contracts_by_number = {}
+            for c in Contract.objects.filter(company=company):
+                key = strip_contract_number_dashes(c.contract_number)
+                if key is not None:
+                    contracts_by_number[key] = c
         except Exception as e:
             raise Exception(f"STEP 2 FAILED (Contract query): {e}") from e
 
@@ -207,7 +209,7 @@ def reconcile_partner(partner_name, raw_rows, company, uploaded_by, filename, no
 
         # Step 4 — Process each row from raw_rows
         for raw_row in raw_rows:
-            lookup_key = normalize_contract_number(raw_row['contract_number'])
+            lookup_key = strip_contract_number_dashes(raw_row['contract_number'])
             statz_data = statz_by_contract_number.get(lookup_key)
             contract_obj = contracts_by_number.get(lookup_key)
 

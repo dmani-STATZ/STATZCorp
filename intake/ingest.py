@@ -16,12 +16,13 @@ from typing import Optional
 
 from contracts.models import Contract, SalesClass
 
+from contracts.services.contract_number import canonicalize_contract_number
+
 from .pdf_parser import (
     AwardParseResult,
     ClinParseResult,
     parse_award_pdf,
     detect_contract_type,
-    normalize_contract_number,
 )
 
 from .models import DraftContract
@@ -402,7 +403,7 @@ def _dibbs_contract_number(record: dict) -> Optional[str]:
     DIBBS exposes Award_Basic_Number; for delivery orders it also has
     Delivery_Order_Number. When present, the DO number is the actual
     contract identity. The raw value is passed through
-    normalize_contract_number() so all stored contract numbers use the
+    canonicalize_contract_number() so all stored contract numbers use the
     standard dashed DLA format (e.g. SPE7L1-26-P-7653), matching the
     format used in contracts.Contract and in SharePoint folder names.
 
@@ -414,7 +415,7 @@ def _dibbs_contract_number(record: dict) -> Optional[str]:
     do = (record.get('Delivery_Order_Number') or '').strip()
     basic = (record.get('Award_Basic_Number') or '').strip()
     raw = do or basic or None
-    return normalize_contract_number(raw) if raw else None
+    return canonicalize_contract_number(raw) if raw else None
 
 
 def ingest_dibbs_record(record: dict, company=None) -> DraftContract:

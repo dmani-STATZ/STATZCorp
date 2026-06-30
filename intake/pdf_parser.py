@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import BinaryIO, List, Optional, Union
+from contracts.services.contract_number import canonicalize_contract_number
 from core.anthropic_client import call_anthropic
 
 try:
@@ -26,12 +27,6 @@ PdfInput = Union[str, os.PathLike[str], BinaryIO]
 
 logger = logging.getLogger(__name__)
 
-# Local copy of the contract/NSN utility rules used by the original parser.
-_RE_UNDASHED_13 = re.compile(r"^[A-Z]{3}[A-Z0-9]{10}$", re.IGNORECASE)
-_RE_DASHED_DLA = re.compile(
-    r"^(SPE[A-Z0-9]{2,3})-(\d{2})-([A-Z])-([A-Z0-9]{4})$",
-    re.IGNORECASE,
-)
 _CONTRACT_TYPE_MAP = {
     "D": "IDIQ",
     "F": "DO",
@@ -44,47 +39,11 @@ _CONTRACT_TYPE_MAP = {
 }
 
 
-def normalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
-    if not contract_number:
-        return None
-    s = str(contract_number).strip().upper()
-    if not s:
-        return None
-
-    # Strip trailing DIBBS HTML navigation artifact (U+00BB '\u00bb') that can
-    # survive into stored values from legacy hot-poll scrape runs.
-    # Example: 'SPE4A626FZ3PY \u00bb' (len=15) → 'SPE4A626FZ3PY' (len=13).
-    _bb = s.find('\u00bb')
-    if _bb != -1:
-        s = s[:_bb].rstrip()
-    if not s:
-        return None
-
-    if "-" in s:
-        if _RE_DASHED_DLA.match(s):
-            return s
-        logger.warning(
-            "normalize_contract_number: dashed input does not match expected "
-            "DLA pattern, passing through as-is: %r",
-            s,
-        )
-        return s
-    if len(s) == 13 and _RE_UNDASHED_13.match(s):
-        return f"{s[:6]}-{s[6:8]}-{s[8]}-{s[9:]}"
-    logger.warning(
-        "normalize_contract_number: unrecognized format (len=%d), "
-        "passing through as-is: %r",
-        len(s),
-        s,
-    )
-    return s
-
-
 def detect_contract_type(contract_number: Optional[str]) -> Optional[str]:
     if not contract_number:
         return None
     try:
-        normalized = normalize_contract_number(contract_number)
+        normalized = canonicalize_contract_number(contract_number)
         if not normalized:
             return None
         parts = normalized.split("-")

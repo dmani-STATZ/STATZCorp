@@ -136,9 +136,9 @@ def queue_we_won_drafts(
                 if draft.contract_type == 'DO':
                     award_basic = (record.get('Award_Basic_Number') or '').strip()
                     if award_basic:
-                        from intake.pdf_parser import normalize_contract_number
+                        from contracts.services.contract_number import canonicalize_contract_number
                         from contracts.models import IdiqContract
-                        normalized = normalize_contract_number(award_basic) or award_basic
+                        normalized = canonicalize_contract_number(award_basic) or award_basic
                         idiq = IdiqContract.objects.filter(
                             contract_number__iexact=normalized
                         ).first()

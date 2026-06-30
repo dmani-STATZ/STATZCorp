@@ -3,6 +3,7 @@ DFAS parsed row → Contract / IdiqContract / Clin matching. Read-only ORM use.
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
@@ -13,26 +14,50 @@ from django.db.models.functions import Replace, Upper
 from contracts.models import Clin, Contract, DfasImportRow, IdiqContract
 from contracts.services.dfas_parser import ParsedDfasRow
 
+logger = logging.getLogger(__name__)
+
 _PSUFFIX_RE = re.compile(r'^P\d{5}$')
+_RE_STRIPPED_13 = re.compile(r"^[A-Z]{3}[A-Z0-9]{10}$")
+_RE_STRIPPED_19_PSUFFIX = re.compile(r"^[A-Z]{3}[A-Z0-9]{10}P\d{5}$")
 
 
-def normalize_contract_number(value: Optional[str]) -> str:
+# NOTE: This is the only function that does this. Before adding another contract-number normalizer anywhere in this codebase, check here first.
+def strip_contract_number_dashes(value: Optional[str]) -> Optional[str]:
     """
-    Normalize a contract or delivery-order number for comparison.
+    Strip dashes/spaces and uppercase a contract or delivery-order number
+    for comparison. Makes STATZ DB values (stored with dashes, e.g.
+    W912PB-24-C-0001) comparable to DFAS export values (no dashes, e.g.
+    W912PB24C0001).
 
-    Strips dashes, spaces, and uppercases. Makes STATZ DB values
-    (stored with dashes, e.g. W912PB-24-C-0001) comparable to DFAS
-    export values (no dashes, e.g. W912PB24C0001).
+    Validates the stripped result against known DLA shapes:
+      - 13 chars: 3-letter prefix + 10 alphanumeric (standard contract/IDIQ/DO number)
+      - 19 chars: the above 13 chars + a P-suffix (P + 5 digits), for DO
+        call numbers carrying the delivery-order modifier
 
-    Used on both the incoming DFAS value AND the annotated DB query side.
+    Returns None (instead of a best-effort guess) if the stripped value
+    doesn't match either shape — this means the input is not a DIBBS-format
+    contract number and should not be used as a comparison key. Callers
+    MUST treat a None return as "no match attempt", not as an empty string.
     """
-    return re.sub(r'[\s\-]', '', (value or '').upper().strip())
+    if not value:
+        return None
+    stripped = re.sub(r'[\s\-]', '', str(value).upper().strip())
+    if not stripped:
+        return None
+    if _RE_STRIPPED_13.match(stripped) or _RE_STRIPPED_19_PSUFFIX.match(stripped):
+        return stripped
+    logger.warning(
+        "strip_contract_number_dashes: input does not match a recognized "
+        "DLA shape (len=%d after stripping), rejecting: %r",
+        len(stripped), value,
+    )
+    return None
 
 
 def _norm_qs(qs, field: str = 'contract_number'):
     """
     Annotate a queryset with `norm_num`: the contract_number field with
-    dashes and spaces removed, uppercased — matching normalize_contract_number().
+    dashes and spaces removed, uppercased — matching strip_contract_number_dashes().
 
     Uses Django ORM Replace + Upper so the normalization runs in SQL,
     not Python. Compatible with Microsoft SQL Server via mssql-django.
@@ -56,7 +81,7 @@ def strip_delivery_order_suffix(call_no: str) -> str:
     Rule: only strip when the 'P' appears at exactly position 14 (1-indexed
     / index 13 0-indexed), and the trailing 6 chars match P + 5 digits.
 
-    Expects call_no to already be normalized via normalize_contract_number().
+    Expects call_no to already be normalized via strip_contract_number_dashes().
     """
     if len(call_no) < 19:
         return call_no
@@ -117,9 +142,13 @@ def match_dfas_row(
         )
 
     # --- Normalize incoming DFAS values ---
-    norm_contract_no = normalize_contract_number(parsed_row.contract_no)
-    norm_call_no_raw = normalize_contract_number(parsed_row.call_no or '')
-    norm_do_number = strip_delivery_order_suffix(norm_call_no_raw)
+    norm_contract_no = strip_contract_number_dashes(parsed_row.contract_no)
+    norm_call_no_raw = strip_contract_number_dashes(parsed_row.call_no or '')
+    norm_do_number = (
+        strip_delivery_order_suffix(norm_call_no_raw)
+        if norm_call_no_raw
+        else ''
+    )
 
     matched_contract: Optional[Contract] = None
     idiq: Optional[IdiqContract] = None
@@ -149,6 +178,14 @@ def match_dfas_row(
         # No Call No.  match by Contract No. directly.
         # Also apply P-suffix stripping in case the DFAS contract number
         # carries a delivery-order modifier (e.g. SPE4A624PAR82P00003  SPE4A624PAR82).
+        if norm_contract_no is None:
+            return MatchResult(
+                status='contract_missing',
+                notes=(
+                    f'Contract No. "{parsed_row.contract_no}" is not a recognized '
+                    f'DLA contract number format.'
+                ),
+            )
         norm_contract_no_stripped = strip_delivery_order_suffix(norm_contract_no)
 
         matched_contract = (

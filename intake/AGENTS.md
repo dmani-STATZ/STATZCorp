@@ -399,7 +399,9 @@ canonical `Contract.contract_number`.
   `intake/services/queue_we_won_drafts.py`, which maps `DibbsAward` ORM
   fields to the scraper dict shape — do not fork conversion logic elsewhere.
 - `_dibbs_contract_number(record)` always returns a normalized (dashed) DLA
-  contract number by calling `normalize_contract_number()` before returning.
+  contract number by calling `canonicalize_contract_number()` (imported from
+  `contracts.services.contract_number`, no longer locally defined in
+  `intake/pdf_parser.py`) before returning.
   The raw DIBBS field values (`Award_Basic_Number`, `Delivery_Order_Number`) are
   NOT modified — they are used separately by `_build_dibbs_award_pdf_url()`
   for HTTP URL construction and must remain undashed.

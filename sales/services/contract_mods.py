@@ -14,7 +14,7 @@ from django.db.models import Max
 from django.utils import timezone
 
 from contracts.models import Contract
-from contracts.services.contract_number import normalize_contract_number
+from contracts.services.contract_number import canonicalize_contract_number
 from sales.constants import PARTNER_CAGES
 from sales.models import CompanyCAGE, DibbsAwardMod
 
@@ -91,7 +91,7 @@ def match_dibbs_award_mod(mod: DibbsAwardMod) -> bool:
     if not raw:
         return False
 
-    normalized = normalize_contract_number(raw)
+    normalized = canonicalize_contract_number(raw)
     if not normalized:
         return False
 
@@ -195,7 +195,7 @@ def rematch_unmatched_mods() -> dict:
 
     # Build a lookup of all contracts keyed by their normalized number.
     contracts_by_norm = {
-        normalize_contract_number(c.contract_number): c
+        canonicalize_contract_number(c.contract_number): c
         for c in Contract.objects.only('id', 'contract_number').iterator()
     }
 
@@ -211,7 +211,7 @@ def rematch_unmatched_mods() -> dict:
         raw = mod.delivery_order_number.strip() or mod.award_basic_number.strip()
         if not raw:
             continue
-        norm = normalize_contract_number(raw)
+        norm = canonicalize_contract_number(raw)
         contract = contracts_by_norm.get(norm)
         if contract:
             DibbsAwardMod.objects.filter(pk=mod.pk).update(

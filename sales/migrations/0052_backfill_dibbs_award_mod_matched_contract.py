@@ -11,7 +11,7 @@ def backfill_matched_contract(apps, schema_editor):
     # server-side cursor from .iterator() while another command runs on the
     # same connection — e.g. DibbsAwardMod.objects.get() inside a contract loop.
     from contracts.models import Contract
-    from contracts.services.contract_number import normalize_contract_number
+    from contracts.services.contract_number import canonicalize_contract_number
     from sales.models import DibbsAwardMod
     from sales.services.contract_mods import mod_contract_identity
 
@@ -30,7 +30,7 @@ def backfill_matched_contract(apps, schema_editor):
         raw = mod_contract_identity(mod)
         if not raw:
             continue
-        key = normalize_contract_number(raw)
+        key = canonicalize_contract_number(raw)
         if key:
             by_identity[key].append(mod.id)
 
@@ -40,7 +40,7 @@ def backfill_matched_contract(apps, schema_editor):
 
     contracts_by_normalized: dict[str, list[int]] = defaultdict(list)
     for contract in contracts:
-        target = normalize_contract_number(contract["contract_number"])
+        target = canonicalize_contract_number(contract["contract_number"])
         if target:
             contracts_by_normalized[target].append(contract["id"])
 
@@ -52,7 +52,7 @@ def backfill_matched_contract(apps, schema_editor):
     mods_to_update: list[DibbsAwardMod] = []
 
     for contract in contracts:
-        target = normalize_contract_number(contract["contract_number"])
+        target = canonicalize_contract_number(contract["contract_number"])
         if not target:
             continue
         contract_pk = unique_contract_by_normalized.get(target)

@@ -19,7 +19,8 @@ _RE_DASHED_DLA = re.compile(
 )
 
 
-def normalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
+# NOTE: This is the only function that does this. Before adding another contract-number normalizer anywhere in this codebase, check here first.
+def canonicalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
     """
     Normalize a DLA contract number to the standard dashed format.
 
@@ -45,7 +46,7 @@ def normalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
         if _RE_DASHED_DLA.match(s):
             return s
         logger.warning(
-            "normalize_contract_number: dashed input does not match expected "
+            "canonicalize_contract_number: dashed input does not match expected "
             "DLA pattern, passing through as-is: %r",
             s,
         )
@@ -55,7 +56,7 @@ def normalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
         return f"{s[:6]}-{s[6:8]}-{s[8]}-{s[9:]}"
 
     logger.warning(
-        "normalize_contract_number: unrecognized format (len=%d), "
+        "canonicalize_contract_number: unrecognized format (len=%d), "
         "passing through as-is: %r",
         len(s),
         s,

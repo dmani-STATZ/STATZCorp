@@ -47,8 +47,8 @@ def build_draft_folder_path(draft: 'DraftContract') -> str | None:
 
     # Defensive: normalize to dashed format so SP paths always match DB format.
     # Handles any undashed legacy drafts that pre-date the DIBBS normalization fix.
-    from intake.pdf_parser import normalize_contract_number
-    contract_number = normalize_contract_number(contract_number) or contract_number
+    from contracts.services.contract_number import canonicalize_contract_number
+    contract_number = canonicalize_contract_number(contract_number) or contract_number
 
     if draft.contract_type == 'DO':
         data = draft.data or {}
@@ -95,7 +95,7 @@ def seed_do_draft_sp_path(draft: 'DraftContract', idiq=None) -> None:
         if draft.sharepoint_folder_status == 'exists':
             return
 
-        from intake.pdf_parser import normalize_contract_number
+        from contracts.services.contract_number import canonicalize_contract_number
 
         data = dict(draft.data or {})
         changed = False
@@ -120,7 +120,7 @@ def seed_do_draft_sp_path(draft: 'DraftContract', idiq=None) -> None:
                 raw = (data.get(key) or '').strip()
                 if not raw:
                     continue
-                normalized = normalize_contract_number(raw) or raw
+                normalized = canonicalize_contract_number(raw) or raw
                 try:
                     from contracts.models import IdiqContract
                     resolved_idiq = IdiqContract.objects.filter(
@@ -147,7 +147,7 @@ def seed_do_draft_sp_path(draft: 'DraftContract', idiq=None) -> None:
         do_number = (draft.contract_number or '').strip()
         if not do_number:
             return
-        do_number = normalize_contract_number(do_number) or do_number
+        do_number = canonicalize_contract_number(do_number) or do_number
 
         from contracts.services.sharepoint_paths import resolve_idiq_folder_path
         idiq_path = resolve_idiq_folder_path(resolved_idiq)['path'].rstrip('/')
