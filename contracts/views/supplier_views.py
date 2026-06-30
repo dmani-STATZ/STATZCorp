@@ -12,10 +12,14 @@ from django.utils import timezone
 from datetime import timedelta, datetime
 
 from STATZWeb.decorators import conditional_login_required
+from suppliers.contact_categories import (
+    PRIMARY_CATEGORY_NAME,
+    assign_primary_category,
+    contact_has_primary_category,
+)
 from suppliers.models import (
     Supplier,
     Contact,
-    SupplierContactGroup,
     SupplierCertification,
     SupplierClassification,
     CertificationType,
@@ -24,39 +28,6 @@ from suppliers.models import (
     SupplierDocument,
 )
 
-PRIMARY_GROUP_NAME = "Primary Contacts"
-
-
-def sync_primary_group(supplier, user=None):
-    """
-    Keep the auto-managed 'Primary Contacts' SupplierContactGroup in sync
-    with Contact.is_primary for the given supplier.
-    - If primary contacts exist: get_or_create the group, set its members.
-    - If no primary contacts exist: delete the group if it exists.
-    Called after any is_primary change (toggle, first-contact save, delete).
-    """
-    primary_contacts = list(
-        Contact.objects.filter(supplier=supplier, is_primary=True)
-    )
-    if primary_contacts:
-        group = SupplierContactGroup.objects.filter(
-            supplier=supplier,
-            name=PRIMARY_GROUP_NAME,
-        ).first()
-        if not group:
-            group = SupplierContactGroup(
-                supplier=supplier,
-                name=PRIMARY_GROUP_NAME,
-                created_by=user,
-                modified_by=user,
-            )
-            group.save()
-        group.contacts.set(primary_contacts)
-    else:
-        SupplierContactGroup.objects.filter(
-            supplier=supplier,
-            name=PRIMARY_GROUP_NAME,
-        ).delete()
 from ..models import (
     Address,
     Contract,
@@ -188,8 +159,13 @@ class SupplierListView(ListView):
 
         contracts_qs = Contract.objects.filter(clin__supplier=supplier).select_related('idiq_contract', 'status').distinct().order_by('-created_on')
         contracts = contracts_qs[:10]
-        contacts = list(Contact.objects.filter(supplier=supplier))
-        primary_contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
+        contacts = list(
+            Contact.objects.filter(supplier=supplier).prefetch_related('categories')
+        )
+        primary_contact = next(
+            (c for c in contacts if contact_has_primary_category(c)),
+            None,
+        )
         certifications = SupplierCertification.objects.filter(supplier=supplier)
         classifications = SupplierClassification.objects.filter(supplier=supplier)
         try:
@@ -280,7 +256,8 @@ class SupplierListView(ListView):
             'contact_email': primary_contact.email if primary_contact else None,
             'contact_phone': primary_contact.phone if primary_contact else None,
             'primary_contact_id': Contact.objects.filter(
-                supplier=supplier, is_primary=True
+                supplier=supplier,
+                categories__name=PRIMARY_CATEGORY_NAME,
             ).values_list('id', flat=True).first(),
             'special_terms': supplier.special_terms.terms if supplier.special_terms else None,
             'special_terms_id': supplier.special_terms.id if supplier.special_terms else None,
@@ -329,7 +306,8 @@ class SupplierListView(ListView):
                     'title': c.title or '',
                     'phone': c.phone or '',
                     'email': c.email or '',
-                    'is_primary': bool(c.is_primary),
+                    'category_ids': [cat.id for cat in c.categories.all()],
+                    'category_names': [cat.name for cat in c.categories.all()],
                 }
                 for c in contacts
             ],
@@ -675,9 +653,7 @@ def save_supplier_contact(request, pk):
     contact.save()
 
     if Contact.objects.filter(supplier=supplier).count() == 1:
-        contact.is_primary = True
-        contact.save(update_fields=['is_primary'])
-        sync_primary_group(supplier, request.user)
+        assign_primary_category(contact)
 
     payload = SupplierListView.build_detail_payload(supplier)
     return JsonResponse(payload, safe=False)
@@ -691,21 +667,7 @@ def delete_supplier_contact(request, pk, contact_id):
     contact = get_object_or_404(Contact, pk=contact_id, supplier=supplier)
 
     contact.delete()
-    sync_primary_group(supplier, request.user)
-    payload = SupplierListView.build_detail_payload(supplier)
-    return JsonResponse(payload, safe=False)
 
-
-@conditional_login_required
-def toggle_contact_primary(request, pk, contact_id):
-    """Toggle is_primary on a contact. POST only."""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Invalid method'}, status=405)
-    supplier = get_object_or_404(Supplier, pk=pk)
-    contact = get_object_or_404(Contact, pk=contact_id, supplier=supplier)
-    contact.is_primary = not bool(contact.is_primary)
-    contact.save(update_fields=['is_primary'])
-    sync_primary_group(supplier, request.user)
     payload = SupplierListView.build_detail_payload(supplier)
     return JsonResponse(payload, safe=False)
 

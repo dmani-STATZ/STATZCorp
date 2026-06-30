@@ -6,6 +6,7 @@ from django.views.decorators.http import require_http_methods
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, GovAction, Contract
 from ..forms import GovActionForm
+from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
 from suppliers.models import Supplier, Contact
 
 
@@ -100,7 +101,10 @@ def get_supplier_info(request, supplier_id):
             Supplier.objects.select_related('physical_address', 'billing_address', 'shipping_address'),
             id=supplier_id
         )
-        contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
+        contact = Contact.objects.filter(
+            supplier=supplier,
+            categories__name=PRIMARY_CATEGORY_NAME,
+        ).first()
         return JsonResponse({
             'success': True,
             'name': supplier.name or '—',

@@ -2378,6 +2378,14 @@ main {
   border-left-style: solid;
 }
 
+.contact-card-actions {
+  min-width: 5.25rem;
+}
+
+.contact-card-action-stack .dropdown-toggle::after {
+  margin-left: auto;
+}
+
 /* Alphabetical banding — left border color by first letter of contact name */
 .contact-band-blue   { border-left-color: #4361ee; } /* A – F */
 .contact-band-teal   { border-left-color: #2ec4b6; } /* G – L */
@@ -2402,6 +2410,51 @@ main {
   color: #fff;
   padding: 1px 7px;
   border-radius: 20px;
+}
+
+/* Display-only category pills on supplier contact cards */
+.contact-category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.contact-category-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background-color: var(--bs-danger, #dc3545);
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 20px;
+  line-height: 1.5;
+}
+
+.contact-cat-dropdown-menu {
+  min-width: 11rem;
+}
+
+.contact-cat-check-inactive .form-check-label {
+  color: var(--bs-secondary, #6c757d);
+  text-decoration: line-through;
+}
+
+.contact-cat-check-inactive .form-check-input:disabled + .form-check-label {
+  opacity: 0.65;
+}
+
+.contact-cat-error {
+  font-size: 0.72rem;
+  color: var(--bs-danger, #dc3545);
+  margin-top: 0.25rem;
+  display: none;
+}
+
+.contact-cat-error.visible {
+  display: block;
 }
 
 /* ── Supplier detail: anchor scroll offset for fixed navbar ──────────────── */

@@ -8,8 +8,12 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 
 from STATZWeb.decorators import conditional_login_required
+from suppliers.contact_categories import (
+    PRIMARY_CATEGORY_NAME,
+    assign_primary_category,
+    contact_has_primary_category,
+)
 from suppliers.models import Contact, Supplier
-from contracts.views.supplier_views import sync_primary_group, PRIMARY_GROUP_NAME
 from ..models import Address
 from ..forms import ContactForm, AddressForm
 
@@ -116,9 +120,7 @@ class ContactCreateView(CreateView):
             try:
                 supplier = Supplier.objects.get(id=supplier_id)
                 if Contact.objects.filter(supplier=supplier).count() == 1:
-                    self.object.is_primary = True
-                    self.object.save(update_fields=['is_primary'])
-                    sync_primary_group(supplier, self.request.user)
+                    assign_primary_category(self.object)
                 messages.info(self.request, f'Contact assigned to supplier {supplier.name}.')
             except Supplier.DoesNotExist:
                 pass
@@ -159,15 +161,12 @@ class ContactDeleteView(DeleteView):
     
     def post(self, request, *args, **kwargs):
         contact = self.get_object()
-        supplier = contact.supplier
-        if contact.is_primary is True:
+        if contact_has_primary_category(contact):
             messages.warning(
                 request,
                 "This contact was marked as a primary contact. It has been deleted.",
             )
         response = super().post(request, *args, **kwargs)
-        if supplier:
-            sync_primary_group(supplier, request.user)
         return response
 
 # Address Views

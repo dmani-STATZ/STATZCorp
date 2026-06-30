@@ -40,6 +40,7 @@ from contracts.models import (
     ClinShipment,
     PaymentHistory,
 )
+from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
 from suppliers.models import (
     Contact,
     Supplier,
@@ -49,7 +50,7 @@ from suppliers.models import (
     SupplierClassification,
     CertificationType,
     ClassificationType,
-    SupplierContactGroup,
+    SupplierContactCategory,
 )
 import requests
 
@@ -669,14 +670,11 @@ class SupplierDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         supplier = self.object
         context['supplier_content_type_id'] = ContentType.objects.get_for_model(Supplier).id
-        context['contacts'] = supplier.contacts.all().order_by('name')
-        contact_groups = (
-            SupplierContactGroup.objects
-            .filter(supplier=supplier)
-            .prefetch_related('contacts')
+        context['contacts'] = (
+            supplier.contacts.all()
+            .prefetch_related('categories')
             .order_by('name')
         )
-        context['contact_groups'] = contact_groups
         documents = list(
             SupplierDocument.objects.filter(supplier=supplier)
             .select_related('certification', 'classification')
@@ -749,8 +747,16 @@ class SupplierDetailView(DetailView):
             or any(c.email for c in context['contacts'])
         )
         context['has_primary_contact'] = Contact.objects.filter(
-            supplier=supplier, is_primary=True
+            supplier=supplier,
+            categories__name=PRIMARY_CATEGORY_NAME,
         ).exists()
+        context['primary_contact_ids'] = set(
+            Contact.objects.filter(
+                supplier=supplier,
+                categories__name=PRIMARY_CATEGORY_NAME,
+            ).values_list('id', flat=True)
+        )
+        context['active_contact_categories'] = SupplierContactCategory.objects.filter(is_active=True)
 
         clin_contract_ids = Clin.objects.filter(
             supplier=supplier,
@@ -1071,7 +1077,7 @@ def supplier_set_rfq_email(request, supplier_id):
     )
 
 
-def _parse_contact_ids_post(raw) -> list[int] | None:
+def _parse_int_ids_post(raw) -> list[int] | None:
     """Return list of int IDs, or None if the string is not empty but unparsable."""
     if raw is None:
         return []
@@ -1111,171 +1117,50 @@ def _validate_contact_ids_for_supplier(
 
 
 @login_required
-@require_GET
-def supplier_group_name_suggestions(request):
-    q = (request.GET.get("q") or "").strip()
-    qs = SupplierContactGroup.objects.all()
-    if q:
-        qs = qs.filter(name__icontains=q)
-    names = qs.values_list("name", flat=True).distinct().order_by("name")
-    return JsonResponse({"names": list(names)})
-
-
-@login_required
 @require_POST
-def supplier_group_create(request, pk):
-    supplier = get_object_or_404(Supplier, pk=pk)
-    name = (request.POST.get("name") or "").strip()
-    if not name:
-        return JsonResponse({"error": "name is required."}, status=400)
-    if len(name) > 100:
-        return JsonResponse({"error": "name must be 100 characters or fewer."}, status=400)
-
-    contact_ids = _parse_contact_ids_post(request.POST.get("contact_ids", ""))
-    if contact_ids is None:
-        return JsonResponse(
-            {"error": "contact_ids must be a comma-separated list of integers."},
-            status=400,
-        )
-    contacts, bad = _validate_contact_ids_for_supplier(pk, contact_ids)
-    if bad is not None:
-        return JsonResponse(
-            {
-                "error": (
-                    f"The following contact id(s) are invalid or do not belong to "
-                    f"this supplier: {', '.join(str(i) for i in bad)}"
-                )
-            },
-            status=400,
-        )
-
-    group = SupplierContactGroup(
-        supplier=supplier,
-        name=name,
-        created_by=request.user,
-        modified_by=request.user,
-    )
-    group.save()
-    group.contacts.set(contacts or [])
-
-    return JsonResponse(
-        {
-            "ok": True,
-            "group_id": group.id,
-            "group_name": group.name,
-            "contact_count": group.contacts.count(),
-        }
-    )
-
-
-@login_required
-@require_POST
-def supplier_group_edit(request, pk, group_id):
+def supplier_contact_set_categories(request, pk, contact_id):
     get_object_or_404(Supplier, pk=pk)
-    group = get_object_or_404(
-        SupplierContactGroup, id=group_id, supplier_id=pk
-    )
+    contact = get_object_or_404(Contact, id=contact_id, supplier_id=pk)
 
-    from contracts.views.supplier_views import PRIMARY_GROUP_NAME
-
-    if group.name == PRIMARY_GROUP_NAME:
+    category_ids = _parse_int_ids_post(request.POST.get("category_ids", ""))
+    if category_ids is None:
         return JsonResponse(
-            {
-                "error": "'Primary Contacts' is an auto-managed group and cannot be renamed."
-            },
+            {"error": "category_ids must be a comma-separated list of integers."},
             status=400,
         )
 
-    name_in_post = "name" in request.POST
-    if name_in_post and (request.POST.get("name") or "").strip() == PRIMARY_GROUP_NAME:
-        return JsonResponse(
-            {"error": f"'{PRIMARY_GROUP_NAME}' is a reserved group name."},
-            status=400,
+    unique_category_ids = list(dict.fromkeys(category_ids))
+    if unique_category_ids:
+        valid_categories = SupplierContactCategory.objects.filter(
+            id__in=unique_category_ids,
+            is_active=True,
         )
-    contact_ids_in_post = "contact_ids" in request.POST
-    if not name_in_post and not contact_ids_in_post:
-        return JsonResponse(
-            {"error": "Provide name and/or contact_ids to update the group."},
-            status=400,
-        )
-
-    if name_in_post:
-        new_name = (request.POST.get("name") or "").strip()
-        if not new_name:
-            return JsonResponse(
-                {"error": "name cannot be empty if provided."},
-                status=400,
-            )
-        if len(new_name) > 100:
-            return JsonResponse(
-                {"error": "name must be 100 characters or fewer."},
-                status=400,
-            )
-        group.name = new_name
-
-    if contact_ids_in_post:
-        contact_ids = _parse_contact_ids_post(request.POST.get("contact_ids", ""))
-        if contact_ids is None:
+        valid_ids = set(valid_categories.values_list("id", flat=True))
+        bad = [i for i in unique_category_ids if i not in valid_ids]
+        if bad:
             return JsonResponse(
                 {
                     "error": (
-                        "contact_ids must be a comma-separated list of integers."
+                        "The following category id(s) are invalid or inactive: "
+                        f"{', '.join(str(i) for i in bad)}"
                     )
                 },
                 status=400,
             )
-        contacts, bad = _validate_contact_ids_for_supplier(pk, contact_ids)
-        if bad is not None:
-            return JsonResponse(
-                {
-                    "error": (
-                        f"The following contact id(s) are invalid or do not belong to "
-                        f"this supplier: {', '.join(str(i) for i in bad)}"
-                    )
-                },
-                status=400,
-            )
-        group.contacts.set(contacts or [])
+        categories = list(valid_categories.order_by("sort_order", "name"))
+    else:
+        categories = []
 
-    group.modified_by = request.user
-    if name_in_post:
-        group.save(update_fields=["name", "modified_by", "modified_on"])
-    elif contact_ids_in_post:
-        group.save(update_fields=["modified_by", "modified_on"])
+    contact.categories.set(categories)
 
     return JsonResponse(
         {
             "ok": True,
-            "group_id": group.id,
-            "group_name": group.name,
-            "contact_count": group.contacts.count(),
+            "contact_id": contact_id,
+            "category_ids": [c.id for c in categories],
+            "category_names": [c.name for c in categories],
         }
     )
-
-
-@login_required
-@require_POST
-def supplier_group_delete(request, pk, group_id):
-    get_object_or_404(Supplier, pk=pk)
-    group = get_object_or_404(
-        SupplierContactGroup, id=group_id, supplier_id=pk
-    )
-
-    from contracts.views.supplier_views import PRIMARY_GROUP_NAME
-
-    if group.name == PRIMARY_GROUP_NAME:
-        return JsonResponse(
-            {
-                "error": (
-                    "'Primary Contacts' is an auto-managed group and cannot be deleted. "
-                    "Remove the Primary designation from all contacts to remove this group."
-                )
-            },
-            status=400,
-        )
-
-    group.delete()
-    return JsonResponse({"ok": True, "group_id": group_id})
 
 
 class SuppliersInfoByType(LoginRequiredMixin, ListView):
@@ -1322,7 +1207,7 @@ def status_report(request):
     Probation section: archived=False, probation=True, ordered by name.
     Conditional section: archived=False, conditional=True, ordered by name.
 
-    Primary contacts (is_primary=True) are fetched in two bulk queries
+    Primary contacts (Primary category) are fetched in two bulk queries
     (one per section) to avoid N+1. Multiple primary contacts per supplier
     are stacked in the same table cell.
     """
@@ -1337,7 +1222,7 @@ def status_report(request):
 
         contact_qs = Contact.objects.filter(
             supplier_id__in=supplier_ids,
-            is_primary=True,
+            categories__name=PRIMARY_CATEGORY_NAME,
         ).order_by('supplier_id')
 
         contacts_map = {}

@@ -63,7 +63,6 @@ from .views import (
     update_supplier_files,
     save_supplier_contact,
     delete_supplier_contact,
-    toggle_contact_primary,
     addresses_lookup,
     add_supplier_certification,
     update_supplier_certification,
@@ -441,11 +440,6 @@ urlpatterns = [
         "supplier/<int:pk>/contact/<int:contact_id>/delete/",
         delete_supplier_contact,
         name="supplier_delete_contact",
-    ),
-    path(
-        'supplier/<int:pk>/contact/<int:contact_id>/toggle-primary/',
-        toggle_contact_primary,
-        name='supplier_toggle_contact_primary',
     ),
     path("addresses/lookup/", addresses_lookup, name="addresses_lookup"),
     # Supplier Certifications and Classifications

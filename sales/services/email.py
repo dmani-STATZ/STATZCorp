@@ -171,9 +171,13 @@ def resolve_supplier_email(supplier):
         if email:
             return email
 
+    from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
     from suppliers.models import Contact
 
-    primary_contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
+    primary_contact = Contact.objects.filter(
+        supplier=supplier,
+        categories__name=PRIMARY_CATEGORY_NAME,
+    ).first()
     if primary_contact and primary_contact.email and primary_contact.email.strip():
         return primary_contact.email.strip()
 

@@ -64,3 +64,7 @@ python manage.py import_release_notes --verbose   # extra logging
 - The markdown files are the **source of truth** for published content.
 - The DB is a **cache** for queries and UX (blocking modal, `/whats-new/` archive).
 - Rows are **never** deleted automatically if a file disappears; warnings are logged for orphan DB rows (cleanup is manual).
+
+## Recent release notes
+
+- [2026-06-30-supplier-contact-categories](2026-06-30-supplier-contact-categories.md) — Contact Categories replace Contact Groups and `is_primary`.

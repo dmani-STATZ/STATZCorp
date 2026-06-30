@@ -5,7 +5,7 @@ from .models import (
     ClassificationType,
     Contact,
     Supplier,
-    SupplierContactGroup,
+    SupplierContactCategory,
     SupplierType,
 )
 
@@ -41,18 +41,14 @@ class SupplierAdmin(admin.ModelAdmin):
 class ContactAdmin(admin.ModelAdmin):
     list_display = ('name', 'company', 'email', 'phone', 'supplier')
     search_fields = ('name', 'company', 'email', 'supplier__name')
+    filter_horizontal = ('categories',)
 
 
-@admin.register(SupplierContactGroup)
-class SupplierContactGroupAdmin(admin.ModelAdmin):
-    list_display = ('name', 'supplier', 'contact_count', 'created_on')
-    search_fields = ('name', 'supplier__name')
-    list_filter = ('supplier',)
-    filter_horizontal = ('contacts',)
-
-    def contact_count(self, obj):
-        return obj.contacts.count()
-    contact_count.short_description = 'Contacts'
+@admin.register(SupplierContactCategory)
+class SupplierContactCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'is_active', 'sort_order')
+    list_editable = ('is_active', 'sort_order')
+    search_fields = ('name',)
 
 
 @admin.register(SupplierType)

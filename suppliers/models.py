@@ -119,15 +119,11 @@ class Contact(models.Model):
     supplier = models.ForeignKey('Supplier', on_delete=models.CASCADE, null=True, blank=True, related_name='contacts')
     address = models.ForeignKey('contracts.Address', on_delete=models.CASCADE, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
-    is_primary = models.BooleanField(
-        default=False,
-        null=True,
+    categories = models.ManyToManyField(
+        'SupplierContactCategory',
         blank=True,
-        help_text=(
-            "Designates this as a primary contact for the supplier. "
-            "Multiple contacts per supplier may be marked primary — "
-            "no uniqueness constraint is enforced."
-        ),
+        related_name='contacts',
+        db_table='contracts_contact_categories',
     )
 
     class Meta:
@@ -137,25 +133,17 @@ class Contact(models.Model):
         return self.name
 
 
-class SupplierContactGroup(AuditModel):
-    supplier = models.ForeignKey(
-        'Supplier',
-        on_delete=models.CASCADE,
-        related_name='contact_groups',
-    )
-    name = models.CharField(max_length=100)
-    contacts = models.ManyToManyField(
-        'Contact',
-        blank=True,
-        related_name='contact_groups',
-    )
+class SupplierContactCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        db_table = 'contracts_suppliercontactgroup'
-        ordering = ['name']
+        db_table = 'contracts_suppliercontactcategory'
+        ordering = ['sort_order', 'name']
 
     def __str__(self):
-        return f"{self.name} ({self.supplier})"
+        return self.name
 
 
 class SupplierCertification(models.Model):

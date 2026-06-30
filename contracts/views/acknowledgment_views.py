@@ -23,6 +23,7 @@ from contracts.services.sharepoint_service import (
 )
 from ..models import AcknowledgementLetter, AcknowledgmentLetterTemplate, Clin
 from ..forms import AcknowledgementLetterForm
+from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
 from suppliers.models import Contact
 from users.user_settings import UserSettings
 
@@ -181,7 +182,10 @@ def _get_or_create_acknowledgment_letter(clin, request):
         supplier = clin.supplier
         letter.supplier = supplier.name
 
-        contact = Contact.objects.filter(supplier=supplier, is_primary=True).first()
+        contact = Contact.objects.filter(
+            supplier=supplier,
+            categories__name=PRIMARY_CATEGORY_NAME,
+        ).first()
         if contact:
             letter.salutation = contact.salutation
             if contact.name:

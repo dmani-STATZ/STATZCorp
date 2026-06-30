@@ -14,7 +14,7 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 ## 2. App Scope
 
 **Owns:**
-- `Supplier`, `SupplierType`, `Contact`, `SupplierContactGroup`, `SupplierCertification`, `CertificationType`, `SupplierClassification`, `ClassificationType`, `SupplierDocument`, `OpenRouterModelSetting` models
+- `Supplier`, `SupplierType`, `Contact`, `SupplierContactCategory`, `SupplierCertification`, `CertificationType`, `SupplierClassification`, `ClassificationType`, `SupplierDocument`, `OpenRouterModelSetting` models
 - Supplier dashboard, per-type lists, and detail/enrichment UI
 - OpenRouter-backed AI enrichment pipeline (`views.py`, `openrouter_config.py`)
 - Templates and static JS for supplier edit, enrichment, and detail views
@@ -92,11 +92,23 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 ### AI model config change
 `suppliers/openrouter_config.py` → `GlobalAIModelConfigView` in `views.py` → enrichment page inline JS in `supplier_enrich.html`
 
-### SupplierContactGroup change
+### SupplierContactCategory change
 `suppliers/models.py` → `suppliers/migrations/` →
-`suppliers/views.py` (group CRUD views + `SupplierDetailView` context) →
+`suppliers/contact_categories.py` →
+`suppliers/views.py` (`SupplierDetailView`, `supplier_contact_set_categories`, `status_report`) →
 `suppliers/urls.py` → `suppliers/admin.py` →
-`templates/suppliers/supplier_detail.html` (Contact Groups section)
+`contracts/views/supplier_views.py` (primary contact reads, first-contact save) →
+`contracts/views/contacts_views.py` →
+`templates/suppliers/supplier_detail.html` (contact cards; category picker UI)
+
+**Template coupling for the category picker:**
+- `SupplierDetailView.get_context_data` must pass `active_contact_categories = SupplierContactCategory.objects.filter(is_active=True)` (ordered by `Meta.ordering: sort_order, name`).
+- `contacts` queryset must be built with `.prefetch_related('categories')` so `contact.categories.all` in the template is not an N+1.
+- `supplier_detail.html` renders **display-only** red category pills (`.contact-category-pill`, one per assigned category) and a **Categories** dropdown checklist (`.contact-cat-dropdown`) in each contact card's vertically stacked action column (Edit / Delete / Categories). Contact cards use a four-up grid (`row g-3` / `col-3`, `h-100`). Pills are not interactive; editing happens only through the dropdown.
+- The dropdown lists all `active_contact_categories` plus any inactive category already assigned to the contact (muted, strikethrough; unchecking removes it and disables re-check). Toggle uses `data-bs-auto-close="outside"` so the menu stays open while checking boxes.
+- On dropdown close (`hidden.bs.dropdown`), if the active-category selection changed since open, the template POSTs once to `suppliers:supplier_contact_set_categories` with kwargs `pk` (supplier pk) and `contact_id`; body field is `category_ids` (comma-separated string of **active** category ids only, or empty string to clear all). Success re-renders that card's pill row and updates `contact-card-primary` in place — no page reload.
+- **Payload shape is a contract:** changing `category_ids` to a multi-value field or altering the view's parse logic will silently break the picker.
+- CSRF is sent as `X-CSRFToken: getCookie('csrftoken')` header (matching the pattern used by other fetch calls in the template). Missing CSRF surfaces an inline error and reverts the checklist.
 
 ---
 
@@ -111,7 +123,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 ### Apps that import from `suppliers.models`
 | App | What it imports |
 |-----|----------------|
-| `contracts` | `Supplier`, `SupplierType`, `SupplierCertification`, `SupplierClassification`, `Contact`, `SupplierContactGroup`, `CertificationType`, `ClassificationType` |
+| `contracts` | `Supplier`, `SupplierType`, `SupplierCertification`, `SupplierClassification`, `Contact`, `SupplierContactCategory`, `CertificationType`, `ClassificationType` |
 | `products` | `Supplier` (FK on product model) |
 | `processing` | `Supplier` (matching and processing views) |
 | `sales` | `Supplier` (RFQ, solicitation, supplier service views) |
@@ -204,10 +216,10 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 9. **`utils.scrape_supplier_site` prints debug output** — if wired into a view, it will leak crawl logs to stdout in production.
 10. **`transactions` signals depend on `Supplier`** — renaming or removing `Supplier` fields without checking `transactions/signals.py` can silently break transaction processing.
 11. **`Supplier.prime` is an IntegerField storing a `SalesClass.id`** — it is rendered in `SupplierForm` as a `ModelChoiceField` with a `clean_prime` override that converts the selected instance back to an integer on save. There is no FK constraint at the database level. Do not change this to a real FK without a coordinated migration.
-12. **`SupplierContactGroup.contacts` M2M only validates that contacts belong to the same supplier at the view layer** — the DB has no constraint preventing a contact from a different supplier being added via ORM directly. Always use the view endpoints or validate supplier ownership before calling `.set()` or `.add()` in any new code path.
-13. **`Contact.is_primary`** — BooleanField (nullable, default False). Multiple contacts per supplier may have `is_primary=True`; this is intentional, do not add a unique constraint. Populated via SQL migration from `COMMONCORE.dbo.STATZ_SUPPLIER_CONTACT_TBL.isPrime` through the `migrate_contact` and `migrate_supplier` mapping tables. 19 contacts were excluded from automated migration due to supplier ID mismatches — see Barbara's manual review list.
-14. **`Contact.is_primary` is the canonical primary contact flag.** Use `Contact.objects.filter(supplier=supplier, is_primary=True).first()`. Toggle endpoint: `contracts:supplier_toggle_contact_primary`. `SupplierListView.build_detail_payload` includes `is_primary` per contact in the `contacts` list and `primary_contact_id` at the supplier level. `ContactDeleteView` deletion is non-blocking; warns if the contact was primary.
-15. **`'Primary Contacts'` is a reserved `SupplierContactGroup` name.** It is auto-managed by `sync_primary_group()` in `contracts/views/supplier_views.py`. Do not create, rename, or delete it manually via ORM — always go through `sync_primary_group`. The `supplier_group_delete` and `supplier_group_edit` endpoints block operations on this name with a 400. The constant `PRIMARY_GROUP_NAME` in `supplier_views.py` is the single source of truth for the reserved name — do not hardcode the string elsewhere.
+12. **`Contact.categories` M2M** — category assignment for a contact must go through `supplier_contact_set_categories` (`POST /suppliers/<pk>/contact/<contact_id>/categories/`) or Django admin. The endpoint validates that every submitted category id exists and is `is_active=True`, and that the contact belongs to the supplier in the URL. Use `prefetch_related("categories")` when listing contacts with their categories.
+13. **`Primary` category** — global `SupplierContactCategory` row (not per-supplier). Multiple contacts per supplier may hold the Primary category. Canonical lookup: `Contact.objects.filter(supplier=supplier, categories__name="Primary")`. First contact saved for a supplier is auto-assigned Primary via `assign_primary_category()` in `suppliers/contact_categories.py`.
+14. **`SupplierContactCategory` is global** — do not add a supplier FK; scope is implicit through `Contact.supplier`.
+15. **RFQ email rewire** — future RFQ dispatch in `sales` should target contacts with the **Sales** category (`SALES_CATEGORY_NAME` in `suppliers/contact_categories.py`). See `sales/AGENTS.md` TODO. `Supplier.rfq_email` remains until that migration ships.
 
 ---
 
@@ -269,7 +281,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 **Data flow:**
 
 - Supplier fields used: `name`, `archived`, `probation`, `conditional`, `probation_on`, `conditional_on`, `notes`
-- Contact fields used: `is_primary`, `name` (single field — not `first_name`/`last_name`), `email`, `phone`
+- Contact fields used: `categories` (Primary category for status-report rows), `name` (single field — not `first_name`/`last_name`), `email`, `phone`
 - Contact model: `suppliers.models.Contact` (`db_table`: `contracts_contact`)
 - Contact FK to Supplier: `contact.supplier_id` (`related_name='contacts'`)
 
