@@ -68,3 +68,4 @@ python manage.py import_release_notes --verbose   # extra logging
 ## Recent release notes
 
 - [2026-06-30-supplier-contact-categories](2026-06-30-supplier-contact-categories.md) — Contact Categories replace Contact Groups and `is_primary`.
+- [2026-06-30-rfq-sales-contact-dispatch](2026-06-30-rfq-sales-contact-dispatch.md) — RFQ dispatch uses Sales-category contacts; legacy RFQ Email deprecated.

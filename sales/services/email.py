@@ -131,29 +131,99 @@ def compose_grouped_rfq_email_message(supplier, rfqs, sent_by, personalization_t
     return (subject, body)
 
 
+def resolve_supplier_rfq_recipients(supplier):
+    """
+    Resolve RFQ recipient emails for dispatch.
+    All Sales-category contacts (deduped, blanks skipped); fallback to dormant rfq_email.
+    """
+    from suppliers.contact_categories import SALES_CATEGORY_NAME
+
+    contacts = getattr(supplier, "contacts", None)
+    if contacts is None:
+        raw = []
+    else:
+        raw = list(
+            contacts.filter(categories__name=SALES_CATEGORY_NAME)
+            .exclude(email__isnull=True)
+            .exclude(email__exact="")
+            .values_list("email", flat=True)
+            .distinct()
+        )
+
+    seen = set()
+    recipients = []
+    for email in raw:
+        normalized = (email or "").strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        recipients.append(normalized)
+
+    if not recipients:
+        fallback = (getattr(supplier, "rfq_email", None) or "").strip()
+        if fallback:
+            return [fallback]
+        logger.warning(
+            "No RFQ recipient for supplier pk=%s (name=%s): "
+            "no Sales-category contacts and rfq_email is blank.",
+            supplier.pk,
+            getattr(supplier, "name", ""),
+        )
+    return recipients
+
+
 def resolve_supplier_email_for_send(supplier):
     """
-    Resolve supplier email for RFQ send (grouped queue).
-    Priority: rfq_email -> business_email -> primary_email -> first active contact email.
+    Resolve a single display/legacy send address (first Sales contact or rfq_email fallback).
     """
-    if getattr(supplier, "rfq_email", None):
-        email = (supplier.rfq_email or "").strip()
-        if email:
-            return email
-    if getattr(supplier, "business_email", None):
-        email = (supplier.business_email or "").strip()
-        if email:
-            return email
-    if getattr(supplier, "primary_email", None):
-        email = (supplier.primary_email or "").strip()
-        if email:
-            return email
-    contacts = getattr(supplier, "contacts", None)
-    if contacts is not None:
-        first = contacts.filter(email__isnull=False).exclude(email="").first()
-        if first and (first.email or "").strip():
-            return first.email.strip()
-    return None
+    recipients = resolve_supplier_rfq_recipients(supplier)
+    return recipients[0] if recipients else None
+
+
+def ensure_supplier_sales_contact(supplier, email):
+    """Find or create a contact by email and assign the Sales category (idempotent)."""
+    from suppliers.contact_categories import SALES_CATEGORY_NAME
+    from suppliers.models import Contact, SupplierContactCategory
+
+    normalized = (email or "").strip()
+    if not normalized:
+        return None
+
+    sales_category = SupplierContactCategory.objects.filter(
+        name=SALES_CATEGORY_NAME,
+        is_active=True,
+    ).first()
+    if not sales_category:
+        logger.warning(
+            "Sales category %r not found; cannot assign Sales contact for supplier pk=%s.",
+            SALES_CATEGORY_NAME,
+            supplier.pk,
+        )
+        return None
+
+    existing = Contact.objects.filter(
+        supplier=supplier,
+        email__iexact=normalized,
+    ).first()
+    if existing:
+        existing.categories.add(sales_category)
+        return existing
+
+    if "@" in normalized:
+        name = normalized.split("@", 1)[0].strip() or normalized
+    else:
+        name = normalized.strip() or normalized
+
+    contact = Contact.objects.create(
+        name=name,
+        email=normalized,
+        supplier=supplier,
+    )
+    contact.categories.add(sales_category)
+    return contact
 
 
 def resolve_supplier_email(supplier):
@@ -452,8 +522,8 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by, personalization_text=""):
     supplier_name = (supplier.name or supplier.cage_code or f"Supplier {supplier.pk}").strip()
     supplier_cage = (supplier.cage_code or "").strip()
 
-    to_address = resolve_supplier_email_for_send(supplier)
-    if not to_address:
+    recipients = resolve_supplier_rfq_recipients(supplier)
+    if not recipients:
         mode = "graph" if settings.GRAPH_MAIL_ENABLED else "mailto"
         return {
             "success": False,
@@ -465,6 +535,8 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by, personalization_text=""):
             "supplier_name": supplier_name,
             "supplier_cage": supplier_cage,
         }
+
+    to_address = ", ".join(recipients)
 
     cage = _default_cage()
     default_from = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@localhost"
@@ -500,11 +572,12 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by, personalization_text=""):
         ] or None
 
         ok = send_mail_via_graph(
-            to_address,
+            recipients[0],
             subject,
             body,
             reply_to=cage_reply or None,
             attachments=pdf_attachments,
+            cc_addresses=recipients[1:] if len(recipients) > 1 else None,
         )
         if not ok:
             return {
@@ -550,8 +623,9 @@ def build_grouped_rfq_email(supplier, rfqs, sent_by, personalization_text=""):
             "supplier_cage": supplier_cage,
         }
 
+    mailto_recipients = ",".join(recipients)
     mailto_url = (
-        f"mailto:{urllib.parse.quote(to_address)}"
+        f"mailto:{urllib.parse.quote(mailto_recipients, safe=',@.')}"
         f"?subject={urllib.parse.quote(subject)}"
         f"&body={urllib.parse.quote(body)}"
     )

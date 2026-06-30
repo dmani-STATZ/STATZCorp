@@ -13,7 +13,7 @@ from sales.models import SupplierContactLog, SupplierRFQ
 from sales.services.email import (
     _default_cage,
     compose_grouped_rfq_email_message,
-    resolve_supplier_email_for_send,
+    resolve_supplier_rfq_recipients,
 )
 
 logger = logging.getLogger("sales.background_tasks")
@@ -39,7 +39,7 @@ def send_queued_rfqs():
     qs = (
         SupplierRFQ.objects.filter(status="READY_TO_SEND")
         .select_related("supplier", "line", "line__solicitation", "sent_by")
-        .prefetch_related("supplier__contacts")
+        .prefetch_related("supplier__contacts__categories")
         .order_by("supplier_id", "line__solicitation__solicitation_number")
     )
     by_supplier = defaultdict(list)
@@ -55,8 +55,8 @@ def send_queued_rfqs():
         sent_by = rfqs[0].sent_by
         pers = (rfqs[0].personalization_text or "").strip()
 
-        to_address = resolve_supplier_email_for_send(supplier)
-        if not to_address:
+        recipients = resolve_supplier_rfq_recipients(supplier)
+        if not recipients:
             err = "No email address for supplier."
             logger.error("send_queued_rfqs: supplier_id=%s %s", supplier_id, err)
             for rfq in rfqs:
@@ -65,6 +65,8 @@ def send_queued_rfqs():
                 rfq.save(update_fields=["send_attempts", "last_send_error"])
             total_failed += 1
             continue
+
+        to_address = ", ".join(recipients)
 
         try:
             subject, body = compose_grouped_rfq_email_message(
@@ -114,11 +116,12 @@ def send_queued_rfqs():
 
         try:
             ok = send_mail_via_graph(
-                to_address,
+                recipients[0],
                 subject,
                 body,
                 reply_to=cage_reply or None,
                 attachments=pdf_attachments,
+                cc_addresses=recipients[1:] if len(recipients) > 1 else None,
             )
         except Exception as exc:
             logger.exception(

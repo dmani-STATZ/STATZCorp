@@ -40,6 +40,8 @@ from sales.services.email import (
     send_followup_email,
     resolve_supplier_email,
     resolve_supplier_email_for_send,
+    resolve_supplier_rfq_recipients,
+    ensure_supplier_sales_contact,
     compose_grouped_rfq_email_message,
 )
 from sales.services.matching import normalize_nsn
@@ -1414,8 +1416,7 @@ def supplier_create_and_queue(request):
             if supplier:
                 update_fields = []
                 if rfq_email:
-                    supplier.rfq_email = rfq_email
-                    update_fields.append("rfq_email")
+                    ensure_supplier_sales_contact(supplier, rfq_email)
                 if website_url:
                     supplier.website_url = website_url
                     update_fields.append("website_url")
@@ -1437,7 +1438,6 @@ def supplier_create_and_queue(request):
                     name=name,
                     cage_code=cage_code,
                     website_url=website_url,
-                    rfq_email=rfq_email,
                     physical_address=physical,
                     archived=False,
                     probation=False,
@@ -1446,6 +1446,8 @@ def supplier_create_and_queue(request):
                     modified_by=request.user,
                 )
                 created_new = True
+                if rfq_email:
+                    ensure_supplier_sales_contact(supplier, rfq_email)
 
             existing_q = SupplierRFQ.objects.filter(
                 line=line,
@@ -1500,7 +1502,7 @@ def supplier_create_and_queue(request):
 
 
 def _resolve_send_email(supplier):
-    """Resolve send email for queue: rfq_email -> business -> primary -> first contact."""
+    """Resolve send email for queue display (first Sales contact or rfq_email fallback)."""
     return resolve_supplier_email_for_send(supplier)
 
 
@@ -1511,7 +1513,7 @@ def _rfq_queue_template_context():
     qs = (
         SupplierRFQ.objects.filter(status="QUEUED")
         .select_related("supplier", "line", "line__solicitation")
-        .prefetch_related("supplier__contacts")
+        .prefetch_related("supplier__contacts__categories")
         .order_by("supplier__name", "line__solicitation__solicitation_number")
     )
     rfq_list = list(qs)
@@ -1682,15 +1684,15 @@ def rfq_queue(request):
 @login_required
 @require_POST
 def rfq_update_supplier_email(request):
-    """Update supplier RFQ email from the queue (stored on ``Supplier.rfq_email``)."""
+    """Assign a Sales-category contact email from the RFQ queue modal."""
     cage_code = (request.POST.get("cage_code") or "").strip()
     email = (request.POST.get("email") or "").strip()
     if not cage_code:
         return JsonResponse({"success": False, "error": "CAGE required"}, status=400)
     try:
         supplier = Supplier.objects.get(cage_code__iexact=cage_code)
-        supplier.rfq_email = email or None
-        supplier.save(update_fields=["rfq_email"])
+        if email:
+            ensure_supplier_sales_contact(supplier, email)
         return JsonResponse({"success": True})
     except Supplier.DoesNotExist:
         return JsonResponse({"success": False, "error": "Supplier not found"}, status=404)
@@ -1703,10 +1705,12 @@ def rfq_supplier_email_options(request, cage_code):
     JSON list of deduplicated email choices for the RFQ email modal (queue).
     GET /sales/rfq/queue/supplier-emails/<cage_code>/
     """
+    from suppliers.contact_categories import SALES_CATEGORY_NAME
+
     cage = (cage_code or "").strip()
     supplier = (
         Supplier.objects.filter(cage_code__iexact=cage)
-        .prefetch_related("contacts")
+        .prefetch_related("contacts__categories")
         .first()
     )
     if not supplier:
@@ -1725,10 +1729,17 @@ def rfq_supplier_email_options(request, cage_code):
         seen.add(key)
         options.append({"email": e, "label": label})
 
-    add_option(getattr(supplier, "rfq_email", None), "RFQ Email")
+    for c in supplier.contacts.all().order_by("name"):
+        if not any(cat.name == SALES_CATEGORY_NAME for cat in c.categories.all()):
+            continue
+        nm = (c.name or "").strip() or "Contact"
+        add_option(getattr(c, "email", None), f"Sales: {nm}")
+
     add_option(getattr(supplier, "primary_email", None), "Primary Email")
     add_option(getattr(supplier, "business_email", None), "Business Email")
     for c in supplier.contacts.all().order_by("name"):
+        if any(cat.name == SALES_CATEGORY_NAME for cat in c.categories.all()):
+            continue
         nm = (c.name or "").strip() or "Contact"
         add_option(getattr(c, "email", None), f"Contact: {nm}")
 
@@ -2275,11 +2286,14 @@ def rfq_inbox_rfq_search(request):
     ).filter(status='SENT')
 
     if email:
+        from suppliers.contact_categories import SALES_CATEGORY_NAME
+
         qs = qs.filter(
-            Q(supplier__rfq_email__iexact=email)
+            Q(supplier__contacts__categories__name=SALES_CATEGORY_NAME, supplier__contacts__email__iexact=email)
             | Q(supplier__business_email__iexact=email)
             | Q(supplier__primary_email__iexact=email)
-        )
+            | Q(supplier__rfq_email__iexact=email)
+        ).distinct()
 
     if q:
         qs = qs.filter(
@@ -2298,9 +2312,8 @@ def rfq_inbox_rfq_search(request):
             'sol_number': sol.solicitation_number if sol else '',
             'supplier_name': sup.name if sup else '',
             'supplier_email': (
-                (getattr(sup, 'rfq_email', None) or '')
-                or (getattr(sup, 'business_email', None) or '')
-                or (getattr(sup, 'primary_email', None) or '')
+                (rfq.email_sent_to or '')
+                or (", ".join(resolve_supplier_rfq_recipients(sup)) if sup else '')
             ),
             'status': rfq.status,
             'sent_at': rfq.sent_at.isoformat() if rfq.sent_at else '',

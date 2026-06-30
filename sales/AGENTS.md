@@ -445,49 +445,16 @@ This project does not use Tailwind in any form. All styling uses Bootstrap 5 plu
 
 ---
 
-## TODO: Migrate RFQ Email to Sales Contact Category
+## RFQ → Sales contact dispatch (implemented 2026-06-30)
 
-**Context:**
+**Recipient resolution** (`sales/services/email.py::resolve_supplier_rfq_recipients`):
 
-`Supplier.rfq_email` is a single `EmailField` on the `Supplier` model
-currently used by the RFQ dispatch flow in the sales app to address
-outbound RFQ emails to a supplier.
+1. All non-blank emails on contacts tagged with the global **Sales** category (`SALES_CATEGORY_NAME` from `suppliers/contact_categories.py`), case-insensitively deduped.
+2. If none: fallback to dormant `Supplier.rfq_email` when non-blank.
+3. If still none: skip that supplier in batch sends and log a warning — do not raise or abort the batch.
 
-Contact categories replace the retired `SupplierContactGroup` model.
-The long-term intention is to replace `Supplier.rfq_email` with contacts
-assigned the global **Sales** category.
+Grouped Graph sends use the first Sales address as **To** and additional Sales addresses as **CC** (`send_mail_via_graph`).
 
-**Migration plan when ready:**
+Data migration `suppliers/0013_migrate_rfq_email_to_sales_contacts` backfilled Sales contacts from every non-blank `rfq_email` (idempotent; does not clear `rfq_email`).
 
-1. In the sales RFQ dispatch view(s), locate all reads of
-   `supplier.rfq_email`. Grep: `rfq_email` across `sales/`.
-2. Replace each read with a lookup:
-
-```python
-from suppliers.contact_categories import SALES_CATEGORY_NAME
-
-sales_contacts = Contact.objects.filter(
-    supplier=supplier,
-    categories__name=SALES_CATEGORY_NAME,
-).exclude(email__isnull=True).exclude(email='')
-rfq_emails = [c.email.strip() for c in sales_contacts if c.email.strip()]
-```
-
-3. Update the RFQ email dispatch logic to send to the list
-   `rfq_emails` instead of the single `supplier.rfq_email` string.
-4. On the supplier detail page, remove the standalone RFQ Email card
-   (`div.card` containing `id="rfq-email-picker"`) from
-   `templates/suppliers/supplier_detail.html` once Sales-category
-   contacts are the preferred RFQ target.
-5. Remove the `supplier_set_rfq_email` view and its URL pattern from
-   `suppliers/views.py` and `suppliers/urls.py`.
-6. Deprecate `Supplier.rfq_email` field: add `null=True, blank=True`
-   (already set), write a data migration to assign the **Sales**
-   category to contacts whose email matches each supplier's
-   `rfq_email` where applicable, then remove the field in a follow-up
-   migration.
-7. Update `suppliers/AGENTS.md` and `suppliers/CONTEXT.md` to remove
-   all references to `rfq_email` and `supplier_set_rfq_email`.
-
-**Do not start this migration until the supplier detail contact-card
-category picker is live and tested.**
+**TODO:** Drop the `Supplier.rfq_email` column in a future migration once Sales-category dispatch is validated in production.

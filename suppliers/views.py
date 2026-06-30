@@ -1059,24 +1059,6 @@ def supplier_search_api(request):
     return JsonResponse({'results': results})
 
 
-@login_required
-@require_POST
-def supplier_set_rfq_email(request, supplier_id):
-    supplier = get_object_or_404(Supplier, pk=supplier_id)
-    email = request.POST.get("rfq_email", "").strip()
-    if email:
-        supplier.rfq_email = email
-        supplier.save(update_fields=["rfq_email"])
-        messages.success(request, f"RFQ email updated to {email}")
-    else:
-        supplier.rfq_email = None
-        supplier.save(update_fields=["rfq_email"])
-        messages.warning(request, "RFQ email cleared.")
-    return redirect(
-        request.POST.get("next") or reverse("suppliers:supplier_detail", args=[supplier_id])
-    )
-
-
 def _parse_int_ids_post(raw) -> list[int] | None:
     """Return list of int IDs, or None if the string is not empty but unparsable."""
     if raw is None:

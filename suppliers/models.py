@@ -43,10 +43,14 @@ class Supplier(AuditModel):
     website_url = models.URLField(null=True, blank=True)
     primary_phone = models.CharField(max_length=50, null=True, blank=True)
     primary_email = models.EmailField(null=True, blank=True)
+    # TODO: drop rfq_email column in a future migration once Sales-category dispatch is validated.
     rfq_email = models.EmailField(
         null=True,
         blank=True,
-        help_text="Preferred email address for RFQ dispatch. Set via the supplier profile.",
+        help_text=(
+            "DEPRECATED — RFQ recipients now derive from Sales-category contacts; "
+            "retained as dormant fallback, slated for removal."
+        ),
     )
     logo_url = models.URLField(null=True, blank=True)
     last_enriched_at = models.DateTimeField(null=True, blank=True)
