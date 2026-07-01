@@ -539,8 +539,8 @@ class MarkCompleteRecertifyTest(TestCase):
             msg=f"Expected recertified message, got: {messages}",
         )
 
-    def test_upload_document_recertifies_existing_completion(self):
-        """Upload recertification for cert-required course preserves the prior Tracker document."""
+    def test_upload_document_still_creates_new_tracker_and_recertifies(self):
+        """upload_document still recertifies via a new Tracker row (regression guard)."""
         course, matrix = self._create_course_and_matrix(upload=True)
         prior_date = timezone.now().date() - timezone.timedelta(days=90)
         old_tracker = Tracker.objects.create(
@@ -690,3 +690,80 @@ class MarkCompleteRecertifyTest(TestCase):
             any("already recertified today" in msg.lower() for msg in messages),
             msg=f"Expected same-day info message, got: {messages}",
         )
+
+    def test_replace_document_does_not_create_new_tracker(self):
+        """replace_document swaps the file on the existing row without changing completed_date."""
+        course, matrix = self._create_course_and_matrix(upload=True)
+        prior_date = timezone.now().date() - timezone.timedelta(days=120)
+        tracker = Tracker.objects.create(
+            user=self.user,
+            matrix=matrix,
+            completed_date=prior_date,
+            document=b"old_bytes",
+            document_name="old.pdf",
+        )
+
+        test_file = SimpleUploadedFile(
+            "fixed.pdf",
+            b"fixed_bytes",
+            content_type="application/pdf",
+        )
+        response = self.client.post(
+            reverse("training:replace_document", kwargs={"matrix_id": matrix.id}),
+            {"document": test_file},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Tracker.objects.filter(user=self.user, matrix=matrix).count(), 1)
+
+        tracker.refresh_from_db()
+        self.assertEqual(tracker.completed_date, prior_date)
+        self.assertEqual(tracker.document, b"fixed_bytes")
+        self.assertEqual(tracker.document_name, "fixed.pdf")
+
+        messages = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("unchanged" in msg.lower() for msg in messages),
+            msg=f"Expected unchanged-date message, got: {messages}",
+        )
+
+    def test_replace_document_requires_existing_completion(self):
+        """replace_document errors when no Tracker exists."""
+        course, matrix = self._create_course_and_matrix(upload=True)
+
+        test_file = SimpleUploadedFile(
+            "orphan.pdf",
+            b"orphan_bytes",
+            content_type="application/pdf",
+        )
+        response = self.client.post(
+            reverse("training:replace_document", kwargs={"matrix_id": matrix.id}),
+            {"document": test_file},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            Tracker.objects.filter(user=self.user, matrix=matrix).exists()
+        )
+
+        messages = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("completion record not found" in msg.lower() for msg in messages),
+            msg=f"Expected not-found message, got: {messages}",
+        )
+
+    def test_user_requirements_shows_certify_controls(self):
+        """Requirements page renders primary certify controls for cert and non-cert courses."""
+        cert_course, cert_matrix = self._create_course_and_matrix(upload=True)
+        non_cert_course, non_cert_matrix = self._create_course_and_matrix(
+            upload=False
+        )
+        non_cert_course.name = "Non Cert Course"
+        non_cert_course.save()
+
+        response = self.client.get(reverse("training:user_requirements"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Upload to Certify")
+        self.assertContains(response, "Click to Certify")
+        self.assertNotContains(response, "Recertify Early")
+        self.assertNotContains(response, "Recertify Now")

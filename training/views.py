@@ -521,6 +521,37 @@ def upload_document(request, matrix_id):  # Changed from matrix_entry_id to matr
 
 
 @login_required
+def replace_document(request, matrix_id):
+    if request.method == "POST" and request.FILES.get("document"):
+        try:
+            matrix = get_object_or_404(Matrix, pk=matrix_id)
+            tracker_entry = (
+                Tracker.objects.filter(user=request.user, matrix=matrix)
+                .order_by("-completed_date", "-id")
+                .first()
+            )
+            if not tracker_entry:
+                messages.error(request, "Completion record not found.")
+                return redirect("training:user_requirements")
+
+            uploaded_file = request.FILES["document"]
+            tracker_entry.document = uploaded_file.read()
+            tracker_entry.document_name = get_valid_filename(uploaded_file.name)
+            tracker_entry.save()
+
+            messages.success(
+                request,
+                f"Document replaced for '{matrix.course.name}'. Your certification date is unchanged.",
+            )
+        except Matrix.DoesNotExist:
+            messages.error(request, "Invalid training requirement.")
+        except Exception as e:
+            messages.error(request, f"Error replacing document: {e}")
+
+    return redirect("training:user_requirements")
+
+
+@login_required
 def view_document(request, tracker_id):
     try:
         tracker = get_object_or_404(Tracker, pk=tracker_id)

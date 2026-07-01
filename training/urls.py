@@ -13,6 +13,7 @@ urlpatterns = [
     path('requirements/review/<int:matrix_id>/', views.review_course_link, name='review_course_link'),
     path('mark-complete/<int:course_id>/', views.mark_complete, name='mark_complete'),
     path('upload-document/<int:matrix_id>/', views.upload_document, name='upload_document'),
+    path('replace-document/<int:matrix_id>/', views.replace_document, name='replace_document'),
     path('view-document/<int:tracker_id>/', views.view_document, name='view_document'),
     path('arctic-wolf/add/', views.add_arctic_wolf_course, name='add_arctic_wolf_course'),
     path('arctic-wolf/list/', views.arctic_wolf_course_list, name='arctic_wolf_course_list'),
