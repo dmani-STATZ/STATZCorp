@@ -131,6 +131,7 @@ grep -r "training:" --include="*.html" --include="*.py" .
 
 - `Matrix.is_active` is the soft-delete mechanism — `manage_matrix` sets existing entries to `is_active=False` before creating new ones. Any query that omits `is_active=True` will include stale requirements.
 - `Tracker.expiration_date` is a `@property` that calls `get_frequency_expiration_date` — it is not stored in the DB. Do not add a migration for it without removing the property.
+- **Recertification creates new `Tracker` rows** — each recertification inserts a new row keyed by `(user, matrix, completed_date)` via `get_or_create`; prior rows are never mutated. Cert-required courses (`Course.upload=True`) recertify only via `upload_document`; `mark_complete` server-side rejects them (must stay aligned with `user_requirements.html` template gating). Non-cert courses use `mark_complete` only.
 - `ArcticWolfCourse.slug` is auto-generated from `name` in `save()`. Changing the slug breaks all AW completion URLs (`/arctic-wolf/complete/<slug>/`) which are distributed to users via email.
 - `ArcticWolfCourse.course_id` (UUID) is used to build unguessable links — never reset or modify existing values.
 - `TrainingDoc.file_blob` and `Tracker.document` are `BinaryField` columns — no size validation exists. Large uploads grow the DB. Keep this limitation in mind before adding bulk-upload features.
@@ -144,7 +145,7 @@ grep -r "training:" --include="*.html" --include="*.py" .
 - `app_name = 'training'` is set in `urls.py`. All named routes are namespaced. Use `training:<name>` everywhere.
 - The `manage_matrix.html` JS toggles frequency `<select>` elements based on checkbox state. The JS relies on element IDs rendered by the template. If the course loop variable or `id` attribute format changes in the template, the JS breaks silently.
 - `admin_cmmc_upload.html` JS uses `user_course_map_json` — a JSON object injected by the view under that exact key name. Renaming this context variable requires updating the template JS.
-- `user_requirements.html` iterates `required_courses_data` — a list of dicts assembled in `user_training_requirements`. The dict keys (`matrix_entry`, `completed`, `is_current`, `latest_doc`, `review_outdated`, `tracker_id`, etc.) are used directly in template conditionals. Renaming context keys requires updating the template.
+- `user_requirements.html` iterates `required_courses_data` — a list of dicts assembled in `user_training_requirements`. The dict keys (`matrix_entry`, `completed`, `is_current`, `latest_doc`, `review_outdated`, `tracker_id`, etc.) are used directly in template conditionals. Renaming context keys requires updating the template. **Recertify Early** / **Recertify Now** render only when `Course.upload` is false; cert-required courses show upload-only recert UI. `mark_complete` must reject `Course.upload=True` if template gating is ever bypassed.
 - AW completion URLs use `<slug:slug>` routing. Slugs are generated from course name — renaming a live AW course invalidates distributed completion links.
 - `training_base.html` wraps all training templates. If the block structure changes, all child templates must be checked.
 
@@ -179,7 +180,7 @@ grep -r "training:" --include="*.html" --include="*.py" .
 
 **Not tested** (manual verification needed):
 - Dashboard CMMC and AW pie chart data
-- `user_training_requirements` context assembly and template rendering
+- `user_training_requirements` context assembly and template rendering (recertify flows covered in `MarkCompleteRecertifyTest`)
 - Matrix management (save, deactivate, reactivate)
 - Review-click logging (`CourseReviewClick` creation/update)
 - AW completion flows and eligibility logic

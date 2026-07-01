@@ -66,23 +66,24 @@
                                 {% endif %}
                             {% endif %}
                         {% endif %}
-                        {% if not item.is_current %}
+                        {% if item.matrix_entry.course.upload %}
+                            <button type="button" class="text-sm text-blue-500 hover:underline mt-1" onclick="toggleUpload('upload_{{ item.matrix_entry.id }}')">
+                                {% if item.completed %}Upload New Certificate to Recertify{% else %}Upload Certificate to Complete{% endif %}
+                            </button>
+                            <form method="post" action="{% url 'training:upload_document' item.matrix_entry.id %}" enctype="multipart/form-data" class="mt-2 hidden" id="upload_{{ item.matrix_entry.id }}">
+                                {% csrf_token %}
+                                <div class="mb-2">
+                                    <input type="file" name="document" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-sm" required>
+                                </div>
+                                <button type="submit" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm">Upload</button>
+                            </form>
+                        {% else %}
                             <form method="post" action="{% url 'training:mark_complete' item.matrix_entry.course.id %}" class="mt-4">
                                 {% csrf_token %}
-                                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 text-sm">
-                                    {% if item.completed %}Mark as Completed Again{% else %}Mark as Completed{% endif %}
+                                <button type="submit" class="{% if item.completed and item.is_current %}bg-blue-500 hover:bg-blue-600{% else %}bg-green-500 hover:bg-green-600{% endif %} text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-opacity-50 text-sm">
+                                    {% if not item.completed %}Mark as Completed{% elif item.is_current %}Recertify Early{% else %}Recertify Now{% endif %}
                                 </button>
                             </form>
-                            {% if item.matrix_entry.course.upload and not item.completed %}
-                                <button type="button" class="text-sm text-blue-500 hover:underline mt-1" onclick="toggleUpload('upload_{{ item.matrix_entry.id }}')">Upload Document</button>
-                                <form method="post" action="{% url 'training:upload_document' item.matrix_entry.id %}" enctype="multipart/form-data" class="mt-2 hidden" id="upload_{{ item.matrix_entry.id }}">
-                                    {% csrf_token %}
-                                    <div class="mb-2">
-                                        <input type="file" name="document" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-sm">
-                                    </div>
-                                    <button type="submit" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm">Upload</button>
-                                </form>
-                            {% endif %}
                         {% endif %}
                     </li>
                 {% endfor %}

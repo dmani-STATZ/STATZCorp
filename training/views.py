@@ -430,14 +430,38 @@ def mark_complete(request, course_id):
             ).first()
 
             if matrix_entry:
-                Tracker.objects.get_or_create(
+                if matrix_entry.course.upload:
+                    messages.error(
+                        request,
+                        f"'{course.name}' requires a certificate upload to recertify. "
+                        "Please upload your certificate instead.",
+                    )
+                    return redirect("training:user_requirements")
+
+                had_prior_completion = Tracker.objects.filter(
+                    user=user, matrix=matrix_entry
+                ).exists()
+
+                tracker_entry, created = Tracker.objects.get_or_create(
                     user=user,
                     matrix=matrix_entry,
                     completed_date=timezone.now().date(),
                 )
-                messages.success(
-                    request, f"Course '{course.name}' marked as completed."
-                )
+
+                if not had_prior_completion:
+                    messages.success(
+                        request, f"Course '{course.name}' marked as completed."
+                    )
+                elif created:
+                    messages.success(
+                        request,
+                        f"Course '{course.name}' recertified. Your completion date has been updated.",
+                    )
+                else:
+                    messages.info(
+                        request,
+                        f"Course '{course.name}' was already recertified today.",
+                    )
             else:
                 messages.error(
                     request,
@@ -456,22 +480,38 @@ def upload_document(request, matrix_id):  # Changed from matrix_entry_id to matr
     if request.method == "POST" and request.FILES.get("document"):
         try:
             matrix = get_object_or_404(Matrix, pk=matrix_id)  # Changed to matrix
-            tracker_entry = (
-                Tracker.objects.filter(user=request.user, matrix=matrix)
-                .order_by("-completed_date", "-id")
-                .first()
-            )
-            if not tracker_entry:
-                messages.error(request, "Completion record not found.")
-                return redirect("training:user_requirements")
-            uploaded_file = request.FILES["document"]
+            today = timezone.now().date()
 
-            tracker_entry.document = (
-                uploaded_file.read()
-            )  # Read the file content into binary data
+            had_prior_completion = Tracker.objects.filter(
+                user=request.user, matrix=matrix
+            ).exists()
+
+            tracker_entry, created = Tracker.objects.get_or_create(
+                user=request.user,
+                matrix=matrix,
+                completed_date=today,
+            )
+
+            uploaded_file = request.FILES["document"]
+            tracker_entry.document = uploaded_file.read()
             tracker_entry.document_name = get_valid_filename(uploaded_file.name)
             tracker_entry.save()
-            messages.success(request, f"Document uploaded for '{matrix.course.name}'.")
+
+            if not had_prior_completion:
+                messages.success(
+                    request,
+                    f"Certificate uploaded — '{matrix.course.name}' marked as completed.",
+                )
+            elif created:
+                messages.success(
+                    request,
+                    f"Certificate uploaded — '{matrix.course.name}' recertified.",
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Certificate updated for '{matrix.course.name}' (already recertified today).",
+                )
         except Matrix.DoesNotExist:
             messages.error(request, "Invalid training requirement.")
         except Exception as e:

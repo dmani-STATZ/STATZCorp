@@ -473,3 +473,220 @@ class CmmcDocumentUploadIntegrationTest(TestCase):
         
         tracker = Tracker.objects.get(user=self.cui_user, matrix__course=self.cmmc_course1)
         self.assertEqual(tracker.document_name, 'updated_cert.pdf')
+
+
+class MarkCompleteRecertifyTest(TestCase):
+    """Tests for mark_complete initial completion and recertification flows."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="recert_user",
+            email="recert@example.com",
+            password="testpass123",
+        )
+        self.account = Account.objects.create(
+            type="cui_user",
+            description="CUI User account type",
+        )
+        UserAccount.objects.create(user=self.user, account=self.account)
+        self.client.login(username="recert_user", password="testpass123")
+
+    def _create_course_and_matrix(self, upload=False, frequency="annually"):
+        course = Course.objects.create(
+            name="Recert Test Course",
+            description="Course for recertification tests",
+            upload=upload,
+        )
+        matrix = Matrix.objects.create(
+            course=course,
+            account=self.account,
+            frequency=frequency,
+        )
+        return course, matrix
+
+    def test_early_recertify_while_still_current(self):
+        """Recertifying while training is still valid creates a new row and shows recertified message."""
+        course, matrix = self._create_course_and_matrix()
+        prior_date = timezone.now().date() - timezone.timedelta(days=30)
+        Tracker.objects.create(
+            user=self.user,
+            matrix=matrix,
+            completed_date=prior_date,
+        )
+
+        response = self.client.post(
+            reverse("training:mark_complete", kwargs={"course_id": course.id}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(
+            response,
+            reverse("training:user_requirements"),
+            fetch_redirect_response=False,
+        )
+
+        today = timezone.now().date()
+        trackers = Tracker.objects.filter(user=self.user, matrix=matrix).order_by(
+            "-completed_date"
+        )
+        self.assertEqual(trackers.count(), 2)
+        self.assertEqual(trackers.first().completed_date, today)
+
+        messages = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("recertified" in msg.lower() for msg in messages),
+            msg=f"Expected recertified message, got: {messages}",
+        )
+
+    def test_upload_document_recertifies_existing_completion(self):
+        """Upload recertification for cert-required course preserves the prior Tracker document."""
+        course, matrix = self._create_course_and_matrix(upload=True)
+        prior_date = timezone.now().date() - timezone.timedelta(days=90)
+        old_tracker = Tracker.objects.create(
+            user=self.user,
+            matrix=matrix,
+            completed_date=prior_date,
+            document=b"original_cert_bytes",
+            document_name="original_cert.pdf",
+        )
+
+        test_file = SimpleUploadedFile(
+            "new_cert.pdf",
+            b"new_cert_bytes",
+            content_type="application/pdf",
+        )
+        response = self.client.post(
+            reverse("training:upload_document", kwargs={"matrix_id": matrix.id}),
+            {"document": test_file},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        old_tracker.refresh_from_db()
+        self.assertEqual(old_tracker.document, b"original_cert_bytes")
+        self.assertEqual(old_tracker.document_name, "original_cert.pdf")
+
+        today = timezone.now().date()
+        trackers = Tracker.objects.filter(user=self.user, matrix=matrix).order_by(
+            "-completed_date", "-id"
+        )
+        self.assertEqual(trackers.count(), 2)
+        latest = trackers.first()
+        self.assertEqual(latest.completed_date, today)
+        self.assertNotEqual(latest.id, old_tracker.id)
+        self.assertEqual(latest.document, b"new_cert_bytes")
+        self.assertEqual(latest.document_name, "new_cert.pdf")
+
+        messages = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("recertified" in msg.lower() for msg in messages),
+            msg=f"Expected recertified message, got: {messages}",
+        )
+
+    def test_upload_document_creates_tracker_for_new_completion(self):
+        """Upload with no prior Tracker creates today's row with document attached."""
+        course, matrix = self._create_course_and_matrix(upload=True)
+        self.assertFalse(
+            Tracker.objects.filter(user=self.user, matrix=matrix).exists()
+        )
+
+        test_file = SimpleUploadedFile(
+            "first_cert.pdf",
+            b"first_cert_bytes",
+            content_type="application/pdf",
+        )
+        response = self.client.post(
+            reverse("training:upload_document", kwargs={"matrix_id": matrix.id}),
+            {"document": test_file},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        tracker = Tracker.objects.get(user=self.user, matrix=matrix)
+        self.assertEqual(tracker.completed_date, timezone.now().date())
+        self.assertEqual(tracker.document, b"first_cert_bytes")
+        self.assertEqual(tracker.document_name, "first_cert.pdf")
+
+        messages = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("marked as completed" in msg.lower() for msg in messages),
+            msg=f"Expected completion message, got: {messages}",
+        )
+
+    def test_mark_complete_rejects_cert_required_course(self):
+        """mark_complete is blocked for courses that require certificate upload."""
+        course, matrix = self._create_course_and_matrix(upload=True)
+
+        response = self.client.post(
+            reverse("training:mark_complete", kwargs={"course_id": course.id}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            Tracker.objects.filter(user=self.user, matrix=matrix).exists()
+        )
+
+        messages = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("certificate upload" in msg.lower() for msg in messages),
+            msg=f"Expected rejection message, got: {messages}",
+        )
+
+    def test_mark_complete_still_works_for_non_cert_course(self):
+        """Non-cert courses still recertify via mark_complete without upload."""
+        course, matrix = self._create_course_and_matrix(upload=False)
+        prior_date = timezone.now().date() - timezone.timedelta(days=45)
+        Tracker.objects.create(
+            user=self.user,
+            matrix=matrix,
+            completed_date=prior_date,
+        )
+
+        response = self.client.post(
+            reverse("training:mark_complete", kwargs={"course_id": course.id}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            Tracker.objects.filter(user=self.user, matrix=matrix).count(), 2
+        )
+
+        messages = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("recertified" in msg.lower() for msg in messages),
+            msg=f"Expected recertified message, got: {messages}",
+        )
+
+    def test_same_day_recertify_does_not_duplicate_tracker(self):
+        """Clicking recertify twice on the same day does not create a duplicate Tracker row."""
+        course, matrix = self._create_course_and_matrix()
+        prior_date = timezone.now().date() - timezone.timedelta(days=60)
+        Tracker.objects.create(
+            user=self.user,
+            matrix=matrix,
+            completed_date=prior_date,
+        )
+
+        url = reverse("training:mark_complete", kwargs={"course_id": course.id})
+        self.client.post(url)
+        count_after_first = Tracker.objects.filter(
+            user=self.user,
+            matrix=matrix,
+            completed_date=timezone.now().date(),
+        ).count()
+        self.assertEqual(count_after_first, 1)
+
+        response = self.client.post(url, follow=True)
+        count_after_second = Tracker.objects.filter(
+            user=self.user,
+            matrix=matrix,
+            completed_date=timezone.now().date(),
+        ).count()
+        self.assertEqual(count_after_second, 1)
+
+        messages = [str(m) for m in response.context["messages"]]
+        self.assertTrue(
+            any("already recertified today" in msg.lower() for msg in messages),
+            msg=f"Expected same-day info message, got: {messages}",
+        )
