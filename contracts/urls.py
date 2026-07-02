@@ -224,13 +224,16 @@ from .views.packaging_views import (
 )
 from .views.dfas_import_views import (
     dfas_clins_api,
+    dfas_import_apply_rows_view,
     dfas_import_cancel_view,
+    dfas_import_close_batch_view,
     dfas_import_finalize_view,
     dfas_import_list_view,
     dfas_import_rematch_view,
     dfas_import_resolve_row_view,
     dfas_import_review_view,
     dfas_import_upload_view,
+    dfas_row_match_preview_api,
     dfas_shipments_api,
 )
 from .views import clin_fix_views
@@ -312,6 +315,16 @@ urlpatterns = [
         name="dfas_import_finalize",
     ),
     path(
+        "dfas-imports/<int:batch_id>/apply/",
+        dfas_import_apply_rows_view,
+        name="dfas_import_apply_rows",
+    ),
+    path(
+        "dfas-imports/<int:batch_id>/close/",
+        dfas_import_close_batch_view,
+        name="dfas_import_close_batch",
+    ),
+    path(
         "dfas-imports/<int:batch_id>/cancel/",
         dfas_import_cancel_view,
         name="dfas_import_cancel",
@@ -320,6 +333,11 @@ urlpatterns = [
         "dfas-imports/<int:batch_id>/rows/<int:row_id>/resolve/",
         dfas_import_resolve_row_view,
         name="dfas_import_resolve_row",
+    ),
+    path(
+        "dfas-imports/<int:batch_id>/rows/<int:row_id>/preview/",
+        dfas_row_match_preview_api,
+        name="dfas_row_match_preview",
     ),
     path(
         "dfas-imports/api/clins/",

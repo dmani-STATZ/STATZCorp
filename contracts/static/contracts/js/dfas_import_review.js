@@ -1,16 +1,12 @@
 /**
- * DFAS import review: per-row resolution via unified drill-down resolve modal.
- * Requires {% csrf_token %}, #dfasResolveRowUrlZero (URL with row_id=0),
- * window.DFAS_CONTRACT_SEARCH_URL, window.DFAS_CLINS_API_URL,
- * window.DFAS_SHIPMENTS_API_URL.
+ * DFAS import review: per-row resolution, bulk apply, match preview, batch close.
  */
 (function () {
     'use strict';
 
-    // ── Unified Resolve Modal state ──────────────────────────────────────────
     const resolveState = {
         rowId: null,
-        steps: [],            // subset of ['contract','clin','shipment'] for this row
+        steps: ['contract', 'clin', 'shipment'],
         currentStepIndex: 0,
         contractId: null,
         clinId: null,
@@ -19,15 +15,17 @@
         rowRef: '',
     };
 
+    const selectedRowIds = new Set();
+    let matchedCount = 0;
+
     const RESOLVE_STEP_LABELS = {
         contract: 'Contract',
         clin: 'CLIN',
         shipment: 'Shipment',
     };
 
-    let _preloadedShipments = null; // cache from background preload
+    let _preloadedShipments = null;
 
-    // ── Utilities ─────────────────────────────────────────────────────────────
     function getCsrfToken() {
         const i = document.querySelector('[name=csrfmiddlewaretoken]');
         if (i && i.value) return i.value;
@@ -41,10 +39,302 @@
         return tpl.value.replace(/\/rows\/0\//, '/rows/' + String(rowId) + '/');
     }
 
+    function rowPreviewUrl(rowId) {
+        const tpl = document.getElementById('dfasPreviewUrlZero');
+        if (!tpl || !tpl.value) return '';
+        return tpl.value.replace(/\/rows\/0\//, '/rows/' + String(rowId) + '/');
+    }
+
+    function applyRowsUrl() {
+        const el = document.getElementById('dfasApplyRowsUrl');
+        return el ? el.value : '';
+    }
+
+    function closeBatchUrl() {
+        const el = document.getElementById('dfasCloseBatchUrl');
+        return el ? el.value : '';
+    }
+
     function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, function (c) {
             return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
         });
+    }
+
+    function fmtMoney(val) {
+        if (val == null || val === '') return '—';
+        const n = parseFloat(val);
+        if (Number.isNaN(n)) return '—';
+        return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // ── Checkbox / sticky bar state ───────────────────────────────────────────
+    function getMatchedCheckboxes() {
+        return Array.from(document.querySelectorAll('.dfas-row-checkbox'));
+    }
+
+    function syncSelectAllCheckbox() {
+        const selectAll = document.getElementById('dfasSelectAllMatched');
+        if (!selectAll) return;
+        const boxes = getMatchedCheckboxes();
+        if (!boxes.length) {
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+            return;
+        }
+        const checkedCount = boxes.filter(cb => cb.checked).length;
+        selectAll.checked = checkedCount === boxes.length;
+        selectAll.indeterminate = checkedCount > 0 && checkedCount < boxes.length;
+    }
+
+    function updateSelectionUi() {
+        const count = selectedRowIds.size;
+        const selectedEl = document.getElementById('dfasSelectedCount');
+        const applySelectedBtn = document.getElementById('dfasApplySelectedBtn');
+        if (selectedEl) selectedEl.textContent = String(count);
+        if (applySelectedBtn) applySelectedBtn.disabled = count === 0;
+        syncSelectAllCheckbox();
+    }
+
+    function updateMatchedCountUi(count) {
+        matchedCount = count;
+        const matchedEl = document.getElementById('dfasMatchedCount');
+        const applyAllBtn = document.getElementById('dfasApplyAllBtn');
+        const label = document.getElementById('dfasMatchedCountLabel');
+        if (matchedEl) matchedEl.textContent = String(count);
+        if (applyAllBtn) {
+            applyAllBtn.disabled = count === 0;
+            applyAllBtn.textContent = 'Apply All Matched (' + count + ')';
+        }
+        if (label) {
+            label.innerHTML = '<span id="dfasMatchedCount">' + count + '</span> row' +
+                (count === 1 ? '' : 's') + ' ready to apply';
+        }
+    }
+
+    function updateStatusBadges(statusCounts) {
+        if (!statusCounts) return;
+        document.querySelectorAll('.dfas-import-page .badge').forEach(function () {
+            // Status badges are server-rendered; patch known keys via data attributes would be ideal,
+            // but we update the sticky matched count and imported badge if present.
+        });
+        const imported = statusCounts.imported || 0;
+        const badgeBar = document.querySelector('.dfas-import-page .d-flex.flex-wrap.gap-2.mb-3');
+        if (!badgeBar) return;
+        let importedBadge = badgeBar.querySelector('[data-dfas-status="imported"]');
+        if (imported > 0) {
+            if (!importedBadge) {
+                importedBadge = document.createElement('span');
+                importedBadge.className = 'badge bg-success';
+                importedBadge.dataset.dfasStatus = 'imported';
+                badgeBar.appendChild(importedBadge);
+            }
+            importedBadge.textContent = 'Imported: ' + imported;
+        } else if (importedBadge) {
+            importedBadge.remove();
+        }
+    }
+
+    function markRowImported(rowId, paymentHistoryId) {
+        const tr = document.querySelector('tr[data-row-id="' + rowId + '"]');
+        if (!tr) return;
+
+        tr.classList.remove('dfas-row-matched');
+        tr.classList.add('dfas-row-imported');
+
+        const statusTd = tr.querySelector('td:first-child');
+        if (statusTd) {
+            statusTd.innerHTML = '<span class="badge bg-success">Imported</span>';
+        }
+
+        const actionsTd = tr.querySelector('td:last-child');
+        if (actionsTd) {
+            let html = '<span class="text-success" title="Imported">✓</span>';
+            if (paymentHistoryId) {
+                html += '<span class="small text-body-secondary ms-1">PH #' +
+                    escapeHtml(paymentHistoryId) + '</span>';
+            }
+            actionsTd.innerHTML = html;
+        }
+
+        selectedRowIds.delete(String(rowId));
+        const cb = document.getElementById('im-' + rowId);
+        if (cb) cb.remove();
+        updateSelectionUi();
+    }
+
+    // ── Apply rows ──────────────────────────────────────────────────────────
+    async function applyRows(rowIds) {
+        const url = applyRowsUrl();
+        if (!url) {
+            alert('Could not apply: missing apply URL.');
+            return;
+        }
+        const ids = Array.from(new Set(rowIds.map(String)));
+        if (!ids.length) return;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+            body: JSON.stringify({ row_ids: ids.map(Number) }),
+        });
+
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (e) {
+            alert('Could not apply: invalid response.');
+            return;
+        }
+
+        if (!response.ok || !data.success) {
+            alert('Could not apply: ' + (data.message || 'Unknown error'));
+            return;
+        }
+
+        const details = data.applied_details || {};
+        (data.applied || []).forEach(function (rowId) {
+            const info = details[rowId] || {};
+            markRowImported(rowId, info.payment_history_id);
+        });
+
+        if (data.failed && Object.keys(data.failed).length) {
+            const lines = Object.entries(data.failed)
+                .map(function (entry) { return 'Row ' + entry[0] + ': ' + entry[1]; });
+            alert('Some rows could not be applied:\n' + lines.join('\n'));
+        }
+
+        updateMatchedCountUi(data.matched_count != null ? data.matched_count : matchedCount);
+        updateStatusBadges(data.status_counts);
+    }
+
+    async function closeBatch(force) {
+        const url = closeBatchUrl();
+        if (!url) {
+            alert('Could not close batch: missing URL.');
+            return;
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+            body: JSON.stringify({ force: !!force }),
+        });
+
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (e) {
+            alert('Could not close batch: invalid response.');
+            return;
+        }
+
+        if (response.status === 400 && !force) {
+            if (confirm(data.message || 'Unresolved rows remain. Close anyway?')) {
+                return closeBatch(true);
+            }
+            return;
+        }
+
+        if (!response.ok || !data.success) {
+            alert('Could not close batch: ' + (data.message || 'Unknown error'));
+            return;
+        }
+
+        if (data.redirect_url) {
+            window.location.href = data.redirect_url;
+        }
+    }
+
+    // ── Match preview ─────────────────────────────────────────────────────────
+    async function openMatchPreview(rowId) {
+        const url = rowPreviewUrl(rowId);
+        if (!url) {
+            alert('Could not load preview: missing URL.');
+            return;
+        }
+
+        const response = await fetch(url, { credentials: 'same-origin' });
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (e) {
+            alert('Could not load preview: invalid response.');
+            return;
+        }
+
+        if (!response.ok || !data.success) {
+            alert('Could not load preview: ' + (data.message || 'Unknown error'));
+            return;
+        }
+
+        const setText = function (id, text) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text || '—';
+        };
+
+        setText('dfasPreviewContract', data.contract_number);
+        const meta = [data.contract_type, data.contract_status].filter(Boolean).join(' · ');
+        setText('dfasPreviewContractMeta', meta || '—');
+
+        const idiqEl = document.getElementById('dfasPreviewIdiq');
+        if (idiqEl) {
+            if (data.idiq_number) {
+                idiqEl.innerHTML = '<span class="font-monospace">' +
+                    escapeHtml(data.idiq_number) + '</span>' +
+                    ' <span class="fst-italic text-body-secondary">(informational only)</span>';
+            } else {
+                idiqEl.innerHTML = '<span class="text-body-secondary fst-italic">None (informational only)</span>';
+            }
+        }
+
+        let clinText = '—';
+        if (data.clin_item_number) {
+            clinText = data.clin_item_number;
+            if (data.clin_item_type) clinText += ' (' + data.clin_item_type + ')';
+            if (data.clin_item_value != null) {
+                clinText += ' — Item ' + fmtMoney(data.clin_item_value);
+            }
+        }
+        setText('dfasPreviewClin', clinText);
+
+        let shipText = '—';
+        if (data.shipment_name) {
+            shipText = data.shipment_name;
+            const parts = [];
+            if (data.shipment_item_value != null) {
+                parts.push('Item ' + fmtMoney(data.shipment_item_value));
+            }
+            if (data.shipment_wawf_payment != null) {
+                parts.push('Cust. Pay ' + fmtMoney(data.shipment_wawf_payment));
+            }
+            if (parts.length) shipText += ' — ' + parts.join(', ');
+        }
+        setText('dfasPreviewShipment', shipText);
+
+        setText('dfasPreviewDfasAmount', fmtMoney(data.dfas_amount));
+        setText('dfasPreviewPaymentDate', data.dfas_payment_date || '—');
+
+        const link = document.getElementById('dfasPreviewOpenContract');
+        if (link && data.contract_detail_url) {
+            link.href = data.contract_detail_url;
+            link.classList.remove('disabled');
+        } else if (link) {
+            link.href = '#';
+            link.classList.add('disabled');
+        }
+
+        bootstrap.Modal.getOrCreateInstance(
+            document.getElementById('dfasMatchPreviewModal')
+        ).show();
     }
 
     // ── Core resolve POST ─────────────────────────────────────────────────────
@@ -81,29 +371,26 @@
     function openResolveModal(btn) {
         const tr = btn.closest('tr[data-row-id]');
         const rowId = tr.dataset.rowId;
-        const startStep = btn.dataset.startStep; // 'contract'|'clin'|'shipment'
+        const startStep = btn.dataset.startStep || 'contract';
 
-        // Reset state
         resolveState.rowId = rowId;
+        resolveState.steps = ['contract', 'clin', 'shipment'];
+        resolveState.currentStepIndex = Math.max(
+            0,
+            resolveState.steps.indexOf(startStep)
+        );
         resolveState.contractId = btn.dataset.contractId || null;
         resolveState.clinId = btn.dataset.clinId || null;
-        resolveState.clinHasShipments = false;
-        resolveState.shipmentId = null;
+        resolveState.shipmentId = btn.dataset.shipmentId || null;
+        resolveState.clinHasShipments = !!resolveState.shipmentId;
         resolveState.rowRef = btn.dataset.rowRef || '';
         _preloadedShipments = null;
 
-        // Build steps array from startStep
-        const allSteps = ['contract', 'clin', 'shipment'];
-        resolveState.steps = allSteps.slice(allSteps.indexOf(startStep));
-        resolveState.currentStepIndex = 0;
-
-        // Populate row reference in modal header
         const rowRefEl = document.getElementById('dfasResolveRowRef');
         if (rowRefEl) rowRefEl.textContent = resolveState.rowRef;
 
-        // Populate amount + date meta line
         const amount = btn.dataset.amount || '';
-        const date   = btn.dataset.date   || '';
+        const date = btn.dataset.date || '';
         const fmtAmount = amount
             ? '$' + parseFloat(amount).toLocaleString('en-US',
                 { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -112,34 +399,26 @@
         const metaEl = document.getElementById('dfasResolveRowMeta');
         if (metaEl) metaEl.textContent = metaParts.join('    ');
 
-        // Render step breadcrumb
         renderStepNav();
+        showResolveStep(resolveState.steps[resolveState.currentStepIndex]);
 
-        // Show the first step
-        showResolveStep(resolveState.steps[0]);
-
-        // If starting at clin step, preload CLINs immediately
-        if (startStep === 'clin' && resolveState.contractId) {
-            loadClins(resolveState.contractId);
+        if (resolveState.contractId) {
+            loadClins(resolveState.contractId, resolveState.clinId);
+        }
+        if (resolveState.clinId) {
+            loadShipments(resolveState.clinId, false, resolveState.shipmentId);
         }
 
-        // If starting at shipment step, preload shipments immediately
-        if (startStep === 'shipment' && resolveState.clinId) {
-            loadShipments(resolveState.clinId);
-        }
-
-        // Open the modal
         bootstrap.Modal.getOrCreateInstance(
             document.getElementById('dfasResolveModal')
         ).show();
     }
 
-    // ── Step rendering helpers ────────────────────────────────────────────────
     function renderStepNav() {
         const nav = document.getElementById('dfasResolveStepNav');
         if (!nav) return;
         nav.innerHTML = '';
-        resolveState.steps.forEach((step, i) => {
+        resolveState.steps.forEach(function (step, i) {
             if (i > 0) {
                 const sep = document.createElement('span');
                 sep.className = 'text-body-secondary';
@@ -158,7 +437,7 @@
     function updateStepNavState() {
         const currentStep = resolveState.steps[resolveState.currentStepIndex];
         document.querySelectorAll('#dfasResolveStepNav .dfas-step-item')
-            .forEach((el, i) => {
+            .forEach(function (el, i) {
                 el.classList.remove('dfas-step-active', 'dfas-step-done');
                 if (i < resolveState.currentStepIndex) {
                     el.classList.add('dfas-step-done');
@@ -169,32 +448,33 @@
     }
 
     function showResolveStep(stepName) {
-        // Hide all step panels
         document.querySelectorAll('.dfas-resolve-step')
-            .forEach(el => el.classList.add('d-none'));
+            .forEach(function (el) { el.classList.add('d-none'); });
 
-        // Show target panel
         const panelId = 'dfasStep' + stepName.charAt(0).toUpperCase() + stepName.slice(1);
         const panel = document.getElementById(panelId);
         if (panel) {
             panel.classList.remove('d-none');
-            // Reset selections in this step
-            panel.querySelectorAll('.dfas-resolve-card.is-selected')
-                .forEach(c => c.classList.remove('is-selected'));
+            panel.querySelectorAll('.dfas-resolve-card.is-selected, .list-group-item.active')
+                .forEach(function (c) {
+                    c.classList.remove('is-selected', 'active');
+                });
         }
 
-        // Back button: hidden if on first step, visible otherwise
         const backBtn = document.getElementById('dfasResolveBackBtn');
         if (backBtn) {
             backBtn.style.visibility =
                 resolveState.currentStepIndex === 0 ? 'hidden' : 'visible';
         }
 
-        // Next button: disabled (no selection yet), label based on position
-        updateNextButton(false);
+        const hasSelection = (
+            (stepName === 'contract' && resolveState.contractId) ||
+            (stepName === 'clin' && resolveState.clinId) ||
+            (stepName === 'shipment' && resolveState.shipmentId)
+        );
+        updateNextButton(!!hasSelection);
 
-        // Clear contract search if re-entering step 1
-        if (stepName === 'contract') {
+        if (stepName === 'contract' && !resolveState.contractId) {
             const input = document.getElementById('dfasResolveContractInput');
             const results = document.getElementById('dfasResolveContractResults');
             if (input) input.value = '';
@@ -209,8 +489,6 @@
         if (!btn) return;
         const isLastStep =
             resolveState.currentStepIndex === resolveState.steps.length - 1;
-
-        // On CLIN step: if selected CLIN has no shipments, treat as last step
         const currentStep = resolveState.steps[resolveState.currentStepIndex];
         const effectivelyLast = isLastStep ||
             (currentStep === 'clin' &&
@@ -221,7 +499,6 @@
         btn.textContent = effectivelyLast ? 'Assign' : 'Next ›';
     }
 
-    // ── Contract search (Step 1) ──────────────────────────────────────────────
     function initContractSearch() {
         const input = document.getElementById('dfasResolveContractInput');
         if (!input) return;
@@ -234,11 +511,11 @@
             if (!results) return;
             if (q.length < 3) { results.innerHTML = ''; return; }
 
-            debounce = setTimeout(() => {
+            debounce = setTimeout(function () {
                 const searchUrl = window.DFAS_CONTRACT_SEARCH_URL || '/contracts/search/';
                 fetch(searchUrl + '?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
-                    .then(r => r.json())
-                    .then(data => {
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
                         results.innerHTML = '';
                         const list = data.results || data;
                         if (!list.length) {
@@ -246,7 +523,7 @@
                                 '<div class="list-group-item text-body-secondary small">No results.</div>';
                             return;
                         }
-                        list.forEach(contract => {
+                        list.forEach(function (contract) {
                             const item = document.createElement('button');
                             item.type = 'button';
                             item.className = 'list-group-item list-group-item-action ' +
@@ -270,18 +547,26 @@
                                     escapeHtml(contract.status || '') +
                                 '</span>';
 
-                            item.addEventListener('click', () => {
-                                // Deselect others
+                            if (resolveState.contractId &&
+                                String(contract.id) === String(resolveState.contractId)) {
+                                item.classList.add('active');
+                            }
+
+                            item.addEventListener('click', function () {
                                 results.querySelectorAll('.active')
-                                    .forEach(el => el.classList.remove('active'));
+                                    .forEach(function (el) { el.classList.remove('active'); });
                                 item.classList.add('active');
                                 resolveState.contractId = String(contract.id);
+                                resolveState.clinId = null;
+                                resolveState.shipmentId = null;
+                                resolveState.clinHasShipments = false;
+                                _preloadedShipments = null;
                                 updateNextButton(true);
                             });
                             results.appendChild(item);
                         });
                     })
-                    .catch(() => {
+                    .catch(function () {
                         results.innerHTML =
                             '<div class="list-group-item text-danger small">Search failed.</div>';
                     });
@@ -289,8 +574,7 @@
         });
     }
 
-    // ── CLIN loader ───────────────────────────────────────────────────────────
-    function loadClins(contractId) {
+    function loadClins(contractId, preselectClinId) {
         const loading = document.getElementById('dfasStepClinLoading');
         const grid = document.getElementById('dfasStepClinCards');
         if (!loading || !grid) return;
@@ -299,21 +583,23 @@
 
         const clinsUrl = window.DFAS_CLINS_API_URL || '/contracts/dfas-imports/api/clins/';
         fetch(clinsUrl + '?contract_id=' + contractId, { credentials: 'same-origin' })
-            .then(r => r.json())
-            .then(data => {
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
                 loading.classList.add('d-none');
                 const clins = data.clins || [];
                 if (!clins.length) {
                     grid.innerHTML = '<div class="col text-body-secondary small">No CLINs found on this contract.</div>';
                     return;
                 }
-                clins.forEach(clin => {
+                clins.forEach(function (clin) {
                     const col = document.createElement('div');
                     col.className = 'col-6 col-md-4';
-                    const fmtVal = v => v != null
-                        ? '$' + parseFloat(v).toLocaleString('en-US',
-                            { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        : '';
+                    const fmtVal = function (v) {
+                        return v != null
+                            ? '$' + parseFloat(v).toLocaleString('en-US',
+                                { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : '';
+                    };
                     col.innerHTML =
                         '<div class="card h-100 dfas-resolve-card"' +
                             ' role="button" tabindex="0"' +
@@ -336,31 +622,38 @@
                             '</div>' +
                         '</div>';
 
-                    col.querySelector('.dfas-resolve-card').addEventListener('click', () => {
-                        grid.querySelectorAll('.dfas-resolve-card')
-                            .forEach(c => c.classList.remove('is-selected'));
-                        col.querySelector('.dfas-resolve-card').classList.add('is-selected');
+                    const card = col.querySelector('.dfas-resolve-card');
+                    if (preselectClinId && String(clin.id) === String(preselectClinId)) {
+                        card.classList.add('is-selected');
                         resolveState.clinId = String(clin.id);
                         resolveState.clinHasShipments = clin.has_shipments;
                         updateNextButton(true);
+                    }
 
-                        // Preload shipments in background if CLIN has them
+                    card.addEventListener('click', function () {
+                        grid.querySelectorAll('.dfas-resolve-card')
+                            .forEach(function (c) { c.classList.remove('is-selected'); });
+                        card.classList.add('is-selected');
+                        resolveState.clinId = String(clin.id);
+                        resolveState.clinHasShipments = clin.has_shipments;
+                        resolveState.shipmentId = null;
+                        updateNextButton(true);
+
                         if (clin.has_shipments) {
-                            loadShipments(clin.id, /* preloadOnly */ true);
+                            loadShipments(clin.id, true);
                         }
                     });
                     grid.appendChild(col);
                 });
             })
-            .catch(() => {
+            .catch(function () {
                 loading.classList.add('d-none');
                 grid.innerHTML =
                     '<div class="col text-danger small">Failed to load CLINs.</div>';
             });
     }
 
-    // ── Shipment loader ───────────────────────────────────────────────────────
-    function loadShipments(clinId, preloadOnly = false) {
+    function loadShipments(clinId, preloadOnly, preselectShipmentId) {
         _preloadedShipments = null;
         const loading = document.getElementById('dfasStepShipmentLoading');
         const grid = document.getElementById('dfasStepShipmentCards');
@@ -372,35 +665,39 @@
 
         const shipmentsUrl = window.DFAS_SHIPMENTS_API_URL || '/contracts/dfas-imports/api/shipments/';
         fetch(shipmentsUrl + '?clin_id=' + clinId, { credentials: 'same-origin' })
-            .then(r => r.json())
-            .then(data => {
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
                 _preloadedShipments = data;
-                if (preloadOnly) return; // just cache it, don't render yet
+                if (preloadOnly) return;
                 if (loading) loading.classList.add('d-none');
-                if (grid) renderShipmentCards(data, grid);
+                if (grid) renderShipmentCards(data, grid, preselectShipmentId);
             })
-            .catch(() => {
+            .catch(function () {
                 if (!preloadOnly) {
                     if (loading) loading.classList.add('d-none');
-                    if (grid) grid.innerHTML =
-                        '<div class="col text-danger small">Failed to load shipments.</div>';
+                    if (grid) {
+                        grid.innerHTML =
+                            '<div class="col text-danger small">Failed to load shipments.</div>';
+                    }
                 }
             });
     }
 
-    function renderShipmentCards(data, grid) {
+    function renderShipmentCards(data, grid, preselectShipmentId) {
         const shipments = data.shipments || [];
         if (!shipments.length) {
             grid.innerHTML = '<div class="col text-body-secondary small">No shipments found on this CLIN.</div>';
             return;
         }
-        shipments.forEach(ship => {
+        shipments.forEach(function (ship) {
             const col = document.createElement('div');
             col.className = 'col-6 col-md-4';
-            const fmtVal = v => v != null
-                ? '$' + parseFloat(v).toLocaleString('en-US',
-                    { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : '';
+            const fmtVal = function (v) {
+                return v != null
+                    ? '$' + parseFloat(v).toLocaleString('en-US',
+                        { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : '';
+            };
 
             const shipDateRow = ship.ship_date
                 ? '<div class="d-flex justify-content-between">' +
@@ -434,10 +731,17 @@
                     '</div>' +
                 '</div>';
 
-            col.querySelector('.dfas-resolve-card').addEventListener('click', () => {
+            const card = col.querySelector('.dfas-resolve-card');
+            if (preselectShipmentId && String(ship.id) === String(preselectShipmentId)) {
+                card.classList.add('is-selected');
+                resolveState.shipmentId = String(ship.id);
+                updateNextButton(true);
+            }
+
+            card.addEventListener('click', function () {
                 grid.querySelectorAll('.dfas-resolve-card')
-                    .forEach(c => c.classList.remove('is-selected'));
-                col.querySelector('.dfas-resolve-card').classList.add('is-selected');
+                    .forEach(function (c) { c.classList.remove('is-selected'); });
+                card.classList.add('is-selected');
                 resolveState.shipmentId = String(ship.id);
                 updateNextButton(true);
             });
@@ -445,13 +749,11 @@
         });
     }
 
-    // ── Back and Next/Assign button handlers ─────────────────────────────────
     function initResolveModalButtons() {
         document.getElementById('dfasResolveBackBtn')
-            ?.addEventListener('click', () => {
+            ?.addEventListener('click', function () {
                 if (resolveState.currentStepIndex > 0) {
                     resolveState.currentStepIndex--;
-                    // Clear forward state for the step we're returning to
                     const step = resolveState.steps[resolveState.currentStepIndex];
                     if (step === 'clin') {
                         resolveState.clinId = null;
@@ -471,7 +773,7 @@
             });
 
         document.getElementById('dfasResolveNextBtn')
-            ?.addEventListener('click', () => {
+            ?.addEventListener('click', function () {
                 const currentStep = resolveState.steps[resolveState.currentStepIndex];
                 const isLastStep =
                     resolveState.currentStepIndex === resolveState.steps.length - 1;
@@ -481,25 +783,26 @@
                 if (effectivelyLast) {
                     submitResolve();
                 } else {
-                    // Advance to next step
                     resolveState.currentStepIndex++;
                     const nextStep = resolveState.steps[resolveState.currentStepIndex];
 
-                    // Load data for next step if needed
                     if (nextStep === 'clin' && resolveState.contractId) {
-                        loadClins(resolveState.contractId);
+                        loadClins(resolveState.contractId, resolveState.clinId);
                     }
                     if (nextStep === 'shipment' && resolveState.clinId) {
-                        // Use preloaded data if available
                         const grid = document.getElementById('dfasStepShipmentCards');
                         const loading = document.getElementById('dfasStepShipmentLoading');
                         if (_preloadedShipments) {
                             if (grid) {
                                 grid.innerHTML = '';
-                                renderShipmentCards(_preloadedShipments, grid);
+                                renderShipmentCards(
+                                    _preloadedShipments,
+                                    grid,
+                                    resolveState.shipmentId
+                                );
                             }
                         } else {
-                            loadShipments(resolveState.clinId);
+                            loadShipments(resolveState.clinId, false, resolveState.shipmentId);
                         }
                     }
 
@@ -526,6 +829,49 @@
         ).hide();
     }
 
+    function initCheckboxHandlers() {
+        document.addEventListener('change', function (event) {
+            const target = event.target;
+            if (target.id === 'dfasSelectAllMatched') {
+                const checked = target.checked;
+                getMatchedCheckboxes().forEach(function (cb) {
+                    cb.checked = checked;
+                    if (checked) {
+                        selectedRowIds.add(cb.value);
+                    } else {
+                        selectedRowIds.delete(cb.value);
+                    }
+                });
+                updateSelectionUi();
+                return;
+            }
+            if (target.classList.contains('dfas-row-checkbox')) {
+                if (target.checked) {
+                    selectedRowIds.add(target.value);
+                } else {
+                    selectedRowIds.delete(target.value);
+                }
+                updateSelectionUi();
+            }
+        });
+
+        document.getElementById('dfasApplySelectedBtn')
+            ?.addEventListener('click', function () {
+                applyRows(Array.from(selectedRowIds));
+            });
+
+        document.getElementById('dfasApplyAllBtn')
+            ?.addEventListener('click', function () {
+                const ids = getMatchedCheckboxes().map(function (cb) { return cb.value; });
+                applyRows(ids);
+            });
+
+        document.getElementById('dfasCloseBatchBtn')
+            ?.addEventListener('click', function () {
+                closeBatch(false);
+            });
+    }
+
     // ── Delegated click handler ───────────────────────────────────────────────
     document.addEventListener('click', async function (event) {
         const btn = event.target.closest('[data-action]');
@@ -533,30 +879,41 @@
 
         const action = btn.dataset.action;
         const rowEl = btn.closest('[data-row-id]');
-        if (!rowEl) return;
-        const rowId = rowEl.dataset.rowId;
-        if (!rowId) return;
+        const rowId = rowEl ? rowEl.dataset.rowId : btn.dataset.rowId;
 
         switch (action) {
             case 'open_resolve_modal':
                 openResolveModal(btn);
                 break;
 
+            case 'preview_match':
+                if (rowId) openMatchPreview(rowId);
+                break;
+
+            case 'apply_row':
+                if (btn.dataset.rowId) {
+                    await applyRows([btn.dataset.rowId]);
+                }
+                break;
+
             case 'skip':
             case 'unskip':
             case 'import_anyway':
-                await resolveRow(rowId, { action: action });
+                if (rowId) await resolveRow(rowId, { action: action });
                 break;
 
             default:
-                // Unknown action — ignore silently
                 break;
         }
     });
 
-    // ── Init on DOMContentLoaded ──────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
+        const matchedEl = document.getElementById('dfasMatchedCount');
+        if (matchedEl) matchedCount = parseInt(matchedEl.textContent, 10) || 0;
+
         initContractSearch();
         initResolveModalButtons();
+        initCheckboxHandlers();
+        updateSelectionUi();
     });
 })();

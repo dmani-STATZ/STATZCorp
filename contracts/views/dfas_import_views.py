@@ -9,14 +9,17 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from contracts.models import Clin, Contract, DfasImportBatch, DfasImportRow
 from contracts.services.dfas_import import (
     DfasImportError,
+    _resolve_row_contract_clin_shipment,
+    close_import_batch,
     create_import_batch,
-    finalize_import_batch,
+    finalize_import_rows,
 )
 
 
@@ -310,61 +313,70 @@ def dfas_import_resolve_row_view(request, batch_id, row_id):
                 {'success': False, 'message': 'contract_id required.'},
                 status=400,
             )
-        contract = Contract.objects.filter(
-            pk=contract_id,
-            company=ac,
-        ).select_related('idiq_contract').first()
-        if not contract:
-            return JsonResponse(
-                {'success': False, 'message': 'Contract not found.'},
-                status=404,
-            )
-
-        row.matched_contract = contract
-        row.matched_idiq = contract.idiq_contract
-        prev = (row.match_notes or '').strip()
-        row.match_notes = (
-            prev + f"\nUser manually assigned contract {contract.contract_number}."
-        ).strip()
-
-        clin = None
         if clin_id:
-            clin = Clin.objects.filter(
-                pk=clin_id,
-                contract=contract,
-                company=ac,
-            ).first()
-        if not clin and row.raw_clin:
-            clin = Clin.objects.filter(
-                contract=contract,
-                item_number=row.raw_clin,
-                company=ac,
-            ).first()
-        if not clin and not row.raw_clin:
-            clin = (
-                Clin.objects.filter(
-                    contract=contract,
-                    item_type='P',
+            try:
+                _resolve_row_contract_clin_shipment(
+                    row=row,
                     company=ac,
+                    contract_id=contract_id,
+                    clin_id=clin_id,
+                    raw_clin_fallback=True,
                 )
-                .order_by('item_number')
-                .first()
-            )
-
-        if clin:
-            row.matched_clin = clin
-            row.status = 'matched'
-            row.match_notes = (
-                (row.match_notes or '')
-                + f"\nResolved CLIN: {clin.item_number}."
-            ).strip()
+            except ValueError as exc:
+                return JsonResponse(
+                    {'success': False, 'message': str(exc)},
+                    status=400,
+                )
         else:
-            row.matched_clin = None
-            row.status = 'clin_missing'
+            contract = Contract.objects.filter(
+                pk=contract_id,
+                company=ac,
+            ).select_related('idiq_contract').first()
+            if not contract:
+                return JsonResponse(
+                    {'success': False, 'message': 'Contract not found.'},
+                    status=404,
+                )
+            row.matched_contract = contract
+            row.matched_idiq = contract.idiq_contract
+            prev = (row.match_notes or '').strip()
             row.match_notes = (
-                (row.match_notes or '')
-                + '\nContract assigned; CLIN still needs selection.'
+                prev + f"\nUser manually assigned contract {contract.contract_number}."
             ).strip()
+
+            clin = None
+            if row.raw_clin:
+                clin = Clin.objects.filter(
+                    contract=contract,
+                    item_number=row.raw_clin,
+                    company=ac,
+                ).first()
+            if not clin and not row.raw_clin:
+                clin = (
+                    Clin.objects.filter(
+                        contract=contract,
+                        item_type='P',
+                        company=ac,
+                    )
+                    .order_by('item_number')
+                    .first()
+                )
+
+            if clin:
+                row.matched_clin = clin
+                row.status = 'matched'
+                row.match_notes = (
+                    (row.match_notes or '')
+                    + f"\nResolved CLIN: {clin.item_number}."
+                ).strip()
+            else:
+                row.matched_clin = None
+                row.matched_shipment = None
+                row.status = 'clin_missing'
+                row.match_notes = (
+                    (row.match_notes or '')
+                    + '\nContract assigned; CLIN still needs selection.'
+                ).strip()
 
         row.resolved_by = request.user
         row.resolved_on = timezone.now()
@@ -422,9 +434,9 @@ def dfas_import_resolve_row_view(request, batch_id, row_id):
 
     elif action == 'resolve_unified':
         data = payload
-        contract_id  = data.get('contract_id')   # required only for contract_missing
-        clin_id      = data.get('clin_id')        # always required
-        shipment_id  = data.get('shipment_id')    # optional
+        contract_id = data.get('contract_id')
+        clin_id = data.get('clin_id')
+        shipment_id = data.get('shipment_id')
 
         if not clin_id:
             return JsonResponse(
@@ -432,61 +444,29 @@ def dfas_import_resolve_row_view(request, batch_id, row_id):
                 status=400,
             )
 
-        #  Contract assignment (contract_missing rows only) 
-        if row.status == 'contract_missing':
-            if not contract_id:
-                return JsonResponse(
-                    {'success': False, 'message': 'contract_id required for contract_missing row.'},
-                    status=400,
-                )
-            try:
-                contract = Contract.objects.get(pk=contract_id, company=ac)
-            except Contract.DoesNotExist:
-                return JsonResponse(
-                    {'success': False, 'message': 'Contract not found.'},
-                    status=400,
-                )
-            row.matched_contract = contract
-
-        #  CLIN assignment 
-        try:
-            clin = Clin.objects.get(pk=clin_id, contract=row.matched_contract)
-        except Clin.DoesNotExist:
+        if contract_id:
+            pass
+        elif row.status == 'contract_missing':
             return JsonResponse(
-                {'success': False, 'message': 'CLIN not found on this contract.'},
+                {'success': False, 'message': 'contract_id required for contract_missing row.'},
                 status=400,
             )
-        row.matched_clin = clin
 
-        #  Shipment assignment (optional) 
-        if shipment_id:
-            from contracts.models import ClinShipment
-            try:
-                shipment = ClinShipment.objects.get(pk=shipment_id, clin=clin)
-            except ClinShipment.DoesNotExist:
-                return JsonResponse(
-                    {'success': False, 'message': 'Shipment not found on this CLIN.'},
-                    status=400,
-                )
-            row.matched_shipment = shipment
-        else:
-            row.matched_shipment = None
+        try:
+            _resolve_row_contract_clin_shipment(
+                row=row,
+                company=ac,
+                contract_id=contract_id,
+                clin_id=clin_id,
+                shipment_id=shipment_id,
+                raw_clin_fallback=False,
+            )
+        except ValueError as exc:
+            return JsonResponse(
+                {'success': False, 'message': str(exc)},
+                status=400,
+            )
 
-        #  Determine final status 
-        if row.matched_shipment_id:
-            row.status = 'matched'
-        elif clin.shipments.exists():
-            # CLIN has shipments but none selected  should not reach here
-            # via the modal, but handle defensively.
-            row.status = 'shipment_missing'
-        else:
-            row.status = 'matched'
-
-        row.match_notes = (
-            f'Manually resolved: contract {row.matched_contract.contract_number}, '
-            f'CLIN {clin.item_number}'
-            + (f', shipment #{row.matched_shipment_id}' if row.matched_shipment_id else '')
-        )
         row.resolved_by = request.user
         row.resolved_on = timezone.now()
         row.save()
@@ -536,6 +516,183 @@ def dfas_import_rematch_view(request, batch_id):
 
 @login_required
 @require_POST
+def dfas_import_apply_rows_view(request, batch_id):
+    ac = _active_company(request)
+    if not ac:
+        return JsonResponse(
+            {'success': False, 'message': 'No active company selected.'},
+            status=403,
+        )
+
+    batch = get_object_or_404(DfasImportBatch, pk=batch_id, company=ac)
+    if batch.status != 'uploaded':
+        return JsonResponse(
+            {
+                'success': False,
+                'message': 'This batch has already been finalized or cancelled.',
+            },
+            status=400,
+        )
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': 'Invalid JSON.'}, status=400)
+
+    row_ids = payload.get('row_ids')
+    if not isinstance(row_ids, list) or not row_ids:
+        return JsonResponse(
+            {'success': False, 'message': 'row_ids must be a non-empty list.'},
+            status=400,
+        )
+
+    try:
+        result = finalize_import_rows(
+            batch=batch,
+            row_ids=[int(rid) for rid in row_ids],
+            user=request.user,
+        )
+    except DfasImportError as exc:
+        return JsonResponse({'success': False, 'message': str(exc)}, status=400)
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {'success': False, 'message': 'row_ids must contain integers.'},
+            status=400,
+        )
+
+    applied_details = {}
+    if result['applied']:
+        applied_rows = DfasImportRow.objects.filter(
+            pk__in=result['applied'],
+        ).select_related('matched_contract', 'matched_clin', 'matched_shipment')
+        for row in applied_rows:
+            applied_details[row.pk] = {
+                'payment_history_id': row.payment_history_id,
+                'status_display': row.get_status_display(),
+            }
+
+    status_counts = result['batch_counts']
+    return JsonResponse({
+        'success': True,
+        'applied': result['applied'],
+        'applied_details': applied_details,
+        'failed': result['failed'],
+        'status_counts': status_counts,
+        'matched_count': status_counts.get('matched', 0),
+    })
+
+
+@login_required
+@require_POST
+def dfas_import_close_batch_view(request, batch_id):
+    ac = _active_company(request)
+    if not ac:
+        return JsonResponse(
+            {'success': False, 'message': 'No active company selected.'},
+            status=403,
+        )
+
+    batch = get_object_or_404(DfasImportBatch, pk=batch_id, company=ac)
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        payload = {}
+
+    force = bool(payload.get('force', False))
+
+    try:
+        close_import_batch(batch=batch, user=request.user, force=force)
+    except DfasImportError as exc:
+        return JsonResponse({'success': False, 'message': str(exc)}, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'redirect_url': reverse('contracts:dfas_import_list'),
+    })
+
+
+@login_required
+@require_GET
+def dfas_row_match_preview_api(request, batch_id, row_id):
+    ac = _active_company(request)
+    if not ac:
+        return JsonResponse(
+            {'success': False, 'message': 'No active company selected.'},
+            status=403,
+        )
+
+    batch = get_object_or_404(DfasImportBatch, pk=batch_id, company=ac)
+    row = get_object_or_404(
+        DfasImportRow.objects.select_related(
+            'matched_contract',
+            'matched_contract__status',
+            'matched_contract__contract_type',
+            'matched_idiq',
+            'matched_clin',
+            'matched_shipment',
+        ),
+        pk=row_id,
+        batch=batch,
+    )
+
+    contract = row.matched_contract
+    if not contract:
+        return JsonResponse(
+            {'success': False, 'message': 'Row has no matched contract.'},
+            status=400,
+        )
+
+    clin = row.matched_clin
+    shipment = row.matched_shipment
+
+    def _fmt_decimal(val):
+        if val is None:
+            return None
+        return f'{val:.2f}'
+
+    contract_type = ''
+    if contract.contract_type_id:
+        contract_type = getattr(contract.contract_type, 'description', '') or str(
+            contract.contract_type
+        )
+
+    contract_status = ''
+    if contract.status_id:
+        contract_status = getattr(contract.status, 'description', '') or str(contract.status)
+
+    idiq_number = None
+    if row.matched_idiq_id and row.matched_idiq:
+        idiq_number = row.matched_idiq.contract_number
+
+    return JsonResponse({
+        'success': True,
+        'contract_number': contract.contract_number,
+        'contract_type': contract_type,
+        'contract_status': contract_status,
+        'idiq_number': idiq_number,
+        'clin_item_number': clin.item_number if clin else None,
+        'clin_item_type': clin.get_item_type_display() if clin else None,
+        'clin_item_value': _fmt_decimal(clin.item_value) if clin else None,
+        'shipment_name': (
+            (shipment.name or f'Shipment {shipment.pk}')
+            if shipment else None
+        ),
+        'shipment_item_value': _fmt_decimal(shipment.item_value) if shipment else None,
+        'shipment_wawf_payment': _fmt_decimal(shipment.wawf_payment) if shipment else None,
+        'dfas_amount': _fmt_decimal(row.raw_check_eft_amount),
+        'dfas_payment_date': (
+            row.raw_payment_date.isoformat() if row.raw_payment_date else None
+        ),
+        'contract_detail_url': reverse(
+            'contracts:contract_management',
+            kwargs={'pk': contract.pk},
+        ),
+    })
+
+
+@login_required
+@require_POST
 def dfas_import_finalize_view(request, batch_id):
     ac = _active_company(request)
     if not ac:
@@ -554,17 +711,22 @@ def dfas_import_finalize_view(request, batch_id):
         return redirect('contracts:dfas_import_list')
 
     try:
-        batch = finalize_import_batch(batch=batch, user=request.user)
+        result = finalize_import_rows(batch=batch, row_ids=None, user=request.user)
+        batch = DfasImportBatch.objects.get(pk=batch.pk)
     except DfasImportError as exc:
-        messages.error(request, f'Could not finalize import: {exc}')
+        messages.error(request, f'Could not apply import: {exc}')
         return redirect('contracts:dfas_import_review', batch_id=batch.id)
 
-    plural = '' if batch.imported_count == 1 else 's'
+    applied_count = len(result['applied'])
+    plural = '' if applied_count == 1 else 's'
     messages.success(
         request,
-        f'Import complete: {batch.imported_count} payment{plural} added.',
+        (
+            f'Applied {applied_count} payment{plural}. '
+            'The batch remains open — use Close Batch when you are finished.'
+        ),
     )
-    return redirect('contracts:dfas_import_list')
+    return redirect('contracts:dfas_import_review', batch_id=batch.id)
 
 
 @login_required

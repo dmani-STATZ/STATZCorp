@@ -10,7 +10,7 @@ from django.db import transaction
 from django.db.models import Count, Sum
 from django.utils import timezone
 
-from contracts.models import Clin, DfasImportBatch, DfasImportRow, PaymentHistory
+from contracts.models import Clin, ClinShipment, Contract, DfasImportBatch, DfasImportRow, PaymentHistory
 from contracts.services.dfas_matcher import MatchResult, match_dfas_row
 from contracts.services.dfas_parser import parse_dfas_file
 
@@ -20,20 +20,31 @@ class DfasImportError(Exception):
     pass
 
 
+_NON_TERMINAL_ROW_STATUSES = frozenset({
+    'matched', 'clin_missing', 'shipment_missing', 'contract_missing',
+    'duplicate', 'pending', 'error',
+})
+
+
 def _refresh_batch_counts(batch: DfasImportBatch) -> None:
     """Set aggregate counters from current row status histogram."""
-    rows = batch.rows
     tallies = dict(
-        rows.order_by().values('status').annotate(c=Count('id')).values_list('status', 'c')
+        batch.rows.order_by().values('status').annotate(c=Count('id')).values_list('status', 'c')
     )
     batch.row_count = sum(tallies.values())
     batch.imported_count = tallies.get('imported', 0)
     batch.skipped_count = tallies.get('skipped', 0)
     batch.duplicate_count = tallies.get('duplicate', 0)
     batch.error_count = tallies.get('error', 0)
-    batch.unmatched_count = rows.filter(
+    batch.unmatched_count = batch.rows.filter(
         status__in=['contract_missing', 'clin_missing', 'shipment_missing']
     ).count()
+
+
+def _batch_status_counts(batch: DfasImportBatch) -> dict[str, int]:
+    return dict(
+        batch.rows.order_by().values('status').annotate(c=Count('id')).values_list('status', 'c')
+    )
 
 
 def auto_assign_shipment(clin, check_eft_amount):
@@ -49,9 +60,6 @@ def auto_assign_shipment(clin, check_eft_amount):
         clin: the matched Clin instance
         check_eft_amount: Decimal or None from the parsed DFAS row
     """
-    from contracts.models import ClinShipment
-    from decimal import Decimal
-
     shipments = list(ClinShipment.objects.filter(clin=clin).order_by('id'))
 
     if not shipments:
@@ -75,6 +83,179 @@ def auto_assign_shipment(clin, check_eft_amount):
     return None, 'shipment_missing'
 
 
+def _resolve_row_contract_clin_shipment(
+    *,
+    row: DfasImportRow,
+    company,
+    contract_id=None,
+    clin_id,
+    shipment_id=None,
+    raw_clin_fallback: bool = True,
+) -> None:
+    """
+    Assign contract (when contract_id provided), CLIN, and optional shipment on a row.
+    Mutates row in memory; caller must save.
+
+    Raises:
+        ValueError: validation failure with a user-facing message.
+    """
+    from contracts.models import ClinShipment
+
+    if not clin_id:
+        raise ValueError('clin_id is required.')
+
+    if contract_id:
+        contract = Contract.objects.filter(pk=contract_id, company=company).select_related(
+            'idiq_contract',
+        ).first()
+        if not contract:
+            raise ValueError('Contract not found.')
+        row.matched_contract = contract
+        row.matched_idiq = contract.idiq_contract
+
+    if not row.matched_contract_id:
+        raise ValueError('Row has no matched contract.')
+
+    clin = Clin.objects.filter(
+        pk=clin_id,
+        contract_id=row.matched_contract_id,
+        company=company,
+    ).first()
+    if not clin and raw_clin_fallback and row.raw_clin and not contract_id:
+        clin = Clin.objects.filter(
+            contract_id=row.matched_contract_id,
+            item_number=row.raw_clin,
+            company=company,
+        ).first()
+    if not clin and raw_clin_fallback and not row.raw_clin and not contract_id:
+        clin = (
+            Clin.objects.filter(
+                contract_id=row.matched_contract_id,
+                item_type='P',
+                company=company,
+            )
+            .order_by('item_number')
+            .first()
+        )
+    if not clin:
+        raise ValueError('CLIN not found on this contract.')
+
+    row.matched_clin = clin
+
+    if shipment_id:
+        shipment = ClinShipment.objects.filter(pk=shipment_id, clin=clin).first()
+        if not shipment:
+            raise ValueError('Shipment not found on this CLIN.')
+        row.matched_shipment = shipment
+    else:
+        row.matched_shipment = None
+
+    if row.matched_shipment_id:
+        row.status = 'matched'
+    elif clin.shipments.exists():
+        row.status = 'shipment_missing'
+    else:
+        row.status = 'matched'
+
+    row.match_notes = (
+        f'Manually resolved: contract {row.matched_contract.contract_number}, '
+        f'CLIN {clin.item_number}'
+        + (f', shipment #{row.matched_shipment_id}' if row.matched_shipment_id else '')
+    )
+
+
+def _finalize_single_row(*, row: DfasImportRow, user) -> None:
+    """Create PaymentHistory for one matched row and mark it imported."""
+    if not row.matched_clin_id:
+        raise DfasImportError(f'Row {row.pk} is matched but has no matched_clin.')
+    if row.raw_payment_date is None:
+        raise DfasImportError(
+            f'Row {row.pk} is matched but raw_payment_date is missing; cannot create PaymentHistory.',
+        )
+    if row.raw_check_eft_amount is None:
+        raise DfasImportError(
+            f'Row {row.pk} is matched but raw_check_eft_amount is missing; cannot create PaymentHistory.',
+        )
+
+    clin_ct = ContentType.objects.get_for_model(Clin)
+    shipment_ct = ContentType.objects.get_for_model(ClinShipment)
+
+    ref = (row.raw_invoice_no or '')[:50]
+    payment_info = (
+        f'DFAS Invoice {row.raw_invoice_no}'
+        if (row.raw_invoice_no or '').strip()
+        else 'DFAS'
+    )
+
+    if row.matched_shipment_id:
+        ph = PaymentHistory(
+            content_type=shipment_ct,
+            object_id=row.matched_shipment_id,
+            payment_type='partial_paid_amount',
+            payment_amount=row.raw_check_eft_amount,
+            payment_date=row.raw_payment_date,
+            payment_info=payment_info,
+            reference_number=ref or None,
+            created_by=user,
+            modified_by=user,
+        )
+        ph.save()
+
+        shipment = row.matched_shipment
+        existing_total = (
+            PaymentHistory.objects.filter(
+                content_type=shipment_ct,
+                object_id=shipment.pk,
+                payment_type='partial_paid_amount',
+            ).aggregate(total=Sum('payment_amount'))['total']
+            or Decimal('0')
+        )
+        shipment.paid_amount = existing_total
+        shipment.modified_by = user
+        shipment.save(update_fields=['paid_amount', 'modified_by', 'modified_on'])
+
+        clin = row.matched_clin
+        agg = clin.shipments.aggregate(
+            paid=Sum('paid_amount'),
+            wawf=Sum('wawf_payment'),
+        )
+        clin.paid_amount = agg['paid'] or Decimal('0.00')
+        clin.wawf_payment = agg['wawf'] or Decimal('0.00')
+        clin.modified_by = user
+        clin.save(update_fields=['paid_amount', 'wawf_payment', 'modified_by', 'modified_on'])
+    else:
+        ph = PaymentHistory(
+            content_type=clin_ct,
+            object_id=row.matched_clin_id,
+            payment_type='paid_amount',
+            payment_amount=row.raw_check_eft_amount,
+            payment_date=row.raw_payment_date,
+            payment_info=payment_info,
+            reference_number=ref or None,
+            created_by=user,
+            modified_by=user,
+        )
+        ph.save()
+
+        clin = row.matched_clin
+        new_total = (
+            PaymentHistory.objects.filter(
+                content_type=clin_ct,
+                object_id=clin.pk,
+                payment_type='paid_amount',
+            ).aggregate(total=Sum('payment_amount'))['total']
+            or Decimal('0')
+        )
+        clin.paid_amount = new_total
+        clin.modified_by = user
+        clin.save()
+
+    row.status = 'imported'
+    row.payment_history = ph
+    row.resolved_by = user
+    row.resolved_on = timezone.now()
+
+
 def create_import_batch(
     *,
     file_obj,
@@ -89,20 +270,7 @@ def create_import_batch(
     All rows land in status 'pending' or one of the resolution statuses
     (matched / clin_missing / contract_missing / duplicate / error). No
     PaymentHistory records are written here — that happens in
-    finalize_import_batch() after the user resolves the batch in the UI.
-
-    Args:
-        file_obj: file-like with .read() returning bytes
-        filename: original filename for audit
-        user: the User performing the import
-        company: the Company context
-
-    Returns:
-        The created DfasImportBatch with .rows prefetched.
-
-    Raises:
-        DfasImportError: if the file can't be parsed at all (header invalid,
-                         encoding broken beyond recovery, etc.).
+    finalize_import_rows() after the user resolves the batch in the UI.
     """
     parse_result = parse_dfas_file(file_obj)
     if parse_result.file_errors and not parse_result.rows:
@@ -162,137 +330,147 @@ def create_import_batch(
     return DfasImportBatch.objects.prefetch_related('rows').get(pk=batch.pk)
 
 
+def finalize_import_rows(
+    *,
+    batch: DfasImportBatch,
+    row_ids: list[int] | None,
+    user,
+) -> dict:
+    """
+    Convert selected (or all) matched rows into PaymentHistory records.
+
+    Does not change batch.status — use close_import_batch() for that.
+
+    Args:
+        batch: Must have status='uploaded'.
+        row_ids: If None, all matched rows in the batch. Otherwise only IDs
+            in this list that belong to the batch and have status='matched'.
+        user: User applying the import.
+
+    Returns:
+        {'applied': [...], 'failed': {row_id: reason}, 'batch_counts': {...}}
+
+    Raises:
+        DfasImportError: if batch is not in 'uploaded' status.
+    """
+    applied: list[int] = []
+    failed: dict[int, str] = {}
+
+    with transaction.atomic():
+        locked = DfasImportBatch.objects.select_for_update().get(pk=batch.pk)
+        if locked.status != 'uploaded':
+            raise DfasImportError('Batch is not in uploaded status; cannot finalize.')
+
+        if row_ids is None:
+            target_ids = list(
+                locked.rows.filter(status='matched').values_list('id', flat=True)
+            )
+        else:
+            requested = list(dict.fromkeys(row_ids))
+            matched_in_batch = set(
+                locked.rows.filter(
+                    id__in=requested,
+                    status='matched',
+                ).values_list('id', flat=True)
+            )
+            for rid in requested:
+                if rid not in matched_in_batch:
+                    failed[rid] = 'Row is not matched or does not belong to this batch.'
+            target_ids = [rid for rid in requested if rid in matched_in_batch]
+
+        if not target_ids:
+            _refresh_batch_counts(locked)
+            locked.save(
+                update_fields=[
+                    'row_count', 'imported_count', 'skipped_count',
+                    'duplicate_count', 'unmatched_count', 'error_count',
+                ],
+            )
+            return {
+                'applied': applied,
+                'failed': failed,
+                'batch_counts': _batch_status_counts(locked),
+            }
+
+        rows = list(
+            locked.rows.select_for_update()
+            .select_related('matched_clin', 'matched_clin__contract', 'matched_shipment')
+            .filter(id__in=target_ids, status='matched')
+            .order_by('id')
+        )
+
+        rows_to_update: list[DfasImportRow] = []
+        for row in rows:
+            sid = transaction.savepoint()
+            try:
+                _finalize_single_row(row=row, user=user)
+                transaction.savepoint_commit(sid)
+                applied.append(row.pk)
+                rows_to_update.append(row)
+            except (DfasImportError, Exception) as exc:
+                transaction.savepoint_rollback(sid)
+                failed[row.pk] = str(exc)
+
+        if rows_to_update:
+            DfasImportRow.objects.bulk_update(
+                rows_to_update,
+                ['status', 'payment_history', 'resolved_by', 'resolved_on'],
+                batch_size=500,
+            )
+
+        _refresh_batch_counts(locked)
+        locked.save(
+            update_fields=[
+                'row_count', 'imported_count', 'skipped_count',
+                'duplicate_count', 'unmatched_count', 'error_count',
+            ],
+        )
+
+    return {
+        'applied': applied,
+        'failed': failed,
+        'batch_counts': _batch_status_counts(locked),
+    }
+
+
 def finalize_import_batch(
     *,
     batch: DfasImportBatch,
     user,
 ) -> DfasImportBatch:
     """
-    Convert all rows in 'matched' status into PaymentHistory records.
+    Backward-compatible wrapper: finalize all matched rows in the batch.
+    Does not close the batch.
+    """
+    finalize_import_rows(batch=batch, row_ids=None, user=user)
+    return DfasImportBatch.objects.prefetch_related('rows').get(pk=batch.pk)
 
-    Phase 1 NOTE: This function is implemented but not exposed via any
-    view. Phase 2 will wire it up to the review screen's 'Confirm Import'
-    button. Tests / admin can call it directly during Phase 1 development.
 
-    Args:
-        batch: The batch to finalize. Must have status='uploaded'.
-        user: the User confirming the import.
-
-    Returns:
-        The updated batch.
+def close_import_batch(
+    *,
+    batch: DfasImportBatch,
+    user,
+    force: bool = False,
+) -> DfasImportBatch:
+    """
+    Mark an uploaded batch as completed. Remaining unresolved rows are left as-is.
 
     Raises:
-        DfasImportError: if batch is not in 'uploaded' status.
-
-    Behavior:
-        - Only rows in status='matched' become PaymentHistory rows.
-        - Each becomes status='imported' with payment_history FK populated.
-        - Aggregate counts on the batch are updated.
-        - batch.status -> 'completed', completed_at set.
-        - All within transaction.atomic().
+        DfasImportError: if batch is not uploaded, or unresolved rows remain
+            without force=True.
     """
-    clin_ct = ContentType.objects.get_for_model(Clin)
+    del user  # reserved for future audit hooks
 
     with transaction.atomic():
         locked = DfasImportBatch.objects.select_for_update().get(pk=batch.pk)
         if locked.status != 'uploaded':
-            raise DfasImportError('Batch is not in uploaded status; cannot finalize.')
-        rows = list(
-            locked.rows.select_related('matched_clin', 'matched_clin__contract').filter(
-                status='matched',
+            raise DfasImportError('Batch is not in uploaded status; cannot close.')
+
+        unresolved = locked.rows.filter(status__in=_NON_TERMINAL_ROW_STATUSES).count()
+        if unresolved > 0 and not force:
+            raise DfasImportError(
+                f'{unresolved} row(s) are still unresolved. Close anyway?'
             )
-        )
-        for row in rows:
-            if not row.matched_clin_id:
-                raise DfasImportError(f'Row {row.pk} is matched but has no matched_clin.')
-            if row.raw_payment_date is None:
-                raise DfasImportError(
-                    f'Row {row.pk} is matched but raw_payment_date is missing; cannot create PaymentHistory.',
-                )
-            if row.raw_check_eft_amount is None:
-                raise DfasImportError(
-                    f'Row {row.pk} is matched but raw_check_eft_amount is missing; cannot create PaymentHistory.',
-                )
-
-            from contracts.models import ClinShipment
-
-            clin_ct = ContentType.objects.get_for_model(Clin)
-            shipment_ct = ContentType.objects.get_for_model(ClinShipment)
-
-            ref = (row.raw_invoice_no or '')[:50]
-            payment_info = (
-                f'DFAS Invoice {row.raw_invoice_no}'
-                if (row.raw_invoice_no or '').strip()
-                else 'DFAS'
-            )
-
-            if row.matched_shipment_id:
-                #  Shipment path 
-                ph = PaymentHistory(
-                    content_type=shipment_ct,
-                    object_id=row.matched_shipment_id,
-                    payment_type='partial_paid_amount',
-                    payment_amount=row.raw_check_eft_amount,
-                    payment_date=row.raw_payment_date,
-                    payment_info=payment_info,
-                    reference_number=ref or None,
-                    created_by=user,
-                    modified_by=user,
-                )
-                ph.save()
-
-                # Update shipment.paid_amount stored column
-                shipment = row.matched_shipment
-                existing_total = (
-                    PaymentHistory.objects.filter(
-                        content_type=shipment_ct,
-                        object_id=shipment.pk,
-                        payment_type='partial_paid_amount',
-                    ).aggregate(total=Sum('payment_amount'))['total']
-                    or Decimal('0')
-                )
-                shipment.paid_amount = existing_total
-                shipment.modified_by = user
-                shipment.save(update_fields=['paid_amount', 'modified_by', 'modified_on'])
-
-                # Roll up to CLIN  mirrors _recompute_clin_payment_rollup in shipment_views.py
-                clin = row.matched_clin
-                agg = clin.shipments.aggregate(
-                    paid=Sum('paid_amount'),
-                    wawf=Sum('wawf_payment'),
-                )
-                clin.paid_amount = agg['paid'] or Decimal('0.00')
-                clin.wawf_payment = agg['wawf'] or Decimal('0.00')
-                clin.modified_by = user
-                clin.save(update_fields=['paid_amount', 'wawf_payment', 'modified_by', 'modified_on'])
-
-            else:
-                #  Legacy path: write directly to CLIN 
-                ph = PaymentHistory(
-                    content_type=clin_ct,
-                    object_id=row.matched_clin_id,
-                    payment_type='paid_amount',
-                    payment_amount=row.raw_check_eft_amount,
-                    payment_date=row.raw_payment_date,
-                    payment_info=payment_info,
-                    reference_number=ref or None,
-                    created_by=user,
-                    modified_by=user,
-                )
-                ph.save()
-
-                clin = row.matched_clin
-                new_total = (
-                    PaymentHistory.objects.filter(
-                        content_type=clin_ct,
-                        object_id=clin.pk,
-                        payment_type='paid_amount',
-                    ).aggregate(total=Sum('payment_amount'))['total']
-                    or Decimal('0')
-                )
-                clin.paid_amount = new_total
-                clin.modified_by = user
-                clin.save()
 
         locked.status = 'completed'
         locked.completed_at = timezone.now()
@@ -310,7 +488,7 @@ def finalize_import_batch(
             ],
         )
 
-    return DfasImportBatch.objects.prefetch_related('rows').get(pk=batch.pk)
+    return DfasImportBatch.objects.prefetch_related('rows').get(pk=locked.pk)
 
 
 def rematch_import_batch(*, batch, company):
