@@ -79,7 +79,7 @@
                     {{ contract.status.description|default:"Unknown" }}
                 </span>
                 {% if contract.status.description == "Open" %}
-                <a href="{% url 'contracts:contract_close' contract.pk %}" class="btn btn-sm btn-outline-danger">Close Contract</a>
+                <a href="{% url 'contracts:contract_close' contract.pk %}?next={{ request.path|urlencode }}" class="btn btn-sm btn-outline-danger">Close Contract</a>
                 {% endif %}
                 <button type="button" class="action-btn" onclick="openDocumentsBrowser({{ contract.id }})">Documents</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-open-notes">Notes</button>

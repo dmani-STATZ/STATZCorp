@@ -5,6 +5,8 @@ from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
+from urllib.parse import urlencode
 from django.utils.decorators import method_decorator
 from django.db import transaction
 from django.db.models import Q, Sum, Count, Value, CharField, IntegerField, Case, When
@@ -256,6 +258,19 @@ class ContractDetailView(ActiveCompanyQuerysetMixin, DetailView):
         return context
 
 
+def _safe_next_url(request, candidate):
+    """Return candidate if it's a safe, same-host redirect target; else ''."""
+    if not candidate:
+        return ''
+    if url_has_allowed_host_and_scheme(
+        url=candidate,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return candidate
+    return ''
+
+
 @method_decorator(conditional_login_required, name='dispatch')
 class ContractCloseView(ActiveCompanyQuerysetMixin, DetailView):
     model = Contract
@@ -275,17 +290,25 @@ class ContractCloseView(ActiveCompanyQuerysetMixin, DetailView):
         ).order_by('item_number')
         context['clins'] = clins
         context['clin_count'] = clins.count()
+
+        raw_next = self.request.GET.get('next') or self.request.META.get('HTTP_REFERER', '')
+        context['next_url'] = _safe_next_url(self.request, raw_next)
         return context
 
     def post(self, request, *args, **kwargs):
         contract = self.get_object()
+        raw_next = request.POST.get('next_url') or request.META.get('HTTP_REFERER', '')
+        next_url = _safe_next_url(request, raw_next)
+        close_url = reverse('contracts:contract_close', kwargs={'pk': contract.pk})
+        redirect_target = f'{close_url}?{urlencode({"next": next_url})}' if next_url else close_url
+
         try:
             closed_status = ContractStatus.objects.get(description='Closed')
             from_status = contract.status
             if from_status_id := getattr(from_status, 'pk', None):
                 if from_status_id == closed_status.pk:
                     messages.info(request, f'Contract {contract.contract_number} is already closed.')
-                    return redirect('contracts:contract_close', pk=contract.pk)
+                    return redirect(redirect_target)
             with transaction.atomic():
                 contract.status = closed_status
                 contract.date_closed = timezone.now()
@@ -299,14 +322,14 @@ class ContractCloseView(ActiveCompanyQuerysetMixin, DetailView):
                     reason='',
                 )
             messages.success(request, f'Contract {contract.contract_number} has been closed.')
-            return redirect('contracts:contract_close', pk=contract.pk)
+            return redirect(redirect_target)
         except ContractStatus.DoesNotExist:
             messages.error(request, 'Could not find Closed status. Contact your administrator.')
-            return redirect('contracts:contract_close', pk=contract.pk)
+            return redirect(redirect_target)
         except Exception as e:
             logger.error(f"Error closing contract {contract.pk}: {str(e)}")
             messages.error(request, f'An error occurred: {str(e)}')
-            return redirect('contracts:contract_close', pk=contract.pk)
+            return redirect(redirect_target)
 
 
 @method_decorator(conditional_login_required, name='dispatch')

@@ -110,6 +110,8 @@ Run repo-wide search before any of these changes:
 - Changing export/report columns or field mappings (`sales/services/bq_export.py`, `contracts` export views, `reports` SQL outputs).
 - Changing signal or middleware behavior (`transactions/signals.py`, `users/signals.py`, `STATZWeb/middleware.py`, `users/middleware.py`).
 
+**Return-to-origin navigation pattern:** when a page can be reached from multiple entry points and needs to send the user back afterward, use a validated `next` query param (`url_has_allowed_host_and_scheme`) carried through hidden form fields across POST-redirect-GET cycles — do not hardcode a single return destination. Established first in `note_views.py` (`referring_url`), extended to `ContractCloseView` on 2026-07-02.
+
 ## 6. Common Coupled Change Patterns
 - `Contract`/`Clin` schema changes:
 - `contracts/models.py` + migration + `contracts/forms.py` + relevant `contracts/views/*` + templates.
