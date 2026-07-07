@@ -68,6 +68,32 @@ def fsc_of(normalized: str) -> str:
     return clean[0:4]
 
 
+_OBVIOUS_SYNTHETIC_PREFIXES = ('M1NAV', 'TESTNSN', 'PLACEHOLDER')
+
+
+def is_plausible_nsn(nsn_code: str) -> bool:
+    """
+    Light sanity check for display-only filtering (e.g. Observatory recent list).
+
+    Not a data validator — do not use for search, dossier, or aggregate stats.
+    """
+    if not nsn_code or not str(nsn_code).strip():
+        return False
+    clean = normalize_nsn(nsn_code)
+    if not clean:
+        return False
+    if any(clean.startswith(prefix) for prefix in _OBVIOUS_SYNTHETIC_PREFIXES):
+        return False
+    if len(clean) > 13:
+        return False
+    if len(clean) == 13 and clean.isalnum():
+        return True
+    # Reject mixed alphanumeric blobs that are not NSN-shaped (e.g. M1NAV20000403).
+    if re.search(r'[A-Z]{2,}', clean) and not clean.isdigit():
+        return False
+    return len(clean) >= 4 and clean.isalnum()
+
+
 def nsn_populated_score(nsn) -> int:
     """Count non-empty descriptive/logistics fields for canonical-row tiebreak."""
     score = 0

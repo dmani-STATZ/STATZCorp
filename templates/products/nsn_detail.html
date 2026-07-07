@@ -60,26 +60,6 @@
         </div>
     </header>
 
-    {# ============ PRICE INTELLIGENCE ============ #}
-    <section class="nsn-detail-panel mb-3">
-        <header class="nsn-detail-panel__head">
-            <h2 class="nsn-detail-panel__title">Price intelligence</h2>
-        </header>
-        <div class="nsn-detail-panel__body">
-            {% if price_series %}
-            <div class="nsn-portal-chart-wrap">
-                <canvas id="nsn-price-chart" aria-label="Price history chart"></canvas>
-            </div>
-            {{ price_series|json_script:"price-series" }}
-            {% else %}
-            <div class="nsn-detail-empty">
-                <span class="nsn-detail-empty__title">No price data yet.</span>
-                Government purchases, supplier quotes, bids, and awards will appear here when available.
-            </div>
-            {% endif %}
-        </div>
-    </section>
-
     <div class="row g-3">
 
         {# ============ LOGISTICS ============ #}
@@ -389,6 +369,26 @@
         </div>
     </div>
 
+    {# ============ PRICE INTELLIGENCE ============ #}
+    <section class="nsn-detail-panel mb-3">
+        <header class="nsn-detail-panel__head">
+            <h2 class="nsn-detail-panel__title">Price intelligence</h2>
+        </header>
+        <div class="nsn-detail-panel__body">
+            {% if price_series %}
+            <div class="nsn-portal-chart-wrap">
+                <canvas id="nsn-price-chart" aria-label="Price history chart"></canvas>
+            </div>
+            {{ price_series|json_script:"price-series" }}
+            {% else %}
+            <div class="nsn-detail-empty">
+                <span class="nsn-detail-empty__title">No price data yet.</span>
+                Government purchases, supplier quotes, bids, and awards will appear here when available.
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
 </div>
 
 {# ============ LOGISTICS MODAL ============ #}
@@ -438,8 +438,8 @@
 {% block extra_scripts %}
 {{ block.super }}
 {% if price_series %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-date-fns/3.0.0/chartjs-adapter-date-fns.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="{% static 'js/vendor/chart.umd.min.js' %}?v={{ cache_version }}"></script>
+<script src="{% static 'js/vendor/chartjs-adapter-date-fns.bundle.min.js' %}?v={{ cache_version }}"></script>
 <script>
 (function () {
     var el = document.getElementById('price-series');
@@ -512,6 +512,27 @@
         }
     }
 
+    var allDates = [];
+    datasets.forEach(function (ds) {
+        (ds.data || []).forEach(function (pt) {
+            if (pt && pt.x) {
+                allDates.push(new Date(pt.x));
+            }
+        });
+    });
+
+    var xScale = {
+        type: 'time',
+        time: { unit: 'month', tooltipFormat: 'MMM d, yyyy' },
+        title: { display: true, text: 'Date' },
+    };
+    if (allDates.length === 1) {
+        var center = allDates[0].getTime();
+        var padMs = 45 * 24 * 60 * 60 * 1000;
+        xScale.min = center - padMs;
+        xScale.max = center + padMs;
+    }
+
     new Chart(canvas, {
         type: 'scatter',
         data: { datasets: datasets },
@@ -519,11 +540,7 @@
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: {
-                    type: 'time',
-                    time: { unit: 'month', tooltipFormat: 'MMM d, yyyy' },
-                    title: { display: true, text: 'Date' },
-                },
+                x: xScale,
                 y: {
                     title: { display: true, text: 'Unit price / total' },
                     ticks: {

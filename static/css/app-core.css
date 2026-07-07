@@ -103,7 +103,7 @@ button.bg-transparent.border-none:focus {
 }
 
 /* ===== Section 3: Layout — Header, Sidebar, Content ===== */
-header {
+#header {
     position: fixed;
     top: 0;
     left: 0;

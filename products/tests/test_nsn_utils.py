@@ -3,6 +3,7 @@ from django.test import SimpleTestCase
 from products.nsn_utils import (
     fsc_of,
     format_nsn,
+    is_plausible_nsn,
     niin_of,
     normalize_nsn,
     nsn_query_variants,
@@ -66,3 +67,13 @@ class SubcodeTests(SimpleTestCase):
     def test_short_nsn_empty_subcodes(self):
         self.assertEqual(fsc_of('123'), '')
         self.assertEqual(niin_of('123'), '')
+
+
+class IsPlausibleNsnTests(SimpleTestCase):
+    def test_valid_nsn_codes(self):
+        self.assertTrue(is_plausible_nsn('5935-01-129-9512'))
+        self.assertTrue(is_plausible_nsn('5935011299512'))
+
+    def test_rejects_obvious_synthetic(self):
+        self.assertFalse(is_plausible_nsn('M1NAV20000403'))
+        self.assertFalse(is_plausible_nsn(''))

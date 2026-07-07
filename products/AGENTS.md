@@ -193,6 +193,9 @@ The dossier now uses a **Bootstrap logistics modal** + form POST. Do not reintro
 - Portal templates (`observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`) extend `contracts/contract_base.html` and **MUST NOT** override header blocks (`{% block body %}`, or any block that replaces the site header from `base_template.html`) or footer blocks.
 - Portal CSS lives in `static/css/products-portal.css` only. **Do not** define new CSS variables, `repeating-linear-gradient` / `linear-gradient` backgrounds, `@keyframes` animations, or diagonal/striped banner patterns in portal templates or stylesheets. Colors reference existing `theme-vars.css` / Bootstrap `--bs-*` tokens only.
 - Every visible NSN in portal templates must use the `|format_nsn` template filter from `products/templatetags/nsn_filters.py` — never hyphenate NSNs by hand in templates.
+- **Chart.js panels:** any portal chart using `maintainAspectRatio: false` must ship with an explicit fixed-height wrapper (`.nsn-portal-chart-wrap` pattern: `position: relative`, bounded `height`, `overflow: hidden`, child `canvas` at `100%` width/height). Do not rely on Chart.js default canvas sizing. Load Chart.js and adapters from `static/js/vendor/` via `{% static %}` — **never** from a public CDN (`cdnjs`, `jsdelivr`, etc.).
+- **Panel section headers:** portal templates use semantic `<header class="nsn-detail-panel__head">` elements. Do **not** add `position: sticky` or `position: fixed` to `.nsn-detail-panel__head`, `.nsn-detail-panel__title`, or equivalent portal selectors. Site nav chrome is `#header` in `app-core.css` only — never reintroduce a global bare `header {}` fixed/sticky rule.
+- **Omnibox CAGE search:** supplier lookup goes through `_suppliers_matching_cage()` (`__iexact` + bounded strip fallback). When changing `portal_search` classifier order or CAGE tokenization, run `products.tests.test_search` — padded `cage_code` values and hyphenated input are regression-tested.
 
 ### CSS prefix convention
 
@@ -276,6 +279,8 @@ After editing, verify manually:
 - **`ApprovedSource.nsn` is a string field, not an FK to `Nsn`.** NSN codes that appear in `ApprovedSource` may not exist in `Nsn`. NSN codes in `Nsn` may have zero matches in `ApprovedSource`. Both are normal states. The detail page renders an empty-state message when there are no matches; do not treat zero matches as an error condition.
 
 - **`ApprovedSource.approved_cage` is a string field, not an FK to `Supplier`.** CAGE codes that don't resolve to a `Supplier` row are normal — the template renders them with a "not in supplier database" indicator. Do not filter unresolved rows out of the panel; the data-quality signal is intentional.
+
+- **`is_plausible_nsn()` is Observatory display-only.** Do not use it in search, dossier querysets, or stats counts. It exists solely to filter the "Recently updated NSNs" panel.
 
 - **CAGE-to-Supplier resolution in `NsnDetailView.get_approved_sources_data` uses a single batched query** (`Supplier.objects.filter(cage_code__in=cage_set)`) producing a `{cage: supplier}` dict. Do NOT refactor this into per-row queries — at scale (an NSN with 50 approved sources) that becomes a 50-query page load that bypasses the existing `select_related` optimisations elsewhere on the page.
 

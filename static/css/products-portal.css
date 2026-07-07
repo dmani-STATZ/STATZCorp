@@ -101,7 +101,15 @@
 
 .nsn-portal-chart-wrap {
     position: relative;
-    height: 320px;
+    height: 400px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.nsn-portal-chart-wrap canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
 }
 
 .nsn-portal-table-compact {

@@ -46,18 +46,18 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
 - Omnibox GET → `/products/search/?q=` (`products:portal_search`).
 - Classifier: 13-char NSN → redirect to dossier if one canonical match; 9-digit NIIN → NSN hits; 5-char CAGE → supplier NSN view if one match; else part-number/text search grouped on results page (50 per group).
 - Stats cached 10 minutes (`products:observatory_stats` cache key): total NSNs, NSNs with procurement coverage, total `NsnProcurementHistory` rows (plain unfiltered `NsnProcurementHistory.objects.count()` — verified 2026-07-07; any gap vs physical table row count is data drift), we-won awards, distinct approved-source CAGEs.
-- Recent activity: up to 10 `DibbsAward` rows with NSN. Ordering uses `-aw_file_date`, `-posted_date`, `-id` (not `award_date`). Dedup on `(award_basic_number, delivery_order_number)` keeps the first row seen in a bounded candidate window (400 most-recent rows by file/posted date) — avoids full-table `Window()` on MSSQL (~30s scan). Plus 10 latest modified `Nsn` rows.
+- Recent activity: up to 10 `DibbsAward` rows with NSN. Ordering uses `-aw_file_date`, `-posted_date`, `-id` (not `award_date`). Dedup on `(award_basic_number, delivery_order_number)` keeps the first row seen in a bounded candidate window (400 most-recent rows by file/posted date) — avoids full-table `Window()` on MSSQL (~30s scan). Plus up to 10 latest modified `Nsn` rows after display-only filtering (see §20).
 
 ### NSN Dossier (`/products/nsn/<pk>/`, `products:nsn_detail`)
 Panels (lazy-loaded sales/contracts data via `nsn_query_variants`):
 1. Identity header — formatted NSN, FSC/NIIN, part/rev, duplicate badge.
-2. Price intelligence chart (Chart.js 4.4.1) — procurement, quotes, bids, awards series via `json_script`.
-3. Logistics — read-only + **Edit logistics** modal → POST `products:nsn_logistics_update`.
+2. Logistics — read-only + **Edit logistics** modal → POST `products:nsn_logistics_update`.
+3. Approved sources — `ApprovedSource` deduped on `(approved_cage, part_number)`; one batched `Supplier` query; `NoQuoteCAGE` badges; orphan count footer.
 4. Government purchase history (`NsnProcurementHistory`, 25 default, `?history=all`).
-5. Approved sources — `ApprovedSource` deduped on `(approved_cage, part_number)`; one batched `Supplier` query; `NoQuoteCAGE` badges; orphan count footer.
-6. Our activity — `SupplierQuote` + `DibbsAward`/`DibbsAwardMod`.
-7. Contracts — `Clin` + `IdiqContractDetails` FKs to `Nsn`; plus `DibbsAwardMod.matched_contract` linkages.
-8. Demand history — `SolicitationLine` + parent `Solicitation` (25 default, `?demand=all`).
+5. Our activity — `SupplierQuote` + `DibbsAward`/`DibbsAwardMod`.
+6. Contracts — `Clin` + `IdiqContractDetails` FKs to `Nsn`; plus `DibbsAwardMod.matched_contract` linkages.
+7. Demand history — `SolicitationLine` + parent `Solicitation` (25 default, `?demand=all`).
+8. Price intelligence chart (Chart.js 4.4.1, vendored static) — procurement, quotes, bids, awards series via `json_script`; rendered at the bottom of the dossier below all tabular panels.
 
 ### Supplier NSN View (`/products/supplier/<pk>/nsns/`, `products:supplier_nsns`)
 Approved on / Quoted us / Won / Manual capabilities (`SupplierNSN`). Without `cage_code`, only quote + manual panels with explanatory note. Paginate at 100 rows per panel.
@@ -69,7 +69,7 @@ Approved on / Quoted us / Won / Manual capabilities (`SupplierNSN`). Without `ca
 ## 7. Templates and UI Surface Area
 - Portal templates extend `contracts/contract_base.html` and use the standard site header from `base_template.html` (no custom header/banner overrides). Footer chrome (Contract Menu, Reminders) is inherited unchanged.
 - `templates/products/nsn_edit.html` — inherits from `contracts/contract_base.html` and renders three sections (NSN info, description, notes) with the shared `contracts/includes/simple_field.html` partials. Since the template lives under `templates/products/`, Django loads it whenever `NsnUpdateView` sets `template_name = 'products/nsn_edit.html'`, but the form layout still depends on `contracts/includes/simple_field.html` and the contracts styling system.
-- `templates/products/nsn_detail.html` — NSN Dossier: identity header (prominent NSN code), price chart, logistics modal, approved sources, procurement/activity/contracts/demand panels. Extends `contract_base.html`; uses `.nsn-detail-*` (app-core.css) + `.nsn-portal-*` (products-portal.css). Chart.js 4.4.1 via CDN.
+- `templates/products/nsn_detail.html` — NSN Dossier: identity header (prominent NSN code), logistics modal, approved sources, procurement/activity/contracts/demand panels, price chart at page bottom. Extends `contract_base.html`; uses `.nsn-detail-*` (app-core.css) + `.nsn-portal-*` (products-portal.css). Chart.js 4.4.1 + chartjs-adapter-date-fns 3.0.0 vendored under `static/js/vendor/`.
 
   **Approved Sources panel** (left column, below Packout): renders the `approved_sources` context dict supplied by `NsnDetailView.get_approved_sources_data` as a vertical list of rows, not a table. Each row uses a four-column grid (CAGE / company name / part number / resolution chip) on `≥md` screens and collapses to two lines on smaller screens (CAGE + company on top, part number + chip on bottom). Resolved rows render in normal contrast; unresolved rows get a soft `--bs-tertiary-bg` background and `--bs-secondary-color` text so the eye lands on familiar suppliers first (the view's sort already floats resolved rows to the top — the CSS reinforces that hierarchy). The resolution chip uses Bootstrap 5.3's `--bs-success-bg-subtle` / `--bs-success-text-emphasis` for resolved and `--bs-secondary-bg-subtle` / `--bs-secondary-color` for unresolved; both subtle palettes auto-flip under `[data-bs-theme="dark"]`, so no extra dark-mode rules are needed. Long lists scroll inside the panel via `max-height: 22rem; overflow-y: auto;` on the list. Component classes are prefixed `.nsn-detail-source-*` (live in `static/css/app-core.css`) and follow the same conventions as the rest of the `.nsn-detail-*` family. An orphaned-row footer appears under the list when `approved_sources.orphaned_count > 0` — single italic line, hairline divider above, no alert framing.
 
@@ -129,8 +129,8 @@ The migration uses `SeparateDatabaseAndState` to avoid touching the existing dat
 ## 17. Known Gaps / Ambiguities
 - `SupplierNSNCapability` is defined but never referenced outside the model/admin; it’s unclear how lead-time/price data is created or maintained today.
 - Every view/template for NSN editing/search lives in `contracts`, so renaming a field (e.g., `directory_url`) touches multiple apps, templates, and API responses.
-- No tests guard this app, so schema changes carry risk that `contracts` code relies on untested behaviors.
-- `products/views.py` is empty, reinforcing that this app is purely a model/URL carrier rather than a self-sufficient feature module.
+- Automated coverage lives in `products/tests/test_nsn_utils.py` and `products/tests/test_search.py`; schema changes still carry risk in coupled `contracts` code paths.
+- **`contracts_nsn` test/seed rows (open data-quality item):** Production reports non-NSN `nsn_code` values (e.g. `M1NAV20000403`) and `modified_on` dates far in the future (e.g. 2099-09-30) surfacing in the Observatory "Recently updated NSNs" panel. Local dev MSSQL (verified 2026-07-07) has **41** total `Nsn` rows and **0** future-dated or implausible codes — the junk appears production-specific, likely from manual/SQL seeding rather than a display bug. **Do not delete rows in a display fix.** The Observatory now filters these at render time via `is_plausible_nsn()` + `modified_on__lte=now`; underlying rows remain for a separate cleanup decision. Re-run `Nsn.objects.filter(modified_on__gt=timezone.now())` and scan non-13-char `nsn_code` values in production to capture exact row count and sample PKs before archival.
 
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
 - Search the `contracts` app for `nsn_code`, `description`, and any `Nsn` references before renaming model fields—the forms, templates (`clin_form.html`, `contract_management.html`, `idiq_contract_detail.html`), and API responses all assume those attributes.
@@ -147,6 +147,33 @@ The migration uses `SeparateDatabaseAndState` to avoid touching the existing dat
 - **Main URLs:** `/products/`, `/products/search/`, `/products/nsn/<pk>/`, `/products/supplier/<pk>/nsns/`.
 - **Key templates:** `observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`, `nsn_edit.html`.
 - **Key dependencies:** lazy imports of `sales.*`, `contracts.models.Clin`/`IdiqContractDetails`, `suppliers.Supplier`.
+
+## 20. Portal defect fixes (2026-07-07)
+
+### Price intelligence chart overflow
+- **Symptom:** NSN Dossier Price Intelligence panel showed a large blank rectangle (including NSNs with a single award, e.g. pk 130003).
+- **Root cause:** Chart.js `maintainAspectRatio: false` without a bounded canvas inside `.nsn-portal-chart-wrap`, plus single-point time-scale charts rendering an invisible domain.
+- **Fix:** `static/css/products-portal.css` — `.nsn-portal-chart-wrap` explicit `height: 400px`, `position: relative`, `overflow: hidden`; child `canvas` set to `width/height: 100%`. `nsn_detail.html` chart script pads the X axis ±45 days when only one date exists.
+
+### CAGE omnibox search
+- **Symptom:** Valid 5-character CAGE codes returned zero supplier matches.
+- **Root cause:** `Supplier.cage_code__iexact` missed rows stored with trailing whitespace padding; classifier otherwise correct for standard 5-char input.
+- **Fix:** `_cage_search_token()` + `_suppliers_matching_cage()` in `products/views.py` — `__iexact` first, then bounded `__istartswith` prefix scan with Python `.strip()` verification (no DB-side trim on indexed columns). SAM-only fallback unchanged.
+
+### Observatory "Recently updated NSNs" data quality (display only)
+- **Symptom:** Panel showed implausible `nsn_code` strings and future `modified_on` dates from seed/test rows in `contracts_nsn`.
+- **Fix:** `is_plausible_nsn()` in `products/nsn_utils.py` (display filter only). `ObservatoryView._get_recent_nsns()` fetches up to 40 candidates with `modified_on__lte=now`, keeps first 10 passing `is_plausible_nsn`. Does not pad when fewer than 10 remain. Underlying rows untouched.
+
+### Site header obscured by panel section title (2026-07-07)
+- **Symptom:** On `/products/` and `/products/nsn/<pk>/`, a red striped bar pinned to the viewport top showed the **last** panel section title on that page (e.g. "RECENTLY UPDATED NSNS", "DEMAND HISTORY") instead of the real site header. `/contracts/` was unaffected.
+- **Root cause:** Global `header { position: fixed; top: 0; … }` in `static/css/app-core.css` (site nav chrome) matched **every** `<header>` element, including portal `<header class="nsn-detail-panel__head">` rows. All panel headers stacked at `top: 0` with the same striped nav background; the last one in DOM order painted on top of `#header`.
+- **Fix:** Scope site nav chrome to `#header` only (`static/css/app-core.css`). Portal panel headers keep their `.nsn-detail-panel__head` styles unchanged.
+
+### Price intelligence chart blank + panel order (2026-07-07)
+- **Symptom:** Chart container rendered but no chart drew; dossier placed Price Intelligence above tabular panels.
+- **Root cause (chart):** Chart.js 4.4.1 and chartjs-adapter-date-fns 3.0.0 loaded from `cdnjs.cloudflare.com`. No `django-csp` middleware in this repo, but GCC High / restricted egress can block external `<script>` tags silently — the init script exits when `typeof Chart === 'undefined'`. Vendoring removes the external dependency.
+- **Fix (chart):** Pin both libraries under `static/js/vendor/`; load via `{% static %}` + `cache_version` in `nsn_detail.html`.
+- **Fix (layout):** Move the Price Intelligence `<section>` to the bottom of `nsn_detail.html`, after Demand History.
 
 
 ## CSS Architecture

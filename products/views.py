@@ -21,6 +21,7 @@ from products.models import Nsn
 from products.nsn_utils import (
     fsc_of,
     format_nsn,
+    is_plausible_nsn,
     niin_of,
     normalize_nsn,
     nsn_populated_score,
@@ -78,6 +79,35 @@ def _batched_sam_names_by_cage(cage_codes):
     }
 
 
+def _cage_search_token(raw: str) -> str:
+    """Return a normalized 5-character CAGE token, or empty if input is not CAGE-shaped."""
+    token = normalize_nsn(raw)
+    if _ALNUM_5_RE.match(token):
+        return token
+    return ''
+
+
+def _suppliers_matching_cage(cage):
+    from suppliers.models import Supplier
+
+    cage_u = (cage or '').strip().upper()
+    if not cage_u:
+        return []
+    exact = list(Supplier.objects.filter(cage_code__iexact=cage_u)[:50])
+    if exact:
+        return exact
+    # Fallback for whitespace-padded cage_code values without wrapping indexed columns.
+    prefix = cage_u[:3]
+    for supplier in Supplier.objects.exclude(cage_code__isnull=True).exclude(cage_code='').filter(
+        cage_code__istartswith=prefix,
+    )[:200]:
+        if (supplier.cage_code or '').strip().upper() == cage_u:
+            exact.append(supplier)
+            if len(exact) >= 50:
+                break
+    return exact
+
+
 def _active_no_quote_cages(cage_codes):
     from sales.models.no_quote import NoQuoteCAGE
 
@@ -108,12 +138,27 @@ class ObservatoryView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context['stats'] = self._get_stats()
         context['recent_awards'] = self._get_recent_awards()
-        context['recent_nsns'] = (
+        context['recent_nsns'] = self._get_recent_nsns()
+        return context
+
+    def _get_recent_nsns(self):
+        from django.utils import timezone
+
+        now = timezone.now()
+        candidates = list(
             Nsn.objects.exclude(nsn_code__isnull=True)
             .exclude(nsn_code='')
-            .order_by('-modified_on')[:10]
+            .filter(modified_on__lte=now)
+            .order_by('-modified_on')[:40]
         )
-        return context
+        recent = []
+        for nsn in candidates:
+            if not is_plausible_nsn(nsn.nsn_code):
+                continue
+            recent.append(nsn)
+            if len(recent) >= 10:
+                break
+        return recent
 
     def _get_stats(self):
         cached = cache.get(_OBSERVATORY_STATS_CACHE_KEY)
@@ -202,8 +247,9 @@ def portal_search(request):
     if _DIGITS_9_RE.match(cleaned):
         return _search_niin(request, cleaned)
 
-    if _ALNUM_5_RE.match(cleaned):
-        return _search_cage(request, cleaned.upper())
+    cage_token = _cage_search_token(raw_stripped)
+    if cage_token:
+        return _search_cage(request, cage_token)
 
     return _search_text(request, raw_stripped)
 
@@ -259,10 +305,10 @@ def _search_niin(request, niin):
 
 
 def _search_cage(request, cage):
-    from suppliers.models import Supplier
     from sales.models.sam_cache import SAMEntityCache
 
-    suppliers = list(Supplier.objects.filter(cage_code__iexact=cage)[:50])
+    cage = (cage or '').strip().upper()
+    suppliers = _suppliers_matching_cage(cage)
     if len(suppliers) == 1:
         return redirect('products:supplier_nsns', pk=suppliers[0].pk)
 

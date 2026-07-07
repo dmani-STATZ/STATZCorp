@@ -29,3 +29,10 @@ You can now update **unit weight**, **dimensions**, and **packaging notes** dire
 - **Recent awards panel** now orders by AW file date (not award date), deduplicates on contract + delivery order, and shows hyphen-formatted NSNs.
 - **Government purchase records** stat uses an unfiltered procurement-history count; numbers across the portal use thousands separators.
 - **Visual polish** — stat cards, omnibox, panels, and empty states aligned with existing contracts card/table patterns and theme tokens.
+
+## Fixes
+
+- **Price chart on the NSN Dossier** now renders in a fixed-size panel instead of leaving a large blank area above the fold when award or quote data exists.
+- **CAGE search in the Observatory** correctly finds suppliers again when you enter a 5-character CAGE code (including codes stored with extra spacing in the database).
+- **Site header on portal pages** no longer hidden under a pinned panel title — the real header (logo, nav, company selector, theme toggle, user info) shows at the top of Observatory and Dossier pages, matching `/contracts/`.
+- **Price Intelligence chart** loads from vendored static files (Chart.js 4.4.1) so it renders in restricted environments; the panel now sits at the bottom of the NSN Dossier, below Demand History.
