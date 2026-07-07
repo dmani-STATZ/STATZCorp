@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -132,6 +132,7 @@ class ObservatoryView(LoginRequiredMixin, TemplateView):
             NsnProcurementHistory.objects.values_list('nsn', flat=True).distinct()
         )
         nsns_with_history = len(catalog_normalized & procurement_nsns)
+        # Plain unfiltered table count — verified 2026-07-07; gap vs physical rows is data drift.
         total_procurement_records = NsnProcurementHistory.objects.count()
         awards_won = DibbsAward.objects.filter(
             id__in=WeWonAward.objects.values('id'),
@@ -157,11 +158,29 @@ class ObservatoryView(LoginRequiredMixin, TemplateView):
     def _get_recent_awards(self):
         from sales.models.awards import DibbsAward
 
-        awards = list(
+        # Bounded prefetch + in-memory dedup — full-table Window() on MSSQL scanned
+        # ~465K partition winners (~30s). Candidates are already date-ordered.
+        _CANDIDATE_LIMIT = 400
+        candidates = (
             DibbsAward.objects.exclude(nsn__isnull=True)
             .exclude(nsn='')
-            .order_by('-award_date')[:10]
+            .order_by(
+                F('aw_file_date').desc(nulls_last=True),
+                F('posted_date').desc(nulls_last=True),
+                '-id',
+            )[:_CANDIDATE_LIMIT]
         )
+        seen = set()
+        awards = []
+        for award in candidates:
+            key = (award.award_basic_number or '', award.delivery_order_number or '')
+            if key in seen:
+                continue
+            seen.add(key)
+            awards.append(award)
+            if len(awards) >= 10:
+                break
+
         for award in awards:
             award.nsn_dossier_pk = _nsn_pk_for_code(award.nsn)
         return awards
@@ -670,7 +689,6 @@ class SupplierNsnView(LoginRequiredMixin, DetailView):
                     'nsn_code': r['nsn'],
                     'part_number': r.get('part_number') or '',
                     'dossier_pk': pk,
-                    'formatted': format_nsn(normalize_nsn(r['nsn'])),
                 })
             context['approved_page'] = self._paginate(approved_rows, 'approved_page')
 

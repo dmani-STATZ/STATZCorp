@@ -22,3 +22,10 @@ Each NSN has a dedicated page that pulls together government purchase history, a
 ## Logistics editing
 
 You can now update **unit weight**, **dimensions**, and **packaging notes** directly on the NSN dossier via **Edit logistics**. Sales workflows that read packout data from the catalog will pick up your changes immediately.
+
+## Fix & polish (2026-07-07)
+
+- **Standard site header** restored on all portal pages — the custom striped banner is removed; Observatory, Dossier, and Supplier NSN View inherit the same header as contracts pages.
+- **Recent awards panel** now orders by AW file date (not award date), deduplicates on contract + delivery order, and shows hyphen-formatted NSNs.
+- **Government purchase records** stat uses an unfiltered procurement-history count; numbers across the portal use thousands separators.
+- **Visual polish** — stat cards, omnibox, panels, and empty states aligned with existing contracts card/table patterns and theme tokens.

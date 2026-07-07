@@ -1,5 +1,5 @@
 {% extends "contracts/contract_base.html" %}
-{% load humanize static %}
+{% load humanize nsn_filters static %}
 
 {% block extra_head %}
 {{ block.super }}
@@ -12,18 +12,19 @@
     {# ============ IDENTITY HEADER ============ #}
     <header class="nsn-detail-header">
         <div>
+            {% with display_nsn=nsn.nsn_normalized|default:nsn.nsn_code|format_nsn %}
             <h1 class="nsn-detail-header__title font-monospace">
-                {% if formatted_nsn %}{{ formatted_nsn }}{% elif nsn.nsn_code %}{{ nsn.nsn_code }}{% else %}<span class="text-muted">No NSN code</span>{% endif %}
+                {% if display_nsn %}{{ display_nsn }}{% else %}<span class="text-muted">No NSN code</span>{% endif %}
             </h1>
-            {% if nsn.nsn_code and formatted_nsn and nsn.nsn_code != formatted_nsn %}
+            {% if nsn.nsn_code and display_nsn and nsn.nsn_code != display_nsn %}
             <p class="nsn-portal-subcode mb-1">Raw: {{ nsn.nsn_code }}</p>
             {% endif %}
+            {% endwith %}
             {% if fsc or niin %}
-            <p class="nsn-portal-subcode mb-1">
-                {% if fsc %}FSC <span class="font-monospace">{{ fsc }}</span>{% endif %}
-                {% if fsc and niin %} · {% endif %}
-                {% if niin %}NIIN <span class="font-monospace">{{ niin }}</span>{% endif %}
-            </p>
+            <div class="nsn-portal-identity-badges">
+                {% if fsc %}<span class="badge text-bg-secondary">FSC {{ fsc }}</span>{% endif %}
+                {% if niin %}<span class="badge text-bg-secondary">NIIN {{ niin }}</span>{% endif %}
+            </div>
             {% endif %}
             <p class="nsn-detail-header__desc">
                 {{ nsn.description|default:"No description on file." }}

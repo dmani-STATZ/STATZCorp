@@ -1,6 +1,6 @@
 /**
  * NSN Portal — page-specific styles.
- * Uses Bootstrap / theme tokens only; no new CSS variables.
+ * References Bootstrap / theme tokens only; no new CSS variables.
  */
 
 .nsn-portal-page {
@@ -9,14 +9,12 @@
 }
 
 .nsn-portal-omnibox {
-    max-width: 42rem;
-    margin: 0 auto 2rem;
+    width: 100%;
+    margin-bottom: 2rem;
 }
 
-.nsn-portal-omnibox__input {
-    font-family: var(--font-mono);
-    font-size: 1.125rem;
-    padding: 0.75rem 1rem;
+.nsn-portal-omnibox .form-text {
+    color: var(--bs-secondary-color);
 }
 
 .nsn-portal-stats {
@@ -31,26 +29,45 @@
     border: 1px solid var(--bs-border-color);
     border-radius: 0.5rem;
     padding: 1rem 1.25rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nsn-portal-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.nsn-portal-stat-card--primary {
+    border-left: 4px solid var(--company-primary);
+}
+
+.nsn-portal-stat-card--success {
+    border-left: 4px solid var(--bs-success);
+}
+
+.nsn-portal-stat-card--info {
+    border-left: 4px solid var(--bs-info);
+}
+
+.nsn-portal-stat-card--warning {
+    border-left: 4px solid var(--bs-warning);
+}
+
+.nsn-portal-stat-card--secondary {
+    border-left: 4px solid var(--bs-secondary);
 }
 
 .nsn-portal-stat-card__value {
-    font-size: 1.5rem;
+    font-size: 2rem;
     font-weight: 700;
-    font-family: var(--font-mono);
+    line-height: 1.1;
     color: var(--bs-body-color);
 }
 
 .nsn-portal-stat-card__label {
     font-size: 0.8125rem;
     color: var(--bs-secondary-color);
-    margin-top: 0.25rem;
-}
-
-.nsn-portal-section-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.75rem;
-    color: var(--bs-body-color);
+    margin-top: 0.35rem;
 }
 
 .nsn-portal-recent-list {
@@ -60,12 +77,26 @@
 }
 
 .nsn-portal-recent-list li {
-    padding: 0.5rem 0;
+    padding: 0.6rem 1rem;
     border-bottom: 1px solid var(--bs-border-color);
+    transition: background-color 0.15s ease;
 }
 
 .nsn-portal-recent-list li:last-child {
     border-bottom: none;
+}
+
+.nsn-portal-recent-list li:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.nsn-portal-recent-list a {
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.nsn-portal-recent-list a:hover {
+    text-decoration: underline;
 }
 
 .nsn-portal-chart-wrap {
@@ -82,6 +113,14 @@
     white-space: nowrap;
 }
 
+.nsn-portal-table-compact tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+.nsn-portal-table-compact tbody tr:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
 .nsn-portal-badge-dup {
     font-size: 0.75rem;
 }
@@ -92,7 +131,6 @@
 }
 
 .nsn-portal-subcode {
-    font-family: var(--font-mono);
     font-size: 0.875rem;
     color: var(--bs-secondary-color);
 }
@@ -114,4 +152,11 @@
 .nsn-portal-logistics-item__value {
     font-family: var(--font-mono);
     font-weight: 500;
+}
+
+.nsn-portal-identity-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
 }

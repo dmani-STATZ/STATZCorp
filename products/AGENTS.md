@@ -20,7 +20,8 @@ Defines how to safely modify the `products` app for AI coding agents and develop
 - `management/commands/backfill_nsn_normalized.py` — idempotent `nsn_normalized` recovery after raw SQL writes
 - URL namespace `products` with portal routes plus shims: `nsn_edit`, `nsn_search` → `contracts/views`
 - Admin registrations for both models
-- Portal templates: `observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`, plus `nsn_edit.html`
+- Portal templates: `observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`, plus `nsn_edit.html` (extend `contract_base.html` only — no header/footer overrides)
+- `products/templatetags/nsn_filters.py` — `|format_nsn` display filter for all portal NSN output
 - Local views: `ObservatoryView`, `portal_search`, `NsnDetailView`, `nsn_logistics_update`, `SupplierNsnView`
 - Unit tests: `products/tests/test_nsn_utils.py`, `products/tests/test_search.py`
 
@@ -186,6 +187,12 @@ Only `NsnLogisticsForm` → `nsn_logistics_update` may mutate portal-visible dat
 ### Inline editing JS contract on `nsn_detail.html` (removed 2026-07-07)
 
 The dossier now uses a **Bootstrap logistics modal** + form POST. Do not reintroduce the JSON `nsn_packout_update` autosave pattern on the portal dossier.
+
+### Portal template / CSS rules (mandatory)
+
+- Portal templates (`observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`) extend `contracts/contract_base.html` and **MUST NOT** override header blocks (`{% block body %}`, or any block that replaces the site header from `base_template.html`) or footer blocks.
+- Portal CSS lives in `static/css/products-portal.css` only. **Do not** define new CSS variables, `repeating-linear-gradient` / `linear-gradient` backgrounds, `@keyframes` animations, or diagonal/striped banner patterns in portal templates or stylesheets. Colors reference existing `theme-vars.css` / Bootstrap `--bs-*` tokens only.
+- Every visible NSN in portal templates must use the `|format_nsn` template filter from `products/templatetags/nsn_filters.py` — never hyphenate NSNs by hand in templates.
 
 ### CSS prefix convention
 

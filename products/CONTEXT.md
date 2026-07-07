@@ -23,6 +23,7 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
 - `apps.py` – Defines `ProductsConfig` so Django can load the app, and the `name = 'products'` label that other apps import.
 - `models.py` – Contains `AuditModel`, `Nsn`, and `SupplierNSNCapability`. `AuditModel` adds `created_by`, `created_on`, `modified_by`, `modified_on` and a `save()` override. `Nsn` defines the descriptive fields, the `suppliers` ManyToMany via `SupplierNSNCapability`, and forces the existing `contracts_nsn` table name. `SupplierNSNCapability` stores lead times/prices between a supplier and an NSN.
 - `nsn_utils.py` – `normalize_nsn`, `format_nsn`, `nsn_query_variants`, `fsc_of`, `niin_of`; mandatory join helper for sales string NSN columns.
+- `templatetags/nsn_filters.py` – `|format_nsn` template filter for portal display (wraps `format_nsn()`; display-only).
 - `forms.py` – `NsnLogisticsForm` (portal sole write path for weight/dims/packaging notes).
 - `views.py` – `ObservatoryView`, `portal_search`, `NsnDetailView`, `nsn_logistics_update`, `SupplierNsnView`.
 - `management/commands/backfill_nsn_normalized.py` – idempotent recovery after raw SQL MERGE into `contracts_nsn`.
@@ -44,8 +45,8 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
 ### Observatory (`/products/`, `products:observatory`)
 - Omnibox GET → `/products/search/?q=` (`products:portal_search`).
 - Classifier: 13-char NSN → redirect to dossier if one canonical match; 9-digit NIIN → NSN hits; 5-char CAGE → supplier NSN view if one match; else part-number/text search grouped on results page (50 per group).
-- Stats cached 10 minutes (`products:observatory_stats` cache key): total NSNs, NSNs with procurement coverage, total `NsnProcurementHistory` rows, we-won awards, distinct approved-source CAGEs.
-- Recent activity: 10 latest `DibbsAward` with NSN + 10 latest modified `Nsn` rows.
+- Stats cached 10 minutes (`products:observatory_stats` cache key): total NSNs, NSNs with procurement coverage, total `NsnProcurementHistory` rows (plain unfiltered `NsnProcurementHistory.objects.count()` — verified 2026-07-07; any gap vs physical table row count is data drift), we-won awards, distinct approved-source CAGEs.
+- Recent activity: up to 10 `DibbsAward` rows with NSN. Ordering uses `-aw_file_date`, `-posted_date`, `-id` (not `award_date`). Dedup on `(award_basic_number, delivery_order_number)` keeps the first row seen in a bounded candidate window (400 most-recent rows by file/posted date) — avoids full-table `Window()` on MSSQL (~30s scan). Plus 10 latest modified `Nsn` rows.
 
 ### NSN Dossier (`/products/nsn/<pk>/`, `products:nsn_detail`)
 Panels (lazy-loaded sales/contracts data via `nsn_query_variants`):
@@ -66,6 +67,7 @@ Approved on / Quoted us / Won / Manual capabilities (`SupplierNSN`). Without `ca
 - **Widget JSON search:** `/products/nsn/search/` → `contracts.views.NsnSearchView` (min 3 chars).
 
 ## 7. Templates and UI Surface Area
+- Portal templates extend `contracts/contract_base.html` and use the standard site header from `base_template.html` (no custom header/banner overrides). Footer chrome (Contract Menu, Reminders) is inherited unchanged.
 - `templates/products/nsn_edit.html` — inherits from `contracts/contract_base.html` and renders three sections (NSN info, description, notes) with the shared `contracts/includes/simple_field.html` partials. Since the template lives under `templates/products/`, Django loads it whenever `NsnUpdateView` sets `template_name = 'products/nsn_edit.html'`, but the form layout still depends on `contracts/includes/simple_field.html` and the contracts styling system.
 - `templates/products/nsn_detail.html` — NSN Dossier: identity header (prominent NSN code), price chart, logistics modal, approved sources, procurement/activity/contracts/demand panels. Extends `contract_base.html`; uses `.nsn-detail-*` (app-core.css) + `.nsn-portal-*` (products-portal.css). Chart.js 4.4.1 via CDN.
 

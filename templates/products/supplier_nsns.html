@@ -1,5 +1,5 @@
 {% extends "contracts/contract_base.html" %}
-{% load humanize static %}
+{% load humanize nsn_filters static %}
 
 {% block extra_head %}
 {{ block.super }}
@@ -51,9 +51,9 @@
                     <tr>
                         <td>
                             {% if row.dossier_pk %}
-                            <a href="{% url 'products:nsn_detail' row.dossier_pk %}">{{ row.formatted|default:row.nsn_code }}</a>
+                            <a href="{% url 'products:nsn_detail' row.dossier_pk %}">{{ row.nsn_code|format_nsn }}</a>
                             {% else %}
-                            {{ row.formatted|default:row.nsn_code }}
+                            {{ row.nsn_code|format_nsn }}
                             <span class="text-muted small">(not in catalog)</span>
                             {% endif %}
                         </td>
@@ -98,8 +98,8 @@
                         <td>{{ q.quote_date|date:"M j, Y" }}</td>
                         <td>
                             {% if q.dossier_pk %}
-                            <a href="{% url 'products:nsn_detail' q.dossier_pk %}">{{ q.nsn }}</a>
-                            {% else %}{{ q.nsn }}{% endif %}
+                            <a href="{% url 'products:nsn_detail' q.dossier_pk %}">{{ q.nsn|format_nsn }}</a>
+                            {% else %}{{ q.nsn|format_nsn }}{% endif %}
                         </td>
                         <td class="text-end font-monospace">${{ q.unit_price|floatformat:2 }}</td>
                         <td>{{ q.lead_time_days }}d</td>
@@ -137,8 +137,8 @@
                         <td>{{ a.award_date|date:"M j, Y" }}</td>
                         <td>
                             {% if a.dossier_pk %}
-                            <a href="{% url 'products:nsn_detail' a.dossier_pk %}">{{ a.nsn }}</a>
-                            {% else %}{{ a.nsn|default:"—" }}{% endif %}
+                            <a href="{% url 'products:nsn_detail' a.dossier_pk %}">{{ a.nsn|format_nsn }}</a>
+                            {% else %}{{ a.nsn|format_nsn|default:"—" }}{% endif %}
                         </td>
                         <td class="font-monospace small">{{ a.award_basic_number|default:"—" }}</td>
                         <td class="text-end font-monospace">
@@ -177,8 +177,8 @@
                     <tr>
                         <td>
                             {% if cap.dossier_pk %}
-                            <a href="{% url 'products:nsn_detail' cap.dossier_pk %}">{{ cap.nsn }}</a>
-                            {% else %}{{ cap.nsn }}{% endif %}
+                            <a href="{% url 'products:nsn_detail' cap.dossier_pk %}">{{ cap.nsn|format_nsn }}</a>
+                            {% else %}{{ cap.nsn|format_nsn }}{% endif %}
                         </td>
                         <td>{{ cap.notes|default:"—" }}</td>
                         <td class="text-muted small">{{ cap.added_at|date:"M j, Y" }}</td>

@@ -1,5 +1,5 @@
 {% extends "contracts/contract_base.html" %}
-{% load static %}
+{% load nsn_filters static %}
 
 {% block extra_head %}
 {{ block.super }}
@@ -45,7 +45,7 @@
                 <tbody>
                     {% for hit in nsn_hits %}
                     <tr>
-                        <td><a href="{% url 'products:nsn_detail' hit.pk %}">{{ hit.nsn_code }}</a></td>
+                        <td><a href="{% url 'products:nsn_detail' hit.pk %}">{{ hit.nsn_normalized|default:hit.nsn_code|format_nsn }}</a></td>
                         <td>{{ hit.description|truncatechars:80|default:"—" }}</td>
                         <td class="nsn-portal-part-number">{{ hit.part_number|default:"—" }}</td>
                     </tr>
@@ -93,7 +93,7 @@
                     {% for hit in part_hits %}
                     <tr>
                         <td class="nsn-portal-part-number">{{ hit.part_number|default:"—" }}</td>
-                        <td><a href="{% url 'products:nsn_detail' hit.nsn.pk %}">{{ hit.nsn.nsn_code }}</a></td>
+                        <td><a href="{% url 'products:nsn_detail' hit.nsn.pk %}">{{ hit.nsn.nsn_normalized|default:hit.nsn.nsn_code|format_nsn }}</a></td>
                         <td class="text-muted">{{ hit.source }}</td>
                     </tr>
                     {% endfor %}
