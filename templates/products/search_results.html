@@ -1,0 +1,114 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/products-portal.css' %}?v={{ cache_version }}">
+{% endblock %}
+
+{% block contract_content %}
+<div class="nsn-portal-page">
+
+    <header class="mb-4">
+        <h1 class="h4 mb-2">Search results</h1>
+        <p class="text-muted mb-0">Query: <span class="font-monospace">{{ query }}</span></p>
+        <a href="{% url 'products:observatory' %}" class="btn btn-outline-brand btn-sm mt-2">← Back to Observatory</a>
+    </header>
+
+    {% if not_in_catalog %}
+    <div class="alert alert-secondary">
+        No catalog row for NSN <strong>{{ not_in_catalog }}</strong>. Government data may still exist on related solicitation lines.
+    </div>
+    {% endif %}
+
+    {% if sam_only %}
+    <div class="alert alert-info">
+        CAGE <strong>{{ sam_only.cage_code }}</strong> found in SAM cache as
+        <strong>{{ sam_only.entity_name|default:"(no name)" }}</strong> but not in our supplier database.
+    </div>
+    {% endif %}
+
+    {% if nsn_hits %}
+    <section class="nsn-detail-panel mb-3">
+        <header class="nsn-detail-panel__head">
+            <h2 class="nsn-detail-panel__title">NSNs</h2>
+        </header>
+        <div class="nsn-detail-panel__body--flush">
+            <table class="table table-sm mb-0 nsn-portal-table-compact">
+                <thead>
+                    <tr>
+                        <th>NSN</th>
+                        <th>Description</th>
+                        <th>Part #</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hit in nsn_hits %}
+                    <tr>
+                        <td><a href="{% url 'products:nsn_detail' hit.pk %}">{{ hit.nsn_code }}</a></td>
+                        <td>{{ hit.description|truncatechars:80|default:"—" }}</td>
+                        <td class="nsn-portal-part-number">{{ hit.part_number|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if supplier_hits %}
+    <section class="nsn-detail-panel mb-3">
+        <header class="nsn-detail-panel__head">
+            <h2 class="nsn-detail-panel__title">Suppliers</h2>
+        </header>
+        <div class="nsn-detail-panel__body--flush">
+            <table class="table table-sm mb-0 nsn-portal-table-compact">
+                <thead>
+                    <tr><th>Name</th><th>CAGE</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in supplier_hits %}
+                    <tr>
+                        <td><a href="{% url 'products:supplier_nsns' s.pk %}">{{ s.name }}</a></td>
+                        <td class="font-monospace">{{ s.cage_code|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if part_hits %}
+    <section class="nsn-detail-panel mb-3">
+        <header class="nsn-detail-panel__head">
+            <h2 class="nsn-detail-panel__title">Part-number matches</h2>
+        </header>
+        <div class="nsn-detail-panel__body--flush">
+            <table class="table table-sm mb-0 nsn-portal-table-compact">
+                <thead>
+                    <tr><th>Part #</th><th>NSN</th><th>Source</th></tr>
+                </thead>
+                <tbody>
+                    {% for hit in part_hits %}
+                    <tr>
+                        <td class="nsn-portal-part-number">{{ hit.part_number|default:"—" }}</td>
+                        <td><a href="{% url 'products:nsn_detail' hit.nsn.pk %}">{{ hit.nsn.nsn_code }}</a></td>
+                        <td class="text-muted">{{ hit.source }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if not nsn_hits and not supplier_hits and not part_hits and not sam_only and not not_in_catalog %}
+    <div class="nsn-detail-empty">
+        <span class="nsn-detail-empty__title">No matches.</span>
+        Try a full NSN, NIIN, CAGE, or part number.
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

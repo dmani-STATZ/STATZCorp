@@ -1,0 +1,109 @@
+{% extends "contracts/contract_base.html" %}
+{% load humanize static %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/products-portal.css' %}?v={{ cache_version }}">
+{% endblock %}
+
+{% block contract_content %}
+<div class="nsn-portal-page">
+
+    <header class="text-center mb-4">
+        <h1 class="h3 mb-1">NSN Observatory</h1>
+        <p class="text-muted mb-0">Research NSNs, suppliers, and part numbers across DIBBS and contracts data.</p>
+    </header>
+
+    <form class="nsn-portal-omnibox" method="get" action="{% url 'products:portal_search' %}">
+        <label class="form-label visually-hidden" for="portal-q">Search</label>
+        <input type="search"
+               id="portal-q"
+               name="q"
+               class="form-control nsn-portal-omnibox__input"
+               placeholder="NSN, NIIN, CAGE, part number, or description…"
+               autocomplete="off"
+               required>
+        <div class="form-text text-center mt-2">
+            13-char NSN · 9-digit NIIN · 5-char CAGE · part number or text
+        </div>
+    </form>
+
+    <div class="nsn-portal-stats">
+        <div class="nsn-portal-stat-card">
+            <div class="nsn-portal-stat-card__value">{{ stats.total_nsns|intcomma }}</div>
+            <div class="nsn-portal-stat-card__label">NSNs in catalog</div>
+        </div>
+        <div class="nsn-portal-stat-card">
+            <div class="nsn-portal-stat-card__value">{{ stats.nsns_with_history|intcomma }}</div>
+            <div class="nsn-portal-stat-card__label">With procurement history</div>
+        </div>
+        <div class="nsn-portal-stat-card">
+            <div class="nsn-portal-stat-card__value">{{ stats.total_procurement_records|intcomma }}</div>
+            <div class="nsn-portal-stat-card__label">Government purchase records</div>
+        </div>
+        <div class="nsn-portal-stat-card">
+            <div class="nsn-portal-stat-card__value">{{ stats.awards_won|intcomma }}</div>
+            <div class="nsn-portal-stat-card__label">Awards we've won</div>
+        </div>
+        <div class="nsn-portal-stat-card">
+            <div class="nsn-portal-stat-card__value">{{ stats.active_approved_cages|intcomma }}</div>
+            <div class="nsn-portal-stat-card__label">Active approved-source CAGEs</div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <section class="nsn-detail-panel">
+                <header class="nsn-detail-panel__head">
+                    <h2 class="nsn-detail-panel__title">Recent awards</h2>
+                </header>
+                <div class="nsn-detail-panel__body">
+                    {% if recent_awards %}
+                    <ul class="nsn-portal-recent-list">
+                        {% for award in recent_awards %}
+                        <li class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                {% if award.nsn_dossier_pk %}
+                                <a href="{% url 'products:nsn_detail' award.nsn_dossier_pk %}">{{ award.nsn }}</a>
+                                {% else %}
+                                <span class="text-muted">{{ award.nsn }}</span>
+                                {% endif %}
+                                <span class="text-muted small d-block">{{ award.award_date|date:"M j, Y" }} · {{ award.awardee_cage }}</span>
+                            </div>
+                            {% if award.we_won %}
+                            <span class="badge text-bg-success">We won</span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="nsn-detail-empty nsn-detail-empty--quiet">No recent award activity.</div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="nsn-detail-panel">
+                <header class="nsn-detail-panel__head">
+                    <h2 class="nsn-detail-panel__title">Recently updated NSNs</h2>
+                </header>
+                <div class="nsn-detail-panel__body">
+                    {% if recent_nsns %}
+                    <ul class="nsn-portal-recent-list">
+                        {% for item in recent_nsns %}
+                        <li>
+                            <a href="{% url 'products:nsn_detail' item.pk %}">{{ item.nsn_code }}</a>
+                            <span class="text-muted small d-block">{{ item.description|truncatechars:60|default:"No description" }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="nsn-detail-empty nsn-detail-empty--quiet">No recent catalog updates.</div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

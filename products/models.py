@@ -33,6 +33,13 @@ class AuditModel(models.Model):
 
 class Nsn(AuditModel):
     nsn_code = models.CharField(max_length=20, null=True, blank=True)
+    nsn_normalized = models.CharField(
+        max_length=13,
+        blank=True,
+        default='',
+        editable=False,
+        db_index=True,
+    )
     description = models.TextField(null=True, blank=True)
     part_number = models.CharField(max_length=25, null=True, blank=True)
     revision = models.CharField(max_length=25, null=True, blank=True)
@@ -66,6 +73,12 @@ class Nsn(AuditModel):
 
     class Meta:
         db_table = 'contracts_nsn'
+
+    def save(self, *args, **kwargs):
+        from products.nsn_utils import normalize_nsn
+
+        self.nsn_normalized = normalize_nsn(self.nsn_code or '')
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"NSN {self.nsn_code}"

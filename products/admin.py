@@ -5,8 +5,8 @@ from .models import Nsn, SupplierNSNCapability
 
 @admin.register(Nsn)
 class NsnAdmin(admin.ModelAdmin):
-    list_display = ('nsn_code', 'description', 'part_number', 'revision', 'unit_weight')
-    search_fields = ('nsn_code', 'description', 'part_number')
+    list_display = ('nsn_code', 'nsn_normalized', 'description', 'part_number', 'revision', 'unit_weight')
+    search_fields = ('nsn_code', 'nsn_normalized', 'description', 'part_number')
 
 
 @admin.register(SupplierNSNCapability)

@@ -1,51 +1,73 @@
 ﻿# Products Context
 
 ## 1. Purpose
-The `products` app owns the canonical National Stock Number (NSN) catalog that the contracts/IDIQ flows rely on. It stores each NSN’s descriptive fields, part/reference information, and the supplier capabilities tied to those NSNs. By centralizing this data (with audit metadata), it allows `contracts` views, forms, and APIs to look up, edit, and re-use NSNs across CLINs, IDIQ contract details, and supplier searches.
+The `products` app owns the canonical National Stock Number (NSN) catalog (`contracts_nsn`) and the **NSN Portal** — a read-focused research surface that aggregates DIBBS/sales intelligence, supplier data, and contract linkages around each NSN. Contracts/IDIQ flows still use `Nsn` as the FK spine; the portal adds cross-app joins via `nsn_normalized` and `nsn_query_variants()`.
 
 ## 2. App Identity
 - **Django app name:** `products` (urls are namespaced under `products`).
 - **AppConfig class:** `ProductsConfig` in `products/apps.py`, standard name/auto-field settings.
 - **Filesystem path:** `products/` inside the project root.
-- **Role:** Support/domain app that exposes the NSN domain objects for the contracts/suppliers ecosystem; it does not ship its own business views but wires into contracts for editing/search.
+- **Role:** NSN domain owner plus the NSN Portal (Observatory, Dossier, Supplier NSN View). Still wires legacy edit/search JSON endpoints into `contracts.views`.
 
 ## 3. High-Level Responsibilities
-- Define the audited NSN domain (`Nsn`) and its join table (`SupplierNSNCapability`) linking NSNs to suppliers.
-- Keep the database schema compatible with legacy tables (`db_table='contracts_nsn'` and `supplier_nsn_capability`).
-- Supply the admin configuration for staff to search and edit NSNs and capability rows.
-- Provide the template used by the contracts `NsnUpdateView` (`templates/products/nsn_edit.html`) and the URL namespace for editing/search endpoints that forward to `contracts.views`.
-- Serve as the definitive code location for anything that touches NSN metadata so other apps can import `Nsn` and `SupplierNSNCapability` without circular imports.
+- Define the audited NSN domain (`Nsn`) with `nsn_normalized` spine (migration `0003`/`0004`) and legacy join table `SupplierNSNCapability` (unused by portal — **do not read**).
+- Host the **NSN Portal** three surfaces (all `@login_required`):
+  1. **Observatory** — `/products/` — omnibox search, cached portfolio stats, recent awards/NSN activity.
+  2. **NSN Dossier** — `/products/nsn/<pk>/` — full intelligence panels + bounded logistics edit.
+  3. **Supplier NSN View** — `/products/supplier/<pk>/nsns/` — approved/quoted/won/manual NSNs per supplier.
+- Cross-app reads use lazy imports inside view methods; sales NSN string columns are filtered with `nsn_query_variants()` (never DB-side string transforms on indexed columns).
+- **Single write path:** logistics fields via `NsnLogisticsForm` POST to `products:nsn_logistics_update` (modal on dossier). Full NSN identity edits remain at `products:nsn_edit` → `contracts.NsnUpdateView`.
+- Admin, migrations, `backfill_nsn_normalized` management command, and `products/nsn_utils.py`.
 
 ## 4. Key Files and What They Do
 - `apps.py` – Defines `ProductsConfig` so Django can load the app, and the `name = 'products'` label that other apps import.
 - `models.py` – Contains `AuditModel`, `Nsn`, and `SupplierNSNCapability`. `AuditModel` adds `created_by`, `created_on`, `modified_by`, `modified_on` and a `save()` override. `Nsn` defines the descriptive fields, the `suppliers` ManyToMany via `SupplierNSNCapability`, and forces the existing `contracts_nsn` table name. `SupplierNSNCapability` stores lead times/prices between a supplier and an NSN.
-- `urls.py` – Namespaces the app as `products` and maps `/nsn/<pk>/edit/` and `/nsn/search/` to `contracts.views.NsnUpdateView` and `contracts.views.NsnSearchView`, exposing those flows under `/products/`.
+- `nsn_utils.py` – `normalize_nsn`, `format_nsn`, `nsn_query_variants`, `fsc_of`, `niin_of`; mandatory join helper for sales string NSN columns.
+- `forms.py` – `NsnLogisticsForm` (portal sole write path for weight/dims/packaging notes).
+- `views.py` – `ObservatoryView`, `portal_search`, `NsnDetailView`, `nsn_logistics_update`, `SupplierNsnView`.
+- `management/commands/backfill_nsn_normalized.py` – idempotent recovery after raw SQL MERGE into `contracts_nsn`.
+- `urls.py` – Portal routes plus shims to `contracts.views.NsnUpdateView` / `NsnSearchView`.
 - `admin.py` – Registers `Nsn` and `SupplierNSNCapability` with useful `list_display`/`search_fields` so staff can find records quickly.
 - `templates/products/nsn_edit.html` – Extends `contracts/contract_base.html`, renders the `NsnForm` sections (NSN info, description, notes), and re-uses `contracts/includes/simple_field.html` for consistent styling.
 - `migrations/0001_initial.py` – Creates the two tables, declares the `contracts_nsn`/`supplier_nsn_capability` names, and wires up the `User` and `Supplier` foreign keys.
-- `views.py` – Empty placeholder; the actual UI lives in `contracts.views` but the urls in this app still point there.
+- `views.py` – Portal views (see §6). Legacy JSON autocomplete remains in `contracts.views.NsnSearchView`.
 
 ## 5. Data Model / Domain Objects
 - **`AuditModel` (abstract):** Adds `created_by`/`modified_by` FK to `auth.User`, timestamps with `timezone.now`, and overrides `save()` so `created_on` is set once and `modified_on` always updates just before persisting.
-- **`Nsn`:** The core model (stored in `contracts_nsn`). Fields include `nsn_code`, `description`, `part_number`, `revision`, `notes`, the packout fields `unit_weight` (DecimalField, lb), `unit_length` / `unit_width` / `unit_height` (DecimalFields, in), and `packaging_notes` (TextField; hazmat/crating/ORM-D notes), `directory_url`, plus the audit fields inherited from `AuditModel`. The packout fields were added in migration `0002_nsn_packout_fields` and are all nullable / defaulted so existing rows do not require backfill. It exposes `suppliers = ManyToManyField(Supplier, through=SupplierNSNCapability, related_name='capable_nsns')`, so `Supplier` rows can navigate back through `Nsn.suppliers`. The `__str__` prints `NSN {nsn_code}` for admin/search results.
+- **`Nsn`:** Core model (`contracts_nsn`). Includes `nsn_normalized` (CharField max 13, `blank=True`, `default=""`, `db_index=True`, populated in `save()` via `normalize_nsn(nsn_code)`). **No uniqueness constraint on `nsn_code`** — duplicates possible; dossier shows a data-quality badge linking to admin when `duplicate_count > 1`. Packout/logistics fields: `unit_weight`, `unit_length`, `unit_width`, `unit_height`, `packaging_notes`. M2M `suppliers` through `SupplierNSNCapability` exists in schema only — portal must not read it.
 - **`SupplierNSNCapability`:** The `supplier_nsn_capability` table that connects an `Nsn` to a `Supplier` and stores `lead_time_days`/`price_reference`. There are no extra methods, so the table is purely data with the M2M relationship on `Nsn`.
 
   **Deprecated in practice (as of 2026-04-26):** `SupplierNSNCapability` is not surfaced anywhere in the v1 NSN detail UI. The active source of truth for "which suppliers can supply this NSN" is `sales.ApprovedSource` — a daily DLA-published feed keyed by NSN code (string) and CAGE code (string), surfaced on the NSN detail page via `NsnDetailView.get_approved_sources_data`. `SupplierNSNCapability` is retained in the schema for backward compatibility, still registered in admin, and still wired through `Nsn.suppliers` (M2M `through=`), but it has no documented creation flow and no production data. Do not write new code that reads from it; do not delete it without a migration plan.
 
-## 6. Request / User Flow
-- **Editing an NSN:** `/products/nsn/<int:pk>/edit/` resolves to `contracts.views.NsnUpdateView` (decorated with `conditional_login_required`). The view pulls the `Nsn` instance, renders `contracts/forms.NsnForm` against `templates/products/nsn_edit.html`, flashes a success message, and redirects either back to the owning CLIN (`contracts:clin_detail` when `clin_id` is in the kwargs) or to `contracts:contracts_dashboard`.
-- **Searching for NSNs:** `/products/nsn/search/` uses `contracts.views.NsnSearchView` (LoginRequiredMixin). It returns JSON (id/text pairs) for the first ten records whose `nsn_code` or `description` contains the user query, but it refuses to hit the DB until the query string has at least three characters.
-- **NSN Detail:** `/products/nsn/<int:pk>/` (`products:nsn_detail`) resolves to `products.views.NsnDetailView` (decorated with `conditional_login_required`). It renders `templates/products/nsn_detail.html` with read-only sections for identification, packout, approved sources, and up to 50 referencing CLINs / IDIQ contract details (lazy-imported from `contracts.models` to avoid circular imports). The packout block is inline-editable and posts JSON to `nsn_packout_update`.
+## 6. Request / User Flow (NSN Portal)
 
-  **Approved-sources data flow:** `NsnDetailView.get_approved_sources_data` (lazy-imports `sales.models.approved_sources.ApprovedSource` and `suppliers.models.Supplier`) filters `ApprovedSource` by `nsn=self.object.nsn_code`, separately counts orphaned rows (`import_batch__isnull=True`) for a footer note, then takes the non-orphaned queryset, dedupes to distinct `(approved_cage, part_number, company_name)` tuples via `.values(...).distinct()`, collects the CAGE set, and resolves CAGEs to `Supplier` rows in a single batched query (`Supplier.objects.filter(cage_code__in=cage_set)`). Each row in the returned `rows` list carries `cage_code`, `company_name` (resolved supplier name preferred, else import-row company name, else "Unknown supplier"), `part_number`, the `Supplier` object (or `None`), and `is_resolved`. Rows are sorted by `is_resolved` desc, then `company_name` asc. The view returns zero counts and an empty list when the NSN has no `nsn_code` or no matching `ApprovedSource` rows.
-- **Packout autosave:** `/products/nsn/<int:pk>/packout/` (`products:nsn_packout_update`) is a POST-only function-based view (`products.views.nsn_packout_update`) protected by `@login_required` + `@require_POST`. It accepts a JSON body with optional `unit_weight`, `unit_length`, `unit_width`, `unit_height`, `packaging_notes` keys, parses each numeric field as `Decimal` (empty string / null clears to `None`), updates only the supplied fields, sets `nsn.modified_by` to the current user, and returns `{"ok": true, "fields": {...}}` on success or `{"ok": false, "errors": {...}}` with HTTP 400 on validation failure. Decimals are serialized as strings to avoid JSON float precision issues. There is no Django form — validation is inline.
-- **Contracts select widgets & IDIQ details:** Those JS-driven modals fetch `/contracts/api/options/nsn/` (see `contracts.views.api_views.get_select_options`) or `/contracts/nsn/search/`, so as long as `Nsn` and `SupplierNSNCapability` fields stay consistent, the `clin_form`, `idiq_contract_detail`, and contract detail screens continue to autocomplete NSNs.
+### Observatory (`/products/`, `products:observatory`)
+- Omnibox GET → `/products/search/?q=` (`products:portal_search`).
+- Classifier: 13-char NSN → redirect to dossier if one canonical match; 9-digit NIIN → NSN hits; 5-char CAGE → supplier NSN view if one match; else part-number/text search grouped on results page (50 per group).
+- Stats cached 10 minutes (`products:observatory_stats` cache key): total NSNs, NSNs with procurement coverage, total `NsnProcurementHistory` rows, we-won awards, distinct approved-source CAGEs.
+- Recent activity: 10 latest `DibbsAward` with NSN + 10 latest modified `Nsn` rows.
+
+### NSN Dossier (`/products/nsn/<pk>/`, `products:nsn_detail`)
+Panels (lazy-loaded sales/contracts data via `nsn_query_variants`):
+1. Identity header — formatted NSN, FSC/NIIN, part/rev, duplicate badge.
+2. Price intelligence chart (Chart.js 4.4.1) — procurement, quotes, bids, awards series via `json_script`.
+3. Logistics — read-only + **Edit logistics** modal → POST `products:nsn_logistics_update`.
+4. Government purchase history (`NsnProcurementHistory`, 25 default, `?history=all`).
+5. Approved sources — `ApprovedSource` deduped on `(approved_cage, part_number)`; one batched `Supplier` query; `NoQuoteCAGE` badges; orphan count footer.
+6. Our activity — `SupplierQuote` + `DibbsAward`/`DibbsAwardMod`.
+7. Contracts — `Clin` + `IdiqContractDetails` FKs to `Nsn`; plus `DibbsAwardMod.matched_contract` linkages.
+8. Demand history — `SolicitationLine` + parent `Solicitation` (25 default, `?demand=all`).
+
+### Supplier NSN View (`/products/supplier/<pk>/nsns/`, `products:supplier_nsns`)
+Approved on / Quoted us / Won / Manual capabilities (`SupplierNSN`). Without `cage_code`, only quote + manual panels with explanatory note. Paginate at 100 rows per panel.
+
+### Legacy flows (unchanged)
+- **Editing an NSN:** `/products/nsn/<int:pk>/edit/` → `contracts.views.NsnUpdateView`.
+- **Widget JSON search:** `/products/nsn/search/` → `contracts.views.NsnSearchView` (min 3 chars).
 
 ## 7. Templates and UI Surface Area
 - `templates/products/nsn_edit.html` — inherits from `contracts/contract_base.html` and renders three sections (NSN info, description, notes) with the shared `contracts/includes/simple_field.html` partials. Since the template lives under `templates/products/`, Django loads it whenever `NsnUpdateView` sets `template_name = 'products/nsn_edit.html'`, but the form layout still depends on `contracts/includes/simple_field.html` and the contracts styling system.
-- `templates/products/nsn_detail.html` — inherits from `contracts/contract_base.html`, rendered by `products.views.NsnDetailView`. Five panels in a single scroll, no tabs: a full-width header (NSN code in monospace, description, audit chip, Edit button), then a Bootstrap two-column row (`col-lg-7` / `col-lg-5`) with **Packout** and **Approved Sources** stacked in the left column and **Identity** and **Usage** stacked in the right. On viewports below `lg` the columns collapse to a single stack in source order (Packout → Approved Sources → Identity → Usage), which matches the sales-priority order. The packout panel is the only interactive surface; everything else is read-only display. All component classes are prefixed `.nsn-detail-*` and live in `static/css/app-core.css`. Colors come from Bootstrap CSS variables (`--bs-body-bg`, `--bs-border-color`, `--bs-success`, `--bs-danger`, etc.) so dark mode (`[data-bs-theme="dark"]` on `<html>`, set by `static/js/theme_toggle.js`) flips automatically. The mono stack used for NSN code, part number, and numeric data is `--font-mono` from `static/css/theme-vars.css`.
-
-  Inline editing (packout panel only): each input has its own `data-state` set to `idle` / `saving` / `saved` / `error`, exposed via attribute selectors so per-field save state is visible in isolation. The inline `<script>` at the bottom of the template debounces 400ms on `input`, flushes immediately on `blur`, sends one POST per changed field to `products:nsn_packout_update` (`{<field_name>: <value>}` body, `X-CSRFToken` header), and updates the field's state from the JSON response. A small JS-only quantity calculator at the bottom of the panel multiplies user-typed quantity against the live values in the packout inputs to show total weight (lbs), cubic inches, and cubic feet — no backend round-trip.
+- `templates/products/nsn_detail.html` — NSN Dossier: identity header (prominent NSN code), price chart, logistics modal, approved sources, procurement/activity/contracts/demand panels. Extends `contract_base.html`; uses `.nsn-detail-*` (app-core.css) + `.nsn-portal-*` (products-portal.css). Chart.js 4.4.1 via CDN.
 
   **Approved Sources panel** (left column, below Packout): renders the `approved_sources` context dict supplied by `NsnDetailView.get_approved_sources_data` as a vertical list of rows, not a table. Each row uses a four-column grid (CAGE / company name / part number / resolution chip) on `≥md` screens and collapses to two lines on smaller screens (CAGE + company on top, part number + chip on bottom). Resolved rows render in normal contrast; unresolved rows get a soft `--bs-tertiary-bg` background and `--bs-secondary-color` text so the eye lands on familiar suppliers first (the view's sort already floats resolved rows to the top — the CSS reinforces that hierarchy). The resolution chip uses Bootstrap 5.3's `--bs-success-bg-subtle` / `--bs-success-text-emphasis` for resolved and `--bs-secondary-bg-subtle` / `--bs-secondary-color` for unresolved; both subtle palettes auto-flip under `[data-bs-theme="dark"]`, so no extra dark-mode rules are needed. Long lists scroll inside the panel via `max-height: 22rem; overflow-y: auto;` on the list. Component classes are prefixed `.nsn-detail-source-*` (live in `static/css/app-core.css`) and follow the same conventions as the rest of the `.nsn-detail-*` family. An orphaned-row footer appears under the list when `approved_sources.orphaned_count > 0` — single italic line, hairline divider above, no alert framing.
 
@@ -73,10 +95,13 @@ All other logic (search throttles, redirect decisions, JSON responses) lives in 
 - Key templates (`clin_detail.html`, `contract_management.html`, `clin_form.html`, `idiq_contract_detail.html`) link to the edit/search endpoints, so their JS (select modals, fetch calls to `/contracts/api/options/nsn/`) relies on this app’s models.
 
 ## 12. URL Surface / API Surface
-- `/products/nsn/<int:pk>/edit/` (`products:nsn_edit`) → `contracts.views.NsnUpdateView` handles GET rendering and POST updates via `NsnForm`.
-- `/products/nsn/search/` (`products:nsn_search`) → `contracts.views.NsnSearchView` returns at most 10 matches in JSON once the query has three or more characters.
-- `/products/nsn/<int:pk>/` (`products:nsn_detail`) → `products.views.NsnDetailView` renders the read-focused detail page (identification, packout, supplier capabilities, referencing CLINs/IDIQ details).
-- `/products/nsn/<int:pk>/packout/` (`products:nsn_packout_update`) → `products.views.nsn_packout_update`, POST-only JSON endpoint that updates the five packout fields and returns `{"ok": ..., "fields"|"errors": ...}`.
+- `/products/` (`products:observatory`) → Observatory landing.
+- `/products/search/` (`products:portal_search`) → omnibox classifier + results.
+- `/products/nsn/<int:pk>/` (`products:nsn_detail`) → NSN Dossier.
+- `/products/nsn/<int:pk>/logistics/` (`products:nsn_logistics_update`) → POST logistics form (sole portal write).
+- `/products/supplier/<int:pk>/nsns/` (`products:supplier_nsns`) → Supplier NSN View.
+- `/products/nsn/<int:pk>/edit/` (`products:nsn_edit`) → `contracts.views.NsnUpdateView`.
+- `/products/nsn/search/` (`products:nsn_search`) → `contracts.views.NsnSearchView` (widget JSON).
 
 ## 13. Permissions / Security Considerations
 - `NsnUpdateView` wraps the view in `conditional_login_required`, so login is required whenever `settings.REQUIRE_LOGIN` is true. The view does not enforce additional per-object ACLs, so broader authorization must be handled by the caller or by restricting who can reach the URL.
@@ -87,7 +112,11 @@ All other logic (search throttles, redirect decisions, JSON responses) lives in 
 None. There are no Celery tasks, periodic jobs, signals, or management commands in `products`.
 
 ## 15. Testing Coverage
-`products/tests.py` contains only the placeholder comment, so this app has no dedicated automated tests. All NSN-related coverage comes indirectly from the broader `contracts` test suite.
+`products/tests/test_nsn_utils.py` and `products/tests/test_search.py` cover normalization utilities and the omnibox classifier. Run:
+
+```bash
+python manage.py test products.tests.test_nsn_utils products.tests.test_search
+```
 
 ## 16. Migrations / Schema Notes
 `0001_initial.py` is the sole migration. It depends on `settings.AUTH_USER_MODEL` and `suppliers.0001_initial`.
@@ -109,12 +138,13 @@ The migration uses `SeparateDatabaseAndState` to avoid touching the existing dat
 - Because the migration ties the models to legacy tables (`contracts_nsn`, `supplier_nsn_capability`), review raw SQL/management commands that reference those names (e.g., `contracts/management/commands/refresh_nsn_view.py`) before renaming tables or indexes.
 
 ## 19. Quick Reference
-- **Primary models:** `Nsn`, `SupplierNSNCapability`, `AuditModel`.
-- **Main URLs:** `/products/nsn/<int:pk>/edit/`, `/products/nsn/search/`, `/products/nsn/<int:pk>/`, `/products/nsn/<int:pk>/packout/`.
-- **Key templates:** `templates/products/nsn_edit.html` and `templates/products/nsn_detail.html` (both extend `contracts/contract_base.html`).
-- **Local views:** `products.views.NsnDetailView`, `products.views.nsn_packout_update`.
-- **Key dependencies:** `contracts.views.NsnUpdateView`/`NsnSearchView`, `contracts.forms.NsnForm`, `suppliers.Supplier`, `STATZWeb.decorators.conditional_login_required`, `contracts.templates/clin_form.html`/`idiq_contract_detail.html` (where the search/edit links live), `contracts.models.Clin` and `contracts.models.IdiqContractDetails` (lazy-imported by `NsnDetailView` for referencing-record lookups), `sales.models.approved_sources.ApprovedSource` (lazy-imported by `NsnDetailView.get_approved_sources_data` for the approved-sources panel).
-- **Risky files to review first:** `contracts/forms.py`, `contracts/views/nsn_views.py`, `contracts/views/idiq_views.py`, and `contracts/models.py` because they define how this app’s models are surfaced to users.
+- **Portal surfaces:** Observatory, NSN Dossier, Supplier NSN View.
+- **Join spine:** `Nsn.nsn_normalized` + `nsn_query_variants()` for all sales string NSN columns.
+- **Forbidden read:** `SupplierNSNCapability` / `Nsn.suppliers` M2M.
+- **Primary models:** `Nsn`, `AuditModel` (`SupplierNSNCapability` schema-only).
+- **Main URLs:** `/products/`, `/products/search/`, `/products/nsn/<pk>/`, `/products/supplier/<pk>/nsns/`.
+- **Key templates:** `observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`, `nsn_edit.html`.
+- **Key dependencies:** lazy imports of `sales.*`, `contracts.models.Clin`/`IdiqContractDetails`, `suppliers.Supplier`.
 
 
 ## CSS Architecture

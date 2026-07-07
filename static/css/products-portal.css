@@ -1,0 +1,117 @@
+/**
+ * NSN Portal — page-specific styles.
+ * Uses Bootstrap / theme tokens only; no new CSS variables.
+ */
+
+.nsn-portal-page {
+    padding-top: 1.25rem;
+    padding-bottom: 4rem;
+}
+
+.nsn-portal-omnibox {
+    max-width: 42rem;
+    margin: 0 auto 2rem;
+}
+
+.nsn-portal-omnibox__input {
+    font-family: var(--font-mono);
+    font-size: 1.125rem;
+    padding: 0.75rem 1rem;
+}
+
+.nsn-portal-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+}
+
+.nsn-portal-stat-card {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+}
+
+.nsn-portal-stat-card__value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--bs-body-color);
+}
+
+.nsn-portal-stat-card__label {
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+    margin-top: 0.25rem;
+}
+
+.nsn-portal-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--bs-body-color);
+}
+
+.nsn-portal-recent-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.nsn-portal-recent-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.nsn-portal-recent-list li:last-child {
+    border-bottom: none;
+}
+
+.nsn-portal-chart-wrap {
+    position: relative;
+    height: 320px;
+}
+
+.nsn-portal-table-compact {
+    font-size: 0.875rem;
+}
+
+.nsn-portal-table-compact th {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.nsn-portal-badge-dup {
+    font-size: 0.75rem;
+}
+
+.nsn-portal-part-number {
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+.nsn-portal-subcode {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+}
+
+.nsn-portal-logistics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.75rem 1.25rem;
+}
+
+.nsn-portal-logistics-item__label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.15rem;
+}
+
+.nsn-portal-logistics-item__value {
+    font-family: var(--font-mono);
+    font-weight: 500;
+}

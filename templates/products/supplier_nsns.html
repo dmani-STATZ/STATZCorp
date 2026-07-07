@@ -1,0 +1,205 @@
+{% extends "contracts/contract_base.html" %}
+{% load humanize static %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/products-portal.css' %}?v={{ cache_version }}">
+{% endblock %}
+
+{% block contract_content %}
+<div class="nsn-portal-page">
+
+    <header class="nsn-detail-header mb-4">
+        <div>
+            <h1 class="nsn-detail-header__title">{{ supplier.name }}</h1>
+            <p class="nsn-detail-header__desc mb-1">
+                {% if supplier.cage_code %}
+                CAGE <span class="font-monospace">{{ supplier.cage_code }}</span>
+                {% else %}
+                <span class="text-muted">No CAGE on file — approved and award panels unavailable.</span>
+                {% endif %}
+            </p>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                {% if no_quote %}
+                <span class="badge text-bg-danger">No Quote</span>
+                {% endif %}
+                {% if supplier.probation %}
+                <span class="badge text-bg-warning">Probation</span>
+                {% endif %}
+                {% if supplier.conditional and not supplier.probation %}
+                <span class="badge text-bg-info">Conditional</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="nsn-detail-header__meta">
+            <a href="{% url 'suppliers:supplier_detail' supplier.pk %}" class="btn btn-outline-brand btn-sm">Supplier profile</a>
+            <a href="{% url 'products:observatory' %}" class="btn btn-outline-secondary btn-sm">Observatory</a>
+        </div>
+    </header>
+
+    {% if has_cage %}
+    <section class="nsn-detail-panel mb-3">
+        <header class="nsn-detail-panel__head">
+            <h2 class="nsn-detail-panel__title">Approved on</h2>
+        </header>
+        <div class="nsn-detail-panel__body--flush">
+            {% if approved_page and approved_page.object_list %}
+            <table class="table table-sm mb-0 nsn-portal-table-compact">
+                <thead><tr><th>NSN</th><th>Part #</th></tr></thead>
+                <tbody>
+                    {% for row in approved_page %}
+                    <tr>
+                        <td>
+                            {% if row.dossier_pk %}
+                            <a href="{% url 'products:nsn_detail' row.dossier_pk %}">{{ row.formatted|default:row.nsn_code }}</a>
+                            {% else %}
+                            {{ row.formatted|default:row.nsn_code }}
+                            <span class="text-muted small">(not in catalog)</span>
+                            {% endif %}
+                        </td>
+                        <td class="nsn-portal-part-number">{{ row.part_number|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if approved_page.has_other_pages %}
+            <nav class="p-2 border-top">
+                {% if approved_page.has_previous %}
+                <a href="?approved_page={{ approved_page.previous_page_number }}" class="small me-2">← Prev</a>
+                {% endif %}
+                <span class="small text-muted">Page {{ approved_page.number }} of {{ approved_page.paginator.num_pages }}</span>
+                {% if approved_page.has_next %}
+                <a href="?approved_page={{ approved_page.next_page_number }}" class="small ms-2">Next →</a>
+                {% endif %}
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="nsn-detail-panel__body">
+                <div class="nsn-detail-empty nsn-detail-empty--quiet">Not on any approved-source list for this CAGE.</div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="nsn-detail-panel mb-3">
+        <header class="nsn-detail-panel__head">
+            <h2 class="nsn-detail-panel__title">Quoted us</h2>
+        </header>
+        <div class="nsn-detail-panel__body--flush">
+            {% if quotes_page and quotes_page.object_list %}
+            <table class="table table-sm mb-0 nsn-portal-table-compact">
+                <thead>
+                    <tr><th>Date</th><th>NSN</th><th class="text-end">Price</th><th>Lead</th></tr>
+                </thead>
+                <tbody>
+                    {% for q in quotes_page %}
+                    <tr>
+                        <td>{{ q.quote_date|date:"M j, Y" }}</td>
+                        <td>
+                            {% if q.dossier_pk %}
+                            <a href="{% url 'products:nsn_detail' q.dossier_pk %}">{{ q.nsn }}</a>
+                            {% else %}{{ q.nsn }}{% endif %}
+                        </td>
+                        <td class="text-end font-monospace">${{ q.unit_price|floatformat:2 }}</td>
+                        <td>{{ q.lead_time_days }}d</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if quotes_page.has_other_pages %}
+            <nav class="p-2 border-top">
+                {% if quotes_page.has_previous %}<a href="?quotes_page={{ quotes_page.previous_page_number }}" class="small me-2">← Prev</a>{% endif %}
+                <span class="small text-muted">Page {{ quotes_page.number }} of {{ quotes_page.paginator.num_pages }}</span>
+                {% if quotes_page.has_next %}<a href="?quotes_page={{ quotes_page.next_page_number }}" class="small ms-2">Next →</a>{% endif %}
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="nsn-detail-panel__body">
+                <div class="nsn-detail-empty nsn-detail-empty--quiet">No quotes from this supplier.</div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if has_cage %}
+    <section class="nsn-detail-panel mb-3">
+        <header class="nsn-detail-panel__head">
+            <h2 class="nsn-detail-panel__title">Won</h2>
+        </header>
+        <div class="nsn-detail-panel__body--flush">
+            {% if won_page and won_page.object_list %}
+            <table class="table table-sm mb-0 nsn-portal-table-compact">
+                <thead><tr><th>Date</th><th>NSN</th><th>Award #</th><th class="text-end">Total</th></tr></thead>
+                <tbody>
+                    {% for a in won_page %}
+                    <tr>
+                        <td>{{ a.award_date|date:"M j, Y" }}</td>
+                        <td>
+                            {% if a.dossier_pk %}
+                            <a href="{% url 'products:nsn_detail' a.dossier_pk %}">{{ a.nsn }}</a>
+                            {% else %}{{ a.nsn|default:"—" }}{% endif %}
+                        </td>
+                        <td class="font-monospace small">{{ a.award_basic_number|default:"—" }}</td>
+                        <td class="text-end font-monospace">
+                            {% if a.total_contract_price %}${{ a.total_contract_price|floatformat:2 }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if won_page.has_other_pages %}
+            <nav class="p-2 border-top">
+                {% if won_page.has_previous %}<a href="?won_page={{ won_page.previous_page_number }}" class="small me-2">← Prev</a>{% endif %}
+                <span class="small text-muted">Page {{ won_page.number }} of {{ won_page.paginator.num_pages }}</span>
+                {% if won_page.has_next %}<a href="?won_page={{ won_page.next_page_number }}" class="small ms-2">Next →</a>{% endif %}
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="nsn-detail-panel__body">
+                <div class="nsn-detail-empty nsn-detail-empty--quiet">No DIBBS awards for this CAGE.</div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="nsn-detail-panel mb-3">
+        <header class="nsn-detail-panel__head">
+            <h2 class="nsn-detail-panel__title">Manual capabilities</h2>
+        </header>
+        <div class="nsn-detail-panel__body--flush">
+            {% if manual_page and manual_page.object_list %}
+            <table class="table table-sm mb-0 nsn-portal-table-compact">
+                <thead><tr><th>NSN</th><th>Notes</th><th>Added</th></tr></thead>
+                <tbody>
+                    {% for cap in manual_page %}
+                    <tr>
+                        <td>
+                            {% if cap.dossier_pk %}
+                            <a href="{% url 'products:nsn_detail' cap.dossier_pk %}">{{ cap.nsn }}</a>
+                            {% else %}{{ cap.nsn }}{% endif %}
+                        </td>
+                        <td>{{ cap.notes|default:"—" }}</td>
+                        <td class="text-muted small">{{ cap.added_at|date:"M j, Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if manual_page.has_other_pages %}
+            <nav class="p-2 border-top">
+                {% if manual_page.has_previous %}<a href="?manual_page={{ manual_page.previous_page_number }}" class="small me-2">← Prev</a>{% endif %}
+                <span class="small text-muted">Page {{ manual_page.number }} of {{ manual_page.paginator.num_pages }}</span>
+                {% if manual_page.has_next %}<a href="?manual_page={{ manual_page.next_page_number }}" class="small ms-2">Next →</a>{% endif %}
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="nsn-detail-panel__body">
+                <div class="nsn-detail-empty nsn-detail-empty--quiet">No manual NSN capabilities recorded.</div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+</div>
+{% endblock %}

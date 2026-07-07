@@ -14,21 +14,23 @@ Defines how to safely modify the `products` app for AI coding agents and develop
 ## 2. App Scope
 
 **Owns:**
-- `Nsn` model (stored in legacy table `contracts_nsn`), including the packout fields `unit_weight`, `unit_length`, `unit_width`, `unit_height`, and `packaging_notes` introduced in migration `0002_nsn_packout_fields`
-- `SupplierNSNCapability` through-model (table `supplier_nsn_capability`)
-- `AuditModel` abstract base
-- URL namespace `products` with four routes: `nsn_edit` and `nsn_search` (shims into `contracts/views`) plus `nsn_detail` and `nsn_packout_update` (local to this app)
+- `Nsn` model (stored in legacy table `contracts_nsn`), including `nsn_normalized` (migration `0003`/`0004`), packout/logistics fields, and `products/nsn_utils.py`
+- **NSN Portal** — Observatory (`/products/`), Dossier (`/products/nsn/<pk>/`), Supplier NSN View (`/products/supplier/<pk>/nsns/`), omnibox search (`/products/search/`)
+- `NsnLogisticsForm` + `nsn_logistics_update` — **sole portal write path** (logistics modal POST)
+- `management/commands/backfill_nsn_normalized.py` — idempotent `nsn_normalized` recovery after raw SQL writes
+- URL namespace `products` with portal routes plus shims: `nsn_edit`, `nsn_search` → `contracts/views`
 - Admin registrations for both models
-- `templates/products/nsn_edit.html` and `templates/products/nsn_detail.html`
-- Local views in `products/views.py`: `NsnDetailView` (DetailView for the read-focused detail page) and `nsn_packout_update` (POST-only JSON endpoint for inline packout editing)
+- Portal templates: `observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`, plus `nsn_edit.html`
+- Local views: `ObservatoryView`, `portal_search`, `NsnDetailView`, `nsn_logistics_update`, `SupplierNsnView`
+- Unit tests: `products/tests/test_nsn_utils.py`, `products/tests/test_search.py`
 
 **Does NOT own:**
 - NSN edit/update form rendering — lives in `contracts/views/nsn_views.py` (`NsnUpdateView`)
 - NSN search view logic — lives in `contracts/views/idiq_views.py` (`NsnSearchView`)
-- NSN form definition — lives in `contracts/forms.py` (`NsnForm`); when packout fields change, both this form and `nsn_packout_update` validation must move together
+- NSN form definition — lives in `contracts/forms.py` (`NsnForm`); portal logistics edits use `products/forms.py` (`NsnLogisticsForm`) — keep both in sync when packout fields change
 - NSN API endpoint for select widgets — lives in `contracts/views/api_views.py`
 - `sales.ApprovedSource` data — `products` reads this model from the NSN detail view (`get_approved_sources_data`) but does not own its schema, import logic, or admin. Any schema change to `ApprovedSource` (especially renaming `nsn`, `approved_cage`, `part_number`, `company_name`, or `import_batch`) is the sales app's responsibility, but it silently breaks the NSN detail page if the read site here is not updated in the same change.
-- No services, signals, tasks, or management commands
+- No services, signals, or tasks beyond `backfill_nsn_normalized` management command
 
 This app started as **glue/domain infrastructure** but now also owns a real read-focused detail page and a small JSON packout endpoint. Treat `models.py`, `views.py`, `urls.py`, and `migrations/` as the blast radius for most change types.
 
@@ -38,7 +40,7 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 
 ### Before changing `models.py` fields
 - `contracts/forms.py` — `NsnForm` lists every editable field explicitly (including the packout fields `unit_weight`, `unit_length`, `unit_width`, `unit_height`, `packaging_notes`)
-- `products/views.py` — `nsn_packout_update` enumerates the packout fields for inline JSON validation; adding/renaming a packout field requires editing the `_DECIMAL_FIELDS` tuple (or the `packaging_notes` branch) here
+- `products/views.py` — `nsn_logistics_update` + `NsnLogisticsForm`; adding/renaming a logistics field requires editing both
 - `templates/products/nsn_detail.html` — the packout form posts the field names verbatim and the readout sections reference field attributes by name
 - `contracts/views/nsn_views.py` — `NsnUpdateView` context keys
 - `contracts/views/idiq_views.py` — `NsnSearchView` queryset filter fields (`nsn_code`, `description`)
@@ -82,7 +84,7 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 | Add/rename a field on `Nsn` | `products/models.py`, `products/migrations/`, `contracts/forms.py`, `contracts/views/nsn_views.py`, `contracts/views/idiq_views.py`, `contracts/views/api_views.py`, `contracts/utils/contracts_schema.py`, `templates/products/nsn_edit.html`, `templates/products/nsn_detail.html`, any affected `contracts/templates/` |
 | Add/rename a field on `SupplierNSNCapability` | `products/models.py`, `products/migrations/`, `products/admin.py` |
 | Change `nsn_code` or `description` specifically | All of the above + `contracts/views/idiq_views.py` (search filter), `contracts/views/api_views.py` (select options), `SQL/migrate_data.sql` |
-| Add/rename a packout field on `Nsn` | `products/models.py`, `products/migrations/`, `products/views.py` (`_DECIMAL_FIELDS` tuple or `packaging_notes` branch in `nsn_packout_update`), `contracts/forms.py` (`NsnForm.Meta.fields` and `widgets`), `templates/products/nsn_detail.html` (form input + readout), `templates/products/nsn_edit.html` if it lists fields explicitly, `SQL/migrate_data.sql` (column list + SELECT clause) |
+| Add/rename a packout/logistics field on `Nsn` | `products/models.py`, `products/migrations/`, `products/forms.py` (`NsnLogisticsForm`), `products/views.py` (`nsn_logistics_update`), `contracts/forms.py` (`NsnForm`), `templates/products/nsn_detail.html` (modal + readout), `templates/products/nsn_edit.html`, `SQL/migrate_data.sql` |
 | Add a new NSN URL | `products/urls.py` + the view file in `products/views.py` (or `contracts/views/`) it points to |
 | Change to `ApprovedSource` fields used in detail page | `sales/models/approved_sources.py`, `products/views.py` (`get_approved_sources_data`), `templates/products/nsn_detail.html` (the approved-sources panel block) |
 
@@ -149,8 +151,8 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 
 ## 9. View / URL / Template Change Rules
 
-- `products/views.py` now owns `NsnDetailView` and `nsn_packout_update`. NSN edit/search still lives in `contracts/views`. Before adding new views to this app, read `AGENTS.md` § 13 footgun about lazy imports — `contracts.models` cannot be imported at module top-level.
-- The four URL names (`products:nsn_edit`, `products:nsn_search`, `products:nsn_detail`, `products:nsn_packout_update`) are reversed in `templates/products/nsn_detail.html`. Search before renaming any of them.
+- `products/views.py` owns portal views. NSN edit/search JSON still lives in `contracts/views`. Lazy-import `contracts.models` inside methods only.
+- Portal URL names: `products:observatory`, `products:portal_search`, `products:nsn_detail`, `products:nsn_logistics_update`, `products:supplier_nsns`, plus shims `products:nsn_edit`, `products:nsn_search`.
 - `templates/products/nsn_edit.html` depends on:
   - `contracts/contract_base.html` (extends)
   - `contracts/includes/simple_field.html` (include — used for every form field)
@@ -159,17 +161,31 @@ This app started as **glue/domain infrastructure** but now also owns a real read
   - `contracts/contract_base.html` (extends)
   - All `.nsn-detail-*` component classes in `static/css/app-core.css` and `--font-mono` in `static/css/theme-vars.css`
   - The context keys supplied by `NsnDetailView.get_context_data` (`nsn`, `supplier_capabilities`, `referencing_clins`, `referencing_idiq_details`, `has_packout_data`)
-  - The reverse URLs `products:nsn_edit`, `products:nsn_packout_update`, `suppliers:supplier_detail`, `contracts:clin_detail`, `contracts:idiq_contract_detail` — if any of these get renamed the detail template breaks
+  - Reverse URLs: `products:nsn_edit`, `products:nsn_logistics_update`, `products:supplier_nsns`, `products:observatory`, `contracts:clin_detail`, `contracts:contract_management`, `contracts:idiq_contract_detail`
 - If a new NSN edit-style template is needed, follow `nsn_edit.html`: extend `contracts/contract_base.html` and use `simple_field.html`. If a new NSN read/scan template is needed, follow `nsn_detail.html`: extend the same base, but use the `.nsn-detail-*` prefix convention for new component classes and rely on Bootstrap CSS variables for colors so dark mode works without extra rules.
 
-### Inline editing JS contract on `nsn_detail.html`
+### Cross-app import rule (mandatory)
 
-The packout panel ships its own inline `<script>` block (no separate JS module — vanilla, ~120 lines, lives at the bottom of the template). When changing the packout fields or the JSON endpoint, keep this contract intact:
+Never import `sales` or `contracts` models at **module top-level** in `products`. Lazy-import inside view methods only (established pattern in `NsnDetailView`).
 
-- Each editable field is a real `<input>` or `<textarea>` wrapped in `<div class="nsn-detail-field" data-field="<field_name>">`. The wrapper's `data-state` attribute (`saving` / `saved` / `error`, or absent for idle) drives the per-field visual state via attribute selectors in `app-core.css`. **Don't replace the wrapper with a Bootstrap `.input-group` or similar — the attribute-selector CSS won't reach inside.**
-- The script reads the panel's `data-update-url` and the `{% csrf_token %}` hidden input from the panel itself, then POSTs `{<field_name>: <value>}` JSON per field with `X-CSRFToken` and `X-Requested-With: XMLHttpRequest`. Adding a new packout field requires adding it to the `DECIMAL_FIELDS` map in the script (or to the textarea-style branch) AND adding it to `_DECIMAL_FIELDS` / the `packaging_notes` branch in `products/views.py` `nsn_packout_update`.
-- Numeric fields debounce 400ms on `input` and flush on `blur`; Enter on a number input commits and blurs (Cmd/Ctrl+Enter for textarea). Empty input is sent as the empty string and clears the field server-side. The endpoint's `{ok, errors}` JSON shape is what drives the `saved` flash vs the inline error text — keep the response shape stable.
-- The live calculator at the bottom of the panel is JS-only (no backend call). It reads from the same `<input>` IDs as the saved fields, so any rename of `nsn-f-unit_weight` / `nsn-f-unit_length` / `nsn-f-unit_width` / `nsn-f-unit_height` / `nsn-calc-qty` breaks the calculator silently.
+### NSN join pattern (mandatory)
+
+All filters against sales-app NSN **string** columns (`ApprovedSource.nsn`, `SupplierQuote.nsn`, `SolicitationLine.nsn`, `DibbsAward.nsn`, `NsnProcurementHistory.nsn`, etc.) must use:
+
+```python
+from products.nsn_utils import nsn_query_variants
+Model.objects.filter(nsn__in=nsn_query_variants(nsn_code))
+```
+
+Never annotate indexed NSN columns with `Replace()` or other DB string functions — breaks sargability on MSSQL.
+
+### Portal write path
+
+Only `NsnLogisticsForm` → `nsn_logistics_update` may mutate portal-visible data. Do not add other POST endpoints in `products` without explicit scope expansion.
+
+### Inline editing JS contract on `nsn_detail.html` (removed 2026-07-07)
+
+The dossier now uses a **Bootstrap logistics modal** + form POST. Do not reintroduce the JSON `nsn_packout_update` autosave pattern on the portal dossier.
 
 ### CSS prefix convention
 
@@ -191,9 +207,25 @@ The "in our system" / "not in DB" indicators on the approved-sources panel are r
 
 ## 11. Background Tasks / Signals / Automation Rules
 
-None. There are no signals, Celery tasks, periodic jobs, or management commands in `products`. The only automated behaviour is the `AuditModel.save()` timestamp logic.
+None for periodic jobs. `AuditModel.save()` timestamps remain the only model automation.
 
-Note: `contracts/management/commands/refresh_nsn_view.py` is in the `contracts` app but touches the `contracts_nsn` table. Inspect it before any schema change.
+### Raw SQL: `Migrate2_contracts_nsn` (SQL Server)
+
+The stored procedure **`Migrate2_contracts_nsn`** MERGEs rows into **`contracts_nsn`** outside the Django ORM. It is **not** in this repository — it lives in SQL Server and must be maintained manually in SSMS. ORM `Nsn.save()` populates `nsn_normalized`, but proc-driven MERGEs leave that column at default `""` until backfilled.
+
+**Recovery:** run `python manage.py backfill_nsn_normalized` after any bulk proc MERGE (idempotent — only updates rows where stored value differs from computed).
+
+**Manual T-SQL snippet** — extend the proc's MERGE `UPDATE`/`INSERT` column list in SSMS (*not* applied by Django migrations):
+
+```sql
+-- TO BE APPLIED MANUALLY IN SSMS — add to Migrate2_contracts_nsn MERGE target assignments:
+-- On INSERT and UPDATE of contracts_nsn from source:
+nsn_normalized = UPPER(REPLACE(REPLACE(source.nsn_code, '-', ''), ' ', ''))
+```
+
+Also update `SQL/migrate_data.sql` column lists when adding new `contracts_nsn` columns.
+
+Note: `contracts/management/commands/refresh_nsn_view.py` touches `contracts_nsn` — inspect before schema changes.
 
 - **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 16.
 ---
@@ -232,7 +264,7 @@ After editing, verify manually:
 
 - **Circular import risk:** `products.models` imports `suppliers.models.Supplier`. Any attempt to import `contracts` models from `products` at module top-level would likely create a circular import chain (`products → contracts → products`). `NsnDetailView` already needs `contracts.models.Clin` and `contracts.models.IdiqContractDetails`; it imports them lazily inside `get_context_data`. Follow the same pattern for any new view in this app that needs `contracts` models.
 
-- **`nsn_packout_update` does not use a Django form — validation is inline.** Adding a new packout field requires updating the validation block in `products/views.py` (the `_DECIMAL_FIELDS` tuple for numeric fields, or the `packaging_notes` branch for string fields) AND the `fields`/`widgets` in `contracts/forms.py` `NsnForm`. Forgetting either side leaves the field savable in one path but silently dropped in the other.
+- **`NsnLogisticsForm` is the portal logistics validator.** Full NSN edits remain in `contracts/forms.py` (`NsnForm`). Keep field lists aligned when adding logistics columns.
 
 - **`ApprovedSource.nsn` is a string field, not an FK to `Nsn`.** NSN codes that appear in `ApprovedSource` may not exist in `Nsn`. NSN codes in `Nsn` may have zero matches in `ApprovedSource`. Both are normal states. The detail page renders an empty-state message when there are no matches; do not treat zero matches as an error condition.
 
@@ -240,7 +272,7 @@ After editing, verify manually:
 
 - **CAGE-to-Supplier resolution in `NsnDetailView.get_approved_sources_data` uses a single batched query** (`Supplier.objects.filter(cage_code__in=cage_set)`) producing a `{cage: supplier}` dict. Do NOT refactor this into per-row queries — at scale (an NSN with 50 approved sources) that becomes a 50-query page load that bypasses the existing `select_related` optimisations elsewhere on the page.
 
-- **`SupplierNSNCapability` is deprecated in practice as of 2026-04-26.** It is no longer surfaced anywhere in the v1 NSN detail UI. Do NOT add new code that reads from it. Do NOT delete the model or its admin registration without a migration plan — the through-table is still wired into `Nsn.suppliers` (M2M `through=`), so removal is a coordinated schema change.
+- **`SupplierNSNCapability` is forbidden in portal code.** Do not read, write, or surface it in templates. The approved-sources panel uses `sales.ApprovedSource` only.
 
 ---
 
@@ -269,7 +301,7 @@ After editing, verify manually:
 | Cross-app dependents | `contracts` (heavy), `processing` (Nsn import), `reports` (table name), `SQL/migrate_data.sql` (column-level raw SQL) |
 | Security-sensitive | `NsnUpdateView` login decorator, `NsnSearchView` login + query-length guard, `AuditModel` audit trail |
 | Riskiest edits | Renaming any `Nsn` field, changing `db_table` values, adding NOT NULL fields without defaults, removing `AuditModel.save()` |
-| App character | Mostly domain infrastructure. Now also owns `NsnDetailView` and the `nsn_packout_update` JSON endpoint, plus the packout fields on `Nsn`. NSN editing/searching still lives in `contracts/views`. |
+| App character | NSN domain + NSN Portal (Observatory, Dossier, Supplier view). Legacy NSN edit/widget search still in `contracts/views`. |
 
 
 ## CSS / Styling Rules
