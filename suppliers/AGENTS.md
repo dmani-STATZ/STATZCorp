@@ -110,6 +110,9 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - **Payload shape is a contract:** changing `category_ids` to a multi-value field or altering the view's parse logic will silently break the picker.
 - CSRF is sent as `X-CSRFToken: getCookie('csrftoken')` header (matching the pattern used by other fetch calls in the template). Missing CSRF surfaces an inline error and reverts the checklist.
 
+### Copy Category button change
+`templates/suppliers/supplier_detail.html` (dropdown markup + standalone `<script>` block reading `.contact-category-pill` / `.edit-contact-btn[data-contact-email]`) — purely client-side, no propagation to `views.py`, `urls.py`, or models. If the contact card markup, pill container selector, or `data-contact-email` attribute name changes, this script must be updated in lockstep.
+
 ---
 
 ## 6. Cross-App Dependency Warnings

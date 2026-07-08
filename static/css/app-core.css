@@ -1289,7 +1289,11 @@ textarea {
 }
 
 /* ===== Section 16: Toasts ===== */
-.toast {
+/* ID selector so this beats Bootstrap's `.toast:not(.show){display:none}`
+   (0,2,0). The container never receives `.show` — only `.toast-item`
+   children do — so a plain `.toast` rule would be overridden and hide
+   every toast. */
+#toast-root {
     position: fixed;
     right: 16px;
     bottom: 16px;

@@ -340,7 +340,38 @@
     <div class="card card-padded shadow-sm" id="contacts-section">
       <div class="row-between mb-3">
         <h2 class="text-lg font-semibold">Contacts</h2>
-        <button type="button" id="open-contact-modal" class="btn btn-sm btn-outline-primary">Add Contact</button>
+        <div class="d-flex gap-2">
+          {% if active_contact_categories %}
+          <div class="dropdown copy-category-dropdown">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary dropdown-toggle"
+              id="copy-category-btn"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+              title="Copy the email addresses of every contact in a category"
+            >
+              Copy Category
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end copy-category-dropdown-menu" aria-labelledby="copy-category-btn">
+              {% for cat in active_contact_categories %}
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item copy-category-item"
+                  data-cat-id="{{ cat.id }}"
+                  data-cat-name="{{ cat.name|escape }}"
+                  disabled
+                >
+                  {{ cat.name }}
+                </button>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+          <button type="button" id="open-contact-modal" class="btn btn-sm btn-outline-primary">Add Contact</button>
+        </div>
       </div>
       <div class="row g-3">
         {% for contact in contacts %}
@@ -2070,6 +2101,118 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 }());
+</script>
+
+<script>
+(function () {
+    'use strict';
+
+    function collectCategoryData(catId) {
+        var emails = [];
+        var seen = {};
+        var missing = 0;
+
+        document.querySelectorAll('.contact-card[data-contact-id]').forEach(function (card) {
+            var contactId = card.getAttribute('data-contact-id');
+            var pillsRow = card.querySelector('.contact-category-pills[data-contact-id="' + contactId + '"]');
+            if (!pillsRow) return;
+            var hasCat = false;
+            pillsRow.querySelectorAll('.contact-category-pill').forEach(function (pill) {
+                if (pill.getAttribute('data-cat-id') === String(catId)) hasCat = true;
+            });
+            if (!hasCat) return;
+
+            var editBtn = card.querySelector('.edit-contact-btn');
+            var email = editBtn ? (editBtn.getAttribute('data-contact-email') || '').trim() : '';
+            if (email) {
+                var key = email.toLowerCase();
+                if (!seen[key]) {
+                    seen[key] = true;
+                    emails.push(email);
+                }
+            } else {
+                missing += 1;
+            }
+        });
+
+        return { emails: emails, missing: missing, total: emails.length + missing };
+    }
+
+    function copyTextToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise(function (resolve, reject) {
+            try {
+                var textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                var ok = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (ok) resolve(); else reject(new Error('Copy command failed.'));
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+
+    function refreshDisabledStates() {
+        document.querySelectorAll('.copy-category-item').forEach(function (btn) {
+            var catId = btn.getAttribute('data-cat-id');
+            var data = collectCategoryData(catId);
+            btn.disabled = data.total === 0;
+        });
+    }
+
+    var dropdownToggle = document.getElementById('copy-category-btn');
+    if (dropdownToggle) {
+        dropdownToggle.closest('.dropdown').addEventListener('show.bs.dropdown', refreshDisabledStates);
+    }
+
+    document.querySelectorAll('.copy-category-item').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (btn.disabled) return;
+            var catId = btn.getAttribute('data-cat-id');
+            var catName = btn.getAttribute('data-cat-name') || 'this category';
+            var data = collectCategoryData(catId);
+
+            if (!data.emails.length) {
+                if (window.notify) {
+                    window.notify('warning', 'No email addresses on file for contacts in "' + catName + '".');
+                }
+                return;
+            }
+
+            var text = data.emails.join('; ');
+            copyTextToClipboard(text).then(function () {
+                if (window.notify) {
+                    window.notify(
+                        'success',
+                        data.emails.length + ' Email Address' + (data.emails.length === 1 ? '' : 'es') + ' Copied',
+                        5000
+                    );
+                }
+                if (data.missing > 0 && window.notify) {
+                    window.notify(
+                        'warning',
+                        data.missing + ' contact' + (data.missing === 1 ? '' : 's') + ' in "' + catName +
+                        '" had no email on file and ' + (data.missing === 1 ? 'was' : 'were') + ' skipped.',
+                        5000
+                    );
+                }
+            }).catch(function () {
+                if (window.notify) window.notify('error', 'Failed to copy emails to clipboard.', 5000);
+            });
+        });
+    });
+
+    // Set correct disabled/enabled state on initial page load too.
+    refreshDisabledStates();
+})();
 </script>
 
 {% endblock %}

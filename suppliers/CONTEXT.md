@@ -42,6 +42,8 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 
 `SupplierContactCategory` maps to `contracts_suppliercontactcategory` — a global, admin-editable lookup (`name`, `is_active`, `sort_order`). Seeded categories: Primary (0), Contracts (1), Sales (2), Leadership (3), Finance (4). Not scoped per supplier; scope is implicit via `Contact.supplier`.
 
+The **Copy Category** control in the Contacts section header (`supplier_detail.html`) is a read-only client-side feature: it reads already-rendered `.contact-category-pill` and `.edit-contact-btn[data-contact-email]` DOM nodes to build a de-duplicated, semicolon-space-delimited email list per category, copies it to the clipboard, and reports skipped (no-email) contacts via a warning toast. It requires no view, URL, or model changes and stays in sync with the AJAX category picker via a `show.bs.dropdown` refresh hook.
+
 **Retired:** `Contact.is_primary` and `SupplierContactGroup` were removed in migrations `0011`–`0012` after data was migrated into categories.
 
 `SupplierDocument` extends `AuditModel` to store uploaded files (upload path `supplier-docs/`), document `doc_type` (CERT/CLASS/GENERAL), optional links to the associated certification/classification, and a `description`; `SupplierDetailView` selects the latest 25 docs and matches them to certifications/classifications.
