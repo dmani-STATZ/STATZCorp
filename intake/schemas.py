@@ -157,6 +157,13 @@ class _CommonContractFields(BaseModel):
     plan_gross: Optional[Decimal] = None
     planned_split: Optional[str] = None
     nist: Optional[bool] = None
+    # CMMC requirement flags — parser-carried background fields. Round-trip in
+    # draft JSON (unknown keys are otherwise dropped) but are NOT rendered in
+    # the editor; written to Contract.* at finalization.
+    cmmc_l1: Optional[bool] = False
+    cmmc_l2_sa: Optional[bool] = False
+    cmmc_l2_c3pao: Optional[bool] = False
+    cmmc_l3: Optional[bool] = False
     contractor_name: Optional[str] = None
     contractor_cage: Optional[str] = None
     files_url: Optional[str] = None

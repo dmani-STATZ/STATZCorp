@@ -655,6 +655,33 @@ class FinalizationTests(TestCase):
         self.assertIsNone(clin.item_value)
         self.assertIsNone(clin.quote_value)
 
+    def test_awd_cmmc_flags_written_to_contract(self):
+        """Draft data carrying CMMC bools → finalized Contract has matching values."""
+        draft = self._ready_awd(
+            cmmc_l1=False,
+            cmmc_l2_sa=True,
+            cmmc_l2_c3pao=True,
+            cmmc_l3=False,
+        )
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        self.assertFalse(target.cmmc_l1)
+        self.assertTrue(target.cmmc_l2_sa)
+        self.assertTrue(target.cmmc_l2_c3pao)
+        self.assertFalse(target.cmmc_l3)
+        self.assertTrue(target.cmmc_any)
+
+    def test_awd_cmmc_flags_default_false_when_absent(self):
+        """A draft with no CMMC keys finalizes with all four flags False."""
+        draft = self._ready_awd()
+        with transaction.atomic():
+            target = finalize_draft(draft, self.alice)
+        self.assertFalse(target.cmmc_l1)
+        self.assertFalse(target.cmmc_l2_sa)
+        self.assertFalse(target.cmmc_l2_c3pao)
+        self.assertFalse(target.cmmc_l3)
+        self.assertFalse(target.cmmc_any)
+
     def test_awd_status_guard(self):
         draft = self._ready_awd()
         draft.status = DraftContract.Status.IN_PROGRESS
@@ -1292,6 +1319,101 @@ class IngestUnitTests(TestCase):
         )
         data = _result_to_data(result)
         self.assertIn('level_charges', data)
+
+    def test_cmmc_flags_mapped_into_data_and_survive_schema(self):
+        """Two CMMC flags True → _result_to_data emits the four keys; schema round-trips them."""
+        from intake.ingest import _result_to_data
+
+        result = _stub_parse_result(cmmc_l2_sa=True, cmmc_l2_c3pao=True)
+        data = _result_to_data(result)
+        self.assertEqual(data['cmmc_l1'], False)
+        self.assertEqual(data['cmmc_l2_sa'], True)
+        self.assertEqual(data['cmmc_l2_c3pao'], True)
+        self.assertEqual(data['cmmc_l3'], False)
+
+        # Schema round-trip must preserve them (unknown keys are otherwise dropped).
+        normalized = validate_data('AWD', data)
+        self.assertEqual(normalized['cmmc_l1'], False)
+        self.assertEqual(normalized['cmmc_l2_sa'], True)
+        self.assertEqual(normalized['cmmc_l2_c3pao'], True)
+        self.assertEqual(normalized['cmmc_l3'], False)
+
+    def test_cmmc_flags_all_false_mapped_and_survive_schema(self):
+        """No CMMC detected → all four keys False and preserved through the schema."""
+        from intake.ingest import _result_to_data
+
+        result = _stub_parse_result()  # cmmc_* default to False
+        data = _result_to_data(result)
+        for key in ('cmmc_l1', 'cmmc_l2_sa', 'cmmc_l2_c3pao', 'cmmc_l3'):
+            self.assertEqual(data[key], False)
+
+        normalized = validate_data('AWD', data)
+        for key in ('cmmc_l1', 'cmmc_l2_sa', 'cmmc_l2_c3pao', 'cmmc_l3'):
+            self.assertEqual(normalized[key], False)
+
+
+class CmmcDetectionTests(TestCase):
+    """LLM-based CMMC detection in the parser. call_anthropic is always mocked."""
+
+    def test_detects_two_levels_from_rd_narrative(self):
+        section_b_text = (
+            "SECTION B\n"
+            "RD004: Cybersecurity Maturity Model Certification (CMMC) Level 2 Self-Assessment\n"
+            "RD005: Cybersecurity Maturity Model Certification (CMMC) Level 2 C3PAO\n"
+        )
+        api_json = (
+            '{"cmmc_l1": false, "cmmc_l2_sa": true, '
+            '"cmmc_l2_c3pao": true, "cmmc_l3": false}'
+        )
+        fake_body = {'content': [{'type': 'text', 'text': api_json}]}
+        from intake.pdf_parser import _detect_cmmc_via_claude_api
+
+        with patch('intake.pdf_parser.call_anthropic', return_value=fake_body):
+            flags = _detect_cmmc_via_claude_api(section_b_text)
+        self.assertEqual(flags['cmmc_l2_sa'], True)
+        self.assertEqual(flags['cmmc_l2_c3pao'], True)
+        self.assertEqual(flags['cmmc_l1'], False)
+        self.assertEqual(flags['cmmc_l3'], False)
+
+    def test_no_cmmc_yields_all_false(self):
+        fake_body = {'content': [{'type': 'text', 'text': (
+            '{"cmmc_l1": false, "cmmc_l2_sa": false, '
+            '"cmmc_l2_c3pao": false, "cmmc_l3": false}'
+        )}]}
+        from intake.pdf_parser import _detect_cmmc_via_claude_api
+
+        with patch('intake.pdf_parser.call_anthropic', return_value=fake_body):
+            flags = _detect_cmmc_via_claude_api("SECTION B\nNo cyber requirements here.")
+        self.assertEqual(
+            flags,
+            {'cmmc_l1': False, 'cmmc_l2_sa': False,
+             'cmmc_l2_c3pao': False, 'cmmc_l3': False},
+        )
+
+    def test_fail_safe_on_exception(self):
+        """A raising API call must not propagate and must yield all-False."""
+        from intake.pdf_parser import _detect_cmmc_via_claude_api
+
+        with patch('intake.pdf_parser.call_anthropic', side_effect=RuntimeError('boom')):
+            flags = _detect_cmmc_via_claude_api("SECTION B\nRD004 CMMC Level 2 Self-Assessment")
+        self.assertEqual(
+            flags,
+            {'cmmc_l1': False, 'cmmc_l2_sa': False,
+             'cmmc_l2_c3pao': False, 'cmmc_l3': False},
+        )
+
+    def test_fail_safe_on_garbage_response(self):
+        """Unparseable API output must yield all-False, not raise."""
+        fake_body = {'content': [{'type': 'text', 'text': 'not json at all {{{'}]}
+        from intake.pdf_parser import _detect_cmmc_via_claude_api
+
+        with patch('intake.pdf_parser.call_anthropic', return_value=fake_body):
+            flags = _detect_cmmc_via_claude_api("SECTION B\nRD004 CMMC Level 2 Self-Assessment")
+        self.assertEqual(
+            flags,
+            {'cmmc_l1': False, 'cmmc_l2_sa': False,
+             'cmmc_l2_c3pao': False, 'cmmc_l3': False},
+        )
 
 
 class RemovePackagingApiTests(TestCase):

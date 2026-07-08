@@ -563,8 +563,21 @@ def check_contract_number(request):
 @conditional_login_required
 def toggle_contract_field(request, contract_id):
     """
-    Toggle boolean fields on the Contract model (e.g., nist)
+    Toggle a whitelisted boolean field on the Contract model.
+
+    Only the explicitly allowed fields (NIST + the four CMMC flags) may be
+    toggled. Any other field value is rejected — we never setattr an arbitrary
+    attribute from client input.
     """
+    # Explicit allowlist of toggleable boolean fields. Do not widen this to a
+    # generic hasattr() check — that would allow flipping arbitrary attributes.
+    ALLOWED_TOGGLE_FIELDS = {
+        'nist',
+        'cmmc_l1',
+        'cmmc_l2_sa',
+        'cmmc_l2_c3pao',
+        'cmmc_l3',
+    }
     try:
         contract = get_object_or_404(Contract.objects.select_related('idiq_contract', 'status', 'company'), id=contract_id)
         data = json.loads(request.body)
@@ -573,9 +586,9 @@ def toggle_contract_field(request, contract_id):
         if not field:
             return JsonResponse({'success': False, 'error': 'Field parameter is required'}, status=400)
         
-        # Verify the field exists on the Contract model
-        if not hasattr(contract, field):
-            return JsonResponse({'success': False, 'error': f'Field {field} does not exist on Contract model'}, status=400)
+        # Reject anything not explicitly whitelisted.
+        if field not in ALLOWED_TOGGLE_FIELDS:
+            return JsonResponse({'success': False, 'error': f'Field {field} is not toggleable'}, status=400)
         
         # Get current value
         current_value = getattr(contract, field, False)
@@ -583,7 +596,7 @@ def toggle_contract_field(request, contract_id):
         
         # Update the field
         setattr(contract, field, new_value)
-        contract.save()
+        contract.save(update_fields=[field])
         
         return JsonResponse({
             'success': True,

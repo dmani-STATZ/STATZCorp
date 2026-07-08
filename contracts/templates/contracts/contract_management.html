@@ -337,13 +337,31 @@
                     </div>
                     {% endif %}
                 </div>
-                    <!-- NIST button below Expedite -->
-                    <div class="flex justify-center">
-                        <button onclick="toggleContractField('nist')" id="nist_btn"
-                            data-nist-state="{% if contract.nist %}true{% else %}false{% endif %}"
-                            class="flex items-center justify-center p-1.5 border border-gray-300 rounded shadow-sm hover:opacity-90 transition-colors {% if contract.nist %}bg-green-500 text-white{% else %}bg-gray-300 text-gray-700{% endif %}" title="NIST">
-                            <img src="{% static 'contracts/images/nist.png' %}" alt="NIST" class="h-7">
-                        </button>
+                    <!-- CMMC cluster (replaces legacy NIST button) -->
+                    <div class="flex flex-col items-center gap-1">
+                      <div id="cmmc_logo"
+                           class="flex items-center justify-center p-1.5 border rounded shadow-sm {% if contract.cmmc_any %}bg-green-500 border-green-600{% else %}bg-gray-300 border-gray-300{% endif %}"
+                           title="CMMC">
+                        <img src="{% static 'contracts/images/cmmc-logo.png' %}" alt="CMMC" class="h-7">
+                      </div>
+                      <div class="flex gap-1">
+                        <button type="button" id="cmmc_l1_btn" onclick="toggleContractField('cmmc_l1')"
+                          data-cmmc-field="cmmc_l1" data-cmmc-state="{% if contract.cmmc_l1 %}true{% else %}false{% endif %}"
+                          class="cmmc-pill text-xs font-semibold px-2 py-0.5 border rounded {% if contract.cmmc_l1 %}bg-green-500 text-white border-green-600{% else %}bg-gray-300 text-gray-700 border-gray-300{% endif %}"
+                          title="CMMC Level 1">L1</button>
+                        <button type="button" id="cmmc_l2_sa_btn" onclick="toggleContractField('cmmc_l2_sa')"
+                          data-cmmc-field="cmmc_l2_sa" data-cmmc-state="{% if contract.cmmc_l2_sa %}true{% else %}false{% endif %}"
+                          class="cmmc-pill text-xs font-semibold px-2 py-0.5 border rounded {% if contract.cmmc_l2_sa %}bg-green-500 text-white border-green-600{% else %}bg-gray-300 text-gray-700 border-gray-300{% endif %}"
+                          title="CMMC Level 2 — Self-Assessment">2-SA</button>
+                        <button type="button" id="cmmc_l2_c3pao_btn" onclick="toggleContractField('cmmc_l2_c3pao')"
+                          data-cmmc-field="cmmc_l2_c3pao" data-cmmc-state="{% if contract.cmmc_l2_c3pao %}true{% else %}false{% endif %}"
+                          class="cmmc-pill text-xs font-semibold px-2 py-0.5 border rounded {% if contract.cmmc_l2_c3pao %}bg-green-500 text-white border-green-600{% else %}bg-gray-300 text-gray-700 border-gray-300{% endif %}"
+                          title="CMMC Level 2 — C3PAO (third-party certified)">2-C3PAO</button>
+                        <button type="button" id="cmmc_l3_btn" onclick="toggleContractField('cmmc_l3')"
+                          data-cmmc-field="cmmc_l3" data-cmmc-state="{% if contract.cmmc_l3 %}true{% else %}false{% endif %}"
+                          class="cmmc-pill text-xs font-semibold px-2 py-0.5 border rounded {% if contract.cmmc_l3 %}bg-green-500 text-white border-green-600{% else %}bg-gray-300 text-gray-700 border-gray-300{% endif %}"
+                          title="CMMC Level 3">L3</button>
+                      </div>
                     </div>
 
                     <!-- Documents button -->
@@ -1510,12 +1528,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Initialize NIST button state
-    const nistBtn = document.getElementById('nist_btn');
-    if (nistBtn) {
-        const isNistCertified = nistBtn.dataset.nistState === 'true';
-        // The button classes are already set in the template, no need to adjust them here
-    }
 });
 
 // Function to open edit note modal - directly called by button onclick
@@ -2680,6 +2692,34 @@ function toggleContractField(field) {
                 btn.classList.add('bg-gray-300');
                 btn.classList.remove('text-white');
                 btn.classList.add('text-gray-700');
+            }
+        }
+
+        if (field.startsWith('cmmc_')) {
+            const pill = document.getElementById(`${field}_btn`);
+            if (pill) {
+                if (data.status) {
+                    pill.classList.remove('bg-gray-300', 'text-gray-700', 'border-gray-300');
+                    pill.classList.add('bg-green-500', 'text-white', 'border-green-600');
+                    pill.dataset.cmmcState = 'true';
+                } else {
+                    pill.classList.remove('bg-green-500', 'text-white', 'border-green-600');
+                    pill.classList.add('bg-gray-300', 'text-gray-700', 'border-gray-300');
+                    pill.dataset.cmmcState = 'false';
+                }
+            }
+            // Re-derive the badge color from the live state of all four pills.
+            const anyOn = Array.from(document.querySelectorAll('.cmmc-pill'))
+                .some(p => p.dataset.cmmcState === 'true');
+            const logo = document.getElementById('cmmc_logo');
+            if (logo) {
+                if (anyOn) {
+                    logo.classList.remove('bg-gray-300', 'border-gray-300');
+                    logo.classList.add('bg-green-500', 'border-green-600');
+                } else {
+                    logo.classList.remove('bg-green-500', 'border-green-600');
+                    logo.classList.add('bg-gray-300', 'border-gray-300');
+                }
             }
         }
     })

@@ -1439,9 +1439,13 @@ class AwardLedgerListView(ListView):
         # Scope-level overview (unfiltered) for the header summary strip.
         scoped = self._scoped_queryset()
         state_labels = dict(AwardLedger.Lifecycle.choices)
+        # .order_by() clears the model's default ordering; MSSQL rejects an
+        # ORDER BY column that is not in the GROUP BY of an aggregate query.
         raw_counts = {
             row['lifecycle_state']: row['n']
-            for row in scoped.values('lifecycle_state').annotate(n=Count('id'))
+            for row in scoped.order_by()
+            .values('lifecycle_state')
+            .annotate(n=Count('id'))
         }
         state_summary = [
             {

@@ -454,6 +454,20 @@ Partner Commission Reconciliation matching normalizes contract numbers using `st
 
 ## Recent completions
 
+- **CMMC flags on Contract (2026-07-08):** `Contract` gained four independent
+  boolean columns — `cmmc_l1`, `cmmc_l2_sa`, `cmmc_l2_c3pao`, `cmmc_l3` — plus a
+  read-only `cmmc_any` property (True when any of the four is set). No `db_index`
+  (display flags, not query predicates). They are auto-detected during **intake**
+  (LLM-based; written at finalize) and are manually toggleable on the contract
+  management screen. On `contract_management.html` they render as a **CMMC badge**
+  (green when `cmmc_any`, grey otherwise) with four click-to-toggle sub-pills
+  (`L1` / `2-SA` / `2-C3PAO` / `L3`); each pill posts to the toggle-field endpoint
+  and the badge color is re-derived client-side from the live pill state. The
+  **toggle-field endpoint** (`toggle_contract_field`) now enforces an explicit
+  allowlist (`nist` + the four `cmmc_*`) — it no longer flips arbitrary attributes
+  via `hasattr`. The legacy **NIST button** (and its JS init) was removed from the
+  management screen, but `Contract.nist`, its schema scalar, its finalize write,
+  and the endpoint's `nist` branch are **retained**.
 - **Metric drill-down width fix (2026-07-08):** `DashboardMetricDetailView` (`/contracts/dashboard/metric-detail/`, `dashboard_views.py`) renders `contracts/templates/contracts/dashboard_metric_detail.html` — one template shared by every `metric=` variant. It previously used a Bootstrap fixed-width `container` inside `contract_base.html`'s 75% wrapper, so the drill-down table wrapped columns. Fixed by setting `{% block body_class %}metric-detail-page{% endblock %}` and switching the inner wrapper to `container-fluid`; the override `.metric-detail-page main > div.mx-auto { width: 95% !important }` in `contracts/static/contracts/css/components.css` beats the inline `width: 75%`. Same escape-the-75%-wrapper pattern as `.finance-audit-page` / `.contract-log-page` / `.clin-detail-page`.
 - **Dashboard open contract count (2026-06-29):** `total_contracts` is already injected by `ContractsDashboardView` and is available in `contract_lifecycle_dashboard.html` for future dashboard header additions.
 - **Dashboard period boundaries (2026-05-28):** `get_period_boundaries()` in `contracts/views/dashboard_views.py` now calls `timezone.localtime(now)` as its first step to prevent UTC-offset boundary bleed. `_start_end_of_day()` updated to return `date` objects for compatibility with `DateField` range filters (post migration 0054).

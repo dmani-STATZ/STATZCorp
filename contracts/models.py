@@ -128,6 +128,15 @@ class Contract(AuditModel):
     assigned_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_assigned_user')
     assigned_date = models.DateField(null=True, blank=True)
     nist = models.BooleanField(null=True, blank=True)
+    # CMMC (Cybersecurity Maturity Model Certification) requirement flags.
+    # Auto-detected from the DD-1155 during intake (LLM-based) and manually
+    # toggleable on the contract management screen. Independent booleans — a
+    # single contract may carry more than one. No db_index: display flags,
+    # not query predicates.
+    cmmc_l1 = models.BooleanField(default=False)
+    cmmc_l2_sa = models.BooleanField(default=False)
+    cmmc_l2_c3pao = models.BooleanField(default=False)
+    cmmc_l3 = models.BooleanField(default=False)
     files_url = models.CharField(max_length=200, null=True, blank=True)
     reviewed = models.BooleanField(null=True, blank=True)
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_reviewed_by')
@@ -175,6 +184,10 @@ class Contract(AuditModel):
             self.company = Company.get_default_company()
         super().save(*args, **kwargs)
     
+    @property
+    def cmmc_any(self) -> bool:
+        return bool(self.cmmc_l1 or self.cmmc_l2_sa or self.cmmc_l2_c3pao or self.cmmc_l3)
+
     @property
     def total_split_value(self):
         from django.db.models import Sum

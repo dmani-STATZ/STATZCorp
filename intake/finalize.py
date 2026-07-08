@@ -26,6 +26,10 @@ AWD / PO / DO / INTERNAL
   data.plan_gross            → Contract.plan_gross
   data.planned_split         → Contract.planned_split
   data.nist                  → Contract.nist
+  data.cmmc_l1               → Contract.cmmc_l1 (via _stamp_cmmc_flags)
+  data.cmmc_l2_sa            → Contract.cmmc_l2_sa (via _stamp_cmmc_flags)
+  data.cmmc_l2_c3pao         → Contract.cmmc_l2_c3pao (via _stamp_cmmc_flags)
+  data.cmmc_l3               → Contract.cmmc_l3 (via _stamp_cmmc_flags)
   data.award_date            → Contract.award_date
   data.due_date              → Contract.due_date
   data.contract_value        → Contract.contract_value
@@ -335,10 +339,28 @@ def _resolve_sales_class(data: dict):
         ) from exc
 
 
+def _stamp_cmmc_flags(contract: Contract, data: dict) -> None:
+    """Write the four CMMC requirement bools from draft data onto the Contract.
+
+    Called after the contract-creation service has returned (Contract-creating
+    types only: AWD/PO/DO/INTERNAL). Coerces with bool(...) — only new
+    finalizations set them; older contracts stay False. Runs inside the
+    caller's transaction.atomic().
+    """
+    contract.cmmc_l1 = bool(data.get('cmmc_l1'))
+    contract.cmmc_l2_sa = bool(data.get('cmmc_l2_sa'))
+    contract.cmmc_l2_c3pao = bool(data.get('cmmc_l2_c3pao'))
+    contract.cmmc_l3 = bool(data.get('cmmc_l3'))
+    contract.save(update_fields=[
+        'cmmc_l1', 'cmmc_l2_sa', 'cmmc_l2_c3pao', 'cmmc_l3',
+    ])
+
+
 def _finalize_awd_po(draft: DraftContract, user: User) -> Contract:
     result = _call_service(_draft_to_service_payload(draft, 'AWD'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, _get_charges_for_finalize(draft.data or {}))
+    _stamp_cmmc_flags(result.contract, draft.data or {})
     _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 
@@ -363,6 +385,7 @@ def _finalize_do(draft: DraftContract, user: User) -> Contract:
     result = _call_service(payload, user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, _get_charges_for_finalize(draft.data or {}))
+    _stamp_cmmc_flags(result.contract, draft.data or {})
     _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 
@@ -383,6 +406,7 @@ def _finalize_internal(draft: DraftContract, user: User) -> Contract:
     result = _call_service(_draft_to_service_payload(draft, 'INTERNAL'), user)
     _apply_legacy_root_finance_lines(draft, user, result.clins_by_item_number)
     _apply_level_charges(result.contract, _get_charges_for_finalize(draft.data or {}))
+    _stamp_cmmc_flags(result.contract, draft.data or {})
     _stamp_po_number(result.contract, result.clins_by_item_number)
     return result.contract
 

@@ -139,6 +139,14 @@ def _result_to_data(result: AwardParseResult) -> dict:
         'buyer_text': result.buyer_text,
         'contractor_name': result.contractor_name,
         'contractor_cage': result.contractor_cage,
+        # CMMC requirement flags — LLM-detected background fields. They
+        # round-trip in draft JSON (schema-declared) but are NOT rendered in
+        # the editor; they land on Contract.* at finalize. This is the single
+        # parser → data mapping point for these four scalars.
+        'cmmc_l1': bool(result.cmmc_l1),
+        'cmmc_l2_sa': bool(result.cmmc_l2_sa),
+        'cmmc_l2_c3pao': bool(result.cmmc_l2_c3pao),
+        'cmmc_l3': bool(result.cmmc_l3),
         'parser': {
             'source': 'pdf',
             'parser_version': 'intake.pdf_parser',

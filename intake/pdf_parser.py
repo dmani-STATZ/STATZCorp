@@ -343,6 +343,13 @@ class AwardParseResult:
     idiq_supplier_part_number: Optional[str]
     contract_packhouse_name: Optional[str]
     page1_reference_cage: Optional[str] = None
+    # CMMC requirement flags — LLM-detected (see _detect_cmmc_via_claude_api).
+    # Independent booleans; any combination may be true. Absence of CMMC in
+    # the document is normal and yields all-False (never an error).
+    cmmc_l1: bool = False
+    cmmc_l2_sa: bool = False
+    cmmc_l2_c3pao: bool = False
+    cmmc_l3: bool = False
 
 
 def _strip_money(value: Optional[str]) -> Optional[str]:
@@ -1107,6 +1114,62 @@ SECTION B TEXT:
     except Exception as exc:
         logger.warning("Claude API IDIQ supplier extraction failed: %s", exc)
         return None
+
+
+_CMMC_KEYS = ("cmmc_l1", "cmmc_l2_sa", "cmmc_l2_c3pao", "cmmc_l3")
+
+
+def _detect_cmmc_via_claude_api(document_text: str) -> dict:
+    """Detect CMMC requirements from the full award document text via the LLM.
+
+    Returns a dict with exactly the four boolean keys in ``_CMMC_KEYS``. On any
+    error, timeout, empty input, or unparseable response, returns all-False.
+    CMMC detection must NEVER raise or block a valid PDF — absence of CMMC
+    language is normal and yields all-False.
+
+    Detection is semantic, not string-based: the requirement usually appears in
+    Section B as a DLA "RD" requirement-code narrative (e.g.
+    ``RD004: ... CMMC Level 2 Self-Assessment``), reworded frequently by the
+    government, so we ask the model to match on meaning rather than pattern-match.
+    """
+    all_false = {k: False for k in _CMMC_KEYS}
+    if not document_text or not document_text.strip():
+        return dict(all_false)
+    try:
+        prompt = f"""Determine which Cybersecurity Maturity Model Certification (CMMC) requirements this contract imposes on the contractor. The requirement may appear anywhere in the document, most often in Section B as a DLA requirement ("RD") code narrative, and the wording varies — match on meaning, not exact phrasing. Set each flag independently; a single contract can require more than one. If CMMC is not mentioned at all, set every flag to false. Do NOT infer or guess a level that is not stated.
+  - cmmc_l1: any CMMC Level 1 requirement.
+  - cmmc_l2_sa: CMMC Level 2 satisfied by self-assessment.
+  - cmmc_l2_c3pao: CMMC Level 2 requiring a certified third-party assessment (C3PAO) / third-party certification.
+  - cmmc_l3: any CMMC Level 3 requirement.
+Return strict JSON with exactly these four boolean keys and nothing else.
+
+DOCUMENT TEXT:
+{document_text}"""
+
+        payload = {
+            "model": "claude-sonnet-4-6",
+            "max_tokens": 200,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        body = call_anthropic(payload, "intake.pdf_parser._detect_cmmc_via_claude_api")
+
+        raw_text = ""
+        for block in body.get("content", []):
+            if block.get("type") == "text":
+                raw_text += block.get("text", "")
+
+        raw_text = raw_text.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```[a-z]*\n?", "", raw_text)
+            raw_text = re.sub(r"\n?```$", "", raw_text)
+
+        result = json.loads(raw_text)
+        if not isinstance(result, dict):
+            return dict(all_false)
+        return {k: bool(result.get(k, False)) for k in _CMMC_KEYS}
+    except Exception as exc:
+        logger.warning("Claude API CMMC detection failed: %s", exc)
+        return dict(all_false)
 
 
 def _extract_nsn_descriptions_from_section_b(full_text: str) -> dict[str, str]:
@@ -1903,6 +1966,10 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
                     if c.item_number and c.item_number in moq_map:
                         c.min_order_qty_text = moq_map[c.item_number]
 
+        # CMMC detection is fully guarded: it never raises and never blocks a
+        # valid PDF. Absence of CMMC language yields all-False.
+        cmmc_flags = _detect_cmmc_via_claude_api(text)
+
         status, merged_notes = _finalize_status_and_notes(
             notes,
             contract_number,
@@ -1940,6 +2007,10 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             idiq_supplier_part_number=idiq_supplier_part_number,
             contract_packhouse_name=contract_packhouse_name,
             page1_reference_cage=_extract_reference_cage(page_one_text),
+            cmmc_l1=cmmc_flags["cmmc_l1"],
+            cmmc_l2_sa=cmmc_flags["cmmc_l2_sa"],
+            cmmc_l2_c3pao=cmmc_flags["cmmc_l2_c3pao"],
+            cmmc_l3=cmmc_flags["cmmc_l3"],
         )
     except Exception as exc:
         return AwardParseResult(

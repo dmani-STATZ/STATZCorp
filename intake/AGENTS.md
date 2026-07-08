@@ -312,6 +312,21 @@ parser and extended with intake-specific extraction logic.
 the parser grows new fields, update the mapping there AND add a test under
 `IngestUnitTests`. Don't sprinkle conversion logic in views.
 
+**CMMC scalars (`cmmc_l1`, `cmmc_l2_sa`, `cmmc_l2_c3pao`, `cmmc_l3`):**
+Four independent booleans carried as parser **background** fields. They
+round-trip in draft JSON (declared on `_CommonContractFields` in
+`schemas.py`) but are **NOT** rendered in the editor — treat them like the
+`contractor_name` / `contractor_cage` provenance fields. `_result_to_data`
+is their single parser → data mapping point. Detection is **LLM-based**
+(`_detect_cmmc_via_claude_api` over the full document text) and **semantic,
+not string-based** — the government rewords the Section B "RD" requirement-code
+narrative constantly, so do NOT add regex CMMC detection. Detection must
+**fail safe**: any error/timeout/garbage response yields all-False and ingest
+continues; it never raises. **All-False is valid and normal** (most 1155s have
+no CMMC). They are written to `Contract.cmmc_*` at finalization via
+`_stamp_cmmc_flags` (AWD/PO/DO/INTERNAL only — never IDIQ/MOD/AMD). Detection
+is forward-only; there is no backfill.
+
 **Supplier drill-down (three tiers now):** (1) Per-CLIN "PLACE OF INSPECTION FOR SUPPLIES" cage+name. (2) Contract-level "PLACE OF INSPECTION FOR SUPPLIES" cage+name. (3) `page1_reference_cage` — Block 16 "Reference your" CAGE extracted by `_extract_reference_cage(page_one_text)`. Tier 3 provides CAGE only (no name). `cage` is now a field on `DraftClin` (`Optional[str]`). Do NOT use `contractor_cage` (Block 9) as any tier of this drill-down.
 
 **Packhouse drill-down:** Same pattern. Contract-level "PLACE OF INSPECTION

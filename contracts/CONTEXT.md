@@ -378,6 +378,18 @@ The project no longer uses Tailwind in any form. The CSS refactor replaced all T
 
 ## Recent completions
 
+**CMMC flags on Contract (2026-07-08):** `Contract` carries four independent
+CMMC requirement booleans — `cmmc_l1`, `cmmc_l2_sa`, `cmmc_l2_c3pao`, `cmmc_l3`
+(all `default=False`, no `db_index`) — plus a `cmmc_any` property (True when any
+is set). They are auto-detected from the DD-1155 during **intake** (LLM-based,
+written at finalization) and are also manually toggleable on the contract
+management screen as a **CMMC badge** with four click-to-toggle sub-pills
+(`L1` / `2-SA` / `2-C3PAO` / `L3`) — the badge is green when any level is set.
+Toggling posts to `toggle_contract_field`, which now enforces an explicit
+allowlist (`nist` + the four `cmmc_*`). The legacy **NIST button** was removed
+from the management screen; `Contract.nist` (field, finalize write, endpoint
+branch) is retained.
+
 **Dashboard period boundaries (2026-05-28):** `get_period_boundaries()` in `contracts/views/dashboard_views.py` now calls `timezone.localtime(now)` as its first step so monthly/weekly/quarterly/yearly boundaries use local calendar dates instead of UTC (preventing off-by-one-day bleed at period edges). `_start_end_of_day()` on `DashboardMetricDetailView` now returns plain `date` objects for `DateField` range filters on `award_date` and `due_date` (post migration 0054).
 
 **DateField migration (2026-05-04):** A widespread `DateTimeField` → `DateField` migration was applied across three apps (`contracts`, `processing`, `suppliers`). Root cause was a timezone offset bug — with `USE_TZ=True` and `TIME_ZONE='America/Chicago'`, dates stored as midnight UTC were rendering one day behind in Django templates. Barbara discovered it when `Contract.due_date` showed Jun 28 in the header but Jun 29 in the Transactions edit modal.

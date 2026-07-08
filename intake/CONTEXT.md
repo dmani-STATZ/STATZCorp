@@ -205,6 +205,16 @@ summed percentage total (e.g. "100"). Both remain user-editable. `nist` (optiona
 `contractor_cage` are parser provenance only — they round-trip in JSON but
 are not shown in the editor UI.
 
+`cmmc_l1`, `cmmc_l2_sa`, `cmmc_l2_c3pao`, `cmmc_l3` (four independent
+booleans) are CMMC requirement flags. They are LLM-detected during PDF parse
+(`intake/pdf_parser.py::_detect_cmmc_via_claude_api`, semantic matching — not
+string patterns — because the Section B "RD" requirement-code narrative is
+reworded frequently), carried as **background** fields (round-trip in JSON, not
+shown in the editor, like `contractor_name`/`contractor_cage`), and written to
+`Contract.cmmc_*` at finalization (`_stamp_cmmc_flags`, AWD/PO/DO/INTERNAL
+only). Detection is forward-only and fail-safe — absence of CMMC language is
+normal and yields all-False; it never blocks a valid PDF.
+
 INTAKE TYPE (`draft.contract_type`) is display-only in the editor. It is
 set by the parser and drives schema routing. CONTRACT TYPE
 (`data.canonical_contract_type_id`) is the analyst-selected FK to
@@ -379,7 +389,9 @@ inside `transaction.atomic()` so any failure rolls back cleanly.
 For AWD/PO/DO/INTERNAL contract creation, among other fields:
 `data.canonical_contract_type_id` → `Contract.contract_type` (FK);
 `data.plan_gross` → `Contract.plan_gross`; `data.planned_split` →
-`Contract.planned_split`; `data.nist` → `Contract.nist`.
+`Contract.planned_split`; `data.nist` → `Contract.nist`;
+`data.cmmc_l1` / `cmmc_l2_sa` / `cmmc_l2_c3pao` / `cmmc_l3` →
+`Contract.cmmc_*` (via `_stamp_cmmc_flags`, AWD/PO/DO/INTERNAL only).
 
 In the **Mapping Rules** section under `AWD / PO / DO / INTERNAL`:
 - `data.level_charges[i].label` → `ContractLevelCharge.label`
