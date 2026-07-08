@@ -131,9 +131,16 @@
                     Drafts in flight. Finalize one to land it in the contracts system.
                 </p>
             </div>
-            {% if request.user.is_superuser %}
-                {% include 'core/partials/api_budget_card.html' %}
-            {% endif %}
+            <div class="d-flex align-items-center gap-3">
+                <a href="{% url 'intake:award_ledger' %}"
+                   class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                   title="Award-to-contract lifecycle ledger">
+                    <i class="ti ti-clipboard-list"></i> Award Ledger
+                </a>
+                {% if request.user.is_superuser %}
+                    {% include 'core/partials/api_budget_card.html' %}
+                {% endif %}
+            </div>
         </div>
 
         {# ---- PDF drag-and-drop ingestion zone ---- #}

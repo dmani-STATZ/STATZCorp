@@ -10,7 +10,7 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 
 from .locks import LOCK_DURATION, is_expired
-from .models import DraftContract
+from .models import AwardLedger, DraftContract
 
 
 class StaleLockFilter(admin.SimpleListFilter):
@@ -88,3 +88,50 @@ class DraftContractAdmin(admin.ModelAdmin):
             f'Cleared locks on {updated} draft(s).',
             level=messages.SUCCESS,
         )
+
+
+@admin.register(AwardLedger)
+class AwardLedgerAdmin(admin.ModelAdmin):
+    """Read-mostly durable award-lifecycle ledger.
+
+    All lifecycle timestamps and FK links are read-only — the ledger is
+    maintained by the sweep service, not by hand.
+    """
+
+    list_display = (
+        'contract_number',
+        'lifecycle_state',
+        'is_we_won',
+        'has_award',
+        'awardee_cage',
+        'mod_count',
+        'first_seen_at',
+        'draft_created_at',
+        'draft_worked_at',
+        'live_contract_at',
+    )
+    list_filter = (
+        'lifecycle_state',
+        'is_we_won',
+        'has_award',
+        'awardee_cage',
+    )
+    search_fields = (
+        'contract_number',
+        'award_basic_number',
+        'purchase_request',
+    )
+    readonly_fields = (
+        'first_seen_at',
+        'draft_created_at',
+        'draft_worked_at',
+        'mod_record_created_at',
+        'live_contract_at',
+        'updated_at',
+        'dibbs_award',
+        'contract',
+    )
+    date_hierarchy = 'first_seen_at'
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('dibbs_award', 'contract')

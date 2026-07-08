@@ -2371,3 +2371,514 @@ class FetchDibbsPdfTests(TestCase):
         # Original award_pdf_url and parser source should be updated/preserved
         self.assertEqual(draft.data['award_pdf_url'], 'https://dibbs2.bsm.dla.mil/Downloads/Awards/28MAY26/SPE7L126P7388.PDF')
 
+
+# ---------------------------------------------------------------------------
+# Award Intake Ledger
+# ---------------------------------------------------------------------------
+
+
+class AwardLedgerUnitTests(TestCase):
+    """Pure-function coverage: latching, advance-only state, canonicalization."""
+
+    def test_latch_writes_once_then_never_overwrites(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import _latch
+
+        row = AwardLedger(contract_number='SPE7L1-26-P-9001')
+        first = timezone.now()
+        # First set: field is None → write occurs.
+        self.assertTrue(_latch(row, 'live_contract_at', first))
+        self.assertEqual(row.live_contract_at, first)
+        # Second set: field already populated → no write, value preserved.
+        later = first + timedelta(days=5)
+        self.assertFalse(_latch(row, 'live_contract_at', later))
+        self.assertEqual(row.live_contract_at, first)
+
+    def test_advance_state_never_regresses(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import _advance_state
+
+        LC = AwardLedger.Lifecycle
+        row = AwardLedger(contract_number='SPE7L1-26-P-9002')
+        # Not we won → not_we_won.
+        self.assertTrue(_advance_state(row))
+        self.assertEqual(row.lifecycle_state, LC.NOT_WE_WON)
+        # We won → awaiting_draft.
+        row.is_we_won = True
+        self.assertTrue(_advance_state(row))
+        self.assertEqual(row.lifecycle_state, LC.AWAITING_DRAFT)
+        # Draft created → in_draft.
+        row.draft_created_at = timezone.now()
+        self.assertTrue(_advance_state(row))
+        self.assertEqual(row.lifecycle_state, LC.IN_DRAFT)
+        # Live contract → live_contract.
+        row.live_contract_at = timezone.now()
+        self.assertTrue(_advance_state(row))
+        self.assertEqual(row.lifecycle_state, LC.LIVE_CONTRACT)
+        # Clearing we_won must NOT regress the state (advance-only).
+        row.is_we_won = False
+        self.assertFalse(_advance_state(row))
+        self.assertEqual(row.lifecycle_state, LC.LIVE_CONTRACT)
+
+    def test_canonical_from_dict_and_string(self):
+        from intake.services.award_ledger import _canonical
+
+        self.assertEqual(_canonical('SPE7L126P7653'), 'SPE7L1-26-P-7653')
+        self.assertEqual(
+            _canonical({'award_basic_number': 'SPE7L126P7653',
+                        'delivery_order_number': ''}),
+            'SPE7L1-26-P-7653',
+        )
+        # Delivery order wins over basic number when present.
+        self.assertEqual(
+            _canonical({'award_basic_number': 'SPE7L126D0001',
+                        'delivery_order_number': 'SPE7L126F0009'}),
+            'SPE7L1-26-F-0009',
+        )
+        self.assertEqual(_canonical({}), '')
+        self.assertEqual(_canonical(None), '')
+
+    def test_mod_summary_counting_is_monotonic(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import _apply_mod_summary
+
+        row = AwardLedger(contract_number='SPE7L1-26-P-9003')
+        now = timezone.now()
+        mods = [
+            {'mod_date': date(2026, 5, 1)},
+            {'mod_date': date(2026, 5, 20)},
+        ]
+        _apply_mod_summary(row, mods, now)
+        self.assertEqual(row.mod_count, 2)
+        self.assertEqual(row.last_mod_posting_date, date(2026, 5, 20))
+        self.assertEqual(row.mod_record_created_at, now)
+        # Re-applying the same batch must not inflate the count (max semantics)
+        # and must not re-latch mod_record_created_at.
+        _apply_mod_summary(row, mods, now + timedelta(days=1))
+        self.assertEqual(row.mod_count, 2)
+        self.assertEqual(row.mod_record_created_at, now)
+
+
+class AwardLedgerSweepTests(TestCase):
+    """upsert_ledger_for_batch: creation, idempotency, mod counting."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from sales.models import AwardImportBatch, CompanyCAGE
+
+        cls.cage = '1ABC5'
+        CompanyCAGE.objects.create(
+            cage_code=cls.cage,
+            sb_representations_code='A',
+            affirmative_action_code='Y6',
+            previous_contracts_code='N4',
+            alternate_disputes_resolution='A',
+            is_active=True,
+        )
+        cls.batch = AwardImportBatch.objects.create(
+            award_date=date(2026, 5, 1),
+            filename='aw-test.txt',
+        )
+
+    def _make_award(self, basic='SPE7L126P7653', **kw):
+        from sales.models import DibbsAward
+
+        defaults = dict(
+            sol_number='SPE7L126Q0001',
+            notice_id=f'notice-{basic}',
+            award_date=date(2026, 5, 1),
+            awardee_cage=self.cage,
+            award_basic_number=basic,
+            aw_import_batch=self.batch,
+        )
+        defaults.update(kw)
+        return DibbsAward.objects.create(**defaults)
+
+    def _patch_wewon(self, ids):
+        """Patch the unmanaged WeWonAward view (no table in test DB)."""
+        from unittest.mock import MagicMock
+
+        ww = MagicMock()
+        ww.objects.values.return_value = list(ids)
+        return patch('sales.models.WeWonAward', ww)
+
+    def test_upsert_creates_row_and_is_idempotent(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import upsert_ledger_for_batch
+
+        award = self._make_award()
+        with self._patch_wewon([award.id]):
+            r1 = upsert_ledger_for_batch(self.batch)
+        self.assertEqual(r1['created'], 1)
+        self.assertEqual(r1['we_won'], 1)
+
+        row = AwardLedger.objects.get(contract_number='SPE7L1-26-P-7653')
+        self.assertTrue(row.is_we_won)
+        self.assertTrue(row.has_award)
+        self.assertEqual(row.dibbs_award_id, award.id)
+        self.assertEqual(row.awardee_cage, self.cage)
+        self.assertEqual(row.lifecycle_state, AwardLedger.Lifecycle.AWAITING_DRAFT)
+
+        # Second sweep updates (never duplicates) the same identity.
+        with self._patch_wewon([award.id]):
+            r2 = upsert_ledger_for_batch(self.batch)
+        self.assertEqual(r2['created'], 0)
+        self.assertEqual(r2['updated'], 1)
+        self.assertEqual(AwardLedger.objects.count(), 1)
+
+    def test_upsert_counts_mods_and_latches_mod_timestamp(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import upsert_ledger_for_batch
+        from sales.models import DibbsAwardMod
+
+        award = self._make_award(basic='SPE7L126P8000',
+                                 notice_id='n-8000')
+        DibbsAwardMod.objects.create(
+            award=award,
+            award_basic_number='SPE7L126P8000',
+            awardee_cage=self.cage,
+            mod_date=date(2026, 5, 3),
+            aw_import_batch=self.batch,
+        )
+        DibbsAwardMod.objects.create(
+            award=award,
+            award_basic_number='SPE7L126P8000',
+            awardee_cage=self.cage,
+            mod_date=date(2026, 5, 10),
+            aw_import_batch=self.batch,
+        )
+        with self._patch_wewon([]):
+            upsert_ledger_for_batch(self.batch)
+
+        row = AwardLedger.objects.get(contract_number='SPE7L1-26-P-8000')
+        self.assertEqual(row.mod_count, 2)
+        self.assertEqual(row.last_mod_posting_date, date(2026, 5, 10))
+        self.assertIsNotNone(row.mod_record_created_at)
+        latched = row.mod_record_created_at
+
+        # Re-sweep: mod_record_created_at is write-once (unchanged).
+        with self._patch_wewon([]):
+            upsert_ledger_for_batch(self.batch)
+        row.refresh_from_db()
+        self.assertEqual(row.mod_record_created_at, latched)
+        self.assertEqual(row.mod_count, 2)
+
+
+class AwardLedgerReconcileTests(TestCase):
+    """reconcile_open_ledger_rows: draft-worked proxy + live-contract backstop."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from contracts.models import Company
+
+        cls.company = Company.objects.create(name='Ledger Co', slug='ledger-co')
+
+    def _ledger(self, cn, **kw):
+        from intake.models import AwardLedger
+
+        return AwardLedger.objects.create(contract_number=cn, **kw)
+
+    def test_draft_worked_proxy_latches(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import reconcile_open_ledger_rows
+
+        cn = 'SPE7L1-26-P-7100'
+        row = self._ledger(cn, is_we_won=True, has_award=True,
+                           draft_created_at=timezone.now())
+        DraftContract.objects.create(
+            contract_number=cn,
+            contract_type='AWD',
+            status=DraftContract.Status.IN_PROGRESS,
+        )
+        res = reconcile_open_ledger_rows(contract_numbers=[cn])
+        self.assertEqual(res['draft_worked'], 1)
+        row.refresh_from_db()
+        self.assertIsNotNone(row.draft_worked_at)
+        self.assertEqual(row.lifecycle_state, AwardLedger.Lifecycle.DRAFT_WORKED)
+
+    def test_live_contract_backstop_sets_fk_and_state(self):
+        from contracts.models import Contract
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import reconcile_open_ledger_rows
+
+        cn = 'SPE7L1-26-P-7200'
+        row = self._ledger(cn, is_we_won=True, has_award=True)
+        contract = Contract.objects.create(contract_number=cn, company=self.company)
+
+        res = reconcile_open_ledger_rows(contract_numbers=[cn])
+        self.assertEqual(res['live'], 1)
+        row.refresh_from_db()
+        self.assertIsNotNone(row.live_contract_at)
+        self.assertEqual(row.contract_id, contract.id)
+        self.assertEqual(row.lifecycle_state, AwardLedger.Lifecycle.LIVE_CONTRACT)
+
+        # Idempotent: second reconcile does not move the latched timestamp.
+        latched = row.live_contract_at
+        reconcile_open_ledger_rows(contract_numbers=[cn])
+        row.refresh_from_db()
+        self.assertEqual(row.live_contract_at, latched)
+
+
+class StampLiveContractTests(TestCase):
+    """stamp_live_contract: real-time finalize hook."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from contracts.models import Company
+
+        cls.company = Company.objects.create(name='Stamp Co', slug='stamp-co')
+
+    def test_noop_on_unknown_number(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import stamp_live_contract
+
+        # No ledger row exists → must be a silent no-op, no row created.
+        stamp_live_contract('SPE7L1-26-P-0000', None)
+        self.assertEqual(AwardLedger.objects.count(), 0)
+
+    def test_latches_live_contract_and_advances(self):
+        from contracts.models import Contract
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import stamp_live_contract
+
+        cn = 'SPE7L1-26-P-7300'
+        row = AwardLedger.objects.create(
+            contract_number=cn, is_we_won=True, has_award=True,
+            draft_created_at=timezone.now(),
+        )
+        contract = Contract.objects.create(contract_number=cn, company=self.company)
+
+        stamp_live_contract(cn, contract)
+        row.refresh_from_db()
+        self.assertIsNotNone(row.live_contract_at)
+        self.assertEqual(row.contract_id, contract.id)
+        self.assertEqual(row.lifecycle_state, AwardLedger.Lifecycle.LIVE_CONTRACT)
+
+        # Write-once: a second stamp does not overwrite the timestamp.
+        latched = row.live_contract_at
+        stamp_live_contract(cn, contract)
+        row.refresh_from_db()
+        self.assertEqual(row.live_contract_at, latched)
+
+
+class AwardLedgerListViewTests(TestCase):
+    """Read-only Award Ledger page: scoping, filters, sort, pagination, CSV."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from contracts.models import Company
+        from sales.models import CompanyCAGE
+        from users.models import UserCompanyMembership
+
+        cls.url = reverse('intake:award_ledger')
+
+        # In-scope company for the normal user, with two active CAGEs.
+        cls.company = Company.objects.create(name='Scope Co', slug='scope-co')
+        cls.cage_a = '1SCP1'
+        cls.cage_b = '1SCP2'
+        for code in (cls.cage_a, cls.cage_b):
+            CompanyCAGE.objects.create(
+                cage_code=code,
+                company=cls.company,
+                sb_representations_code='A',
+                affirmative_action_code='Y6',
+                previous_contracts_code='N4',
+                alternate_disputes_resolution='A',
+                is_active=True,
+            )
+        # An out-of-scope CAGE belonging to another company.
+        cls.other_company = Company.objects.create(name='Other Co', slug='other-co')
+        cls.cage_out = '9OUT9'
+        CompanyCAGE.objects.create(
+            cage_code=cls.cage_out,
+            company=cls.other_company,
+            sb_representations_code='A',
+            affirmative_action_code='Y6',
+            previous_contracts_code='N4',
+            alternate_disputes_resolution='A',
+            is_active=True,
+        )
+
+        cls.alice = User.objects.create_user('alice_ledger', 'a@x.com', 'pw')
+        UserCompanyMembership.objects.create(
+            user=cls.alice, company=cls.company, is_default=True,
+        )
+        cls.root = User.objects.create_superuser('root_ledger', 'r@x.com', 'pw')
+
+    def _ledger(self, cn, cage, **kw):
+        from intake.models import AwardLedger
+
+        return AwardLedger.objects.create(
+            contract_number=cn, awardee_cage=cage, **kw
+        )
+
+    # -- scoping ----------------------------------------------------------
+    def test_non_superuser_sees_only_in_cage_rows(self):
+        from intake.models import AwardLedger
+
+        self._ledger('SPE7L1-26-P-0001', self.cage_a)
+        self._ledger('SPE7L1-26-P-0002', self.cage_out)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertIn('SPE7L1-26-P-0001', numbers)
+        self.assertNotIn('SPE7L1-26-P-0002', numbers)
+
+    def test_superuser_sees_all_rows(self):
+        self._ledger('SPE7L1-26-P-0001', self.cage_a)
+        self._ledger('SPE7L1-26-P-0002', self.cage_out)
+
+        self.client.force_login(self.root)
+        resp = self.client.get(self.url)
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertIn('SPE7L1-26-P-0001', numbers)
+        self.assertIn('SPE7L1-26-P-0002', numbers)
+
+    def test_user_without_cages_sees_nothing(self):
+        from users.models import UserCompanyMembership
+
+        loner = User.objects.create_user('loner', 'l@x.com', 'pw')
+        # Member of the out-of-scope company but no CAGE overlap with rows below.
+        self._ledger('SPE7L1-26-P-0001', self.cage_a)
+        UserCompanyMembership.objects.create(
+            user=loner, company=self.other_company, is_default=True,
+        )
+        # Deactivate the other company's CAGE so scope is empty.
+        from sales.models import CompanyCAGE
+        CompanyCAGE.objects.filter(cage_code=self.cage_out).update(is_active=False)
+
+        self.client.force_login(loner)
+        resp = self.client.get(self.url)
+        self.assertEqual(list(resp.context['entries']), [])
+
+    # -- filters ----------------------------------------------------------
+    def test_state_filter_narrows(self):
+        from intake.models import AwardLedger
+
+        self._ledger('SPE7L1-26-P-0001', self.cage_a,
+                     lifecycle_state=AwardLedger.Lifecycle.LIVE_CONTRACT)
+        self._ledger('SPE7L1-26-P-0002', self.cage_a,
+                     lifecycle_state=AwardLedger.Lifecycle.AWAITING_DRAFT)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'state': 'live_contract'})
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertEqual(numbers, {'SPE7L1-26-P-0001'})
+
+    def test_we_won_filter_narrows(self):
+        self._ledger('SPE7L1-26-P-0001', self.cage_a, is_we_won=True)
+        self._ledger('SPE7L1-26-P-0002', self.cage_a, is_we_won=False)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'we_won': 'yes'})
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertEqual(numbers, {'SPE7L1-26-P-0001'})
+
+        resp = self.client.get(self.url, {'we_won': 'no'})
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertEqual(numbers, {'SPE7L1-26-P-0002'})
+
+    def test_cage_filter_narrows(self):
+        self._ledger('SPE7L1-26-P-0001', self.cage_a)
+        self._ledger('SPE7L1-26-P-0002', self.cage_b)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'cage': self.cage_b})
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertEqual(numbers, {'SPE7L1-26-P-0002'})
+
+    def test_q_filter_searches_multiple_fields(self):
+        self._ledger('SPE7L1-26-P-0001', self.cage_a, nsn='5310-00-111-2222')
+        self._ledger('SPE7L1-26-P-0002', self.cage_a, purchase_request='PR-ZZZ')
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'q': '111-2222'})
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertEqual(numbers, {'SPE7L1-26-P-0001'})
+
+        resp = self.client.get(self.url, {'q': 'PR-ZZZ'})
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertEqual(numbers, {'SPE7L1-26-P-0002'})
+
+    def test_date_range_filter_on_first_seen(self):
+        from datetime import datetime
+
+        old = timezone.make_aware(datetime(2026, 1, 1, 12, 0))
+        new = timezone.make_aware(datetime(2026, 6, 1, 12, 0))
+        self._ledger('SPE7L1-26-P-0001', self.cage_a, first_seen_at=old)
+        self._ledger('SPE7L1-26-P-0002', self.cage_a, first_seen_at=new)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'from': '2026-05-01', 'to': '2026-07-01'})
+        numbers = {e.contract_number for e in resp.context['entries']}
+        self.assertEqual(numbers, {'SPE7L1-26-P-0002'})
+
+    # -- sort -------------------------------------------------------------
+    def test_junk_sort_falls_back_to_default(self):
+        self._ledger('SPE7L1-26-P-0001', self.cage_a)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'sort': 'DROP TABLE', 'dir': 'sideways'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['current_sort'], 'first_seen_at')
+        self.assertEqual(resp.context['current_dir'], 'desc')
+
+    def test_lifecycle_sort_uses_rank_order(self):
+        from intake.models import AwardLedger
+
+        self._ledger('SPE7L1-26-P-0001', self.cage_a,
+                     lifecycle_state=AwardLedger.Lifecycle.LIVE_CONTRACT)
+        self._ledger('SPE7L1-26-P-0002', self.cage_a,
+                     lifecycle_state=AwardLedger.Lifecycle.NOT_WE_WON)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'sort': 'lifecycle_state', 'dir': 'asc'})
+        ordered = [e.contract_number for e in resp.context['entries']]
+        # not_we_won (rank 0) before live_contract (rank 5)
+        self.assertEqual(ordered[0], 'SPE7L1-26-P-0002')
+        self.assertEqual(ordered[-1], 'SPE7L1-26-P-0001')
+
+    # -- pagination -------------------------------------------------------
+    def test_pagination_preserves_querystring(self):
+        for i in range(55):
+            self._ledger(f'SPE7L1-26-P-1{i:03d}', self.cage_a, is_we_won=True)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'we_won': 'yes', 'page': 2})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['is_paginated'])
+        self.assertIn('we_won=yes', resp.context['pagination_query_string'])
+        # Filter must persist across pages: page 2 still scoped to won rows.
+        self.assertTrue(all(e.is_we_won for e in resp.context['entries']))
+
+    # -- CSV export -------------------------------------------------------
+    def test_csv_export_respects_scope(self):
+        self._ledger('SPE7L1-26-P-0001', self.cage_a)
+        self._ledger('SPE7L1-26-P-0002', self.cage_out)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'export': 'csv'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'text/csv')
+        self.assertIn('attachment; filename=', resp['Content-Disposition'])
+        body = resp.content.decode('utf-8')
+        self.assertIn('SPE7L1-26-P-0001', body)
+        self.assertNotIn('SPE7L1-26-P-0002', body)
+
+    def test_csv_export_respects_filters(self):
+        self._ledger('SPE7L1-26-P-0001', self.cage_a, is_we_won=True)
+        self._ledger('SPE7L1-26-P-0002', self.cage_a, is_we_won=False)
+
+        self.client.force_login(self.alice)
+        resp = self.client.get(self.url, {'export': 'csv', 'we_won': 'yes'})
+        body = resp.content.decode('utf-8')
+        self.assertIn('SPE7L1-26-P-0001', body)
+        self.assertNotIn('SPE7L1-26-P-0002', body)
+
+    def test_login_required(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/login', resp.url.lower())
+

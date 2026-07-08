@@ -1724,6 +1724,34 @@ window.selectCharge = function (chargeId) {
         });
 };
 
+window.deleteLevelCharge = function (chargeId) {
+    if (!confirm('Delete this charge? This cannot be undone.')) return;
+
+    fetch('/contracts/api/level-charges/' + chargeId + '/delete/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)[1],
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.success) {
+                var row = document.querySelector(
+                    '.charge-list-row[data-charge-id="' + chargeId + '"]'
+                );
+                if (row) row.remove();
+                var panel = document.getElementById('clin-details-content');
+                if (panel) panel.innerHTML = '<p class="text-muted small p-3">Select a CLIN or charge to view details.</p>';
+            } else {
+                alert(data.error || 'Failed to delete charge.');
+            }
+        })
+        .catch(function () {
+            alert('Failed to delete charge. Please try again.');
+        });
+};
+
 function switchToClinTab(clinId) {
     // Sync row selection
     document.querySelectorAll('.clin-row').forEach(row => {

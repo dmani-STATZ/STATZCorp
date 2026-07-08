@@ -7,15 +7,19 @@ the same draft concurrently.
 """
 from __future__ import annotations
 
+import csv
 import json
 import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.http import JsonResponse
+from django.db import models, transaction
+from django.db.models import Case, Count, IntegerField, Value, When
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView
@@ -34,10 +38,23 @@ from .matchers import (
     create_record,
     search as matcher_search,
 )
-from .models import DraftContract
+from .models import AwardLedger, DraftContract
 from .schemas import DraftDataValidationError, validate_data
 
 logger = logging.getLogger('intake.views')
+
+# Whitelisted server-side sort columns for the Award Ledger. Anything not in
+# this set falls back to the default. Every ordering also carries a
+# deterministic tiebreak (see AwardLedgerListView) — MSSQL pagination requires
+# a stable ORDER BY.
+AWARD_LEDGER_SORT_WHITELIST = frozenset({
+    'first_seen_at',
+    'award_date',
+    'total_contract_price',
+    'contract_number',
+    'lifecycle_state',
+})
+AWARD_LEDGER_DEFAULT_SORT = 'first_seen_at'
 
 
 @method_decorator(login_required, name='dispatch')
@@ -1182,3 +1199,282 @@ def fetch_dibbs_pdf(request, pk):
 
     status_code = 200 if fetch_result.get('ok') else 500
     return JsonResponse(fetch_result, status=status_code)
+
+
+# ---------------------------------------------------------------------------
+# Award Ledger (Stage 2 — read-only diagnostic surface)
+# ---------------------------------------------------------------------------
+
+
+def _award_ledger_lifecycle_rank_case():
+    """Case/When mapping lifecycle_state -> LIFECYCLE_RANK for ORDER BY.
+
+    Never order by the raw enum string — the lifecycle is an advance-only
+    sequence and its natural sort is the rank, not the alphabet.
+    """
+    whens = [
+        When(lifecycle_state=state, then=Value(rank))
+        for state, rank in AwardLedger.LIFECYCLE_RANK.items()
+    ]
+    return Case(*whens, default=Value(-1), output_field=IntegerField())
+
+
+@method_decorator(login_required, name='dispatch')
+class AwardLedgerListView(ListView):
+    """Read-only Award Ledger — DIBBS award lifecycle overlay, scoped by CAGE.
+
+    Mirrors the DIBBS awards table with the intake lifecycle overlay so
+    analysts (and Dion) can answer, per contract identity: what we saw,
+    whether we won it, whether/when a draft was created and worked, mod
+    activity, and whether/when it became a live contract. This is the
+    diagnostic surface for "won awards that never entered intake".
+
+    Read-only: GET filters/sort/pagination + an optional scoped CSV export.
+    No POST, no model writes. Auth/company scoping mirrors DraftQueueView.
+    """
+    model = AwardLedger
+    template_name = 'intake/award_ledger.html'
+    context_object_name = 'entries'
+    paginate_by = 50
+
+    # -- scoping ----------------------------------------------------------
+    def _in_scope_cages(self):
+        """Materialize the active company's active CAGE codes (no-MARS).
+
+        SQL Server (no MARS) cannot iterate one server-side cursor while
+        running writes/reads on the same connection, so the CAGE list is
+        fully materialized with `list(...)` BEFORE it is used to filter the
+        ledger. AwardLedger has no company FK — CompanyCAGE is the bridge.
+        """
+        from contracts.models import Company  # lazy cross-app import
+
+        companies = Company.objects.filter(
+            user_memberships__user=self.request.user,
+        )
+        from sales.models import CompanyCAGE  # lazy cross-app import
+
+        return list(
+            CompanyCAGE.objects.filter(
+                company__in=companies,
+                is_active=True,
+            ).values_list('cage_code', flat=True)
+        )
+
+    def _scoped_queryset(self):
+        """Base queryset after auth/company scoping, before filters/sort."""
+        qs = AwardLedger.objects.select_related('dibbs_award', 'contract')
+        if self.request.user.is_superuser:
+            return qs
+        cages = self._in_scope_cages()
+        if not cages:
+            return qs.none()
+        return qs.filter(awardee_cage__in=cages)
+
+    # -- filtering --------------------------------------------------------
+    def _read_filters(self):
+        """Pull and normalize the GET filter values (re-rendered into form)."""
+        g = self.request.GET
+        valid_states = {c[0] for c in AwardLedger.Lifecycle.choices}
+        state = (g.get('state') or '').strip()
+        if state not in valid_states:
+            state = ''
+        we_won = (g.get('we_won') or '').strip().lower()
+        if we_won not in ('yes', 'no'):
+            we_won = ''
+        return {
+            'state': state,
+            'we_won': we_won,
+            'cage': (g.get('cage') or '').strip(),
+            'q': (g.get('q') or '').strip(),
+            'from': (g.get('from') or '').strip(),
+            'to': (g.get('to') or '').strip(),
+        }
+
+    def _apply_filters(self, qs, filters):
+        if filters['state']:
+            qs = qs.filter(lifecycle_state=filters['state'])
+        if filters['we_won'] == 'yes':
+            qs = qs.filter(is_we_won=True)
+        elif filters['we_won'] == 'no':
+            qs = qs.filter(is_we_won=False)
+        if filters['cage']:
+            qs = qs.filter(awardee_cage=filters['cage'])
+        if filters['q']:
+            term = filters['q']
+            qs = qs.filter(
+                models.Q(contract_number__icontains=term)
+                | models.Q(award_basic_number__icontains=term)
+                | models.Q(purchase_request__icontains=term)
+                | models.Q(nsn__icontains=term)
+            )
+        # Date range on first_seen_at (DateTimeField) — inclusive, treated as
+        # calendar dates. `first_seen_at` is a datetime; the __date transform
+        # is valid here (it is NOT one of the migrated DateField columns).
+        date_from = parse_date(filters['from']) if filters['from'] else None
+        if date_from:
+            qs = qs.filter(first_seen_at__date__gte=date_from)
+        date_to = parse_date(filters['to']) if filters['to'] else None
+        if date_to:
+            qs = qs.filter(first_seen_at__date__lte=date_to)
+        return qs
+
+    # -- sorting ----------------------------------------------------------
+    def _read_sort(self):
+        sort = (self.request.GET.get('sort') or '').strip()
+        if sort not in AWARD_LEDGER_SORT_WHITELIST:
+            sort = AWARD_LEDGER_DEFAULT_SORT
+        direction = (self.request.GET.get('dir') or '').strip().lower()
+        if direction not in ('asc', 'desc'):
+            # Default direction: first_seen_at descending, everything else asc.
+            direction = 'desc' if sort == AWARD_LEDGER_DEFAULT_SORT else 'asc'
+        return sort, direction
+
+    def _apply_sort(self, qs, sort, direction):
+        prefix = '-' if direction == 'desc' else ''
+        if sort == 'lifecycle_state':
+            qs = qs.annotate(_lifecycle_rank=_award_ledger_lifecycle_rank_case())
+            order_field = f'{prefix}_lifecycle_rank'
+        else:
+            order_field = f'{prefix}{sort}'
+        # Deterministic tiebreak — MSSQL pagination requires a stable ORDER BY.
+        return qs.order_by(order_field, '-first_seen_at', '-id')
+
+    # -- queryset assembly ------------------------------------------------
+    def get_queryset(self):
+        qs = self._scoped_queryset()
+        qs = self._apply_filters(qs, self._read_filters())
+        sort, direction = self._read_sort()
+        return self._apply_sort(qs, sort, direction)
+
+    # -- CSV export short-circuit ----------------------------------------
+    def get(self, request, *args, **kwargs):
+        if (request.GET.get('export') or '').strip().lower() == 'csv':
+            return self._export_csv()
+        return super().get(request, *args, **kwargs)
+
+    def _export_csv(self):
+        """Stream the CURRENT filtered+scoped queryset (ignoring pagination).
+
+        Auth + company scope apply identically to the HTML view — the export
+        can never leak rows outside the caller's CAGE scope.
+        """
+        qs = self.get_queryset()
+        filename = f"award_ledger_{timezone.localdate():%Y%m%d}.csv"
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Contract Number',
+            'Award/Basic Number',
+            'Delivery Order Number',
+            'Delivery Order Counter',
+            'CAGE',
+            'NSN',
+            'Nomenclature',
+            'Purchase Request',
+            'Solicitation',
+            'Total Contract Price',
+            'Award Date',
+            'Posted Date',
+            'AW File Date',
+            'Last Mod Posting Date',
+            'Mod Count',
+            'We Won',
+            'Has Award',
+            'Lifecycle State',
+            'Live Contract ID',
+            'First Seen At',
+            'Draft Created At',
+            'Draft Worked At',
+            'Mod Record Created At',
+            'Live Contract At',
+        ])
+
+        def _dt(value):
+            return value.isoformat() if value else ''
+
+        for e in qs.iterator():
+            writer.writerow([
+                e.contract_number,
+                e.award_basic_number,
+                e.delivery_order_number,
+                e.delivery_order_counter,
+                e.awardee_cage,
+                e.nsn,
+                e.nomenclature,
+                e.purchase_request,
+                e.solicitation,
+                e.total_contract_price if e.total_contract_price is not None else '',
+                _dt(e.award_date),
+                _dt(e.posted_date),
+                _dt(e.aw_file_date),
+                _dt(e.last_mod_posting_date),
+                e.mod_count,
+                'Yes' if e.is_we_won else 'No',
+                'Yes' if e.has_award else 'No',
+                e.lifecycle_state,
+                e.contract_id or '',
+                _dt(e.first_seen_at),
+                _dt(e.draft_created_at),
+                _dt(e.draft_worked_at),
+                _dt(e.mod_record_created_at),
+                _dt(e.live_contract_at),
+            ])
+        return response
+
+    # -- context ----------------------------------------------------------
+    def _querystring_without(self, *drop_keys):
+        """Build a querystring from current GET minus the given keys."""
+        params = self.request.GET.copy()
+        for key in drop_keys:
+            params.pop(key, None)
+        return params.urlencode()
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        filters = self._read_filters()
+        sort, direction = self._read_sort()
+
+        # Scope-level overview (unfiltered) for the header summary strip.
+        scoped = self._scoped_queryset()
+        state_labels = dict(AwardLedger.Lifecycle.choices)
+        raw_counts = {
+            row['lifecycle_state']: row['n']
+            for row in scoped.values('lifecycle_state').annotate(n=Count('id'))
+        }
+        state_summary = [
+            {
+                'value': value,
+                'label': label,
+                'count': raw_counts.get(value, 0),
+            }
+            for value, label in AwardLedger.Lifecycle.choices
+        ]
+
+        # Distinct in-scope CAGEs for the filter select.
+        cage_options = list(
+            scoped.exclude(awardee_cage='')
+            .values_list('awardee_cage', flat=True)
+            .distinct()
+            .order_by('awardee_cage')
+        )
+
+        ctx.update({
+            'filters': filters,
+            'lifecycle_choices': AwardLedger.Lifecycle.choices,
+            'lifecycle_labels': state_labels,
+            'cage_options': cage_options,
+            'current_sort': sort,
+            'current_dir': direction,
+            'total_in_scope': scoped.count(),
+            'filtered_count': ctx['paginator'].count if ctx.get('paginator') else 0,
+            'state_summary': state_summary,
+            # Pagination links keep every active param except the page number.
+            'pagination_query_string': self._querystring_without('page'),
+            # Column-sort links rebuild sort/dir but keep filters (drop page too).
+            'sort_query_string': self._querystring_without('sort', 'dir', 'page'),
+            # Export + generic "current filters" querystring (page-independent).
+            'base_query_string': self._querystring_without('page'),
+        })
+        return ctx

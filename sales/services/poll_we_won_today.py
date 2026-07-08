@@ -187,6 +187,22 @@ def poll_we_won_today(
             logger.exception("%s queue_we_won_drafts error", _LOG_PREFIX)
 
         # ------------------------------------------------------------------ #
+        # Step D9 — award ledger sweep (durable lifecycle record)              #
+        # ------------------------------------------------------------------ #
+        try:
+            from intake.services.award_ledger import upsert_ledger_for_batch
+
+            ledger_result = upsert_ledger_for_batch(batch, activity_log=emit)
+            _emit(
+                f"upsert_ledger_for_batch: created={ledger_result['created']} "
+                f"updated={ledger_result['updated']} "
+                f"we_won={ledger_result['we_won']} mods={ledger_result['mods']}."
+            )
+        except Exception as exc:
+            _emit(f"upsert_ledger_for_batch failed unexpectedly: {exc}")
+            logger.exception("%s upsert_ledger_for_batch error", _LOG_PREFIX)
+
+        # ------------------------------------------------------------------ #
         # Step E — finalize batch (keep IN_PROGRESS; lives all day)            #
         # ------------------------------------------------------------------ #
         batch.last_attempted_at = timezone.now()

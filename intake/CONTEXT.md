@@ -37,6 +37,46 @@ First-class columns:
 
 SharePoint folder path is stored in `data['sharepoint_folder_path']` (not a model column).
 
+### `AwardLedger` (table `intake_award_ledger`)
+
+The **sole durable record** of the DIBBS award → intake draft → live-contract
+journey. `DraftContract.final_contract` is deleted together with the draft on
+finalization, so nothing else survives to answer "did we win it, was a draft
+created and worked, does a mod exist, and when did it become a live contract?".
+One row per contract identity (`contract_number`, the upsert key). Scope is
+limited to DIBBS awards/mods for **our own CAGEs** (`sales.CompanyCAGE`).
+
+| Column | Purpose |
+|---|---|
+| `contract_number` | Canonical (dashed) identity; unique upsert key (matches `DraftContract`/`Contract`) |
+| `award_basic_number`, `delivery_order_number`, `delivery_order_counter`, `awardee_cage`, `nsn`, `nomenclature`, `purchase_request`, `solicitation` | DIBBS mirror strings (types copied from `sales.DibbsAward`) |
+| `total_contract_price`, `award_date`, `posted_date`, `aw_file_date`, `last_mod_posting_date` | DIBBS mirror decimal/date fields |
+| `mod_count` | Number of mods observed (monotonic; never inflated on re-run) |
+| `is_we_won` | Award appears in the `WeWonAward` view (our active CAGE) |
+| `has_award` | A `DibbsAward` row exists for this identity |
+| `dibbs_award` | FK → `sales.DibbsAward` (`SET_NULL`) |
+| `contract` | FK → `contracts.Contract` (`SET_NULL`); set when the live contract is detected |
+| `first_seen_at` | **Latched** — when the identity first entered the ledger |
+| `draft_created_at` | **Latched** — a `DraftContract` was created |
+| `draft_worked_at` | **Latched** — draft observed as worked (proxy; see AGENTS.md) |
+| `mod_record_created_at` | **Latched** — a `DibbsAwardMod` was first observed |
+| `live_contract_at` | **Latched** — draft finalized into / matched to a live `Contract` |
+| `lifecycle_state` | Derived enum; recomputed each sweep, **advance-only** |
+| `updated_at` | `auto_now` bookkeeping |
+
+**Latching rule (invariant):** the five `*_at` timestamps are **write-once**.
+Once set they are never overwritten or cleared. Every set goes through
+`award_ledger._latch`, which only writes when the field is currently `None`.
+`lifecycle_state` is recomputed each sweep but may only advance (never regress).
+
+**`lifecycle_state` enum (furthest stage observed):**
+`not_we_won` → `mod_only` → `awaiting_draft` → `in_draft` → `draft_worked`
+→ `live_contract`.
+
+The ledger is maintained by `intake/services/award_ledger.py` (see AGENTS.md).
+It is read-mostly in admin — all lifecycle timestamps and FK links are
+read-only.
+
 ### `data` JSON shape
 Varies by `contract_type`. See `intake/schemas.py` for the authoritative
 per-type schema. Matched FK lifecycle: both `*_text` (parsed) and `*_id`
@@ -81,6 +121,45 @@ incompatible with new code. Validation is a hard requirement.
   save + finalize in one step (lock retained through both phases; bypasses
   the review queue)
 - `intake:update_draft_company` — `POST /intake/drafts/<pk>/update-company/` — staff/superuser only, updates DraftContract.company
+- `intake:award_ledger` — `GET /intake/ledger/` — **read-only** Award Ledger
+  page (Stage 2). Mirrors the DIBBS awards table with the lifecycle overlay so
+  analysts can see, per contract identity: what we saw, whether we won it,
+  whether/when a draft was created and worked, mod activity, and whether/when it
+  became a live contract. Diagnostic surface for "won awards that never entered
+  intake."
+
+## Award Ledger Page (`AwardLedgerListView`)
+Read-only `ListView` at `/intake/ledger/`. No POST, no model writes.
+
+- **Auth / scoping:** same wrapping as `DraftQueueView` (`login_required` on
+  dispatch). Superusers see all rows. `AwardLedger` has **no company FK** —
+  non-superusers are scoped **by CAGE**: the active company's active CAGEs are
+  materialized first via `list(CompanyCAGE.objects.filter(company__in=<user
+  companies>, is_active=True).values_list('cage_code', flat=True))` (no-MARS on
+  MSSQL), then `AwardLedger.objects.filter(awardee_cage__in=cages)`. No matching
+  CAGEs → empty result. `sales.CompanyCAGE` is the scoping bridge.
+- **`select_related('dibbs_award', 'contract')`** to avoid N+1.
+- **GET filters (re-rendered into the form):** `state` (a `lifecycle_state`
+  enum value or blank), `we_won` (`''` / `yes` / `no`), `cage` (exact
+  `awardee_cage`), `q` (icontains across `contract_number`,
+  `award_basic_number`, `purchase_request`, `nsn`), `from` / `to` (inclusive
+  date range on `first_seen_at`, treated as dates via `__date`).
+- **Sort (`?sort=&dir=`), whitelist only:** `first_seen_at` (default,
+  `dir=desc`), `award_date`, `total_contract_price`, `contract_number`,
+  `lifecycle_state` (ordered by a `Case/When` built from `LIFECYCLE_RANK`, not
+  the raw string). Non-whitelisted `sort` falls back to the default. Every
+  ordering carries a deterministic tiebreak (`-first_seen_at, -id`) — MSSQL
+  pagination requires a stable ORDER BY.
+- **Pagination:** Django `Paginator`, 50/page; page + sort links preserve all
+  active query params.
+- **CSV export:** `?export=csv` streams the CURRENT filtered+scoped queryset
+  (pagination ignored). Auth + CAGE scope apply identically — it can never
+  export rows outside scope. Filename `award_ledger_YYYYMMDD.csv`.
+- **Template:** `intake/templates/intake/award_ledger.html`, extends
+  `contracts/contract_base.html`, `.intake-*`-scoped `<style>`, Bootstrap 5.3,
+  Tabler `ti ti-*` icons, no CDN assets. Nav entry lives in the `draft_queue.html`
+  header ("Award Ledger"); the ledger header carries a "Back to Intake Queue"
+  link.
 
 ## Editor
 The editor (`intake/templates/intake/draft_edit.html`) is a CLIN-card

@@ -29,4 +29,6 @@ urlpatterns = [
     # SharePoint scan API
     path('api/scan-sharepoint/', views.scan_sharepoint_drafts, name='scan_sharepoint_drafts'),
     path('drafts/<int:pk>/fetch-dibbs-pdf/', views.fetch_dibbs_pdf, name='fetch_dibbs_pdf'),
+    # Stage 2: read-only Award Ledger (lifecycle overlay of DIBBS awards)
+    path('ledger/', views.AwardLedgerListView.as_view(), name='award_ledger'),
 ]

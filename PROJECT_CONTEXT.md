@@ -133,16 +133,17 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 ### `intake` — Contract Intake Queue
 **Purpose:** JSON-backed draft workspace for new contracts before finalization into `contracts`. Replaces processing queue over time; independent of processing staging tables.
 
-**Owns:** `DraftContract` (with `company` FK and `sharepoint_folder_status`), Pydantic schemas, soft locks, PDF/DIBBS ingestion, finalization into canonical tables
+**Owns:** `DraftContract` (with `company` FK and `sharepoint_folder_status`), `AwardLedger` (table `intake_award_ledger` — the sole durable award→draft→live-contract lifecycle record), Pydantic schemas, soft locks, PDF/DIBBS ingestion, finalization into canonical tables
 
 **Consumes from other apps:**
-- `contracts.Company`, `contracts.Contract` — company scoping, dedup badge, finalization target
-- `sales.CompanyCAGE` (`dibbs_company_cage`) — CAGE → company resolution at DIBBS injection
+- `contracts.Company`, `contracts.Contract` — company scoping, dedup badge, finalization target, ledger live-contract link
+- `sales.CompanyCAGE` (`dibbs_company_cage`) — CAGE → company resolution at DIBBS injection; ledger our-CAGE scoping
+- `sales.DibbsAward` / `DibbsAwardMod` / `WeWonAward` — ledger mirror source (read-only)
 - `contracts.services.sharepoint_service` / `sharepoint_paths` via `intake/services/sharepoint_intake.py` — folder path build, probe, create (no `processing.*` imports)
 
-**Other apps consume from it:** Nothing yet — intake is the entry point, not a dependency for other apps
+**Other apps consume from it:** The `sales` nightly scrape (`scrape_awards`) and daytime hot poll (`poll_we_won_today`) call `intake.services.award_ledger.upsert_ledger_for_batch(batch, ...)` in a guarded piggyback block — the same injection pattern as `queue_we_won_drafts`.
 
-**URL prefix:** `/intake/`
+**URL prefix:** `/intake/` (queue at `/intake/`; read-only Award Ledger page at `/intake/ledger/` → `intake:award_ledger`)
 
 **Critical notes:**
 - Drafts are deleted on successful finalization; `DraftContract` is not audited by `transactions`
@@ -157,6 +158,8 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 - Draft documents browser at `/contracts/documents/draft/` (owned by contracts URL space, intake-authorized)
 - SharePoint folder path carried to `Contract.files_url` at finalization
 - DIBBS PDF fetch: fetch_and_apply_dibbs_pdf in intake/services/dibbs_pdf_fetcher.py. URL pattern confirmed: Award/IDIQ/PO  dibbs2.bsm.dla.mil/Downloads/Awards/{DDMONYY}/{contract_number}.PDF; DO  {idiq}{do}.PDF. Requires make_dibbs2_session() (DOD cookie). Stored in data['award_pdf_url'] at injection time.
+- **Award Intake Ledger (`AwardLedger`):** the only durable record of the award→draft→live-contract journey (drafts + their `final_contract` link are deleted on finalize). Maintained by `intake/services/award_ledger.py`; latched write-once `*_at` timestamps + advance-only `lifecycle_state`. Updated from the scrape/poll piggyback (`upsert_ledger_for_batch`), the finalize hook (`stamp_live_contract` in `intake/finalize.py`), and the nightly `reconcile_award_ledger` background task. Backfill: `python manage.py backfill_award_ledger [--days N]`.
+- **Award Ledger page (`intake:award_ledger`, `/intake/ledger/`):** read-only `AwardLedgerListView` — GET filters/sort/pagination + scoped CSV export (`?export=csv`). No company FK on the model, so scoping is by CAGE via `sales.CompanyCAGE` (superusers see all). Sort is whitelisted with a deterministic MSSQL tiebreak; `lifecycle_state` orders by `LIFECYCLE_RANK`. Nav link lives in the `draft_queue.html` header.
 
 ---
 
@@ -252,6 +255,7 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
   - **Mod leak gate (hot poll):** `parse_awdrecs_html` must populate `Last_Mod_Posting_Date` (and related AW columns) so `import_aw_records` → `usp_process_award_staging` classifies MOD rows into `dibbs_award_mod` instead of `dibbs_award`. Rows with a populated mod posting date must not enter `WeWonAward` / Intake draft injection.
   - **`DibbsAwardMod` contract link:** `matched_contract` (FK → `contracts.Contract`, exact `contract_number` match via `contracts/services/contract_number.normalize_contract_number`), `acknowledged_at`, `acknowledged_by`. Matching runs after each `import_aw_records` / `import_aw_file` when `awardee_cage` is in active `CompanyCAGE` **or** `sales/constants.py::PARTNER_CAGES` (currently ETP / `64W95`). Backfill (`0052`) iterates `contracts.Contract` — not CAGE-filtered — so partner-managed contracts are included when the contract number exists in DB. Contract-page display: `sales/services/contract_mods.py` (`mods_for_contract`, `build_award_record_url`).
   3. `check_dibbs_notices` (1440 min / daily): Scrapes `www.dibbs.bsm.dla.mil` homepage for public DIBBS Notices using `make_www_session()` (requests only — no Playwright). Upserts new rows into `DibbsNotice` via `get_or_create` on `(title, posted_date)`; never overwrites existing rows.
+  8. `reconcile_award_ledger` (1440 min / daily, run_order 8): `intake/tasks/reconcile_award_ledger.py`. Full backstop for the Award Intake Ledger — runs `intake.services.award_ledger.reconcile_open_ledger_rows()` across all open rows (draft-worked proxy + live-contract backstop + advance-only `lifecycle_state`). Catches finalize-hook misses and stragglers. Seeded by `core/migrations/0004_seed_reconcile_award_ledger_task.py`.
 - `DibbsNotice` rows are keyed on `(title, posted_date)`. Use `get_or_create` only. `external_url` is resolved to absolute URL at scrape time and stored; never re-updated. Do not use Playwright for notice scraping — `make_www_session()` is sufficient.
 
 ---

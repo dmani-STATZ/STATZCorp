@@ -1,0 +1,375 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Award Ledger{% endblock %}
+
+{% block content %}
+    <style>
+    .intake-ledger-thead {
+        background-color: #f9fafb;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.06);
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .intake-ledger-thead > tr > th {
+        background-color: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--bs-secondary-color);
+        padding: 0.5rem 0.6rem;
+    }
+    .intake-ledger-thead a {
+        color: inherit;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+    }
+    .intake-ledger-thead a:hover { color: var(--bs-primary); }
+    [data-bs-theme="dark"] .intake-ledger-scroll-wrap.card {
+        border: 1px solid var(--bs-border-color);
+    }
+    [data-bs-theme="dark"] .intake-ledger-thead,
+    [data-bs-theme="dark"] .intake-ledger-thead > tr > th {
+        background-color: #343a40;
+        color: #e9ecef;
+        border-bottom-color: var(--bs-border-color);
+    }
+    [data-bs-theme="dark"] .intake-ledger-tbody {
+        background-color: var(--bs-body-bg) !important;
+    }
+    .intake-ledger-tbody > tr > td {
+        padding: 0.45rem 0.6rem;
+        font-size: 0.82rem;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+    .intake-ledger-row:hover { background-color: #f9fafb; }
+    [data-bs-theme="dark"] .intake-ledger-row:hover { background-color: #343a40; }
+    .intake-ledger-sub {
+        font-size: 0.72rem;
+        color: var(--bs-secondary-color);
+    }
+    .intake-ledger-chip {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.15rem 0.55rem;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
+    .intake-ledger-timeline {
+        display: flex;
+        gap: 0.75rem;
+    }
+    .intake-ledger-timeline-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 46px;
+    }
+    .intake-ledger-timeline-label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--bs-secondary-color);
+    }
+    .intake-ledger-timeline-value {
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+    .intake-ledger-timeline-value.is-empty {
+        color: var(--bs-tertiary-color);
+        font-weight: 400;
+    }
+    .intake-ledger-summary-chip {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.7rem;
+        border-radius: 999px;
+    }
+    .intake-ledger-summary-chip .count { font-weight: 700; font-size: 0.9rem; }
+    </style>
+
+    <div class="container-fluid px-4 py-4">
+        {# ---- Header ---- #}
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">Award Ledger</h1>
+                <p class="small text-muted mb-0">
+                    Every DIBBS award we saw for our CAGEs, overlaid with its intake
+                    lifecycle &mdash; from first sighting through to a live contract.
+                </p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'intake:queue' %}"
+                   class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
+                    <i class="ti ti-arrow-left"></i> Back to Intake Queue
+                </a>
+                <a href="?export=csv{% if base_query_string %}&{{ base_query_string }}{% endif %}"
+                   class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
+                    <i class="ti ti-file-download"></i> Export CSV
+                </a>
+            </div>
+        </div>
+
+        {# ---- Summary strip (per-state counts, scope-wide) ---- #}
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+            <span class="intake-ledger-summary-chip bg-dark-subtle text-dark-emphasis">
+                <span class="count">{{ total_in_scope|default:0 }}</span> in scope
+            </span>
+            {% for s in state_summary %}
+            <span class="intake-ledger-summary-chip
+                {% if s.value == 'not_we_won' %}bg-secondary-subtle text-secondary-emphasis
+                {% elif s.value == 'mod_only' %}bg-info-subtle text-info-emphasis
+                {% elif s.value == 'awaiting_draft' %}bg-warning-subtle text-warning-emphasis
+                {% elif s.value == 'in_draft' %}bg-primary-subtle text-primary-emphasis
+                {% elif s.value == 'draft_worked' %}bg-primary text-white
+                {% elif s.value == 'live_contract' %}bg-success-subtle text-success-emphasis
+                {% else %}bg-secondary-subtle text-secondary-emphasis{% endif %}">
+                <span class="count">{{ s.count }}</span> {{ s.label }}
+            </span>
+            {% endfor %}
+        </div>
+
+        {# ---- Filter bar (server-side GET; re-renders selected state) ---- #}
+        <form method="get" class="card card-body mb-3 py-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label class="form-label small mb-1">Lifecycle</label>
+                    <select name="state" class="form-select form-select-sm">
+                        <option value="">All states</option>
+                        {% for value, label in lifecycle_choices %}
+                        <option value="{{ value }}" {% if filters.state == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">We Won</label>
+                    <select name="we_won" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="yes" {% if filters.we_won == 'yes' %}selected{% endif %}>Won</option>
+                        <option value="no" {% if filters.we_won == 'no' %}selected{% endif %}>Not won</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">CAGE</label>
+                    <select name="cage" class="form-select form-select-sm">
+                        <option value="">All CAGEs</option>
+                        {% for c in cage_options %}
+                        <option value="{{ c }}" {% if filters.cage == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">Search</label>
+                    <input type="text" name="q" value="{{ filters.q }}"
+                           class="form-control form-control-sm"
+                           placeholder="Contract #, Award/Basic, PR, NSN"
+                           style="min-width: 220px;">
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">First seen from</label>
+                    <input type="date" name="from" value="{{ filters.from }}"
+                           class="form-control form-control-sm">
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-1">First seen to</label>
+                    <input type="date" name="to" value="{{ filters.to }}"
+                           class="form-control form-control-sm">
+                </div>
+                {# Preserve active sort across filter submits. #}
+                {% if current_sort %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
+                {% if current_dir %}<input type="hidden" name="dir" value="{{ current_dir }}">{% endif %}
+                <div class="col-auto d-flex gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1">
+                        <i class="ti ti-filter"></i> Apply
+                    </button>
+                    <a href="{% url 'intake:award_ledger' %}"
+                       class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1">
+                        <i class="ti ti-x"></i> Clear
+                    </a>
+                </div>
+            </div>
+        </form>
+
+        {# ---- Results ---- #}
+        <div class="card shadow-md overflow-x-auto intake-ledger-scroll-wrap"
+             style="max-height: calc(100vh - 340px); overflow-y: auto;">
+            <table class="min-w-full intake-ledger-table">
+                <thead class="sticky-top intake-ledger-thead" style="z-index: 10;">
+                    <tr>
+                        <th>
+                            <a href="?sort=contract_number&dir={% if current_sort == 'contract_number' and current_dir == 'asc' %}desc{% else %}asc{% endif %}{% if sort_query_string %}&{{ sort_query_string }}{% endif %}">
+                                Contract #
+                                {% if current_sort == 'contract_number' %}<i class="ti {% if current_dir == 'asc' %}ti-arrow-up{% else %}ti-arrow-down{% endif %}"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>Award / DO</th>
+                        <th>CAGE</th>
+                        <th>NSN / Nomenclature</th>
+                        <th>
+                            <a href="?sort=award_date&dir={% if current_sort == 'award_date' and current_dir == 'asc' %}desc{% else %}asc{% endif %}{% if sort_query_string %}&{{ sort_query_string }}{% endif %}">
+                                Award Date
+                                {% if current_sort == 'award_date' %}<i class="ti {% if current_dir == 'asc' %}ti-arrow-up{% else %}ti-arrow-down{% endif %}"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>Posted</th>
+                        <th class="text-end">
+                            <a href="?sort=total_contract_price&dir={% if current_sort == 'total_contract_price' and current_dir == 'asc' %}desc{% else %}asc{% endif %}{% if sort_query_string %}&{{ sort_query_string }}{% endif %}">
+                                Total Price
+                                {% if current_sort == 'total_contract_price' %}<i class="ti {% if current_dir == 'asc' %}ti-arrow-up{% else %}ti-arrow-down{% endif %}"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>We Won</th>
+                        <th>Mods</th>
+                        <th>
+                            <a href="?sort=lifecycle_state&dir={% if current_sort == 'lifecycle_state' and current_dir == 'asc' %}desc{% else %}asc{% endif %}{% if sort_query_string %}&{{ sort_query_string }}{% endif %}">
+                                Lifecycle
+                                {% if current_sort == 'lifecycle_state' %}<i class="ti {% if current_dir == 'asc' %}ti-arrow-up{% else %}ti-arrow-down{% endif %}"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort=first_seen_at&dir={% if current_sort == 'first_seen_at' and current_dir == 'asc' %}desc{% else %}asc{% endif %}{% if sort_query_string %}&{{ sort_query_string }}{% endif %}">
+                                Timeline
+                                {% if current_sort == 'first_seen_at' %}<i class="ti {% if current_dir == 'asc' %}ti-arrow-up{% else %}ti-arrow-down{% endif %}"></i>{% endif %}
+                            </a>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white intake-ledger-tbody">
+                    {% for e in entries %}
+                    <tr class="intake-ledger-row">
+                        <td>
+                            {% if e.contract_id %}
+                                <a href="{% url 'contracts:contract_management' e.contract_id %}"
+                                   class="fw-semibold text-decoration-none" target="_blank">
+                                    {{ e.contract_number }}
+                                </a>
+                            {% else %}
+                                <span class="fw-semibold">{{ e.contract_number }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ e.award_basic_number|default:"—" }}
+                            {% if e.delivery_order_number %}
+                                <div class="intake-ledger-sub">DO {{ e.delivery_order_number }}{% if e.delivery_order_counter %} / {{ e.delivery_order_counter }}{% endif %}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ e.awardee_cage|default:"—" }}</td>
+                        <td>
+                            {{ e.nsn|default:"—" }}
+                            {% if e.nomenclature %}<div class="intake-ledger-sub">{{ e.nomenclature }}</div>{% endif %}
+                        </td>
+                        <td>{{ e.award_date|date:"M j, Y"|default:"—" }}</td>
+                        <td>{{ e.posted_date|date:"M j, Y"|default:"—" }}</td>
+                        <td class="text-end">
+                            {% if e.total_contract_price is not None %}
+                                ${{ e.total_contract_price|floatformat:2|intcomma }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            {% if e.is_we_won %}
+                                <span class="badge bg-success-subtle text-success-emphasis">Won</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis">No</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if e.mod_count %}
+                                <span title="{% if e.last_mod_posting_date %}Last mod posted {{ e.last_mod_posting_date|date:'M j, Y' }}{% else %}Mods observed{% endif %}">
+                                    {{ e.mod_count }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">0</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="intake-ledger-chip
+                                {% if e.lifecycle_state == 'not_we_won' %}bg-secondary-subtle text-secondary-emphasis
+                                {% elif e.lifecycle_state == 'mod_only' %}bg-info-subtle text-info-emphasis
+                                {% elif e.lifecycle_state == 'awaiting_draft' %}bg-warning-subtle text-warning-emphasis
+                                {% elif e.lifecycle_state == 'in_draft' %}bg-primary-subtle text-primary-emphasis
+                                {% elif e.lifecycle_state == 'draft_worked' %}bg-primary text-white
+                                {% elif e.lifecycle_state == 'live_contract' %}bg-success-subtle text-success-emphasis
+                                {% else %}bg-secondary-subtle text-secondary-emphasis{% endif %}">
+                                {{ e.get_lifecycle_state_display|default:"—" }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="intake-ledger-timeline">
+                                <div class="intake-ledger-timeline-step">
+                                    <span class="intake-ledger-timeline-label">Imported</span>
+                                    <span class="intake-ledger-timeline-value{% if not e.first_seen_at %} is-empty{% endif %}">{{ e.first_seen_at|date:"M j, Y"|default:"—" }}</span>
+                                </div>
+                                <div class="intake-ledger-timeline-step">
+                                    <span class="intake-ledger-timeline-label">Draft</span>
+                                    <span class="intake-ledger-timeline-value{% if not e.draft_created_at %} is-empty{% endif %}">{{ e.draft_created_at|date:"M j, Y"|default:"—" }}</span>
+                                </div>
+                                <div class="intake-ledger-timeline-step">
+                                    <span class="intake-ledger-timeline-label">Worked</span>
+                                    <span class="intake-ledger-timeline-value{% if not e.draft_worked_at %} is-empty{% endif %}">{{ e.draft_worked_at|date:"M j, Y"|default:"—" }}</span>
+                                </div>
+                                <div class="intake-ledger-timeline-step">
+                                    <span class="intake-ledger-timeline-label">Live</span>
+                                    <span class="intake-ledger-timeline-value{% if not e.live_contract_at %} is-empty{% endif %}">{{ e.live_contract_at|date:"M j, Y"|default:"—" }}</span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-5">
+                            No awards match these filters yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# ---- Pagination (preserves filters + sort) ---- #}
+        {% if is_paginated %}
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3">
+            <div class="small text-muted">
+                Showing {{ page_obj.start_index }}&ndash;{{ page_obj.end_index }} of {{ filtered_count }} result{{ filtered_count|pluralize }}
+            </div>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}">First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}">Prev</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">First</span></li>
+                    <li class="page-item disabled"><span class="page-link">Prev</span></li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }} / {{ paginator.num_pages }}</span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ paginator.num_pages }}{% if pagination_query_string %}&{{ pagination_query_string }}{% endif %}">Last</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">Next</span></li>
+                    <li class="page-item disabled"><span class="page-link">Last</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}

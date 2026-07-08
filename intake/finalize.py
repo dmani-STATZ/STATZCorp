@@ -132,6 +132,17 @@ def finalize_draft(draft: DraftContract, user: User) -> CanonicalTarget:
 
     # Brief link for audit/admin visibility before the draft is removed.
     if isinstance(target, Contract):
+        # Durable award-lifecycle record: latch live_contract_at on the ledger
+        # before the draft (and its final_contract link) is deleted. A ledger
+        # failure must never abort finalization, so this is fully guarded.
+        try:
+            from intake.services.award_ledger import stamp_live_contract
+            stamp_live_contract(draft.contract_number, target)
+        except Exception:
+            logger.exception(
+                'AwardLedger stamp_live_contract failed for %s (finalization '
+                'continues)', draft.contract_number,
+            )
         draft.final_contract = target
         draft.status = DraftContract.Status.COMPLETED
         draft.save(update_fields=['final_contract', 'status', 'modified_at'])

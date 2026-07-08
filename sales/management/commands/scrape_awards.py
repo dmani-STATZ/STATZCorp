@@ -490,6 +490,25 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             self._activity(f"Intake draft injection failed unexpectedly: {exc}")
             self.stderr.write(f"queue_we_won_drafts error: {exc}")
 
+        # Piggyback: update the durable Award Intake Ledger from this batch.
+        # Runs on SUCCESS and PARTIAL. Never allowed to crash the scrape job.
+        try:
+            from intake.services.award_ledger import upsert_ledger_for_batch
+
+            ledger_result = upsert_ledger_for_batch(
+                batch, activity_log=self._activity
+            )
+            self._activity(
+                f"Award ledger sweep: "
+                f"created={ledger_result['created']} "
+                f"updated={ledger_result['updated']} "
+                f"we_won={ledger_result['we_won']} "
+                f"mods={ledger_result['mods']}."
+            )
+        except Exception as exc:
+            self._activity(f"Award ledger sweep failed unexpectedly: {exc}")
+            self.stderr.write(f"upsert_ledger_for_batch error: {exc}")
+
         return True, None
 
     def _scrape_single_date(self, target_date: date) -> None:

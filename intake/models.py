@@ -178,3 +178,119 @@ class DraftContract(models.Model):
         """Release lock for this user."""
         from .locks import release
         release(self, user)
+
+
+class AwardLedger(models.Model):
+    """Durable, one-row-per-contract-identity ledger of the DIBBS award lifecycle.
+
+    This is the ONLY persistent record of the award → draft → live-contract
+    journey. `DraftContract.final_contract` is deleted together with the draft
+    on finalization, so nothing else survives to answer questions like
+    "did we win this, was a draft created, was it worked, did it become a
+    live contract, and when did each of those happen?".
+
+    Latching invariant: the `*_at` lifecycle timestamps are WRITE-ONCE. Once
+    set they are never overwritten or cleared. `lifecycle_state` is recomputed
+    each sweep but may only advance (never regress). Mirror columns and the
+    boolean/link fields are refreshed on every sweep.
+
+    Scope: only DIBBS awards/mods for our own CAGEs (via `sales.CompanyCAGE`)
+    are recorded here. Non-DIBBS manual drafts are intentionally out of scope.
+    """
+
+    class Lifecycle(models.TextChoices):
+        NOT_WE_WON = 'not_we_won', 'Not We-Won'
+        MOD_ONLY = 'mod_only', 'Mod Only'
+        AWAITING_DRAFT = 'awaiting_draft', 'Awaiting Draft'
+        IN_DRAFT = 'in_draft', 'In Draft'
+        DRAFT_WORKED = 'draft_worked', 'Draft Worked'
+        LIVE_CONTRACT = 'live_contract', 'Live Contract'
+
+    # Advance-only ranking of lifecycle states. Higher wins; never regress.
+    LIFECYCLE_RANK = {
+        Lifecycle.NOT_WE_WON: 0,
+        Lifecycle.MOD_ONLY: 1,
+        Lifecycle.AWAITING_DRAFT: 2,
+        Lifecycle.IN_DRAFT: 3,
+        Lifecycle.DRAFT_WORKED: 4,
+        Lifecycle.LIVE_CONTRACT: 5,
+    }
+
+    # -- Identity (upsert key) ------------------------------------------------
+    contract_number = models.CharField(
+        max_length=25,
+        unique=True,
+        help_text='Canonical (dashed) contract number — matches '
+                  'DraftContract.contract_number / Contract.contract_number.',
+    )
+
+    # -- DIBBS mirror (types copied from sales.DibbsAward) --------------------
+    award_basic_number = models.CharField(max_length=50, blank=True, default='')
+    delivery_order_number = models.CharField(max_length=50, blank=True, default='')
+    delivery_order_counter = models.CharField(max_length=20, blank=True, default='')
+    awardee_cage = models.CharField(max_length=10, blank=True, default='', db_index=True)
+    nsn = models.CharField(max_length=46, blank=True, default='')
+    nomenclature = models.CharField(max_length=100, blank=True, default='')
+    purchase_request = models.CharField(max_length=20, blank=True, default='')
+    solicitation = models.CharField(max_length=50, blank=True, default='')
+
+    total_contract_price = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    award_date = models.DateField(null=True, blank=True)
+    posted_date = models.DateField(null=True, blank=True)
+    aw_file_date = models.DateField(null=True, blank=True)
+    last_mod_posting_date = models.DateField(null=True, blank=True)
+    mod_count = models.PositiveIntegerField(default=0)
+
+    # -- Classification / links ----------------------------------------------
+    is_we_won = models.BooleanField(default=False)
+    has_award = models.BooleanField(default=False)
+    dibbs_award = models.ForeignKey(
+        'sales.DibbsAward',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ledger_entries',
+    )
+    contract = models.ForeignKey(
+        'contracts.Contract',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='award_ledger_entries',
+    )
+
+    # -- Latched lifecycle timestamps (write-once — never overwrite/clear) ----
+    first_seen_at = models.DateTimeField(default=timezone.now)
+    draft_created_at = models.DateTimeField(null=True, blank=True)
+    draft_worked_at = models.DateTimeField(null=True, blank=True)
+    mod_record_created_at = models.DateTimeField(null=True, blank=True)
+    live_contract_at = models.DateTimeField(null=True, blank=True)
+
+    # -- Derived / display (recomputed each sweep; advance-only) --------------
+    lifecycle_state = models.CharField(
+        max_length=20,
+        choices=Lifecycle.choices,
+        default='',
+        db_index=True,
+    )
+
+    # -- Bookkeeping ----------------------------------------------------------
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'intake_award_ledger'
+        ordering = ['-first_seen_at']
+        verbose_name = 'Award Ledger Entry'
+        verbose_name_plural = 'Award Ledger Entries'
+        indexes = [
+            models.Index(fields=['is_we_won'], name='award_ledger_we_won_idx'),
+            models.Index(fields=['lifecycle_state'], name='award_ledger_state_idx'),
+            models.Index(fields=['awardee_cage'], name='award_ledger_cage_idx'),
+            models.Index(fields=['first_seen_at'], name='award_ledger_seen_idx'),
+            models.Index(fields=['live_contract_at'], name='award_ledger_live_idx'),
+        ]
+
+    def __str__(self):
+        return f'AwardLedger {self.contract_number} ({self.lifecycle_state or "new"})'

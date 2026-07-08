@@ -444,6 +444,94 @@ DraftContract.is_dibbs_draft property: True when data['parser']['source'] == 'di
 After a successful fetch and merge, parser.source becomes 'pdf', so the button
 naturally disappears on next page load.
 
+### Award Intake Ledger (`AwardLedger` / `intake/services/award_ledger.py`)
+
+`AwardLedger` (table `intake_award_ledger`) is the **only durable record** of
+the award → draft → live-contract lifecycle. `DraftContract.final_contract` is
+deleted with the draft on finalization, so the ledger is where "did we win,
+was a draft created/worked, is there a mod, when did it go live" is answered.
+One row per canonical `contract_number` (the upsert key). Scope: DIBBS
+awards/mods for our own CAGEs (`sales.CompanyCAGE`) only — non-DIBBS manual
+drafts are intentionally out of scope.
+
+**Sweep service — `intake/services/award_ledger.py`.** Mirrors the
+`queue_we_won_drafts` conventions: module logger + `_LOG_PREFIX`, lazy
+cross-app imports inside functions (intake → sales, intake → contracts; no
+`processing.*`), never raises to callers (every entry point is wrapped +
+logged), MSSQL no-MARS safety (all source reads are materialized with
+`list(qs.values(...))`/`list(qs)` before any secondary DB call; `__in` lookups
+are chunked under the 2,100-parameter limit). No raw SQL. Public functions:
+- `upsert_ledger_for_batch(batch, activity_log=None)` — get_or_create per
+  our-CAGE award and mod in the batch; refresh mirror fields; set
+  `has_award`/`dibbs_award`/`is_we_won`; refresh `mod_count` + latch
+  `mod_record_created_at`; latch `draft_created_at` from an existing draft;
+  then reconcile the touched rows. Returns `{created, updated, we_won, mods}`.
+- `reconcile_open_ledger_rows(activity_log=None, contract_numbers=None)` —
+  draft-worked proxy + live-contract backstop + advance `lifecycle_state`.
+- `stamp_live_contract(contract_number, contract)` — the real-time finalize
+  hook (no-op when no ledger row exists).
+
+**Latching-timestamps invariant (do not violate).** The five `*_at` columns
+(`first_seen_at`, `draft_created_at`, `draft_worked_at`, `mod_record_created_at`,
+`live_contract_at`) are **write-once** — never overwrite or clear them. Every
+set MUST go through `_latch(row, field, value)`, which only writes when the
+field is currently `None`. `lifecycle_state` is recomputed each sweep via
+`_advance_state`, which is **advance-only** (never regress). `mod_count` uses
+`max()` semantics so re-running a batch never inflates it.
+
+**Finalize hook.** `intake/finalize.py::finalize_draft` calls
+`stamp_live_contract(draft.contract_number, created_contract)` inside the
+finalize `transaction.atomic()`, in the `isinstance(target, Contract)` branch,
+BEFORE `final_contract` is set / the draft is deleted. It is wrapped in
+try/except and logs on failure — a ledger error must NEVER abort finalization.
+
+**Nightly `reconcile_award_ledger` task.** `intake/tasks/reconcile_award_ledger.py::reconcile_award_ledger_task`
+(zero-arg, self-guarding) runs `reconcile_open_ledger_rows()` across ALL open
+rows as a full backstop for finalize-hook misses and stragglers. Registered in
+`core/management/commands/run_background_tasks.py` (`TASK_FUNCTIONS`) and seeded
+as a `core.ScheduledTask` (`interval_minutes=1440`, `run_order=8`) by
+`core/migrations/0004_seed_reconcile_award_ledger_task.py`.
+
+**`draft_worked` = proxy observation.** There is no explicit "analyst finished
+working this" signal. `draft_worked_at` is latched when a `DraftContract` still
+exists AND (status is non-`queued` OR `locked_by` is set OR
+`modified_at > created_at`). Treat it as a best-effort observation, not an
+authoritative audit event.
+
+**Injection points (same pattern as `queue_we_won_drafts`).** The `sales`
+scrape (`scrape_awards._scrape_single_date_from_batch`) and hot poll
+(`poll_we_won_today` service) call `upsert_ledger_for_batch(batch, ...)` in a
+guarded piggyback block AFTER the `queue_we_won_drafts` block. Both are
+wrapped so a ledger failure can never crash the scrape/poll. Backfill:
+`python manage.py backfill_award_ledger [--days N]` (default 45) is idempotent.
+
+### Award Ledger page (`AwardLedgerListView`, Stage 2) — safe-edit rules
+- **Read-only.** This is a diagnostic surface only — no POST, no model writes,
+  no migrations. Do not add mutating endpoints here; ledger writes belong to
+  `intake/services/award_ledger.py`.
+- **CAGE-based scoping (no company FK on `AwardLedger`).** Superusers see all
+  rows; non-superusers are scoped by `awardee_cage__in=<active CAGEs>`. The
+  CAGE list MUST be materialized first with `list(CompanyCAGE.objects.filter(
+  company__in=<user companies>, is_active=True).values_list('cage_code',
+  flat=True))` before filtering the ledger — MSSQL has no MARS, so never iterate
+  one queryset while filtering another on the same connection. `sales.CompanyCAGE`
+  is the only scoping bridge; do not invent a company FK on the ledger.
+- **Sort whitelist + deterministic MSSQL order.** Only `first_seen_at`
+  (default), `award_date`, `total_contract_price`, `contract_number`, and
+  `lifecycle_state` are sortable (see `AWARD_LEDGER_SORT_WHITELIST` in
+  `views.py`). Reject anything else by falling back to the default. Order
+  `lifecycle_state` via a `Case/When` from `AwardLedger.LIFECYCLE_RANK` — never
+  by the raw enum string. Every ordering appends the deterministic tiebreak
+  `-first_seen_at, -id`; MSSQL pagination requires a stable ORDER BY.
+- **No CDN / local assets only.** The page is served in-app under GCC High CSP.
+  Do not add CDN `<link>`/`<script>` tags to `award_ledger.html`; use the
+  `.intake-*`-scoped `<style>`, Bootstrap 5.3, and Tabler `ti ti-*` classes the
+  base chain already provides. (The CDN links in `email_compose.html` are an
+  email-only exception.)
+- **CSV export is scoped + authenticated.** `?export=csv` streams the current
+  filtered+scoped queryset (ignoring pagination). It reuses `get_queryset()`, so
+  auth and CAGE scope apply identically — it must never leak out-of-scope rows.
+
 ## Tests
 `intake/tests.py` covers:
 - Unique constraint on `contract_number` (dedup against re-injection)
@@ -456,6 +544,15 @@ naturally disappears on next page load.
   clear semantics
 - Matcher endpoint tests: lock gating on apply/clear, search-without-lock,
   invalid JSON / unknown action rejection
+- Award ledger: `_latch` write-once, advance-only `lifecycle_state`,
+  `_canonical`, mod-summary counting, `upsert_ledger_for_batch` idempotency
+  (WeWonAward view is patched in tests — it has no table in the SQLite test DB),
+  reconcile draft-worked/live backstop, `stamp_live_contract` no-op on unknown
+- Award Ledger page (`AwardLedgerListViewTests`): CAGE scoping (non-superuser
+  sees only in-CAGE rows; superuser sees all; empty-CAGE user sees nothing),
+  each GET filter narrows (state / we_won / cage / q / date range), junk `sort`
+  falls back to default, `lifecycle_state` sort uses rank order, pagination
+  preserves the querystring, and CSV export respects both scope and filters
 
 After model changes:
 - `python manage.py makemigrations --check`
