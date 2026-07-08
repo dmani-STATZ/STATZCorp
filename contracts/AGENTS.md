@@ -453,6 +453,7 @@ Partner Commission Reconciliation matching normalizes contract numbers using `st
 
 ## Recent completions
 
+- **Metric drill-down width fix (2026-07-08):** `DashboardMetricDetailView` (`/contracts/dashboard/metric-detail/`, `dashboard_views.py`) renders `contracts/templates/contracts/dashboard_metric_detail.html` — one template shared by every `metric=` variant. It previously used a Bootstrap fixed-width `container` inside `contract_base.html`'s 75% wrapper, so the drill-down table wrapped columns. Fixed by setting `{% block body_class %}metric-detail-page{% endblock %}` and switching the inner wrapper to `container-fluid`; the override `.metric-detail-page main > div.mx-auto { width: 95% !important }` in `contracts/static/contracts/css/components.css` beats the inline `width: 75%`. Same escape-the-75%-wrapper pattern as `.finance-audit-page` / `.contract-log-page` / `.clin-detail-page`.
 - **Dashboard open contract count (2026-06-29):** `total_contracts` is already injected by `ContractsDashboardView` and is available in `contract_lifecycle_dashboard.html` for future dashboard header additions.
 - **Dashboard period boundaries (2026-05-28):** `get_period_boundaries()` in `contracts/views/dashboard_views.py` now calls `timezone.localtime(now)` as its first step to prevent UTC-offset boundary bleed. `_start_end_of_day()` updated to return `date` objects for compatibility with `DateField` range filters (post migration 0054).
 

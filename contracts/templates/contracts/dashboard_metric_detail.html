@@ -3,8 +3,10 @@
 
 {% block title %}{{ metric_label }} - {{ period_label }}{% endblock %}
 
+{% block body_class %}metric-detail-page{% endblock %}
+
 {% block content %}
-<div class="container mx-auto px-4 py-6">
+<div class="container-fluid px-4 py-6">
     <div class="card card-padded mb-4">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
             <div>

@@ -15,6 +15,13 @@
     max-width: 100% !important;
 }
 
+/* Dashboard Metric Detail drill-down — wider layout override (contract_base 75% container)
+ * so table columns (Due Date, Award Date, Plan Gross, etc.) stop wrapping. */
+.metric-detail-page main > div.mx-auto {
+    width: 95% !important;
+    max-width: 95% !important;
+}
+
 .finance-audit-header-bar {
     /* base — open contract (green) */
     background-color: rgba(25, 135, 84, 0.12);
