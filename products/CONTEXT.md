@@ -45,7 +45,7 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
 ### Observatory (`/products/`, `products:observatory`)
 - Omnibox GET → `/products/search/?q=` (`products:portal_search`).
 - Classifier: 13-char NSN → redirect to dossier if one canonical match; 9-digit NIIN → NSN hits; 5-char CAGE → supplier NSN view if one match; else part-number/text search grouped on results page (50 per group).
-- Stats cached 10 minutes (`products:observatory_stats` cache key): total NSNs, NSNs with procurement coverage, total `NsnProcurementHistory` rows (plain unfiltered `NsnProcurementHistory.objects.count()` — verified 2026-07-07; any gap vs physical table row count is data drift), we-won awards, distinct approved-source CAGEs.
+- Stats cached 10 minutes (`products:observatory_stats` cache key): total NSNs, NSNs with procurement coverage, total `NsnProcurementHistory` rows (plain unfiltered `NsnProcurementHistory.objects.count()` — verified 2026-07-07; any gap vs physical table row count is data drift), canonical contract count (`contracts.Contract.objects.count()`), distinct approved-source CAGEs.
 - Recent activity: up to 10 `DibbsAward` rows with NSN. Ordering uses `-aw_file_date`, `-posted_date`, `-id` (not `award_date`). Dedup on `(award_basic_number, delivery_order_number)` keeps the first row seen in a bounded candidate window (400 most-recent rows by file/posted date) — avoids full-table `Window()` on MSSQL (~30s scan). Plus up to 10 latest modified `Nsn` rows after display-only filtering (see §20).
 
 ### NSN Dossier (`/products/nsn/<pk>/`, `products:nsn_detail`)
@@ -53,11 +53,11 @@ Panels (lazy-loaded sales/contracts data via `nsn_query_variants`):
 1. Identity header — formatted NSN, FSC/NIIN, part/rev, duplicate badge.
 2. Logistics — read-only + **Edit logistics** modal → POST `products:nsn_logistics_update`.
 3. Approved sources — `ApprovedSource` deduped on `(approved_cage, part_number)`; one batched `Supplier` query; `NoQuoteCAGE` badges; orphan count footer.
-4. Government purchase history (`NsnProcurementHistory`, 25 default, `?history=all`).
-5. Our activity — `SupplierQuote` + `DibbsAward`/`DibbsAwardMod`.
-6. Contracts — `Clin` + `IdiqContractDetails` FKs to `Nsn`; plus `DibbsAwardMod.matched_contract` linkages.
+4. Contracts — `Clin` + `IdiqContractDetails` FKs to `Nsn`; plus `DibbsAwardMod.matched_contract` linkages (left column, below Approved Sources).
+5. Government purchase history (`NsnProcurementHistory`, 25 default, `?history=all`).
+6. Our activity — `SupplierQuote` + `DibbsAward`/`DibbsAwardMod`.
 7. Demand history — `SolicitationLine` + parent `Solicitation` (25 default, `?demand=all`).
-8. Price intelligence chart (Chart.js 4.4.1, vendored static) — procurement, quotes, bids, awards series via `json_script`; rendered at the bottom of the dossier below all tabular panels.
+8. Price intelligence chart (Chart.js 4.4.1, vendored static) — procurement, quotes, bids, awards series via `json_script`; dual Y axes (unit price left, contract total right); rendered at the bottom of the dossier below all tabular panels.
 
 ### Supplier NSN View (`/products/supplier/<pk>/nsns/`, `products:supplier_nsns`)
 Approved on / Quoted us / Won / Manual capabilities (`SupplierNSN`). Without `cage_code`, only quote + manual panels with explanatory note. Paginate at 100 rows per panel.
@@ -174,6 +174,26 @@ The migration uses `SeparateDatabaseAndState` to avoid touching the existing dat
 - **Root cause (chart):** Chart.js 4.4.1 and chartjs-adapter-date-fns 3.0.0 loaded from `cdnjs.cloudflare.com`. No `django-csp` middleware in this repo, but GCC High / restricted egress can block external `<script>` tags silently — the init script exits when `typeof Chart === 'undefined'`. Vendoring removes the external dependency.
 - **Fix (chart):** Pin both libraries under `static/js/vendor/`; load via `{% static %}` + `cache_version` in `nsn_detail.html`.
 - **Fix (layout):** Move the Price Intelligence `<section>` to the bottom of `nsn_detail.html`, after Demand History.
+
+## 21. Portal integration and stat fixes (2026-07-07)
+
+### Main navigation
+- **NSN Portal** added to the site sidebar (`templates/base_template.html`) after Suppliers, before Reports — links to `products:observatory` (`/products/`). Sidebar list spacing tightened (`space-y-1`, `py-1` on `<li>`) so nine items fit within the prior eight-item vertical footprint; anchor `py-2` preserved for click targets.
+
+### NSN Dossier layout
+- **Contracts** panel (CLINs, IDIQ details, DIBBS MOD matches) moved from the right column to the left column, below Approved Sources. Left column order: Logistics → Approved Sources → Contracts. Right column: Government Purchase History → Our Activity → Demand History.
+
+### Price intelligence dual-axis chart
+- **Symptom:** Government-paid unit-price line appeared flat near zero when award contract totals (10–40× larger) shared the same Y axis.
+- **Fix:** Chart.js `y` (left) — "Unit price ($)" for `govt_paid`, `supplier_quoted`, `we_bid`. `y1` (right) — "Contract total ($)" with `grid.drawOnChartArea: false` for `Awards (other)` and `Awards (we won)`. Per-unit and contract-total series must never share one axis again.
+
+### Observatory "Awards we've won" stat
+- **Was:** `DibbsAward` rows flagged via `WeWonAward` / `we_won` (raw DIBBS scrape, unmatched noise).
+- **Now:** `contracts.Contract.objects.count()`. Rows in `contracts_contract` are canonical post-award wins created through processing finalization or manual entry — Open, Closed, and Canceled are all real contracts; there is no queue/draft state in this table. Company-wide count (Observatory stats are not company-scoped). DIBBS `we_won` data remains on dossier "Our activity" and Observatory "Recent awards" panels.
+
+### Observatory "With procurement history" stat returning 0
+- **Root cause:** Set intersection used raw `NsnProcurementHistory.nsn` strings against `Nsn.nsn_normalized` without normalization. Procurement rows are often hyphenated (`4810-01-124-3692`) while the catalog spine is 13-character bare (`4810011243692`), so the intersection was always empty despite dossier pages matching correctly via `nsn_query_variants()`.
+- **Fix:** Normalize both sides with `normalize_nsn()` before intersecting catalog codes with distinct procurement NSN values. Count = distinct catalog NSNs with at least one normalized match in procurement history.
 
 
 ## CSS Architecture

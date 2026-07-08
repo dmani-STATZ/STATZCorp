@@ -273,8 +273,8 @@
         <div class="sidebar-content">
             <img src="{% static 'images/StatzCorpColorFINAL.png' %}?v={{ cache_version }}-{% now 'U' %}" alt="STATZ Corp" style="height:48px;margin: 2.5rem 2rem 1.5rem 2rem;">
             <div class="ps-1 pe-0 pb-4">
-                <ul class="mt-6 space-y-2">
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer group relative has-submenu">
+                <ul class="mt-6 space-y-1">
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer group relative has-submenu">
                         <a href="{% url 'index' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Home</a>
                         <ul class="mt-1 pl-4 space-y-1 submenu">
                             <li>
@@ -282,13 +282,13 @@
                             </li>
                         </ul>
                     </li>
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'training:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Training</a>
                     </li>
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'inventory:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Inventory</a>
                     </li>
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer group relative has-submenu">
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer group relative has-submenu">
                         <a href="{% url 'contracts:contracts_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Contracts</a>
                         <ul class="mt-1 pl-4 space-y-1 submenu">
                             <li>
@@ -302,18 +302,21 @@
                             </li>
                         </ul>
                     </li>
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'sales:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">STATZ Sales</a>
                     </li>
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'suppliers:supplier_dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Suppliers</a>
                     </li>
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
+                        <a href="{% url 'products:observatory' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">NSN Portal</a>
+                    </li>
                     {% if user.is_authenticated %}
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'reports:hub' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">Reports</a>
                     </li>
                     {% endif %}
-                    <li class="py-2 ps-1 hover:text-green-700 cursor-pointer group relative has-submenu">
+                    <li class="py-1 ps-1 hover:text-green-700 cursor-pointer group relative has-submenu">
                         <span class="px-3 py-2 rounded-md text-sm font-medium menu-label">Tools</span>
                         <ul class="mt-1 pl-4 space-y-1 submenu">
                             <li>

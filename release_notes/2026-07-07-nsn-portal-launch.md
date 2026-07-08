@@ -36,3 +36,10 @@ You can now update **unit weight**, **dimensions**, and **packaging notes** dire
 - **CAGE search in the Observatory** correctly finds suppliers again when you enter a 5-character CAGE code (including codes stored with extra spacing in the database).
 - **Site header on portal pages** no longer hidden under a pinned panel title — the real header (logo, nav, company selector, theme toggle, user info) shows at the top of Observatory and Dossier pages, matching `/contracts/`.
 - **Price Intelligence chart** loads from vendored static files (Chart.js 4.4.1) so it renders in restricted environments; the panel now sits at the bottom of the NSN Dossier, below Demand History.
+
+## Fixes & Updates
+
+- **NSN Portal in the main menu** — open it from the sidebar (after Suppliers) without typing `/products/`.
+- **Contracts panel on the NSN Dossier** moved to the left column under Approved Sources so linked CLINs and contracts are easier to spot while reviewing an NSN.
+- **Price chart readability** — per-unit pricing (what the government paid, supplier quotes, our bids) and full contract award values now use separate scales so both lines are readable on the same chart.
+- **Observatory counts corrected** — "Awards we've won" now reflects contracts in our system (not raw DIBBS scrape rows), and "With procurement history" now counts NSNs that actually have government purchase data.

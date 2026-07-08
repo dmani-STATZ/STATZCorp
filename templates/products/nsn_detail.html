@@ -147,6 +147,62 @@
                     {% endif %}
                 </div>
             </section>
+
+            {# ============ CONTRACTS ============ #}
+            <section class="nsn-detail-panel mb-3">
+                <header class="nsn-detail-panel__head">
+                    <h2 class="nsn-detail-panel__title">Contracts</h2>
+                </header>
+                <div class="nsn-detail-panel__body">
+                    {% if contracts_panel.clins or contracts_panel.idiq_details or contracts_panel.mod_contracts %}
+                    {% if contracts_panel.clins %}
+                    <h3 class="h6 text-muted mb-2">CLINs</h3>
+                    <table class="table table-sm nsn-portal-table-compact mb-3">
+                        <thead><tr><th>Contract</th><th>CLIN</th><th>Status</th></tr></thead>
+                        <tbody>
+                            {% for clin in contracts_panel.clins %}
+                            <tr>
+                                <td><a href="{% url 'contracts:contract_management' clin.contract_id %}">{{ clin.contract.contract_number }}</a></td>
+                                <td><a href="{% url 'contracts:clin_detail' clin.pk %}">{{ clin.item_number }}</a></td>
+                                <td>{{ clin.contract.status.description|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                    {% if contracts_panel.idiq_details %}
+                    <h3 class="h6 text-muted mb-2">IDIQ details</h3>
+                    <table class="table table-sm nsn-portal-table-compact mb-3">
+                        <thead><tr><th>IDIQ</th><th>Supplier</th></tr></thead>
+                        <tbody>
+                            {% for det in contracts_panel.idiq_details %}
+                            <tr>
+                                <td><a href="{% url 'contracts:idiq_contract_detail' det.idiq_contract_id %}">{{ det.idiq_contract.contract_number }}</a></td>
+                                <td>{{ det.supplier.name|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                    {% if contracts_panel.mod_contracts %}
+                    <h3 class="h6 text-muted mb-2">Via DIBBS award MOD match</h3>
+                    <table class="table table-sm nsn-portal-table-compact mb-0">
+                        <thead><tr><th>Contract</th><th>MOD date</th></tr></thead>
+                        <tbody>
+                            {% for mod in contracts_panel.mod_contracts %}
+                            <tr>
+                                <td><a href="{% url 'contracts:contract_management' mod.matched_contract_id %}">{{ mod.matched_contract.contract_number }}</a></td>
+                                <td>{{ mod.mod_date|date:"M j, Y" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                    {% else %}
+                    <div class="nsn-detail-empty nsn-detail-empty--quiet">No linked contracts or CLINs for this NSN.</div>
+                    {% endif %}
+                </div>
+            </section>
         </div>
 
         <div class="col-lg-7">
@@ -265,62 +321,6 @@
                     </table>
                     {% else %}
                     <div class="nsn-detail-empty nsn-detail-empty--quiet">No DIBBS awards on file for this NSN.</div>
-                    {% endif %}
-                </div>
-            </section>
-
-            {# ============ CONTRACTS ============ #}
-            <section class="nsn-detail-panel mb-3">
-                <header class="nsn-detail-panel__head">
-                    <h2 class="nsn-detail-panel__title">Contracts</h2>
-                </header>
-                <div class="nsn-detail-panel__body">
-                    {% if contracts_panel.clins or contracts_panel.idiq_details or contracts_panel.mod_contracts %}
-                    {% if contracts_panel.clins %}
-                    <h3 class="h6 text-muted mb-2">CLINs</h3>
-                    <table class="table table-sm nsn-portal-table-compact mb-3">
-                        <thead><tr><th>Contract</th><th>CLIN</th><th>Status</th></tr></thead>
-                        <tbody>
-                            {% for clin in contracts_panel.clins %}
-                            <tr>
-                                <td><a href="{% url 'contracts:contract_management' clin.contract_id %}">{{ clin.contract.contract_number }}</a></td>
-                                <td><a href="{% url 'contracts:clin_detail' clin.pk %}">{{ clin.item_number }}</a></td>
-                                <td>{{ clin.contract.status.description|default:"—" }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% endif %}
-                    {% if contracts_panel.idiq_details %}
-                    <h3 class="h6 text-muted mb-2">IDIQ details</h3>
-                    <table class="table table-sm nsn-portal-table-compact mb-3">
-                        <thead><tr><th>IDIQ</th><th>Supplier</th></tr></thead>
-                        <tbody>
-                            {% for det in contracts_panel.idiq_details %}
-                            <tr>
-                                <td><a href="{% url 'contracts:idiq_contract_detail' det.idiq_contract_id %}">{{ det.idiq_contract.contract_number }}</a></td>
-                                <td>{{ det.supplier.name|default:"—" }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% endif %}
-                    {% if contracts_panel.mod_contracts %}
-                    <h3 class="h6 text-muted mb-2">Via DIBBS award MOD match</h3>
-                    <table class="table table-sm nsn-portal-table-compact mb-0">
-                        <thead><tr><th>Contract</th><th>MOD date</th></tr></thead>
-                        <tbody>
-                            {% for mod in contracts_panel.mod_contracts %}
-                            <tr>
-                                <td><a href="{% url 'contracts:contract_management' mod.matched_contract_id %}">{{ mod.matched_contract.contract_number }}</a></td>
-                                <td>{{ mod.mod_date|date:"M j, Y" }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% endif %}
-                    {% else %}
-                    <div class="nsn-detail-empty nsn-detail-empty--quiet">No linked contracts or CLINs for this NSN.</div>
                     {% endif %}
                 </div>
             </section>
@@ -492,6 +492,7 @@
             datasets.push({
                 label: 'Awards (other)',
                 data: lost,
+                yAxisID: 'y1',
                 borderColor: 'rgb(108, 117, 125)',
                 backgroundColor: 'rgba(108, 117, 125, 0.5)',
                 pointStyle: 'rectRot',
@@ -503,6 +504,7 @@
             datasets.push({
                 label: 'Awards (we won)',
                 data: won,
+                yAxisID: 'y1',
                 borderColor: 'rgb(220, 53, 69)',
                 backgroundColor: 'rgba(220, 53, 69, 0.85)',
                 pointStyle: 'star',
@@ -542,7 +544,15 @@
             scales: {
                 x: xScale,
                 y: {
-                    title: { display: true, text: 'Unit price / total' },
+                    title: { display: true, text: 'Unit price ($)' },
+                    ticks: {
+                        callback: function (v) { return '$' + Number(v).toLocaleString(); },
+                    },
+                },
+                y1: {
+                    position: 'right',
+                    title: { display: true, text: 'Contract total ($)' },
+                    grid: { drawOnChartArea: false },
                     ticks: {
                         callback: function (v) { return '$' + Number(v).toLocaleString(); },
                     },

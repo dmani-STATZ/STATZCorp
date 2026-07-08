@@ -165,24 +165,26 @@ class ObservatoryView(LoginRequiredMixin, TemplateView):
         if cached is not None:
             return cached
 
+        from contracts.models import Contract
         from sales.models.solicitations import NsnProcurementHistory
         from sales.models.approved_sources import ApprovedSource
-        from sales.models.awards import DibbsAward, WeWonAward
 
         total_nsns = Nsn.objects.count()
-        catalog_normalized = set(
-            Nsn.objects.exclude(nsn_normalized='').values_list('nsn_normalized', flat=True)
-        )
-        procurement_nsns = set(
-            NsnProcurementHistory.objects.values_list('nsn', flat=True).distinct()
-        )
-        nsns_with_history = len(catalog_normalized & procurement_nsns)
+        catalog_normalized = set()
+        for normalized, nsn_code in Nsn.objects.values_list('nsn_normalized', 'nsn_code'):
+            norm = normalized or normalize_nsn(nsn_code or '')
+            if norm:
+                catalog_normalized.add(norm)
+        procurement_normalized = {
+            normalize_nsn(nsn_val)
+            for nsn_val in NsnProcurementHistory.objects.values_list('nsn', flat=True).distinct()
+            if normalize_nsn(nsn_val)
+        }
+        nsns_with_history = len(catalog_normalized & procurement_normalized)
         # Plain unfiltered table count — verified 2026-07-07; gap vs physical rows is data drift.
         total_procurement_records = NsnProcurementHistory.objects.count()
-        awards_won = DibbsAward.objects.filter(
-            id__in=WeWonAward.objects.values('id'),
-            is_faux=False,
-        ).count()
+        # Contract rows are canonical post-award wins (Open/Closed/Canceled); not DIBBS scrape noise.
+        awards_won = Contract.objects.count()
         active_approved_cages = (
             ApprovedSource.objects.exclude(approved_cage='')
             .values('approved_cage')
