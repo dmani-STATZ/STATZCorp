@@ -195,6 +195,12 @@ The migration uses `SeparateDatabaseAndState` to avoid touching the existing dat
 - **Root cause:** Set intersection used raw `NsnProcurementHistory.nsn` strings against `Nsn.nsn_normalized` without normalization. Procurement rows are often hyphenated (`4810-01-124-3692`) while the catalog spine is 13-character bare (`4810011243692`), so the intersection was always empty despite dossier pages matching correctly via `nsn_query_variants()`.
 - **Fix:** Normalize both sides with `normalize_nsn()` before intersecting catalog codes with distinct procurement NSN values. Count = distinct catalog NSNs with at least one normalized match in procurement history.
 
+### Portal omnibox search returning zero NSN/NIIN hits (2026-07-09)
+- **Hypothesis tested:** `normalize_nsn()` drift vs stored `nsn_normalized`. **Refuted** — git history shows `normalize_nsn()` unchanged since the NSN Portal shipped (2026-07-07); only `is_plausible_nsn()` was added later.
+- **Confirmed root cause:** Portal search paths (`_search_nsn_full`, `_search_niin`, `_nsn_pk_for_code`) filter exclusively on the indexed `nsn_normalized` column. Rows inserted or updated by the SQL Server `Migrate2_contracts_nsn` MERGE bypass ORM `save()` and leave `nsn_normalized=""` while `nsn_code` is populated — dossier pages load by pk and never re-normalize, so they appear healthy while every NSN/NIIN lookup silently returns nothing. CAGE and free-text description search use other columns and were unaffected.
+- **Drift counts (local MSSQL dev, 43 rows):** before fix `normalize_nsn(nsn_code) != nsn_normalized` → **0**; `nsn_code` populated but `nsn_normalized` empty → **0**. Production (~13k rows) expected to show the empty-column pattern on MERGE-sourced rows; run `python manage.py backfill_nsn_normalized` there and inspect `SELECT COUNT(*) FROM contracts_nsn WHERE nsn_code IS NOT NULL AND nsn_code <> '' AND (nsn_normalized IS NULL OR nsn_normalized = '')`.
+- **Fix:** (1) Idempotent `backfill_nsn_normalized` to repopulate the column. (2) `_nsns_matching_normalized()` / `_nsns_matching_niin()` in `products/views.py` — primary `nsn_normalized` index lookup, then sargable `nsn_code__in=nsn_query_variants()` / bounded NIIN fallback so search works before backfill completes. Regression tests: `test_golden_production_nsn`, `test_full_nsn_matches_when_nsn_normalized_empty`, `test_niin_matches_when_nsn_normalized_empty`.
+
 
 ## CSS Architecture
 

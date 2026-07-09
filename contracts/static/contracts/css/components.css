@@ -407,6 +407,29 @@ tfoot .grand-total-row td {
     margin-bottom: 0.5rem;
 }
 
+.clin-sibling-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+    padding: 0.25rem 1rem 0.5rem;
+}
+
+.clin-sibling-link {
+    font-size: 0.8rem;
+    color: var(--bs-primary);
+    text-decoration: none;
+}
+
+.clin-sibling-link:hover {
+    text-decoration: underline;
+}
+
+.clin-sibling-current {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--bs-body-color);
+}
+
 .clin-detail-sidebar .nav-link {
     color: var(--bs-body-color);
     border-left: 3px solid transparent;

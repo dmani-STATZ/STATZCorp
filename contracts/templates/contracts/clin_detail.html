@@ -118,6 +118,17 @@ function refreshClinShipQty() {
             <a class="nav-link" href="#clin-financials">Financials</a>
             <a class="nav-link" href="#clin-history">Change History</a>
             <br>
+            <p class="clin-sidebar-label">CLINs</p>
+            <div class="clin-sibling-nav">
+                {% for sibling in sibling_clins %}
+                    {% if sibling.pk == clin.pk %}
+                        <span class="clin-sibling-current">{{ sibling.item_number }}</span>
+                    {% else %}
+                        <a href="{% url 'contracts:clin_detail' pk=sibling.pk %}" class="clin-sibling-link">{{ sibling.item_number }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            <br>
             {% if request.user.is_staff %}
             <a href="{% url 'contracts:clin_delete' clin.pk %}"
                class="nav-link text-danger">

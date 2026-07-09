@@ -36,22 +36,74 @@ _DIGITS_9_RE = re.compile(r'^\d{9}$')
 _ALNUM_5_RE = re.compile(r'^[A-Za-z0-9]{5}$')
 
 
+def _canonical_nsn_from_rows(rows):
+    if not rows:
+        return None
+    ordered = list(rows)
+    ordered.sort(key=lambda n: (-nsn_populated_score(n), n.pk))
+    return ordered[0]
+
+
+def _nsns_matching_normalized(normalized, raw_hint=''):
+    """Match by indexed nsn_normalized, then sargable nsn_code variants."""
+    if not normalized:
+        return []
+    matches = list(Nsn.objects.filter(nsn_normalized=normalized))
+    if matches:
+        return matches
+    variants = nsn_query_variants(raw_hint or normalized)
+    if not variants:
+        return []
+    return list(Nsn.objects.filter(nsn_code__in=variants))
+
+
+def _nsns_matching_niin(niin, limit=50):
+    if not niin:
+        return []
+    hits = list(
+        Nsn.objects.filter(nsn_normalized__endswith=niin).order_by('nsn_code')[:limit]
+    )
+    if hits:
+        return hits
+    prefix = niin[:4]
+    suffix = niin[-4:]
+    candidates = (
+        Nsn.objects.exclude(nsn_code__isnull=True)
+        .exclude(nsn_code='')
+        .filter(Q(nsn_code__icontains=prefix) | Q(nsn_code__icontains=suffix))
+        .order_by('nsn_code')[:500]
+    )
+    hits = []
+    for row in candidates:
+        norm = row.nsn_normalized or normalize_nsn(row.nsn_code or '')
+        if len(norm) == 13 and norm.endswith(niin):
+            hits.append(row)
+        if len(hits) >= limit:
+            break
+    return hits
+
+
 def _duplicate_count_for(nsn):
     normalized = nsn.nsn_normalized or normalize_nsn(nsn.nsn_code or '')
     if not normalized:
         return 0
-    return Nsn.objects.filter(nsn_normalized=normalized).count()
+    count = Nsn.objects.filter(nsn_normalized=normalized).count()
+    if count:
+        return count
+    variants = nsn_query_variants(nsn.nsn_code or normalized)
+    if not variants:
+        return 0
+    return Nsn.objects.filter(nsn_code__in=variants).count()
 
 
-def _resolve_canonical_nsn_queryset(normalized):
+def _resolve_canonical_nsn_queryset(normalized, raw_hint=''):
     """Return queryset ordered canonical-first for a normalized code."""
     if not normalized:
         return Nsn.objects.none()
-    rows = list(Nsn.objects.filter(nsn_normalized=normalized))
-    if not rows:
+    canonical = _canonical_nsn_from_rows(_nsns_matching_normalized(normalized, raw_hint))
+    if not canonical:
         return Nsn.objects.none()
-    rows.sort(key=lambda n: (-nsn_populated_score(n), n.pk))
-    return Nsn.objects.filter(pk=rows[0].pk)
+    return Nsn.objects.filter(pk=canonical.pk)
 
 
 def _batched_suppliers_by_cage(cage_codes):
@@ -124,11 +176,10 @@ def _nsn_pk_for_code(nsn_code):
     normalized = normalize_nsn(nsn_code or '')
     if not normalized:
         return None
-    rows = list(Nsn.objects.filter(nsn_normalized=normalized))
-    if not rows:
-        return None
-    rows.sort(key=lambda n: (-nsn_populated_score(n), n.pk))
-    return rows[0].pk
+    canonical = _canonical_nsn_from_rows(
+        _nsns_matching_normalized(normalized, nsn_code or '')
+    )
+    return canonical.pk if canonical else None
 
 
 class ObservatoryView(LoginRequiredMixin, TemplateView):
@@ -257,7 +308,7 @@ def portal_search(request):
 
 
 def _search_nsn_full(request, normalized, raw_stripped):
-    matches = list(Nsn.objects.filter(nsn_normalized=normalized))
+    matches = _nsns_matching_normalized(normalized, raw_stripped)
     if len(matches) == 1:
         return redirect('products:nsn_detail', pk=matches[0].pk)
     if len(matches) > 1:
@@ -280,10 +331,7 @@ def _search_nsn_full(request, normalized, raw_stripped):
 def _search_niin(request, niin):
     from sales.models.solicitations import SolicitationLine
 
-    nsn_hits = list(
-        Nsn.objects.filter(nsn_normalized__endswith=niin)
-        .order_by('nsn_code')[:50]
-    )
+    nsn_hits = _nsns_matching_niin(niin)
     line_nsns = list(
         SolicitationLine.objects.filter(niin=niin)
         .values_list('nsn', flat=True)

@@ -227,6 +227,8 @@ The stored procedure **`Migrate2_contracts_nsn`** MERGEs rows into **`contracts_
 
 **Recovery:** run `python manage.py backfill_nsn_normalized` after any bulk proc MERGE (idempotent — only updates rows where stored value differs from computed).
 
+**Search breakage:** portal omnibox NSN/NIIN paths filter on `nsn_normalized` only — blank MERGE rows return zero hits while dossier-by-pk still works. **Always run backfill after any `normalize_nsn()` change or bulk SQL write to `contracts_nsn`.** Enforcement: `products/tests/test_nsn_utils.py::test_golden_production_nsn` (locks function output) and `products/tests/test_search.py::test_full_nsn_matches_when_nsn_normalized_empty` (locks search fallback).
+
 **Manual T-SQL snippet** — extend the proc's MERGE `UPDATE`/`INSERT` column list in SSMS (*not* applied by Django migrations):
 
 ```sql

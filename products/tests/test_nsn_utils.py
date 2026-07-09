@@ -27,6 +27,10 @@ class NormalizeNsnTests(SimpleTestCase):
         self.assertEqual(normalize_nsn(''), '')
         self.assertEqual(normalize_nsn(None), '')
 
+    def test_golden_production_nsn(self):
+        """Lock normalize_nsn output — portal search indexes on this value."""
+        self.assertEqual(normalize_nsn('4810-01-124-3692'), '4810011243692')
+
 
 class FormatNsnTests(SimpleTestCase):
     def test_thirteen_char_normalized(self):

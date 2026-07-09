@@ -63,6 +63,11 @@ class ClinDetailView(ActiveCompanyQuerysetMixin, DetailView):
         context['clinshipment_content_type_id'] = ContentType.objects.get_for_model(ClinShipment).id
         context['clin_splits'] = clin.splits.all()
         context['clin_has_shipments'] = clin.shipments.exists()
+        context["sibling_clins"] = (
+            Clin.objects.filter(contract=self.object.contract)
+            .only("id", "item_number")
+            .order_by("item_number")
+        )
         return context
 
 

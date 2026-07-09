@@ -40,6 +40,24 @@ class PortalSearchClassifierTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'WIDGET-42')
 
+    def test_full_nsn_matches_when_nsn_normalized_empty(self):
+        """SQL MERGE rows can have nsn_code set but nsn_normalized blank."""
+        self.nsn.nsn_code = '4810-01-124-3692'
+        self.nsn.save()
+        Nsn.objects.filter(pk=self.nsn.pk).update(nsn_normalized='')
+        resp = self.client.get(reverse('products:portal_search'), {'q': '4810-01-124-3692'})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse('products:nsn_detail', kwargs={'pk': self.nsn.pk}))
+
+    def test_niin_matches_when_nsn_normalized_empty(self):
+        self.nsn.nsn_code = '4810-01-124-3692'
+        self.nsn.save()
+        Nsn.objects.filter(pk=self.nsn.pk).update(nsn_normalized='')
+        niin = normalize_nsn('4810011243692')[4:]
+        resp = self.client.get(reverse('products:portal_search'), {'q': niin})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '4810-01-124-3692')
+
     def test_cage_single_supplier_redirects_to_supplier_nsns(self):
         supplier = Supplier.objects.create(name='Acme Supply', cage_code='1BRD5')
         resp = self.client.get(reverse('products:portal_search'), {'q': '1BRD5'})
