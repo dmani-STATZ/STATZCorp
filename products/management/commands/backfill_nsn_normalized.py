@@ -23,7 +23,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         updated = 0
         batch = []
-        for row in Nsn.objects.all().only('pk', 'nsn_code', 'nsn_normalized').iterator(chunk_size=2000):
+        rows = list(
+            Nsn.objects.all().only('pk', 'nsn_code', 'nsn_normalized').iterator(chunk_size=2000)
+        )
+        for row in rows:
             computed = _normalize_nsn(row.nsn_code or '')
             if row.nsn_normalized != computed:
                 row.nsn_normalized = computed

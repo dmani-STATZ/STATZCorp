@@ -14,7 +14,10 @@ def _normalize_nsn(value):
 def backfill_nsn_normalized(apps, schema_editor):
     Nsn = apps.get_model('products', 'Nsn')
     batch = []
-    for row in Nsn.objects.all().only('pk', 'nsn_code', 'nsn_normalized').iterator(chunk_size=2000):
+    rows = list(
+        Nsn.objects.all().only('pk', 'nsn_code', 'nsn_normalized').iterator(chunk_size=2000)
+    )
+    for row in rows:
         computed = _normalize_nsn(row.nsn_code or '')
         if row.nsn_normalized != computed:
             row.nsn_normalized = computed
