@@ -17,13 +17,14 @@ Defines how to safely modify the `products` app for AI coding agents and develop
 - `Nsn` model (stored in legacy table `contracts_nsn`), including `nsn_normalized` (migration `0003`/`0004`), packout/logistics fields, and `products/nsn_utils.py`
 - **NSN Portal** — Observatory (`/products/`), Dossier (`/products/nsn/<pk>/`), Supplier NSN View (`/products/supplier/<pk>/nsns/`), omnibox search (`/products/search/`)
 - `NsnLogisticsForm` + `nsn_logistics_update` — **sole portal write path** (logistics modal POST)
-- `management/commands/backfill_nsn_normalized.py` — idempotent `nsn_normalized` recovery after raw SQL writes
+- `management/commands/backfill_nsn_normalized.py` — idempotent `nsn_normalized` recovery after raw SQL writes (blanks overflow rows)
+- `management/commands/list_unnormalized_nsns.py` — rerunnable audit of `nsn_code` values that normalize to >13 characters
 - URL namespace `products` with portal routes plus shims: `nsn_edit`, `nsn_search` → `contracts/views`
 - Admin registrations for both models
 - Portal templates: `observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`, plus `nsn_edit.html` (extend `contract_base.html` only — no header/footer overrides)
 - `products/templatetags/nsn_filters.py` — `|format_nsn` display filter for all portal NSN output
 - Local views: `ObservatoryView`, `portal_search`, `NsnDetailView`, `nsn_logistics_update`, `SupplierNsnView`
-- Unit tests: `products/tests/test_nsn_utils.py`, `products/tests/test_search.py`
+- Unit tests: `products/tests/test_nsn_utils.py`, `products/tests/test_search.py`, `products/tests/test_nsn_normalized.py`
 
 **Does NOT own:**
 - NSN edit/update form rendering — lives in `contracts/views/nsn_views.py` (`NsnUpdateView`)
@@ -31,7 +32,7 @@ Defines how to safely modify the `products` app for AI coding agents and develop
 - NSN form definition — lives in `contracts/forms.py` (`NsnForm`); portal logistics edits use `products/forms.py` (`NsnLogisticsForm`) — keep both in sync when packout fields change
 - NSN API endpoint for select widgets — lives in `contracts/views/api_views.py`
 - `sales.ApprovedSource` data — `products` reads this model from the NSN detail view (`get_approved_sources_data`) but does not own its schema, import logic, or admin. Any schema change to `ApprovedSource` (especially renaming `nsn`, `approved_cage`, `part_number`, `company_name`, or `import_batch`) is the sales app's responsibility, but it silently breaks the NSN detail page if the read site here is not updated in the same change.
-- No services, signals, or tasks beyond `backfill_nsn_normalized` management command
+- No services, signals, or tasks beyond `backfill_nsn_normalized` / `list_unnormalized_nsns` management commands
 
 This app started as **glue/domain infrastructure** but now also owns a real read-focused detail page and a small JSON packout endpoint. Treat `models.py`, `views.py`, `urls.py`, and `migrations/` as the blast radius for most change types.
 
@@ -225,7 +226,9 @@ None for periodic jobs. `AuditModel.save()` timestamps remain the only model aut
 
 The stored procedure **`Migrate2_contracts_nsn`** MERGEs rows into **`contracts_nsn`** outside the Django ORM. It is **not** in this repository — it lives in SQL Server and must be maintained manually in SSMS. ORM `Nsn.save()` populates `nsn_normalized`, but proc-driven MERGEs leave that column at default `""` until backfilled.
 
-**Recovery:** run `python manage.py backfill_nsn_normalized` after any bulk proc MERGE (idempotent — only updates rows where stored value differs from computed).
+**Recovery:** run `python manage.py backfill_nsn_normalized` after any bulk proc MERGE (idempotent — only updates rows where stored value differs from computed; overflow rows left blank).
+
+**Overflow / malformed `nsn_code`:** Do **not** widen `nsn_normalized` past `max_length=13`. When `normalize_nsn(nsn_code)` is longer than 13 (typos with extra digits, drawing numbers, non-NSN identifiers), `Nsn.save()`, migration `0004`, and `backfill_nsn_normalized` all set `nsn_normalized=''` — never truncate into the column. Durable audit: `python manage.py list_unnormalized_nsns`.
 
 **Search breakage:** portal omnibox NSN/NIIN paths filter on `nsn_normalized` only — blank MERGE rows return zero hits while dossier-by-pk still works. **Always run backfill after any `normalize_nsn()` change or bulk SQL write to `contracts_nsn`.** Enforcement: `products/tests/test_nsn_utils.py::test_golden_production_nsn` (locks function output) and `products/tests/test_search.py::test_full_nsn_matches_when_nsn_normalized_empty` (locks search fallback).
 
@@ -285,6 +288,8 @@ After editing, verify manually:
 - **`ApprovedSource.approved_cage` is a string field, not an FK to `Supplier`.** CAGE codes that don't resolve to a `Supplier` row are normal — the template renders them with a "not in supplier database" indicator. Do not filter unresolved rows out of the panel; the data-quality signal is intentional.
 
 - **`is_plausible_nsn()` is Observatory display-only.** Do not use it in search, dossier querysets, or stats counts. It exists solely to filter the "Recently updated NSNs" panel.
+
+- **`nsn_normalized` max_length=13 is locked.** Malformed / non-NSN `nsn_code` values that normalize longer than 13 must stay blank on `nsn_normalized` (save path, backfill, and migration `0004`). Do not truncate into the column and do not widen the field. Use `list_unnormalized_nsns` for cleanup lists — not a one-time migration log.
 
 - **CAGE-to-Supplier resolution in `NsnDetailView.get_approved_sources_data` uses a single batched query** (`Supplier.objects.filter(cage_code__in=cage_set)`) producing a `{cage: supplier}` dict. Do NOT refactor this into per-row queries — at scale (an NSN with 50 approved sources) that becomes a 50-query page load that bypasses the existing `select_related` optimisations elsewhere on the page.
 

@@ -26,7 +26,8 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
 - `templatetags/nsn_filters.py` – `|format_nsn` template filter for portal display (wraps `format_nsn()`; display-only).
 - `forms.py` – `NsnLogisticsForm` (portal sole write path for weight/dims/packaging notes).
 - `views.py` – `ObservatoryView`, `portal_search`, `NsnDetailView`, `nsn_logistics_update`, `SupplierNsnView`.
-- `management/commands/backfill_nsn_normalized.py` – idempotent recovery after raw SQL MERGE into `contracts_nsn`.
+- `management/commands/backfill_nsn_normalized.py` – idempotent recovery after raw SQL MERGE into `contracts_nsn` (skips / blanks overflow rows).
+- `management/commands/list_unnormalized_nsns.py` – rerunnable audit of `nsn_code` values that normalize to more than 13 characters.
 - `urls.py` – Portal routes plus shims to `contracts.views.NsnUpdateView` / `NsnSearchView`.
 - `admin.py` – Registers `Nsn` and `SupplierNSNCapability` with useful `list_display`/`search_fields` so staff can find records quickly.
 - `templates/products/nsn_edit.html` – Extends `contracts/contract_base.html`, renders the `NsnForm` sections (NSN info, description, notes), and re-uses `contracts/includes/simple_field.html` for consistent styling.
@@ -35,7 +36,7 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
 
 ## 5. Data Model / Domain Objects
 - **`AuditModel` (abstract):** Adds `created_by`/`modified_by` FK to `auth.User`, timestamps with `timezone.now`, and overrides `save()` so `created_on` is set once and `modified_on` always updates just before persisting.
-- **`Nsn`:** Core model (`contracts_nsn`). Includes `nsn_normalized` (CharField max 13, `blank=True`, `default=""`, `db_index=True`, populated in `save()` via `normalize_nsn(nsn_code)`). **No uniqueness constraint on `nsn_code`** — duplicates possible; dossier shows a data-quality badge linking to admin when `duplicate_count > 1`. Packout/logistics fields: `unit_weight`, `unit_length`, `unit_width`, `unit_height`, `packaging_notes`. M2M `suppliers` through `SupplierNSNCapability` exists in schema only — portal must not read it.
+- **`Nsn`:** Core model (`contracts_nsn`). Includes `nsn_normalized` (CharField max 13, `blank=True`, `default=""`, `db_index=True`, populated in `save()` via `normalize_nsn(nsn_code)`). When `normalize_nsn(nsn_code)` exceeds 13 characters (NSN typos with extra digits, or non-NSN identifiers mis-stored in `nsn_code`), `nsn_normalized` is intentionally left blank — never truncated, never widened. Audit with `python manage.py list_unnormalized_nsns`. **No uniqueness constraint on `nsn_code`** — duplicates possible; dossier shows a data-quality badge linking to admin when `duplicate_count > 1`. Packout/logistics fields: `unit_weight`, `unit_length`, `unit_width`, `unit_height`, `packaging_notes`. M2M `suppliers` through `SupplierNSNCapability` exists in schema only — portal must not read it.
 - **`SupplierNSNCapability`:** The `supplier_nsn_capability` table that connects an `Nsn` to a `Supplier` and stores `lead_time_days`/`price_reference`. There are no extra methods, so the table is purely data with the M2M relationship on `Nsn`.
 
   **Deprecated in practice (as of 2026-04-26):** `SupplierNSNCapability` is not surfaced anywhere in the v1 NSN detail UI. The active source of truth for "which suppliers can supply this NSN" is `sales.ApprovedSource` — a daily DLA-published feed keyed by NSN code (string) and CAGE code (string), surfaced on the NSN detail page via `NsnDetailView.get_approved_sources_data`. `SupplierNSNCapability` is retained in the schema for backward compatibility, still registered in admin, and still wired through `Nsn.suppliers` (M2M `through=`), but it has no documented creation flow and no production data. Do not write new code that reads from it; do not delete it without a migration plan.
@@ -111,15 +112,16 @@ All other logic (search throttles, redirect decisions, JSON responses) lives in 
 - No additional decorators, permission classes, or object-level filters exist in `products` itself; any tightening must happen in the `contracts` views this app relies on.
 
 ## 14. Background Processing / Scheduled Work
-None. There are no Celery tasks, periodic jobs, signals, or management commands in `products`.
+No Celery tasks or periodic jobs. Management commands:
+- `backfill_nsn_normalized` — idempotent ORM recovery after raw SQL MERGE; blanks overflow (>13 normalized chars).
+- `list_unnormalized_nsns` — durable audit list of overflow / malformed `nsn_code` rows.
 
 ## 15. Testing Coverage
-`products/tests/test_nsn_utils.py` and `products/tests/test_search.py` cover normalization utilities and the omnibox classifier. Run:
+`products/tests/test_nsn_utils.py`, `products/tests/test_search.py`, and `products/tests/test_nsn_normalized.py` cover normalization utilities, the omnibox classifier, the `nsn_normalized` overflow guard on `save()`, and `list_unnormalized_nsns`. Run:
 
 ```bash
-python manage.py test products.tests.test_nsn_utils products.tests.test_search
+python manage.py test products.tests.test_nsn_utils products.tests.test_search products.tests.test_nsn_normalized
 ```
-
 ## 16. Migrations / Schema Notes
 `0001_initial.py` is the sole migration. It depends on `settings.AUTH_USER_MODEL` and `suppliers.0001_initial`.
 - `contracts_nsn` is created with the audit fields, descriptive columns, and is set as the table that `contracts` already expects (`db_table` is hardcoded to keep legacy SQL/views stable).
@@ -131,6 +133,7 @@ The migration uses `SeparateDatabaseAndState` to avoid touching the existing dat
 - Every view/template for NSN editing/search lives in `contracts`, so renaming a field (e.g., `directory_url`) touches multiple apps, templates, and API responses.
 - Automated coverage lives in `products/tests/test_nsn_utils.py` and `products/tests/test_search.py`; schema changes still carry risk in coupled `contracts` code paths.
 - **`contracts_nsn` test/seed rows (open data-quality item):** Production reports non-NSN `nsn_code` values (e.g. `M1NAV20000403`) and `modified_on` dates far in the future (e.g. 2099-09-30) surfacing in the Observatory "Recently updated NSNs" panel. Local dev MSSQL (verified 2026-07-07) has **41** total `Nsn` rows and **0** future-dated or implausible codes — the junk appears production-specific, likely from manual/SQL seeding rather than a display bug. **Do not delete rows in a display fix.** The Observatory now filters these at render time via `is_plausible_nsn()` + `modified_on__lte=now`; underlying rows remain for a separate cleanup decision. Re-run `Nsn.objects.filter(modified_on__gt=timezone.now())` and scan non-13-char `nsn_code` values in production to capture exact row count and sample PKs before archival.
+- **`nsn_normalized` overflow (>13 chars):** ~52 production rows have `nsn_code` values that normalize longer than the column allows (extra-digit typos, drawing numbers, `M1222ST4N...NCNN`-pattern codes). Column stays `max_length=13`. Migration `0004`, `Nsn.save()`, and `backfill_nsn_normalized` all set `nsn_normalized=''` for those rows. Durable audit: `python manage.py list_unnormalized_nsns`.
 
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
 - Search the `contracts` app for `nsn_code`, `description`, and any `Nsn` references before renaming model fields—the forms, templates (`clin_form.html`, `contract_management.html`, `idiq_contract_detail.html`), and API responses all assume those attributes.

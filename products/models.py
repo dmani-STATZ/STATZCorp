@@ -77,7 +77,8 @@ class Nsn(AuditModel):
     def save(self, *args, **kwargs):
         from products.nsn_utils import normalize_nsn
 
-        self.nsn_normalized = normalize_nsn(self.nsn_code or '')
+        computed = normalize_nsn(self.nsn_code or '')
+        self.nsn_normalized = computed if len(computed) <= 13 else ''
         super().save(*args, **kwargs)
 
     def __str__(self):
