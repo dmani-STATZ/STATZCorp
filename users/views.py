@@ -4,7 +4,6 @@ from urllib.parse import urlparse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from .forms import (
-    UserRegisterForm,
     BaseForm,
     AdminLoginForm,
     PasswordChangeForm,
@@ -43,7 +42,7 @@ from .models import (
 )
 from contracts.models import Company
 from django.contrib.auth.models import User
-from django.urls import resolve, reverse
+from django.urls import reverse
 import logging
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.http import require_POST
@@ -433,56 +432,6 @@ def switch_company(request):
     messages.success(request, f'Active company set to {company.name}.')
     return redirect(next_url)
 
-def is_staff(user):
-    return user.is_staff
-
-@user_passes_test(is_staff)
-def debug_app_permissions(request):
-    """A debug view to see all current app permissions in the database"""
-    users = User.objects.all()
-    
-    # Build a dictionary of all permissions
-    permissions_data = {}
-    
-    for user in users:
-        permissions = AppPermission.objects.filter(user=user)
-        user_permissions = {}
-        
-        for perm in permissions:
-            user_permissions[perm.app_name_id] = perm.has_access
-        
-        permissions_data[user.username] = {
-            'user_id': user.id,
-            'permissions': user_permissions
-        }
-    
-    return JsonResponse({
-        'app_permissions': permissions_data,
-        'total_users': users.count(),
-        'total_permissions': AppPermission.objects.count()
-    })
-
-def test_app_name(request):
-    """Test view to determine the current app_name"""
-    resolved = resolve(request.path_info)
-    app_name = resolved.app_name
-    namespace = resolved.namespace
-    url_name = resolved.url_name
-    view_name = f"{namespace}:{url_name}" if namespace else url_name
-    
-    logger.info(f"app_name: {app_name}")
-    logger.info(f"namespace: {namespace}")
-    logger.info(f"url_name: {url_name}")
-    logger.info(f"view_name: {view_name}")
-    
-    return JsonResponse({
-        'app_name': app_name,
-        'namespace': namespace,
-        'url_name': url_name,
-        'view_name': view_name,
-        'path': request.path_info,
-    })
-
 @login_required
 def save_user_setting(request):
     """Handle saving user settings via AJAX"""
@@ -658,27 +607,6 @@ def ajax_get_setting_types(request):
             'success': False,
             'message': f"Error: {str(e)}"
         }, status=400)
-
-@login_required
-def check_auth_method(request):
-    """
-    Check and display the user's authentication method
-    For debugging purposes
-    """
-    auth_method = request.session.get('auth_method', 'unknown')
-    logger.info(f"User {request.user.username} authenticated via {auth_method}")
-    
-    # Check if microsoft token exists
-    ms_token = request.session.get('microsoft_token', None)
-    ms_token_status = "exists" if ms_token else "missing"
-    
-    return JsonResponse({
-        'username': request.user.username,
-        'email': request.user.email,
-        'auth_method': auth_method,
-        'microsoft_token_status': ms_token_status,
-        'is_authenticated': request.user.is_authenticated,
-    })
 
 class SystemMessageListView(LoginRequiredMixin, ListView):
     """View for displaying all system messages for a user."""

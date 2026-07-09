@@ -135,7 +135,6 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 - **`LoginRequiredMiddleware` bypass list is security-critical.** Any addition to the public URL list must be intentional. Wildcard bypasses (`/users/microsoft/*`) exist for a reason — understand the scope before modifying.
 - **`AppPermissionAdmin.save_model()` deletes all existing permissions before recreating them.** This is intentional but dangerous if the form submission is partial. Do not change this flow without understanding the full replace semantics.
 - **`UserOAuthToken` stores access tokens.** Do not add logging, exports, or admin list views that expose `access_token` or `refresh_token` fields.
-- **`debug_app_permissions` and `debug_auth_config` views** expose internal state. Confirm they are protected or restricted before deploying. Currently: `debug_auth_config` is a `View` subclass — verify it has auth guards.
 - **`portal_events_export_csv`** outputs event data including `is_private` events. Verify the queryset filters correctly by organizer/attendee before changing the export logic.
 - **Password forms enforce an 8-character minimum in Python.** Do not remove these checks or move them to client-side only.
 - **`ActiveCompanyMiddleware`** skips membership checks for superusers. This is intentional — do not accidentally apply membership restrictions to superusers.

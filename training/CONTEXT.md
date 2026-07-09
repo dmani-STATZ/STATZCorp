@@ -18,7 +18,7 @@ The `training` app is the compliance training hub inside STATZCorp, pairing acco
 ## 4. Key Files and What They Do
 - `models.py`: declares `Course`, `Account`, `Matrix`, `UserAccount`, `Tracker`, `TrainingDoc`, `CourseReviewClick`, `ArcticWolfCourse`, and `ArcticWolfCompletion`; includes helpers such as `get_frequency_expiration_date` and `Tracker.expiration_date`.
 - `views.py`: contains the bulk of business logic (dashboard metrics, matrix persistence, requirement rendering, uploads, audits, PDF exports, AW link flows, email helpers, admin uploads, helper functions like `get_completion_status`).
-- `forms.py`: supplies `BaseFormMixin`/`BaseModelForm`, forms for `Course`, `Account`, `Matrix`, `ArcticWolfCourse`, and branded `MatrixManagementForm`, `CmmcDocumentUploadForm`, `TrainingDocForm` with styling and validation logic.
+- `forms.py`: supplies `BaseFormMixin`/`BaseModelForm`, forms for `Course`, `Account`, `Matrix`, `ArcticWolfCourse`, and branded `CmmcDocumentUploadForm`, `TrainingDocForm` with styling and validation logic.
 - `admin.py`: registers all models, wires `TrainingDocInline` into `CourseAdmin`, and customizes `UserAccountAdmin` to restrict the `user` dropdown to active accounts.
 - `urls.py`: exposes the training surface at `/training/` with named routes for dashboards, matrix management, audit/export, AW flows, and uploads.
 - `templates/training/`: houses the UI surface (`dashboard.html`, `manage_matrix.html`, `user_requirements.html`, `admin_cmmc_upload.html`, AW templates, `training_base.html`).
@@ -63,7 +63,7 @@ The `training` app is the compliance training hub inside STATZCorp, pairing acco
 ## 9. Forms, Validation, and Input Handling
 - `BaseFormMixin` applies consistent Bootstrap-esque classes (`form-input`, `form-select`, etc.) and auto-placeholder text to every field.
 - Model forms (`CourseForm`, `AccountForm`, `MatrixForm`, `ArcticWolfCourseForm`) expose the expected fields to admin UIs; `MatrixForm` is used in admin registration.
-- `MatrixManagementForm` wraps the account selector used in the matrix page and disallows empty selection.
+- `manage_matrix` account selection uses an inline `<select name="account">` in `manage_matrix.html` (GET submit), not a Django form class. `MatrixForm` remains for Django admin `Matrix` CRUD.
 - `CmmcDocumentUploadForm` lets staff upload supporting docs only when the chosen user has an active `Matrix` entry for the chosen course; its `clean` raises `ValidationError` for invalid combos, and it limits course dropdowns via `UserAccount` lookup.
 - `TrainingDocForm` requires a file on create, reads the uploaded bytes into `file_blob`, derives a sanitized name via `get_valid_filename`, and stores a SHA-256 hash (`file_hash`).
 

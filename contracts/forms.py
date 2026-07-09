@@ -28,9 +28,6 @@ from .models import (
     CanceledReason,
     SalesClass,
     SpecialPaymentTerms,
-    IdiqContract,
-    IdiqContractDetails,
-    FolderTracking,
     Company,
     GovAction,
     ClinSplit,
@@ -740,61 +737,6 @@ class ContractSearchForm(forms.Form):
             'hx-target': '#search-results'
         })
     )
-
-class FolderTrackingForm(forms.ModelForm):
-    class Meta:
-        model = FolderTracking
-        fields = ['contract']
-        widgets = {
-            'contract': forms.HiddenInput()
-        }
-
-class IdiqContractForm(BaseModelForm):
-    class Meta:
-        model = IdiqContract
-        fields = [
-            'contract_number',
-            'buyer',
-            'award_date',
-            'term_length',
-            'option_length',
-            'closed',
-            'tab_num',
-            'alert_note',
-        ]
-        widgets = {
-            'contract_number': forms.TextInput(),
-            'buyer': forms.Select(),
-            'award_date': forms.DateInput(attrs={
-                'type': 'date'
-            }),
-            'term_length': forms.NumberInput(attrs={
-                'min': 0
-            }),
-            'option_length': forms.NumberInput(attrs={
-                'min': 0
-            }),
-            'closed': forms.Select(),
-            'tab_num': forms.TextInput(),
-            'alert_note': forms.Textarea(attrs={
-                'rows': 3,
-                'placeholder': 'Optional notice shown to analysts when this IDIQ is matched in Processing or Intake',
-            }),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-
-class IdiqContractDetailsForm(forms.ModelForm):
-    class Meta:
-        model = IdiqContractDetails
-        fields = ['nsn', 'supplier']
-        widgets = {
-            'nsn': forms.Select(attrs={'class': 'select2'}),
-            'supplier': forms.Select(attrs={'class': 'select2'}),
-        }
-
 
 class ContractTypeForm(BaseModelForm):
     class Meta:

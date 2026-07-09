@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from ..models import FolderTracking, Contract, FolderStack
 from users.models import UserSetting, UserSettingState
-from ..forms import FolderTrackingForm, ContractSearchForm
+from ..forms import ContractSearchForm
 import json
 import csv
 from datetime import datetime

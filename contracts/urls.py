@@ -1,6 +1,4 @@
 from django.urls import path, re_path
-from django.views.generic import TemplateView
-from users.views import test_app_name
 from . import views
 from .views import partner_reconciliation_views
 from .views.payment_forecast_views import PaymentForecastView, upsert_payment_plan
@@ -281,11 +279,6 @@ urlpatterns = [
     ),
     # Dashboard views
     path("", ContractLifecycleDashboardView.as_view(), name="contracts_dashboard"),
-    path(
-        "contract/demo/",
-        TemplateView.as_view(template_name="contracts/demo.html"),
-        name="contract_workspace_demo",
-    ),
     path(
         "dashboard/metric-detail/",
         DashboardMetricDetailView.as_view(),
@@ -611,8 +604,6 @@ urlpatterns = [
     path("api/suppliers/create/", create_supplier, name="api_supplier_create"),
     path("api/nsn/create/", views.api_views.create_nsn, name="api_nsn_create"),
     path("api/day-counts/", contract_day_counts, name="contract_day_counts"),
-    # Test
-    path("test-app-name/", test_app_name, name="test_app_name"),
     path("check-contract-number/", check_contract_number, name="check_contract_number"),
     # Contact management
     path("contacts/", ContactListView.as_view(), name="contact_list"),

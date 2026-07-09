@@ -97,7 +97,7 @@ efresh_token/expires_at per user; is_expired and refresh helpers keep the token 
 equest.active_company current. /users/switch-company/ enforces membership before writing ctive_company_id to the session and settings. Context processors expose ctive_company, vailable_companies, preferences, and unread message counts to templates.
 - **Portal/dashboard APIs:** /users/portal/dashboard/ returns portal_services.build_portal_context() plus announcements. /users/portal/sections/ lists sections for all users (GET) and permits superusers to create/update (PortalSectionForm). Resources are upserted/deleted via /portal/resources/... respecting section editors and restricting file uploads to superusers. Tasks/events can be created via /portal/tasks/create/ and /portal/events/create/; the portal_event_feed endpoint returns upcoming events (expanding recurrences via _expand_recurrences). Event operations (detail/update/delete, attachments) are organizer-bound, with JSON payloads and forms ensuring validation. /portal/nlp-schedule/ parses natural language text, stores NaturalLanguageScheduleRequest, optionally auto-creates WorkCalendarEvent, and auto-inserts a ScheduledMicroBreak. /portal/microbreaks/*, /portal/events/export/csv/, /portal/events/import/sharepoint/, and /users/sharepoint-import-ui/ round out the async UX for schedule management.
 - **System messaging:** /users/messages/ lists SystemMessage rows, /users/messages/create/ lets staff build notifications, /mark-read/ + /mark-all-read/ update statuses, and /unread-count/ powers the badge shown by the context processor.
-- **Permissions/debug:** /users/permission-denied/ renders a reusable error page. /users/debug/permissions/ dumps all AppPermission rows for debugging. /users/test-app-name/ and /users/check-auth-method/ provide helpers for middleware diagnostics.
+- **Permissions:** /users/permission-denied/ renders a reusable error page.
 
 ## 7. Templates and UI Surface Area
 - Authentication UIs live in 	emplates/users/ (login.html, logout.html, 
@@ -111,7 +111,7 @@ egister.html, custom_password_reset.html, oauth_migration.html, oauth_password_s
 ## 8. Admin / Staff Functionality
 - dmin.py registers AppPermission with custom checkboxes per active app, PortalSection/PortalResource inlines, calendar models (tasks/events/attendance/reminders), NaturalLanguageScheduleRequest, CalendarAnalyticsSnapshot, ScheduledMicroBreak, UserCompanyMembership, Announcement, AppRegistry, and schedule-specific inlines.
 - The custom admin form rebuilds AppPermission rows instead of saving the base AppPermission instance directly—the save_model override deletes old records and inserts one per checked app (AppRegistry.get_active_apps()).
-- SharePoint import is gated by @user_passes_test(_is_staff) in sharepoint_import_ui, so only staff can upload XLSX files. The DebugAuthView (debug_auth.py) shows current Azure AD config for diagnostics.
+- SharePoint import is gated by @user_passes_test(_is_staff) in sharepoint_import_ui, so only staff can upload XLSX files.
 - Management commands under management/commands/ let staff refresh the registry (update_app_registry, ix_appregistry), clean orphaned permissions (cleanup_permissions, cleanup_app_permissions, ix_apppermissions), and inspect legacy contracts tables (check_contract_table, check_clin_tables, migrate_notes).
 
 ## 9. Forms, Validation, and Input Handling
@@ -141,8 +141,8 @@ equest.active_company, persist the selection, and expose it via the context proc
 equests, openpyxl, and optionally dateutil/python-dateutil (fall-back). The portal scheduler also uses Python’s json, datetime, and django.db.models.Q heavily.
 
 ## 12. URL Surface / API Surface
-- Authentication: /users/register/, /users/login/, /users/logout/, /users/profile/, /users/password-reset/ + Django’s password reset/done/confirm/complete URLs, /users/custom-password-reset/, /users/oauth-migration/, /users/oauth-password-set/, /users/password-change/, /users/password-set/, and /users/check-auth-method/.
-- Permissions/debug: /users/permission-denied/, /users/test-app-name/, /users/debug/permissions/, /users/debug/auth-config/.
+- Authentication: /users/register/, /users/login/, /users/logout/, /users/profile/, /users/password-reset/ + Django’s password reset/done/confirm/complete URLs, /users/custom-password-reset/, /users/oauth-migration/, /users/oauth-password-set/, /users/password-change/, /users/password-set/.
+- Permissions: /users/permission-denied/.
 - Company/settings: /users/switch-company/, /users/settings/view/, /users/settings/ajax/get/, /users/settings/ajax/save/, /users/settings/ajax/types/, /users/settings/view/.
 - Microsoft auth: /users/microsoft/login/, /users/microsoft/auth-callback/.
 - System messages: /users/messages/, /users/messages/create/, /users/messages/mark-read/<pk>/, /users/messages/mark-all-read/, /users/messages/unread-count/.

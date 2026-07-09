@@ -2,8 +2,6 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
 from .ms_views import MicrosoftAuthView, MicrosoftCallbackView
-from .debug_auth import DebugAuthView
-
 app_name = 'users'
 
 urlpatterns = [
@@ -24,8 +22,6 @@ urlpatterns = [
          auth_views.PasswordResetCompleteView.as_view(template_name='users/password_reset_complete.html'), 
          name='password_reset_complete'),
     path('permission-denied/', views.permission_denied, name='permission_denied'),
-    path('test-app-name/', views.test_app_name, name='test_app_name'),
-    path('debug/permissions/', views.debug_app_permissions, name='debug_permissions'),
     # Company switching (superuser only)
     path('switch-company/', views.switch_company, name='switch_company'),
     
@@ -47,7 +43,6 @@ urlpatterns = [
     # Microsoft Authentication URLs
     path('microsoft/login/', MicrosoftAuthView.as_view(), name='microsoft_login'),
     path('microsoft/auth-callback/', MicrosoftCallbackView.as_view(), name='microsoft_callback'),
-    path('check-auth-method/', views.check_auth_method, name='check_auth_method'),
     
     # System Messages URLs
     path('messages/', views.SystemMessageListView.as_view(), name='messages'),
@@ -57,9 +52,6 @@ urlpatterns = [
     path('messages/unread-count/', views.GetUnreadCountView.as_view(), name='unread-message-count'),
     path('session/keep-alive/', views.SessionKeepAliveView.as_view(), name='session-keep-alive'),
     path('release-notes/acknowledge/', views.acknowledge_release_notes, name='release_notes_acknowledge'),
-    
-    # Debug URLs
-    path('debug/auth-config/', DebugAuthView.as_view(), name='debug_auth_config'),
 
     # Portal APIs
     path('portal/dashboard/', views.portal_dashboard_data, name='portal_dashboard_data'),

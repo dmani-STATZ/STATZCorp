@@ -1,0 +1,51 @@
+{% extends "contracts/contract_base.html" %}
+
+{% block title %}Delete Contact — {{ contact.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto px-3 py-5" style="max-width: 680px;">
+  <div class="mb-4 text-center">
+    <h1 class="display-6 fw-bold mb-1">Delete Contact</h1>
+    <p class="text-body-secondary mb-3">{{ contact.name }}{% if contact.company %} · {{ contact.company }}{% endif %}</p>
+    <hr class="border-danger opacity-25 mb-0">
+  </div>
+
+  <div class="card border-danger bg-danger bg-opacity-10 mb-4">
+    <div class="card-body">
+      {% if contact.title or contact.email or contact.phone %}
+      <dl class="row mb-0 small">
+        {% if contact.title %}
+        <dt class="col-sm-4 text-body-secondary">Title</dt>
+        <dd class="col-sm-8">{{ contact.title }}</dd>
+        {% endif %}
+        {% if contact.email %}
+        <dt class="col-sm-4 text-body-secondary">Email</dt>
+        <dd class="col-sm-8">{{ contact.email }}</dd>
+        {% endif %}
+        {% if contact.phone %}
+        <dt class="col-sm-4 text-body-secondary">Phone</dt>
+        <dd class="col-sm-8">{{ contact.phone }}</dd>
+        {% endif %}
+      </dl>
+      {% else %}
+      <p class="text-body-secondary mb-0">This contact record will be permanently removed.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-danger bg-opacity-10 border border-danger rounded-3 p-4 mb-4 text-center">
+    <p class="text-danger fw-semibold mb-2">
+      Are you sure you want to delete <strong>{{ contact.name }}</strong>?
+    </p>
+    <p class="text-danger fw-bold mb-0">This action cannot be undone.</p>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="d-flex gap-3 align-items-center">
+      <button type="submit" class="btn btn-danger btn-lg px-4">Delete Contact</button>
+      <a href="{% url 'contracts:contact_detail' contact.pk %}" class="btn btn-outline-secondary btn-lg px-4">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

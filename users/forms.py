@@ -3,7 +3,6 @@ from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 from django.forms.models import construct_instance
 from django.contrib.auth.models import User
-from django.contrib.auth.forms import UserCreationForm
 from .models import (
     Announcement,
     PortalResource,
@@ -54,13 +53,6 @@ class BaseModelForm(BaseFormMixin, forms.ModelForm):
 class BaseForm(BaseFormMixin, forms.Form):
     """Base Form that implements the form-styling-rule."""
     pass
-
-class UserRegisterForm(BaseFormMixin, UserCreationForm):
-    email = forms.EmailField()
-
-    class Meta:
-        model = User
-        fields = ['username', 'email', 'password1', 'password2']
 
 class AnnouncementForm(BaseModelForm):
     class Meta:

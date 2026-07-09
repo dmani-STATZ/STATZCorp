@@ -48,7 +48,6 @@ class LoginRequiredMiddleware:
             '/api/system-test/',  # System test API endpoint
             '/health/',
             '/api/azure-health/',
-            '/api/health-check/',
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 

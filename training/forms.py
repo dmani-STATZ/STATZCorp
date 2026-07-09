@@ -105,18 +105,6 @@ class MatrixForm(BaseModelForm):
         fields = ["course", "account", "frequency"]
 
 
-class MatrixManagementForm(BaseForm):
-    account = forms.ModelChoiceField(
-        queryset=Account.objects.all().order_by("type"),
-        label="Account",
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["account"].empty_label = "Select Account"
-
-
 class ArcticWolfCourseForm(BaseModelForm):
     class Meta:
         model = ArcticWolfCourse
