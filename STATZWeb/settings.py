@@ -209,7 +209,7 @@ if IS_PRODUCTION:
                 "driver": "ODBC Driver 17 for SQL Server",
                 "timeout": 60,
                 "autocommit": True,
-                "extra_params": "Encrypt=yes;TrustServerCertificate=yes;Connection Timeout=60;",
+                "extra_params": "Encrypt=yes;TrustServerCertificate=yes;MARS_Connection=Yes;Connection Timeout=60;",
             },
         },
     }
