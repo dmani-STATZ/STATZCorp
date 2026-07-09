@@ -36,6 +36,7 @@ from sales.models.inbox import InboxMessage, InboxMessageRFQLink
 from sales.models.no_quote import NoQuoteCAGE
 from sales.models.packaging import SolPackaging
 from sales.models.sam_cache import SAMEntityCache
+from sales.models.competitor_watchlist import CompetitorWatchlist
 from sales.models.saved_filters import SavedFilter
 from sales.models.sol_analysis import SolAnalysis
 from sales.models.dibbs_notices import DibbsNotice
@@ -72,6 +73,7 @@ __all__ = [
     'NoQuoteCAGE',
     'SolPackaging',
     'SAMEntityCache',
+    'CompetitorWatchlist',
     'SavedFilter',
     'SolAnalysis',
     'DibbsNotice',

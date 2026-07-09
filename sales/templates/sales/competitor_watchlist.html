@@ -1,0 +1,117 @@
+{% extends "base_template.html" %}
+{% load humanize %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+
+<div class="d-flex flex-wrap align-items-baseline justify-content-between mb-3 gap-2">
+  <div>
+    <h1 class="fs-4 fw-semibold mb-0">Competitors Numbers</h1>
+    <p class="text-muted small mb-0 mt-1" style="max-width:42rem;">
+      Track competitor CAGE codes and DIBBS award win counts and dollar totals for the current week, month, quarter, and year.
+    </p>
+  </div>
+</div>
+
+{% if earliest_award_date %}
+<div class="alert alert-info mb-3 small">
+  Award data has been tracked since {{ earliest_award_date|date:"M j, Y" }}.
+  Statistics reflect only awards scraped on or after this date.
+</div>
+{% else %}
+<div class="alert alert-warning mb-3 small">
+  No non-faux award records are available yet. Statistics will appear once nightly DIBBS award scraping has populated data.
+</div>
+{% endif %}
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h2 class="h6 fw-semibold mb-3">Add competitor CAGE</h2>
+    <form method="post" action="{% url 'sales:competitor_watchlist_add' %}" class="row g-2 align-items-end">
+      {% csrf_token %}
+      <div class="col-auto flex-grow-1" style="min-width:12rem; max-width:20rem;">
+        <label for="cage_code" class="form-label small mb-1">CAGE code</label>
+        <input type="text" class="form-control form-control-sm font-monospace" id="cage_code"
+               name="cage_code" maxlength="10" placeholder="e.g. 1ABC5" autocomplete="off" required>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-save btn-sm">Add to watchlist</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if not rows %}
+<div class="alert alert-secondary small">
+  No competitor CAGE codes on the watchlist yet. Add one above to start tracking award statistics.
+</div>
+{% else %}
+<div class="table-responsive border rounded">
+  <table class="table table-sm table-bordered table-hover align-middle mb-0 small">
+    <thead class="table-light">
+      <tr>
+        <th scope="col">Competitor</th>
+        <th scope="col" class="text-end">This Week</th>
+        <th scope="col" class="text-end">This Month</th>
+        <th scope="col" class="text-end">This Quarter</th>
+        <th scope="col" class="text-end">This Year</th>
+        <th scope="col" class="text-end" style="width:6rem;">Remove</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      {% with entry=row.entry stats=row.stats %}
+      <tr>
+        <td>
+          {% if row.name_available %}
+          <div class="fw-semibold">{{ row.display_name }}</div>
+          <div class="text-muted font-monospace">{{ entry.cage_code }}</div>
+          {% else %}
+          <div class="fw-semibold font-monospace">{{ entry.cage_code }} — name unavailable</div>
+          {% endif %}
+          <div class="text-muted mt-1" style="font-size:0.75rem;">
+            Added by {{ entry.added_by.get_full_name|default:entry.added_by.username|default:"Unknown" }},
+            {{ entry.added_at|date:"M j, Y" }}
+          </div>
+        </td>
+        <td class="text-end text-nowrap">
+          <div class="fw-semibold">{{ stats.week_count }}</div>
+          <div class="text-muted">${{ stats.week_total|floatformat:2|intcomma }}</div>
+        </td>
+        <td class="text-end text-nowrap">
+          <div class="fw-semibold">{{ stats.month_count }}</div>
+          <div class="text-muted">${{ stats.month_total|floatformat:2|intcomma }}</div>
+        </td>
+        <td class="text-end text-nowrap">
+          <div class="fw-semibold">{{ stats.quarter_count }}</div>
+          <div class="text-muted">${{ stats.quarter_total|floatformat:2|intcomma }}</div>
+        </td>
+        <td class="text-end text-nowrap">
+          <div class="fw-semibold">{{ stats.year_count }}</div>
+          <div class="text-muted">${{ stats.year_total|floatformat:2|intcomma }}</div>
+        </td>
+        <td class="text-end">
+          {% if row.can_remove %}
+          <form method="post" action="{% url 'sales:competitor_watchlist_remove' entry.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-delete btn-sm"
+                    onclick="return confirm('Remove CAGE {{ entry.cage_code }} from the watchlist?')">
+              Remove
+            </button>
+          </form>
+          {% else %}
+          <button type="button" class="btn btn-delete btn-sm" disabled title="Only the user who added this CAGE can remove it">
+            Remove
+          </button>
+          {% endif %}
+        </td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+</div>
+{% endblock body %}
