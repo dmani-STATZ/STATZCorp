@@ -169,8 +169,38 @@ def _cell_text(td) -> str:
     return " ".join(td.get_text(separator=" ", strip=True).split())
 
 
+# Document-link titles on AwdRecs.aspx (distinct from Package View / CAGE links).
+_PDF_TITLE_DO = "Link To Delivery Order Document"
+_PDF_TITLE_BASIC = "Link To Award/Basic Document"
+
+
+def extract_row_pdf_url(tr) -> str:
+    """
+    Soft-extract the dibbs2 Downloads/Awards PDF href from one grid row.
+
+    Prefer the DO document link when present (DO rows also expose the base
+    award PDF on the basic-number cell). Soft-fail to '' when absent.
+    """
+    if tr is None:
+        return ""
+    try:
+        do_link = tr.find("a", href=True, title=_PDF_TITLE_DO)
+        if do_link:
+            href = (do_link.get("href") or "").strip()
+            if href:
+                return href
+        basic_link = tr.find("a", href=True, title=_PDF_TITLE_BASIC)
+        if basic_link:
+            href = (basic_link.get("href") or "").strip()
+            if href:
+                return href
+    except Exception:
+        logger.exception("extract_row_pdf_url failed; leaving pdf_url blank")
+    return ""
+
+
 def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
-    """Parse the awards grid HTML into row dicts matching COLUMNS."""
+    """Parse the awards grid HTML into row dicts matching COLUMNS (+ Pdf_Url)."""
     _ = award_date
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", id=re.compile(r"grdAward", re.I))
@@ -200,6 +230,7 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
         for i, col in enumerate(COLUMNS):
             cell = cells[i] if i < len(cells) else None
             row[col] = _cell_text(cell)
+        row["Pdf_Url"] = extract_row_pdf_url(tr)
         rows_out.append(row)
     return rows_out
 
@@ -223,6 +254,10 @@ def normalize_award_record_for_importer(
 
     if not out.get("Award_Date"):
         out["Award_Date"] = award_date.strftime("%m-%d-%Y")
+
+    # Preserve document-link URL (additive; blank when row has no PDF icon).
+    pdf_url = (raw.get("Pdf_Url") or "").strip()
+    out["Pdf_Url"] = pdf_url
 
     return out
 

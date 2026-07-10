@@ -20,6 +20,7 @@ class AwardRow:
     nomenclature: str | None
     purchase_request: str | None
     dibbs_solicitation_number: str | None
+    pdf_url: str = ""
 
 
 @dataclass

@@ -25,6 +25,15 @@ class CompetitorAwardParseStatus(models.Model):
         max_length=20, choices=STATUS_CHOICES, blank=True, default=""
     )
     parse_notes = models.TextField(blank=True, default="")
+    resolved_pdf_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text=(
+            "Real dibbs2 Downloads/Awards PDF URL resolved from AwdRec.aspx. "
+            "Cached so retries skip re-resolution."
+        ),
+    )
     fetch_error = models.BooleanField(default=False)
     attempt_count = models.IntegerField(default=0)
     last_attempted_at = models.DateTimeField(null=True, blank=True)

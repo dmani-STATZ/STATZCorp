@@ -114,6 +114,10 @@ BEGIN
         da.solicitation_id = s.solicitation_id,
         da.aw_file_date = TRY_CONVERT(DATE, s.aw_file_date, 110),
         da.aw_import_batch_id = @batch_id,
+        da.pdf_url = CASE
+                        WHEN LTRIM(RTRIM(ISNULL(s.pdf_url, ''))) <> '' THEN s.pdf_url
+                        ELSE da.pdf_url
+                     END,
         da.we_won = CASE 
                         WHEN EXISTS (
                             SELECT 1 FROM dibbs_company_cage cc 
@@ -134,13 +138,28 @@ BEGIN
 
     SET @faux_upgraded = @@ROWCOUNT;
 
+    -- 5a2: Fill blank pdf_url on existing awards when staging has a value
+    UPDATE da
+    SET da.pdf_url = s.pdf_url
+    FROM dibbs_award da
+    INNER JOIN dibbs_award_staging s
+        ON s.award_basic_number = da.award_basic_number
+        AND ISNULL(s.delivery_order_number, '') = ISNULL(da.delivery_order_number, '')
+        AND ISNULL(s.nsn, '') = ISNULL(da.nsn, '')
+        AND ISNULL(s.purchase_request, '') = ISNULL(da.purchase_request, '')
+    WHERE s.stage_id = @stage_id
+      AND s.row_type = 'AWARD'
+      AND LTRIM(RTRIM(ISNULL(s.pdf_url, ''))) <> ''
+      AND LTRIM(RTRIM(ISNULL(da.pdf_url, ''))) = '';
+
     -- 5b: Insert new award rows that don't exist at all
     INSERT INTO dibbs_award (
         notice_id, source, award_basic_number, delivery_order_number,
         delivery_order_counter, last_mod_posting_date, awardee_cage,
         total_contract_price, award_date, posted_date, nsn, nomenclature,
         purchase_request, dibbs_solicitation_number, sol_number,
-        solicitation_id, is_faux, aw_file_date, aw_import_batch_id, we_won
+        solicitation_id, is_faux, aw_file_date, aw_import_batch_id, we_won,
+        pdf_url
     )
     SELECT
         s.notice_id,
@@ -171,7 +190,8 @@ BEGIN
                 AND cc.is_active = 1
             ) THEN 1 
             ELSE 0 
-        END
+        END,
+        ISNULL(s.pdf_url, '')
     FROM dibbs_award_staging s
     WHERE s.stage_id = @stage_id
       AND s.row_type = 'AWARD'
@@ -194,7 +214,8 @@ BEGIN
         delivery_order_counter, last_mod_posting_date, awardee_cage,
         total_contract_price, award_date, posted_date, nsn, nomenclature,
         purchase_request, dibbs_solicitation_number, sol_number,
-        solicitation_id, is_faux, aw_file_date, aw_import_batch_id, we_won
+        solicitation_id, is_faux, aw_file_date, aw_import_batch_id, we_won,
+        pdf_url
     )
     SELECT DISTINCT
         s.notice_id,
@@ -222,7 +243,8 @@ BEGIN
         1,  -- is_faux = True
         TRY_CONVERT(DATE, s.aw_file_date, 110),
         @batch_id, 
-        0
+        0,
+        ISNULL(s.pdf_url, '')
     FROM dibbs_award_staging s
     WHERE s.stage_id = @stage_id
       AND s.row_type = 'MOD'

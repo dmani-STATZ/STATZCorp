@@ -5,9 +5,11 @@ watched competitor CAGEs (drafts-free; no DraftContract / SharePoint).
 Stores LLM-derived role-tagged CAGE/DoDAAC entities per award, with
 parse bookkeeping on CompetitorAwardParseStatus.
 
-Reuses intake URL building + ``_extract_pdf_texts`` (text only — never
-``parse_award_pdf``, which would burn Claude on CLIN/CMMC for intake).
-Download via ``sales.services.dibbs_session.make_dibbs2_session``.
+PDF URL order: ``award.pdf_url`` (scrape-time grid capture) → cached
+``resolved_pdf_url`` → live AwdRec.aspx resolve → intake
+``_build_dibbs_award_pdf_url`` reconstruction. Text extraction uses intake
+``_extract_pdf_texts`` (never ``parse_award_pdf``). Download via
+``make_dibbs2_session``.
 
 Inter-award pacing is intentionally slower than dibbs_awards_scraper.PAGE_DELAY
 (2.0s) so multi-Claude bursts per award do not trip Anthropic 429s.
@@ -21,7 +23,9 @@ import time
 from decimal import Decimal
 from io import BytesIO
 from typing import Any
+from urllib.parse import urljoin
 
+from bs4 import BeautifulSoup
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -33,7 +37,8 @@ from sales.models import (
     CompetitorWatchlist,
     DibbsAward,
 )
-from sales.services.dibbs_session import make_dibbs2_session
+from sales.services.contract_mods import build_award_record_url
+from sales.services.dibbs_session import make_dibbs2_session, make_www_session
 
 logger = logging.getLogger("sales.competitor_supplier_intel")
 
@@ -43,6 +48,10 @@ DEFAULT_BATCH_SIZE = 15
 DEFAULT_MAX_DURATION_SECONDS = 1800.0
 MAX_ATTEMPTS = 3
 _DIBBS2_DOWNLOAD_TIMEOUT = 60
+_WWW_RESOLVE_TIMEOUT = 60
+# Pace between AwdRec resolve GET and dibbs2 PDF download (matches scraper PAGE_DELAY).
+_RESOLVE_TO_DOWNLOAD_DELAY_SECONDS = 2.0
+_DIBBS_WWW_BASE = "https://www.dibbs.bsm.dla.mil"
 
 # Haiku for structured entity classification (cheaper than Sonnet used by
 # intake CLIN/IDIQ/CMMC extractors — see core/anthropic_client.MODEL_PRICING).
@@ -261,11 +270,92 @@ def _persist_entities(award: DibbsAward, entity_dicts: list[dict[str, str]]) -> 
     )
 
 
+def _extract_pdf_url_from_awdrec_html(html: str) -> str:
+    """
+    Pull the dibbs2 Downloads/Awards PDF href from an AwdRec.aspx page body.
+
+    Soft-fail: returns '' when no matching link is present.
+    """
+    if not html:
+        return ""
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        logger.exception(
+            "competitor_supplier_intel: BeautifulSoup failed parsing AwdRec HTML"
+        )
+        return ""
+
+    for a_tag in soup.find_all("a", href=True):
+        href = (a_tag.get("href") or "").strip()
+        if not href:
+            continue
+        absolute = urljoin(_DIBBS_WWW_BASE + "/", href)
+        if "Downloads/Awards" in absolute and absolute.upper().endswith(".PDF"):
+            return absolute
+    return ""
+
+
+def resolve_award_pdf_url(award: DibbsAward, www_session=None) -> str:
+    """
+    Resolve the real dibbs2 award PDF URL from DIBBS AwdRec.aspx.
+
+    GETs ``AwdRec.aspx?contract=&dlv=&cnt=`` via ``make_www_session`` (plain
+    requests — no Playwright / ASP.NET postback) and extracts the
+    ``Downloads/Awards/...PDF`` href. Soft-fails to '' on any error.
+    """
+    basic = _blank(getattr(award, "award_basic_number", None)).upper()
+    if not basic:
+        logger.warning(
+            "competitor_supplier_intel: cannot resolve PDF URL — missing "
+            "award_basic_number for award pk=%s",
+            getattr(award, "pk", None),
+        )
+        return ""
+
+    do_num = _blank(getattr(award, "delivery_order_number", None))
+    cnt = getattr(award, "delivery_order_counter", None)
+    record_url = build_award_record_url(basic, do_num, cnt)
+    if not record_url:
+        return ""
+
+    try:
+        session = www_session or make_www_session()
+        response = session.get(record_url, timeout=_WWW_RESOLVE_TIMEOUT)
+        response.raise_for_status()
+    except Exception as exc:
+        logger.warning(
+            "competitor_supplier_intel: AwdRec resolve failed for award pk=%s "
+            "url=%s: %s",
+            getattr(award, "pk", None),
+            record_url,
+            exc,
+        )
+        return ""
+
+    pdf_url = _extract_pdf_url_from_awdrec_html(response.text)
+    if not pdf_url:
+        logger.warning(
+            "competitor_supplier_intel: no Downloads/Awards PDF href on AwdRec "
+            "for award pk=%s basic=%s do=%s url=%s",
+            getattr(award, "pk", None),
+            basic,
+            do_num,
+            record_url,
+        )
+    return pdf_url
+
+
 def fetch_and_parse_award(award: DibbsAward) -> dict:
     """
     Fetch the DD Form 1155 for one DibbsAward, extract text, run the LLM
     entity pass, and upsert CompetitorAwardParseStatus + CompetitorAwardEntity.
     Never raises. Does not call intake ``parse_award_pdf`` (no CLIN/CMMC spend).
+
+    PDF URL order: ``award.pdf_url`` (scrape-time capture) → cached
+    ``resolved_pdf_url`` → live AwdRec.aspx resolve → intake date-folder
+    reconstruction fallback. ``STATUS_UNAVAILABLE`` only when a download
+    attempt returns HTTP 404.
     """
     result = {
         "ok": False,
@@ -274,9 +364,14 @@ def fetch_and_parse_award(award: DibbsAward) -> dict:
     }
     now = timezone.now()
 
+    existing = None
+    prior_attempts = 0
+    cached_pdf_url = ""
     try:
         existing = CompetitorAwardParseStatus.objects.filter(award=award).first()
-        prior_attempts = existing.attempt_count if existing else 0
+        if existing:
+            prior_attempts = existing.attempt_count
+            cached_pdf_url = _blank(existing.resolved_pdf_url)
     except Exception as exc:
         logger.exception(
             "competitor_supplier_intel: failed reading prior status for award %s: %s",
@@ -284,6 +379,7 @@ def fetch_and_parse_award(award: DibbsAward) -> dict:
             exc,
         )
         prior_attempts = 0
+        cached_pdf_url = ""
 
     # Retriable attempts only — unavailable (404 / aged-off) does not increment.
     defaults: dict[str, Any] = {
@@ -291,6 +387,8 @@ def fetch_and_parse_award(award: DibbsAward) -> dict:
         "last_attempted_at": now,
         "fetch_error": False,
     }
+    if cached_pdf_url:
+        defaults["resolved_pdf_url"] = cached_pdf_url
 
     def _persist_unavailable(notes: str) -> dict:
         """Terminal: document gone from DIBBS. Do not burn attempt_count."""
@@ -301,6 +399,8 @@ def fetch_and_parse_award(award: DibbsAward) -> dict:
             "parse_notes": notes,
             "fetch_error": True,
         }
+        if defaults.get("resolved_pdf_url"):
+            unavailable_defaults["resolved_pdf_url"] = defaults["resolved_pdf_url"]
         try:
             with transaction.atomic():
                 CompetitorAwardParseStatus.objects.update_or_create(
@@ -329,14 +429,51 @@ def fetch_and_parse_award(award: DibbsAward) -> dict:
         )
         basic = (award.award_basic_number or "").strip().upper()
         do_num = (award.delivery_order_number or "").strip().upper()
-        pdf_url = _build_dibbs_award_pdf_url(basic, do_num, award_date)
+
+        # Priority: scraped award.pdf_url → cached status URL → AwdRec resolve → reconstruct
+        scraped_pdf_url = _blank(getattr(award, "pdf_url", None))
+        pdf_url = scraped_pdf_url or cached_pdf_url
+        newly_resolved = False
+        if scraped_pdf_url:
+            defaults["resolved_pdf_url"] = scraped_pdf_url
+        if not pdf_url:
+            pdf_url = resolve_award_pdf_url(award)
+            if pdf_url:
+                newly_resolved = True
+                defaults["resolved_pdf_url"] = pdf_url
+                # Persist early so a later download failure still skips re-resolve.
+                try:
+                    CompetitorAwardParseStatus.objects.update_or_create(
+                        award=award,
+                        defaults={
+                            "resolved_pdf_url": pdf_url,
+                            "last_attempted_at": now,
+                            "attempt_count": prior_attempts + 1,
+                        },
+                    )
+                except Exception:
+                    logger.exception(
+                        "competitor_supplier_intel: failed caching resolved_pdf_url "
+                        "for award %s",
+                        award.pk,
+                    )
+
+        if not pdf_url:
+            pdf_url = _build_dibbs_award_pdf_url(basic, do_num, award_date) or ""
+            if pdf_url:
+                logger.info(
+                    "competitor_supplier_intel: AwdRec resolve miss for award pk=%s; "
+                    "falling back to reconstructed URL %s",
+                    award.pk,
+                    pdf_url,
+                )
 
         if not pdf_url:
             defaults.update(
                 {
                     "parse_status": CompetitorAwardParseStatus.STATUS_FAILED,
                     "parse_notes": (
-                        "Cannot build DIBBS PDF URL "
+                        "Cannot resolve or reconstruct DIBBS PDF URL "
                         f"(basic={basic!r}, do={do_num!r}, date={award_date!r})."
                     ),
                     "fetch_error": True,
@@ -350,6 +487,9 @@ def fetch_and_parse_award(award: DibbsAward) -> dict:
             result["error"] = defaults["parse_notes"]
             result["parse_status"] = CompetitorAwardParseStatus.STATUS_FAILED
             return result
+
+        if newly_resolved and _RESOLVE_TO_DOWNLOAD_DELAY_SECONDS > 0:
+            time.sleep(_RESOLVE_TO_DOWNLOAD_DELAY_SECONDS)
 
         session = make_dibbs2_session()
         response = session.get(pdf_url, timeout=_DIBBS2_DOWNLOAD_TIMEOUT)
@@ -368,6 +508,9 @@ def fetch_and_parse_award(award: DibbsAward) -> dict:
                 "DIBBS returned an HTML page instead of a PDF. "
                 "The DOD acknowledgement session may not have been established correctly."
             )
+
+        # Cache any URL that successfully downloaded (incl. reconstruction fallback).
+        defaults["resolved_pdf_url"] = pdf_url
 
         pdf_file = BytesIO(pdf_bytes)
         pdf_file.name = f"{basic or award.notice_id}.pdf"

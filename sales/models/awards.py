@@ -131,6 +131,15 @@ class DibbsAward(models.Model):
             "Set to False when the real award is subsequently imported."
         ),
     )
+    pdf_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text=(
+            "Real dibbs2 Downloads/Awards PDF URL captured from the AwdRecs.aspx "
+            "grid document-link anchor at scrape time (blank when absent)."
+        ),
+    )
 
     class Meta:
         db_table = "dibbs_award"
@@ -271,6 +280,7 @@ class DibbsAwardStaging(models.Model):
     purchase_request = models.CharField(max_length=50, blank=True, null=True)
     dibbs_solicitation_number = models.CharField(max_length=50, blank=True, null=True)
     aw_file_date = models.CharField(max_length=20, blank=True, null=True)
+    pdf_url = models.CharField(max_length=500, blank=True, default="")
 
     # Set by stored proc — null on insert
     row_type = models.CharField(max_length=5, blank=True, null=True)

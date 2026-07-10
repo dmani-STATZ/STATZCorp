@@ -14,7 +14,7 @@ def _chunked(lst, n):
         yield lst[i : i + n]
 
 
-AW_CHUNK = 100  # 100 rows x 20 fields = 2000 params — under SQL Server 2100 limit
+AW_CHUNK = 100  # 100 rows x 19 fields = 1900 params — under SQL Server 2100 limit
 
 
 def _dibbs_file_notice_id(
@@ -91,6 +91,7 @@ def _stage_rows(
             row.purchase_request,
             row.dibbs_solicitation_number,
             aw_file_date.strftime("%m-%d-%Y"),
+            (getattr(row, "pdf_url", None) or "")[:500],
             None,  # row_type — set by proc
             None,  # solicitation_id — set by proc
         )
@@ -178,6 +179,7 @@ def import_aw_records(
                 purchase_request=(d.get("Purchase_Request") or "").strip() or None,
                 dibbs_solicitation_number=(d.get("Solicitation") or "").strip()
                 or None,
+                pdf_url=(d.get("Pdf_Url") or "").strip()[:500],
             )
         )
 

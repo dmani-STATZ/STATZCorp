@@ -68,6 +68,32 @@ _SUFFIX_TO_KEY: dict[str, str] = {
 # The sentinel suffix used to identify data rows.
 _ROW_ANCHOR_SUFFIX = "_lblAwardBasicNumber"
 
+# Document-link titles on AwdRecs.aspx (not Package View / CAGE).
+_PDF_TITLE_DO = "Link To Delivery Order Document"
+_PDF_TITLE_BASIC = "Link To Award/Basic Document"
+
+
+def _extract_row_pdf_url(tr: Tag) -> str:
+    """
+    Soft-extract the row's dibbs2 PDF href. Prefer DO document link when
+    present (DO rows also expose the base award PDF on the basic cell).
+    """
+    try:
+        do_link = tr.find("a", href=True, title=_PDF_TITLE_DO)
+        if do_link:
+            href = (do_link.get("href") or "").strip()
+            if href:
+                return href
+        basic_link = tr.find("a", href=True, title=_PDF_TITLE_BASIC)
+        if basic_link:
+            href = (basic_link.get("href") or "").strip()
+            if href:
+                return href
+    except Exception:
+        logger.exception("parse_awdrecs_html: pdf_url extract failed; leaving blank")
+    return ""
+
+
 # Keys consumed by import_aw_records (nightly scraper + hot poll).
 REQUIRED_KEYS: frozenset[str] = frozenset(
     [
@@ -162,13 +188,18 @@ def _extract_award_basic_number(span: Tag) -> str:
         elif isinstance(child, Tag):
             if child.name == "img":
                 continue  # skip spacer images
-            # Stop at <br>, <span>, or <a> — everything useful is before them.
+            # PDF document-link wraps the contract number — take its text.
+            if child.name == "a" and (child.get("title") or "") == _PDF_TITLE_BASIC:
+                text_parts.append(child.get_text())
+                break
+            # Stop at <br>, <span>, or other <a> — everything useful is before them.
             break
     parsed_text = _clean_contract_field("".join(text_parts))
 
-    # Step 2: fallback / cross-check via anchor href.
+    # Step 2: fallback / cross-check via AwdRec.aspx package-view href
+    # (ignore dibbs2 PDF document links — they have no contract= param).
     href_contract: str = ""
-    a_tag = span.find("a", href=True)
+    a_tag = span.find("a", href=re.compile(r"AwdRec\.aspx", re.I))
     if a_tag:
         href = a_tag.get("href", "")
         try:
@@ -252,10 +283,13 @@ def parse_awdrecs_html(html: str) -> list[dict]:
                     else _clean(raw)
                 )
 
-        # Guarantee all 8 required keys are present (should already be true above).
+        # Guarantee all required keys are present (should already be true above).
         for key in REQUIRED_KEYS:
             if key not in row:
                 row[key] = ""
+
+        # Additive document-link capture (blank when row has no PDF icon).
+        row["Pdf_Url"] = _extract_row_pdf_url(tr)
 
         rows_out.append(row)
 
