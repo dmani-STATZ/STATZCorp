@@ -1,9 +1,17 @@
 # DIBBS Awards Scraper WebJob
 
 ## What This Does
-Runs the Django management command `scrape_awards` which scrapes today's
-DIBBS award records directly into the DibbsAward table.
-Scraper defaults to running the day prior to the current day.
+Runs the Django management command `scrape_awards`, which scrapes DIBBS award
+records into the `DibbsAward` table (nightly reconciliation by default).
+
+As the **final in-process phase** of that command (not a separate shell step),
+`scrape_awards` also runs Competitor Supplier Intelligence entity extraction
+for watched-competitor awards that still need parsing. That phase is
+fault-isolated inside Python — a failure there is logged and never causes the
+WebJob to exit non-zero on its own. Tunables (optional App Service env vars):
+
+- `COMPETITOR_ENTITY_BATCH_SIZE` (default `50`)
+- `COMPETITOR_ENTITY_MAX_DURATION_SECONDS` (default `1800`)
 
 ## Azure Deployment Instructions
 1. Zip ONLY the `run.sh` file (not the folder, just the file):
@@ -23,6 +31,6 @@ SSH into App Service and run:
   python manage.py scrape_awards --date 2026-03-25
 
 ## Logs (Azure WebJob)
-The WebJob captures **stdout and stderr** from this script. The management command prints timestamped `[scrape_awards]` lines for each phase (inventory, DB sync, scrape queue, per-date browser steps, notifications). `run.sh` sets `PYTHONUNBUFFERED=1` and uses `python -u` so lines appear in the portal **Log stream** as they are written instead of only when the buffer fills.
+The WebJob captures **stdout and stderr** from this script. The management command prints timestamped `[scrape_awards]` lines for each phase (inventory, DB sync, scrape queue, per-date browser steps, competitor entity extraction, notifications).
 
 In Azure Portal: **App Service → WebJobs → (your job) → Logs** (or **Log stream** while the job runs).

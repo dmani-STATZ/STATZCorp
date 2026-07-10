@@ -24,6 +24,58 @@
 </div>
 {% endif %}
 
+{% if our_rows %}
+<div class="mb-4">
+  <h2 class="h6 fw-semibold mb-2">Our Numbers</h2>
+  <p class="text-muted small mb-2">STATZ award wins for reference — not part of the competitor watchlist.</p>
+  <div class="table-responsive border rounded border-primary-subtle">
+    <table class="table table-sm table-bordered align-middle mb-0 small">
+      <thead class="table-primary">
+        <tr>
+          <th scope="col">Company</th>
+          <th scope="col" class="text-end">This Week</th>
+          <th scope="col" class="text-end">This Month</th>
+          <th scope="col" class="text-end">This Quarter</th>
+          <th scope="col" class="text-end">This Year</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in our_rows %}
+        {% with stats=row.stats %}
+        <tr>
+          <td>
+            {% if row.name_available %}
+            <div class="fw-semibold">{{ row.display_name }}</div>
+            <div class="text-muted font-monospace">{{ row.cage_code }}</div>
+            {% else %}
+            <div class="fw-semibold font-monospace">{{ row.cage_code }}</div>
+            {% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <div class="fw-semibold">{{ stats.week_count }}</div>
+            <div class="text-muted">${{ stats.week_total|floatformat:2|intcomma }}</div>
+          </td>
+          <td class="text-end text-nowrap">
+            <div class="fw-semibold">{{ stats.month_count }}</div>
+            <div class="text-muted">${{ stats.month_total|floatformat:2|intcomma }}</div>
+          </td>
+          <td class="text-end text-nowrap">
+            <div class="fw-semibold">{{ stats.quarter_count }}</div>
+            <div class="text-muted">${{ stats.quarter_total|floatformat:2|intcomma }}</div>
+          </td>
+          <td class="text-end text-nowrap">
+            <div class="fw-semibold">{{ stats.year_count }}</div>
+            <div class="text-muted">${{ stats.year_total|floatformat:2|intcomma }}</div>
+          </td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <div class="card mb-4">
   <div class="card-body">
     <h2 class="h6 fw-semibold mb-3">Add competitor CAGE</h2>
@@ -46,6 +98,7 @@
   No competitor CAGE codes on the watchlist yet. Add one above to start tracking award statistics.
 </div>
 {% else %}
+<h2 class="h6 fw-semibold mb-2">Competitor watchlist</h2>
 <div class="table-responsive border rounded">
   <table class="table table-sm table-bordered table-hover align-middle mb-0 small">
     <thead class="table-light">
@@ -55,7 +108,7 @@
         <th scope="col" class="text-end">This Month</th>
         <th scope="col" class="text-end">This Quarter</th>
         <th scope="col" class="text-end">This Year</th>
-        <th scope="col" class="text-end" style="width:6rem;">Remove</th>
+        <th scope="col" class="text-end" style="width:18rem;">Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -90,7 +143,20 @@
           <div class="fw-semibold">{{ stats.year_count }}</div>
           <div class="text-muted">${{ stats.year_total|floatformat:2|intcomma }}</div>
         </td>
-        <td class="text-end">
+        <td class="text-end text-nowrap">
+          <a href="{% url 'sales:competitor_supplier_intel' entry.cage_code %}"
+             class="btn btn-outline-brand btn-sm me-1">
+            View Suppliers
+          </a>
+          {% if not row.name_available %}
+          <form method="post" action="{% url 'sales:competitor_watchlist_refetch_name' entry.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-brand btn-sm me-1"
+                    title="Force a fresh SAM.gov name lookup for this CAGE">
+              Refetch name
+            </button>
+          </form>
+          {% endif %}
           {% if row.can_remove %}
           <form method="post" action="{% url 'sales:competitor_watchlist_remove' entry.pk %}" class="d-inline">
             {% csrf_token %}

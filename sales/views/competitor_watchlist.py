@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from sales.models import CompetitorWatchlist, SAMEntityCache
+from sales.models import CompanyCAGE, CompetitorWatchlist, SAMEntityCache
 from sales.services.competitor_stats import (
     _EMPTY_STATS,
     get_competitor_stats,
@@ -33,9 +33,40 @@ def _adder_display_name(user):
     return full.strip() if full and full.strip() else user.username
 
 
+def _our_numbers_display_name(company_cage):
+    """Resolve STATZ CAGE display name from CompanyCAGE (no SAM lookup)."""
+    name = (company_cage.company_name or "").strip()
+    if name:
+        return name
+    if company_cage.company_id:
+        return (company_cage.company.name or "").strip()
+    return ""
+
+
 @login_required
 def competitor_watchlist(request):
     """GET — render the shared competitor watchlist and award statistics."""
+    our_cages = list(
+        CompanyCAGE.objects.filter(is_active=True)
+        .select_related("company")
+        .order_by("-is_default", "cage_code")
+    )
+    our_cage_codes = [c.cage_code for c in our_cages]
+    our_stats_map = get_competitor_stats(our_cage_codes)
+    our_rows = []
+    for company_cage in our_cages:
+        display_name = _our_numbers_display_name(company_cage)
+        our_rows.append(
+            {
+                "cage_code": company_cage.cage_code,
+                "display_name": display_name,
+                "name_available": bool(display_name),
+                "stats": our_stats_map.get(
+                    company_cage.cage_code, dict(_EMPTY_STATS)
+                ),
+            }
+        )
+
     entries = list(
         CompetitorWatchlist.objects.select_related("added_by").order_by("-added_at")
     )
@@ -72,6 +103,7 @@ def competitor_watchlist(request):
 
     context = {
         "page_title": "Competitors Numbers",
+        "our_rows": our_rows,
         "rows": ordered_rows,
         "earliest_award_date": get_earliest_award_date(),
     }
@@ -86,6 +118,13 @@ def competitor_watchlist_add(request):
     cage_norm = normalize_cage_code(raw_cage)
     if not cage_norm:
         messages.warning(request, "Enter a valid CAGE code (up to 5 characters).")
+        return redirect(reverse("sales:competitor_watchlist"))
+
+    if CompanyCAGE.objects.filter(cage_code=cage_norm, is_active=True).exists():
+        messages.warning(
+            request,
+            f"CAGE {cage_norm} is one of STATZ's own CAGE codes, not a competitor.",
+        )
         return redirect(reverse("sales:competitor_watchlist"))
 
     existing = (
@@ -123,4 +162,23 @@ def competitor_watchlist_remove(request, pk):
     cage = entry.cage_code
     entry.delete()
     messages.success(request, f"CAGE {cage} removed from the watchlist.")
+    return redirect(reverse("sales:competitor_watchlist"))
+
+
+@login_required
+@require_POST
+def competitor_watchlist_refetch_name(request, pk):
+    """POST — force a fresh SAM.gov name lookup for one watchlist CAGE."""
+    entry = get_object_or_404(CompetitorWatchlist, pk=pk)
+    cage = entry.cage_code
+    cache_record = get_or_fetch_cage(cage, force_refresh=True)
+    if _name_is_available(cache_record):
+        name = (cache_record.entity_name or "").strip()
+        messages.success(request, f"Name for CAGE {cage} updated: {name}.")
+    else:
+        messages.warning(
+            request,
+            f"Could not resolve a company name for CAGE {cage}. "
+            "Try again later or check SAM.gov access.",
+        )
     return redirect(reverse("sales:competitor_watchlist"))

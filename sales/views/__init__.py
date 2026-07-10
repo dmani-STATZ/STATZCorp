@@ -120,7 +120,9 @@ from sales.views.competitor_watchlist import (
     competitor_watchlist,
     competitor_watchlist_add,
     competitor_watchlist_remove,
+    competitor_watchlist_refetch_name,
 )
+from sales.views.competitor_supplier_intel import competitor_supplier_intel
 from sales.views.dibbs_notices import dibbs_notices_api
 from sales.views.awards_wins import awards_wins
 
@@ -231,6 +233,8 @@ __all__ = [
     "competitor_watchlist",
     "competitor_watchlist_add",
     "competitor_watchlist_remove",
+    "competitor_watchlist_refetch_name",
+    "competitor_supplier_intel",
     "dibbs_notices_api",
     "awards_wins",
 ]

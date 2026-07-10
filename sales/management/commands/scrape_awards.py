@@ -120,15 +120,81 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             else "Stuck IN_PROGRESS cleanup: none found."
         )
 
+        dry_run = options.get("dry_run", False)
+
         if options.get("date"):
             self._activity("--date mode: single-date scrape (reconciliation skipped).")
             target_date = self._parse_date(options["date"])
             self._scrape_single_date(target_date)
-            self._activity("Command finished.")
-            return
+        else:
+            self._run_full_reconciliation(dry_run=dry_run)
 
-        self._run_full_reconciliation(dry_run=options.get("dry_run", False))
+        # Final phase: competitor 1155 entity extraction (new + historical backlog).
+        # Skipped on --dry-run. Fault-isolated — never fails the scrape job.
+        if not dry_run:
+            self._run_competitor_entity_extraction()
+
         self._activity("Command finished.")
+
+    def _run_competitor_entity_extraction(self) -> None:
+        """
+        Piggyback: extract role-tagged entities from watched-competitor award PDFs.
+        Never allowed to crash the scrape job.
+        """
+        try:
+            from sales.services.competitor_supplier_intel import (
+                DEFAULT_BATCH_SIZE,
+                DEFAULT_MAX_DURATION_SECONDS,
+                DEFAULT_REQUEST_DELAY_SECONDS,
+                process_pending_competitor_extractions,
+            )
+
+            try:
+                batch_size = int(
+                    os.environ.get(
+                        "COMPETITOR_ENTITY_BATCH_SIZE", str(DEFAULT_BATCH_SIZE)
+                    )
+                    or str(DEFAULT_BATCH_SIZE)
+                )
+            except ValueError:
+                batch_size = DEFAULT_BATCH_SIZE
+
+            try:
+                max_duration = float(
+                    os.environ.get(
+                        "COMPETITOR_ENTITY_MAX_DURATION_SECONDS",
+                        str(DEFAULT_MAX_DURATION_SECONDS),
+                    )
+                    or str(DEFAULT_MAX_DURATION_SECONDS)
+                )
+            except ValueError:
+                max_duration = DEFAULT_MAX_DURATION_SECONDS
+
+            self._activity(
+                "Competitor entity extraction: starting "
+                f"(batch_size={batch_size}, max_duration_seconds={max_duration})."
+            )
+            result = process_pending_competitor_extractions(
+                batch_size=batch_size,
+                request_delay_seconds=DEFAULT_REQUEST_DELAY_SECONDS,
+                max_duration_seconds=max_duration,
+            )
+            self._activity(
+                "Competitor entity extraction: "
+                f"processed={result['processed']} "
+                f"success={result['success']} "
+                f"failure={result['failure']} "
+                f"pending_found={result['pending_found']} "
+                f"skipped_budget={result['skipped_budget']} "
+                f"stopped_for_duration={result['stopped_for_duration']}."
+            )
+        except Exception as exc:
+            self._activity(
+                f"Competitor entity extraction failed unexpectedly: {exc}"
+            )
+            self.stderr.write(
+                f"process_pending_competitor_extractions error: {exc}"
+            )
 
     def _fail_stuck_in_progress_batches(self) -> int:
         """

@@ -113,6 +113,8 @@ from .views import (
     competitor_watchlist,
     competitor_watchlist_add,
     competitor_watchlist_remove,
+    competitor_watchlist_refetch_name,
+    competitor_supplier_intel,
     dibbs_notices_api,
 )
 from .views import awards
@@ -295,6 +297,16 @@ urlpatterns = [
         "competitors/<int:pk>/remove/",
         competitor_watchlist_remove,
         name="competitor_watchlist_remove",
+    ),
+    path(
+        "competitors/<int:pk>/refetch-name/",
+        competitor_watchlist_refetch_name,
+        name="competitor_watchlist_refetch_name",
+    ),
+    path(
+        "competitors/<str:cage_code>/suppliers/",
+        competitor_supplier_intel,
+        name="competitor_supplier_intel",
     ),
     path("dibbs-notices/api/", dibbs_notices_api, name="dibbs_notices_api"),
     path(

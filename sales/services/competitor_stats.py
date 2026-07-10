@@ -130,13 +130,13 @@ def get_competitor_stats(cage_codes):
 
 
 def get_earliest_award_date():
-    """Earliest non-faux award_date in DibbsAward, cached for one hour."""
+    """Earliest non-faux aw_file_date in DibbsAward, cached for one hour."""
     cached = cache.get(_EARLIEST_AWARD_DATE_CACHE_KEY, _SENTINEL)
     if cached is not _SENTINEL:
         return cached
 
     earliest = DibbsAward.objects.filter(is_faux=False).aggregate(
-        min_date=Min("award_date")
+        min_date=Min("aw_file_date")
     )["min_date"]
     cache.set(_EARLIEST_AWARD_DATE_CACHE_KEY, earliest, _EARLIEST_AWARD_DATE_CACHE_TTL)
     return earliest

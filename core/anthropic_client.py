@@ -1,8 +1,10 @@
 import os
+import time
 from decimal import Decimal
-from django.utils.timezone import now
-from django.db.models import F
+
 import requests
+from django.db.models import F
+from django.utils.timezone import now
 
 MODEL_PRICING = {
     "claude-sonnet-4-6": {"input": 3.00 / 1_000_000, "output": 15.00 / 1_000_000},
@@ -10,12 +12,18 @@ MODEL_PRICING = {
 }
 DEFAULT_PRICING = {"input": 3.00 / 1_000_000, "output": 15.00 / 1_000_000}
 
+# Retry only HTTP 429; backoff before attempts 2 and 3 (then give up).
+_RATE_LIMIT_MAX_ATTEMPTS = 3
+_RATE_LIMIT_BACKOFF_SECONDS = (2.0, 8.0, 20.0)
+
+
 def calculate_cost(model: str, input_tokens: int, output_tokens: int) -> Decimal:
     pricing = MODEL_PRICING.get(model, DEFAULT_PRICING)
     input_rate = Decimal(str(pricing["input"]))
     output_rate = Decimal(str(pricing["output"]))
     cost = (Decimal(input_tokens) * input_rate) + (Decimal(output_tokens) * output_rate)
     return cost.quantize(Decimal("0.000001"))
+
 
 def record_api_usage(model: str, input_tokens: int, output_tokens: int, call_site: str) -> None:
     try:
@@ -29,7 +37,7 @@ def record_api_usage(model: str, input_tokens: int, output_tokens: int, call_sit
             output_tokens=output_tokens,
             cost_usd=cost
         )
-        APIBudget.get() # Ensure singleton exists
+        APIBudget.get()  # Ensure singleton exists
         APIBudget.objects.filter(pk=1).update(
             balance_usd=F('balance_usd') - cost,
             updated_at=now()
@@ -38,6 +46,7 @@ def record_api_usage(model: str, input_tokens: int, output_tokens: int, call_sit
         # A failure here must NEVER raise or interrupt the caller
         pass
 
+
 def call_anthropic(payload: dict, call_site: str) -> dict:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     headers = {
@@ -45,23 +54,31 @@ def call_anthropic(payload: dict, call_site: str) -> dict:
         "anthropic-version": "2023-06-01",
         "x-api-key": api_key,
     }
-    
+
     url = "https://api.anthropic.com/v1/messages"
-    
-    # payload is a dict, requests expects json keyword parameter for automatic serialization
-    response = requests.post(url, json=payload, headers=headers, timeout=30)
-    
-    if not response.ok:
-        response.raise_for_status()
-        
+    response = None
+
+    for attempt in range(_RATE_LIMIT_MAX_ATTEMPTS):
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+
+        if response.status_code == 429:
+            if attempt < _RATE_LIMIT_MAX_ATTEMPTS - 1:
+                time.sleep(_RATE_LIMIT_BACKOFF_SECONDS[attempt])
+                continue
+            response.raise_for_status()
+
+        if not response.ok:
+            response.raise_for_status()
+        break
+
     response_body = response.json()
-    
-    # On success: extract usage and record API usage
+
+    # On success only: extract usage and debit APIBudget once.
     usage = response_body.get("usage", {})
     input_tokens = usage.get("input_tokens", 0)
     output_tokens = usage.get("output_tokens", 0)
     model = payload.get("model", "")
-    
+
     record_api_usage(model, input_tokens, output_tokens, call_site)
-    
+
     return response_body

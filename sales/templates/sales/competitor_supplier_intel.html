@@ -1,0 +1,153 @@
+{% extends "base_template.html" %}
+{% load humanize %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+
+<div class="d-flex flex-wrap align-items-baseline justify-content-between mb-3 gap-2">
+  <div>
+    <h1 class="fs-4 fw-semibold mb-0">Supplier Intelligence</h1>
+    <p class="text-muted small mb-0 mt-1" style="max-width:42rem;">
+      Entities extracted from DD Form 1155 parses for awards won by this competitor.
+      Buyer and payment-office DoDAACs are excluded from the ranking below.
+      Sorted by how often each code appears (most-used first).
+    </p>
+  </div>
+  <a href="{% url 'sales:competitor_watchlist' %}" class="btn btn-outline-brand btn-sm">
+    Back to Competitors Numbers
+  </a>
+</div>
+
+<div class="mb-3">
+  {% if competitor_name %}
+  <div class="fw-semibold">{{ competitor_name }}</div>
+  <div class="text-muted font-monospace">{{ competitor_cage }}</div>
+  {% else %}
+  <div class="fw-semibold font-monospace">{{ competitor_cage }}</div>
+  {% endif %}
+</div>
+
+{% if total_intel_count == 0 %}
+<div class="alert alert-secondary small">
+  No supplier intelligence has been parsed for this competitor yet.
+  The background backfill job processes watched-competitor awards in batches;
+  check back after it has run.
+</div>
+{% else %}
+
+{% if unresolved_count %}
+<div class="alert alert-warning small">
+  {{ unresolved_count }} of {{ total_intel_count }} parsed award{{ total_intel_count|pluralize }}
+  have no ranking-eligible supplier entity (coverage gap).
+</div>
+{% endif %}
+
+{% if not suppliers %}
+<div class="alert alert-secondary small">
+  {{ total_intel_count }} award{{ total_intel_count|pluralize }} parsed, but none resolved to a sourcing entity yet.
+</div>
+{% else %}
+<div class="table-responsive border rounded mb-4">
+  <table class="table table-sm table-bordered table-hover align-middle mb-0 small">
+    <thead class="table-light">
+      <tr>
+        <th scope="col">Entity</th>
+        <th scope="col">Role</th>
+        <th scope="col">Where found</th>
+        <th scope="col" class="text-end">Awards</th>
+        <th scope="col" class="text-end">Most recent award</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in suppliers %}
+      <tr>
+        <td>
+          {% if s.name_available %}
+          <div class="fw-semibold">{{ s.display_name }}</div>
+          <div class="text-muted font-monospace">
+            {{ s.code }}
+            {% if s.code_type != "CAGE" %}
+            <span class="text-muted">({{ s.code_type }})</span>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="fw-semibold font-monospace">
+            {{ s.code }}
+            {% if s.code_type != "CAGE" %}
+            <span class="fw-normal text-muted">({{ s.code_type }})</span>
+            {% endif %}
+            — name unavailable
+          </div>
+          {% endif %}
+        </td>
+        <td class="text-nowrap">{{ s.role_label }}</td>
+        <td>{% if s.source_note %}{{ s.source_note }}{% else %}—{% endif %}</td>
+        <td class="text-end fw-semibold">{{ s.award_count|intcomma }}</td>
+        <td class="text-end text-nowrap">
+          {% if s.latest_award_date %}
+          {{ s.latest_award_date|date:"M j, Y" }}
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if other_entities %}
+<h2 class="fs-6 fw-semibold mb-2">Other entities on file</h2>
+<p class="text-muted small mb-2">
+  Buyer and payment-office codes stored for audit only — not included in sourcing rankings.
+</p>
+<div class="table-responsive border rounded">
+  <table class="table table-sm table-bordered align-middle mb-0 small">
+    <thead class="table-light">
+      <tr>
+        <th scope="col">Entity</th>
+        <th scope="col">Role</th>
+        <th scope="col">Where found</th>
+        <th scope="col" class="text-end">Awards</th>
+        <th scope="col" class="text-end">Most recent award</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in other_entities %}
+      <tr>
+        <td>
+          {% if s.name_available %}
+          <div class="fw-semibold">{{ s.display_name }}</div>
+          <div class="text-muted font-monospace">
+            {{ s.code }}
+            <span class="text-muted">({{ s.code_type }})</span>
+          </div>
+          {% else %}
+          <div class="fw-semibold font-monospace">
+            {{ s.code }}
+            <span class="fw-normal text-muted">({{ s.code_type }})</span>
+          </div>
+          {% endif %}
+        </td>
+        <td class="text-nowrap">{{ s.role_label }}</td>
+        <td>{% if s.source_note %}{{ s.source_note }}{% else %}—{% endif %}</td>
+        <td class="text-end">{{ s.award_count|intcomma }}</td>
+        <td class="text-end text-nowrap">
+          {% if s.latest_award_date %}
+          {{ s.latest_award_date|date:"M j, Y" }}
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endif %}
+
+</div>
+{% endblock body %}
