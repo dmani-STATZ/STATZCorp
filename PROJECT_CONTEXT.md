@@ -243,6 +243,8 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 - Three match tiers: T1 (`dibbs_supplier_nsn_scored` view — indexed `match_count` column, refreshed nightly), T2 (approved sources from `tbl_ApprovedSource`), T3 (FSC match).
 - DIBBS PDFs fetched via Playwright in batches of 10 sessions.
 - `NsnProcurementHistory` keyed on `(nsn, contract_number)` — `save_procurement_history` updates `last_seen_sol`/`extracted_at` only for existing keys; never overwrites price/quantity.
+- **Manual SQL deploy boundary:** `sales/sql/usp_process_award_staging.sql` and the production `dibbs_we_won_awards` view are not managed by Django migrations. Every SQL-file change must be redeployed manually via SSMS to every environment; an application deploy alone can leave production on stale SQL. `python manage.py verify_stored_procs` runs during startup and may be run on demand to warn when the award proc lacks the repository's required `ISNULL(s.pdf_url, '')` guard. It is read-only and does not replace manual deployment.
+- **Stale award staging cleanup:** `python manage.py purge_stale_award_staging --older-than-hours=24 --dry-run` reports orphaned rows belonging only to stale `IN_PROGRESS` / `FAILED` scrape batches; omit `--dry-run` to delete those rows and their matching staging errors. Never blanket-truncate staging tables.
 - Background tasks registered via `core/management/commands/run_background_tasks.py` and scheduled per-task in `core.ScheduledTask` (`interval_minutes`, `run_order`). The WebJob heartbeat fires every 1 minute (`0 * 11-22 * * *`, 6 AM–5 PM CT window).
   1. `send_queued_rfqs` (5 min): Sends queued RFQs.
   2. `poll_we_won_today` (15 min): Daytime we-won award detection.

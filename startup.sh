@@ -28,6 +28,9 @@ $PYTHON_EXE manage.py collectstatic --noinput || true
 echo "[startup] Importing release notes"
 $PYTHON_EXE manage.py import_release_notes || echo "import_release_notes failed; continuing startup"
 
+echo "[startup] Verifying manually deployed stored procedures"
+$PYTHON_EXE manage.py verify_stored_procs || echo "verify_stored_procs failed; continuing startup"
+
 # Install Playwright system dependencies in the background AFTER gunicorn starts.
 # Playwright tasks check last_run_at intervals before executing, providing a safe
 # window of several minutes — more than enough for install-deps to complete.

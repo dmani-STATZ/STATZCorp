@@ -91,6 +91,8 @@ def _stage_rows(
             row.purchase_request,
             row.dibbs_solicitation_number,
             aw_file_date.strftime("%m-%d-%Y"),
+            # Defense in depth: the proc bypasses Django's default="" and must
+            # never receive SQL NULL for this non-nullable destination column.
             (getattr(row, "pdf_url", None) or "")[:500],
             None,  # row_type — set by proc
             None,  # solicitation_id — set by proc
@@ -179,6 +181,8 @@ def import_aw_records(
                 purchase_request=(d.get("Purchase_Request") or "").strip() or None,
                 dibbs_solicitation_number=(d.get("Solicitation") or "").strip()
                 or None,
+                # Keep this explicit: usp_process_award_staging bypasses the
+                # ORM-level default="" when it writes dibbs_award.
                 pdf_url=(d.get("Pdf_Url") or "").strip()[:500],
             )
         )

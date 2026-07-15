@@ -67,6 +67,7 @@ python manage.py import_release_notes --verbose   # extra logging
 
 ## Recent release notes
 
+- [2026-07-15-nightly-award-import-reliability](2026-07-15-nightly-award-import-reliability.md) — Fixed nightly award imports failing when production retained a stale manually deployed stored procedure.
 - [2026-07-02-dfas-import-review](2026-07-02-dfas-import-review.md) — DFAS import review: per-row and bulk apply, re-match, match preview, explicit batch close.
 - [2026-06-30-dashboard-non-numeric-item-number](2026-06-30-dashboard-non-numeric-item-number.md) — Fixed Contracts Dashboard crash when CLIN item numbers contain letters (e.g. `0001AA`).
 - [2026-06-30-supplier-contact-categories](2026-06-30-supplier-contact-categories.md) — Contact Categories replace Contact Groups and `is_primary`.
