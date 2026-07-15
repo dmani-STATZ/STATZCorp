@@ -1,5 +1,5 @@
 {% extends "contracts/contract_base.html" %}
-{% load humanize static %}
+{% load humanize static contract_tags %}
 
 {% block title %}Review Contract {{ contract.contract_number }}{% endblock %}
 
@@ -40,7 +40,7 @@ window.onTransactionSaved = function(data) {
       <a class="nav-link active" href="#review-contract">Contract Info</a>
       <a class="nav-link" href="#review-financials">Financials</a>
       <a class="nav-link" href="#review-misc">Misc</a>
-      <a class="nav-link" href="#review-packaging">Packaging</a>
+      <a class="nav-link" href="#review-packaging">Contract Level Charges</a>
       <a class="nav-link" href="#review-splits">Split Summary</a>
       <a class="nav-link" href="#review-assignment">Assignment</a>
       <a class="nav-link" href="#review-clins">CLINs</a>
@@ -280,14 +280,68 @@ window.onTransactionSaved = function(data) {
       </div>
     </section>
 
-    {# SECTION: Packaging #}
+    {# SECTION: Contract Level Charges #}
     <section id="review-packaging" class="mb-4">
       <div class="card review-section-card review-card-packaging">
         <div class="card-header review-section-header d-flex justify-content-between align-items-center">
-          <span>Packaging</span>
+          <span>Contract Level Charges</span>
         </div>
         <div class="card-body">
+          {% if level_charges %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Supplier</th>
+                  <th class="text-end">Estimated</th>
+                  <th class="text-end">Billed/Paid</th>
+                  <th>Payment Date</th>
+                  <th>Invoice #</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for charge in level_charges %}
+                <tr>
+                  <td>{{ charge.label }}</td>
+                  <td>
+                    {% if charge.supplier %}
+                    <a href="{% url 'suppliers:supplier_detail' charge.supplier.id %}" class="text-primary">
+                      {{ charge.supplier.name }}
+                    </a>
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="text-end text-body-secondary fst-italic">
+                    {% if charge.estimated_amount is not None %}
+                      ${{ charge.estimated_amount|floatformat:2|intcomma }}
+                    {% else %}—{% endif %}
+                    <small class="d-block text-body-secondary" style="font-size:0.7rem">Edit on Finance Audit</small>
+                  </td>
+                  <td class="text-end text-body-secondary fst-italic">
+                    {% if charge.billed_paid_amount is not None %}
+                      ${{ charge.billed_paid_amount|floatformat:2|intcomma }}
+                    {% else %}—{% endif %}
+                    <small class="d-block text-body-secondary" style="font-size:0.7rem">Edit on Finance Audit</small>
+                  </td>
+                  <td class="text-body-secondary fst-italic">
+                    {% if charge.payment_date %}
+                      {{ charge.payment_date|date:"M d, Y" }}
+                    {% else %}—{% endif %}
+                    <small class="d-block text-body-secondary" style="font-size:0.7rem">Edit on Finance Audit</small>
+                  </td>
+                  <td class="text-body-secondary fst-italic">
+                    {{ charge.invoice_number|default:"—" }}
+                    <small class="d-block text-body-secondary" style="font-size:0.7rem">Edit on Finance Audit</small>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+
           {% if packaging %}
+          <h3 class="fw-semibold small text-body-secondary {% if level_charges %}mt-4{% endif %} mb-3">Legacy Packaging</h3>
           <div class="row g-3">
 
             {# Packhouse — editable, links to supplier detail #}
@@ -370,8 +424,10 @@ window.onTransactionSaved = function(data) {
             </div>
           </div>
 
-          {% else %}
-          <p class="text-body-secondary small mb-0">No packaging information recorded for this contract.</p>
+          {% endif %}
+
+          {% if not level_charges and not packaging %}
+          <p class="text-body-secondary small mb-0">No contract level charges recorded for this contract.</p>
           {% endif %}
         </div>
       </div>
@@ -390,15 +446,79 @@ window.onTransactionSaved = function(data) {
                   <th>Company</th>
                   <th class="text-end">Total Split Value</th>
                   <th class="text-end">Total Split Paid</th>
+                  <th style="width:1.5rem"></th>
                 </tr>
               </thead>
               <tbody>
                 {% for row in clin_split_rollup %}
-                <tr>
-                  <td>{{ row.company_name }}</td>
+                {% with pct=company_percentages|get_item:row.company_name %}
+                <tr class="review-split-company-row">
+                  <td>
+                    {{ row.company_name }}
+                    {% if pct is not None %}
+                    <span class="text-body-secondary small ms-1">({{ pct|floatformat:1 }}%)</span>
+                    {% endif %}
+                  </td>
                   <td class="text-end">{% if row.total_value is not None %}${{ row.total_value|floatformat:2 }}{% else %}—{% endif %}</td>
                   <td class="text-end">{% if row.total_paid is not None %}${{ row.total_paid|floatformat:2 }}{% else %}—{% endif %}</td>
+                  <td class="text-center">
+                    {% if clin_splits_by_company|get_item:row.company_name %}
+                    <button type="button"
+                            class="btn btn-link btn-sm p-0 review-split-expand-btn"
+                            aria-expanded="false"
+                            title="Expand CLIN breakdown">
+                      ▼
+                    </button>
+                    {% endif %}
+                  </td>
                 </tr>
+                <tr class="review-split-clin-accordion d-none">
+                  <td colspan="4" class="p-0">
+                    <table class="table table-sm mb-0 review-split-clin-table">
+                      <tbody>
+                        {% for clin_row in clin_splits_by_company|get_item:row.company_name %}
+                        <tr>
+                          <td class="ps-4 text-body-secondary small">{{ clin_row.item_number }}</td>
+                          <td class="text-end small">
+                            {% if clin_row.raw_split_value is not None %}
+                              ${{ clin_row.raw_split_value|floatformat:2 }}
+                            {% elif clin_row.split_value is not None %}
+                              ${{ clin_row.split_value|floatformat:2 }}
+                            {% else %}
+                              —
+                            {% endif %}
+                          </td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                        {% endfor %}
+                        {% with pkg_share=packaging_share_per_company|get_item:row.company_name %}
+                        {% if pkg_share %}
+                        <tr class="text-danger">
+                          <td class="ps-4 small fst-italic">Packaging</td>
+                          <td class="text-end small fst-italic">&minus;${{ pkg_share|floatformat:2 }}</td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                        {% endif %}
+                        {% endwith %}
+                        {% with charge_rows=level_charge_shares_per_company|get_item:row.company_name %}
+                        {% if charge_rows %}
+                        {% for charge in charge_rows %}
+                        <tr class="text-danger">
+                          <td class="ps-4 small fst-italic">{{ charge.label }}{% if charge.supplier_name %} — {{ charge.supplier_name }}{% endif %}</td>
+                          <td class="text-end small fst-italic">&minus;${{ charge.share|floatformat:2 }}</td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                        {% endwith %}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                {% endwith %}
                 {% endfor %}
               </tbody>
               <tfoot>
@@ -406,6 +526,7 @@ window.onTransactionSaved = function(data) {
                   <th>Total</th>
                   <td class="text-end fw-semibold">${{ contract.total_split_value|floatformat:2 }}</td>
                   <td class="text-end fw-semibold">${{ contract.total_split_paid|floatformat:2 }}</td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -535,6 +656,18 @@ document.addEventListener('DOMContentLoaded', function () {
         target: '#review-page-nav',
         smoothScroll: true,
         offset: 80
+    });
+
+    document.querySelectorAll('.review-split-expand-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var companyRow = btn.closest('tr');
+            var accordionRow = companyRow ? companyRow.nextElementSibling : null;
+            if (!accordionRow) return;
+            var isOpen = !accordionRow.classList.contains('d-none');
+            accordionRow.classList.toggle('d-none', isOpen);
+            btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+            btn.textContent = isOpen ? '▼' : '▲';
+        });
     });
 });
 </script>

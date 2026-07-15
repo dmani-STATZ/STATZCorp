@@ -15,6 +15,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import JsonResponse
 from django.urls import reverse
 from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, ContractPackaging, PaymentHistory, ContractLevelCharge
+from contracts.services.split_breakdown import build_split_breakdown_context
 from .mixins import ActiveCompanyQuerysetMixin
 import logging
 from decimal import Decimal
@@ -209,60 +210,18 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                         total_paid=Sum('split_paid'),
                     ).order_by('company_name')
                 )
-                # Per-CLIN split breakdown for Finance Audit accordion.
-                clin_splits_by_company = {}
-                for split in ClinSplit.objects.filter(
-                    clin__contract=self.object
-                ).select_related('clin').prefetch_related(
-                    'clin__finance_lines'
-                ).order_by('company_name', 'clin__item_number'):
-                    cname = split.company_name
-                    if cname not in clin_splits_by_company:
-                        clin_splits_by_company[cname] = []
-
-                    clin = split.clin
-                    wawf_val = Decimal(str(clin.wawf_payment or 0))
-                    item_val = Decimal(str(clin.item_value or 0))
-                    income = wawf_val if wawf_val != Decimal('0') else item_val
-                    quote_val = Decimal(str(clin.quote_value or 0))
-                    paid_val = Decimal(str(clin.paid_amount or 0))
-                    cost = paid_val if paid_val != Decimal('0') else quote_val
-                    gross = income - cost
-                    fin_costs = sum(
-                        Decimal(str(fl.amount_billed or 0))
-                        for fl in clin.finance_lines.all()
-                    )
-                    clin_raw_gp = gross - fin_costs
-                    pct = split.percentage
-                    if pct is not None:
-                        raw_split_value = (
-                            clin_raw_gp * pct / Decimal('100')
-                        ).quantize(Decimal('0.01'))
-                    else:
-                        raw_split_value = None
-
-                    clin_splits_by_company[cname].append({
-                        'split_id': split.id,
-                        'item_number': clin.item_number,
-                        'split_value': split.split_value,
-                        'split_paid': split.split_paid,
-                        'percentage': pct,
-                        'raw_split_value': raw_split_value,
-                    })
-                context['clin_splits_by_company'] = clin_splits_by_company
+                split_breakdown_context = build_split_breakdown_context(
+                    self.object
+                )
+                context.update(split_breakdown_context)
+                charges_deduction = split_breakdown_context[
+                    'charges_deduction'
+                ]
+                level_charges = split_breakdown_context['level_charges']
                 context['log_split_paid_url'] = reverse(
                     'contracts:log_split_paid',
                     kwargs={'contract_pk': self.object.pk},
                 )
-
-                # Use the first non-null percentage found per company for summary display.
-                company_percentages = {}
-                for cname, rows in clin_splits_by_company.items():
-                    for row in rows:
-                        if row['percentage'] is not None:
-                            company_percentages[cname] = row['percentage']
-                            break
-                context['company_percentages'] = company_percentages
 
                 finance_lines_qs = ContractFinanceLine.objects.filter(
                     clin__contract=self.object,
@@ -309,89 +268,6 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
 
                 context['shipments_by_clin'] = shipments_by_clin
                 context['shipment_subtotals_by_clin'] = shipment_subtotals_by_clin
-
-                packaging_deduction = Decimal('0.00')
-                packaging_context = None
-                try:
-                    pkg = self.object.packaging
-                    if pkg.amount_paid is not None and Decimal(str(pkg.amount_paid)) != Decimal('0'):
-                        packaging_deduction = Decimal(str(pkg.amount_paid))
-                    elif pkg.quote_amount is not None and Decimal(str(pkg.quote_amount)) != Decimal('0'):
-                        packaging_deduction = Decimal(str(pkg.quote_amount))
-                    packaging_context = pkg
-                except ContractPackaging.DoesNotExist:
-                    pass
-
-                context['packaging'] = packaging_context
-                context['packaging_deduction'] = packaging_deduction
-
-                packaging_share_per_company = {}
-                if packaging_deduction:
-                    for company_name, rows in clin_splits_by_company.items():
-                        pct = next(
-                            (r['percentage'] for r in rows if r['percentage'] is not None),
-                            None,
-                        )
-                        if pct is not None:
-                            packaging_share_per_company[company_name] = (
-                                packaging_deduction * pct / Decimal('100')
-                            ).quantize(Decimal('0.01'))
-                context['packaging_share_per_company'] = packaging_share_per_company
-
-                charges_deduction = Decimal('0.00')
-                level_charges = list(
-                    self.object.level_charges.select_related('supplier').order_by('id')
-                )
-                for charge in level_charges:
-                    if charge.action_type != 'charge':
-                        continue
-                    if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
-                        charges_deduction += Decimal(str(charge.billed_paid_amount))
-                    else:
-                        charges_deduction += Decimal(str(charge.estimated_amount))
-
-                context['level_charges'] = level_charges
-                context['charges_deduction'] = charges_deduction
-
-                # Per-company itemized ContractLevelCharge shares for the Split Summary accordion.
-                # Mirrors packaging_share_per_company: proportional to the company's percentage.
-                level_charge_shares_per_company = {}
-                if level_charges:
-                    for company_name, rows in clin_splits_by_company.items():
-                        pct = next(
-                            (r['percentage'] for r in rows if r['percentage'] is not None),
-                            None,
-                        )
-                        if pct is None:
-                            continue
-                        charge_rows = []
-                        for charge in level_charges:
-                            if charge.action_type != 'charge':
-                                continue
-                            if (
-                                charge.billed_paid_amount is not None
-                                and Decimal(str(charge.billed_paid_amount)) != Decimal('0')
-                            ):
-                                amount = Decimal(str(charge.billed_paid_amount))
-                            else:
-                                amount = Decimal(str(charge.estimated_amount))
-                            share = (
-                                amount * pct / Decimal('100')
-                            ).quantize(Decimal('0.01'))
-                            if share == Decimal('0.00'):
-                                continue
-                            charge_rows.append({
-                                'label': charge.label,
-                                'supplier_name': (
-                                    charge.supplier.name if charge.supplier_id else None
-                                ),
-                                'share': share,
-                            })
-                        if charge_rows:
-                            level_charge_shares_per_company[company_name] = charge_rows
-                context['level_charge_shares_per_company'] = (
-                    level_charge_shares_per_company
-                )
 
                 ct_contract = ContentType.objects.get_for_model(Contract)
                 ct_clin = ContentType.objects.get_for_model(Clin)

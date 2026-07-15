@@ -660,6 +660,17 @@ html {
     font-weight: 600;
 }
 
+.review-split-clin-table {
+    background: var(--bs-tertiary-bg);
+    font-size: 0.8rem;
+}
+
+.review-split-expand-btn {
+    color: var(--bs-secondary-color);
+    font-size: 0.65rem;
+    line-height: 1;
+}
+
 /* ── Contract Search Modal ───────────────────────────────────────────────── */
 
 .contract-search-results {

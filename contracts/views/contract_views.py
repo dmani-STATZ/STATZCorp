@@ -36,6 +36,7 @@ from ..models import (
 )
 from .mixins import ActiveCompanyQuerysetMixin
 from contracts.services.sharepoint_paths import build_explorer_uri
+from contracts.services.split_breakdown import build_split_breakdown_context
 
 logger = logging.getLogger(__name__)
 
@@ -729,12 +730,7 @@ class ContractReviewView(DetailView):
                 total_paid=Sum('split_paid'),
             ).order_by('company_name')
         )
-
-        # Packaging (optional — may not exist on every contract)
-        try:
-            context['packaging'] = contract.packaging
-        except ContractPackaging.DoesNotExist:
-            context['packaging'] = None
+        context.update(build_split_breakdown_context(contract))
 
         # Packhouse picker (suppliers flagged as packhouse first, then by name).
         # Serialize to JSON so the template can embed it directly in <script>.
