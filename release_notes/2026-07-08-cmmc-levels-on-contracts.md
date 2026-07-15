@@ -1,7 +1,7 @@
 ---
 id: 2026-07-08-cmmc-levels-on-contracts
 title: CMMC Levels on Contracts
-published: false
+published: true
 publish_date: 2026-07-08
 tags: [new, contracts]
 critical: false

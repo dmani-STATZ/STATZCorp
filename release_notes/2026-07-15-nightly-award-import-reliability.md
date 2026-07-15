@@ -1,7 +1,7 @@
 ---
 id: 2026-07-15-nightly-award-import-reliability
 title: Nightly award import reliability improved
-published: false
+published: true
 publish_date: 2026-07-15
 tags: [fixed, sales]
 critical: false

@@ -1,7 +1,7 @@
 ---
 id: 2026-07-09-contact-address-delete-confirm
 title: "Fixed: Contact and address delete confirmation pages no longer error"
-published: false
+published: true
 publish_date: 2026-07-09
 tags: [fixed, contracts]
 critical: false

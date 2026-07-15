@@ -1,7 +1,7 @@
 ---
 id: 2026-07-02-dfas-import-review
 title: DFAS import review — apply rows individually and close batches explicitly
-published: false
+published: true
 publish_date: 2026-07-02
 tags: [improved, contracts]
 critical: false

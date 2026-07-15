@@ -1,7 +1,7 @@
 ---
 id: 2026-07-08-award-ledger-page
 title: Browse the Award Ledger from a new read-only page
-published: false
+published: true
 publish_date: 2026-07-08
 tags: [new, sales]
 critical: false

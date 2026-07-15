@@ -1,7 +1,7 @@
 ---
 id: 2026-06-30-dashboard-non-numeric-item-number
 title: Contracts Dashboard No Longer Crashes on Alphanumeric CLIN Numbers
-published: false
+published: true
 publish_date: 2026-06-30
 tags: [fixed, contracts]
 critical: false

@@ -1,7 +1,7 @@
 ---
 id: 2026-07-09-nsn-normalization-truncation-fix
 title: Malformed NSNs no longer block deploys
-published: false
+published: true
 publish_date: 2026-07-09
 tags: [fixed, contracts]
 critical: false

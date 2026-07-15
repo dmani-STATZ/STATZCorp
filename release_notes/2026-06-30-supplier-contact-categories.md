@@ -1,7 +1,7 @@
 ---
 id: 2026-06-30-supplier-contact-categories
 title: Supplier Contact Categories Replace Groups and Primary Flag
-published: false
+published: true
 publish_date: 2026-06-30
 tags: [improved, contracts]
 critical: false

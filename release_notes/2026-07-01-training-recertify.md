@@ -1,7 +1,7 @@
 ---
 id: 2026-07-01-training-recertify
 title: Recertify your training anytime
-published: false
+published: true
 publish_date: 2026-07-01
 tags: [new, training]
 critical: false

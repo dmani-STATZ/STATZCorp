@@ -1,7 +1,7 @@
 ---
 id: 2026-06-30-mod-matching-migration-fix
 title: DIBBS mod-to-contract matching backfill runs reliably on SQL Server
-published: false
+published: true
 publish_date: 2026-06-30
 tags: [fixed, system]
 critical: false
