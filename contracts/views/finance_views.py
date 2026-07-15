@@ -167,6 +167,7 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context['packaging'] = None
         context['packaging_deduction'] = Decimal('0.00')
         context['packaging_share_per_company'] = {}
+        context['level_charge_shares_per_company'] = {}
         context['charges_deduction'] = Decimal('0.00')
         context['level_charges'] = []
         context['level_charge_content_type_id'] = ContentType.objects.get_for_model(ContractLevelCharge).id
@@ -351,6 +352,46 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
 
                 context['level_charges'] = level_charges
                 context['charges_deduction'] = charges_deduction
+
+                # Per-company itemized ContractLevelCharge shares for the Split Summary accordion.
+                # Mirrors packaging_share_per_company: proportional to the company's percentage.
+                level_charge_shares_per_company = {}
+                if level_charges:
+                    for company_name, rows in clin_splits_by_company.items():
+                        pct = next(
+                            (r['percentage'] for r in rows if r['percentage'] is not None),
+                            None,
+                        )
+                        if pct is None:
+                            continue
+                        charge_rows = []
+                        for charge in level_charges:
+                            if charge.action_type != 'charge':
+                                continue
+                            if (
+                                charge.billed_paid_amount is not None
+                                and Decimal(str(charge.billed_paid_amount)) != Decimal('0')
+                            ):
+                                amount = Decimal(str(charge.billed_paid_amount))
+                            else:
+                                amount = Decimal(str(charge.estimated_amount))
+                            share = (
+                                amount * pct / Decimal('100')
+                            ).quantize(Decimal('0.01'))
+                            if share == Decimal('0.00'):
+                                continue
+                            charge_rows.append({
+                                'label': charge.label,
+                                'supplier_name': (
+                                    charge.supplier.name if charge.supplier_id else None
+                                ),
+                                'share': share,
+                            })
+                        if charge_rows:
+                            level_charge_shares_per_company[company_name] = charge_rows
+                context['level_charge_shares_per_company'] = (
+                    level_charge_shares_per_company
+                )
 
                 ct_contract = ContentType.objects.get_for_model(Contract)
                 ct_clin = ContentType.objects.get_for_model(Clin)

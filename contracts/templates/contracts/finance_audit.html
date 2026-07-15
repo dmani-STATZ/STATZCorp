@@ -302,6 +302,18 @@
                                             </tr>
                                             {% endif %}
                                             {% endwith %}
+                                            {% with charge_rows=level_charge_shares_per_company|get_item:row.company_name %}
+                                            {% if charge_rows %}
+                                            {% for charge in charge_rows %}
+                                            <tr class="text-danger">
+                                                <td class="ps-4 small fst-italic">{{ charge.label }}{% if charge.supplier_name %} — {{ charge.supplier_name }}{% endif %}</td>
+                                                <td class="text-end small">&minus;${{ charge.share|floatformat:2 }}</td>
+                                                <td></td>
+                                                <td></td>
+                                            </tr>
+                                            {% endfor %}
+                                            {% endif %}
+                                            {% endwith %}
                                         </tbody>
                                     </table>
                                 </td>
