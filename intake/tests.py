@@ -3004,3 +3004,288 @@ class AwardLedgerListViewTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertIn('/login', resp.url.lower())
 
+
+class AwardLedgerProvenanceTests(TestCase):
+    """Tests for the new Award Ledger user, timestamp, and source tracking."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from contracts.models import Company, Buyer
+        from sales.models import CompanyCAGE
+        from users.models import UserCompanyMembership
+        from products.models import Nsn
+        from suppliers.models import Supplier
+
+        # Company Setup
+        cls.company = Company.objects.create(name='Proven Co', slug='proven-co')
+        cls.cage = '1PROV'
+        cls.cage_model = CompanyCAGE.objects.create(
+            cage_code=cls.cage,
+            company=cls.company,
+            sb_representations_code='A',
+            affirmative_action_code='Y6',
+            previous_contracts_code='N4',
+            alternate_disputes_resolution='A',
+            is_active=True,
+        )
+
+        # Users
+        cls.user = User.objects.create_user('proven_user', 'p@x.com', 'pw')
+        UserCompanyMembership.objects.create(user=cls.user, company=cls.company, is_default=True)
+        cls.superuser = User.objects.create_superuser('proven_admin', 'pa@x.com', 'pw')
+
+        # Finalization Helpers
+        cls.buyer = Buyer.objects.create(description='Acme Buying Office')
+        cls.nsn1 = Nsn.objects.create(nsn_code='1111-11-111-1111', description='Bolt')
+        cls.supplier1 = Supplier.objects.create(name='Supp A', cage_code='AAAAA')
+
+    def test_latch_provenance_write_once(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import _latch
+
+        row = AwardLedger.objects.create(contract_number='SPE7L1-26-P-1111')
+        self.assertIsNone(row.created_by)
+
+        # First latch sets it
+        self.assertTrue(_latch(row, 'created_by', self.user))
+        self.assertEqual(row.created_by, self.user)
+
+        # Second latch is ignored
+        self.assertFalse(_latch(row, 'created_by', self.superuser))
+        self.assertEqual(row.created_by, self.user)
+
+    def test_ingestion_source_first_touch_latch(self):
+        from intake.models import AwardLedger
+        from intake.services.award_ledger import log_draft_ingestion
+        from intake.models import DraftContract
+
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-2222',
+            contract_type=DraftContract.Type.AWD,
+            status=DraftContract.Status.QUEUED,
+            company=self.company,
+        )
+
+        # First touch logs as PDF_UPLOAD
+        log_draft_ingestion(draft, AwardLedger.IngestionSource.PDF_UPLOAD, user=self.user)
+        row = AwardLedger.objects.get(contract_number='SPE7L1-26-P-2222')
+        self.assertEqual(row.ingestion_source, AwardLedger.IngestionSource.PDF_UPLOAD)
+        self.assertEqual(row.created_by, self.user)
+
+        # Subsequent logging doesn't overwrite first-touch
+        log_draft_ingestion(draft, AwardLedger.IngestionSource.MANUAL, user=self.superuser)
+        row.refresh_from_db()
+        self.assertEqual(row.ingestion_source, AwardLedger.IngestionSource.PDF_UPLOAD)
+        self.assertEqual(row.created_by, self.user)
+
+    def test_cage_resolution_resolves_correctly(self):
+        from intake.models import AwardLedger, DraftContract
+        from intake.services.award_ledger import log_draft_ingestion
+        from sales.models import CompanyCAGE
+
+        # 1. prime contractor CAGE block
+        draft_with_parse = DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-3331',
+            contract_type=DraftContract.Type.AWD,
+            company=self.company,
+            data={'contractor_cage': 'PARSE'}
+        )
+        log_draft_ingestion(draft_with_parse, AwardLedger.IngestionSource.MANUAL, user=self.user)
+        row = AwardLedger.objects.get(contract_number='SPE7L1-26-P-3331')
+        self.assertEqual(row.awardee_cage, 'PARSE')
+
+        # 2. company single active CAGE
+        draft_skeleton = DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-3332',
+            contract_type=DraftContract.Type.AWD,
+            company=self.company,
+            data={}
+        )
+        log_draft_ingestion(draft_skeleton, AwardLedger.IngestionSource.MANUAL, user=self.user)
+        row2 = AwardLedger.objects.get(contract_number='SPE7L1-26-P-3332')
+        self.assertEqual(row2.awardee_cage, '1PROV')
+
+        # 3. ambiguous multi-CAGE
+        CompanyCAGE.objects.create(
+            cage_code='2PROV',
+            company=self.company,
+            sb_representations_code='A',
+            affirmative_action_code='Y6',
+            previous_contracts_code='N4',
+            alternate_disputes_resolution='A',
+            is_active=True,
+        )
+        draft_ambig = DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-3333',
+            contract_type=DraftContract.Type.AWD,
+            company=self.company,
+            data={}
+        )
+        log_draft_ingestion(draft_ambig, AwardLedger.IngestionSource.MANUAL, user=self.user)
+        row3 = AwardLedger.objects.get(contract_number='SPE7L1-26-P-3333')
+        # Resolved CAGE should be empty/blank
+        self.assertEqual(row3.awardee_cage, '')
+
+    def test_create_draft_view_dedup_and_creation(self):
+        from intake.models import DraftContract, AwardLedger
+        from contracts.models import Contract, ContractStatus
+        from django.urls import reverse
+
+        self.client.force_login(self.user)
+        url = reverse('intake:create_draft')
+
+        # Normal creation
+        resp = self.client.post(url, {
+            'contract_type': 'PO',
+            'contract_number': 'SPE7L1-26-P-4444',
+        })
+        self.assertEqual(resp.status_code, 302)
+        
+        # Verify draft created
+        draft = DraftContract.objects.get(contract_number='SPE7L1-26-P-4444')
+        self.assertEqual(draft.contract_type, DraftContract.Type.PO)
+        
+        # Verify ledger row created
+        row = AwardLedger.objects.get(contract_number='SPE7L1-26-P-4444')
+        self.assertEqual(row.ingestion_source, AwardLedger.IngestionSource.MANUAL)
+        self.assertEqual(row.created_by, self.user)
+
+        # Test duplicate against draft
+        resp2 = self.client.post(url, {
+            'contract_type': 'PO',
+            'contract_number': 'SPE7L1-26-P-4444',
+        })
+        self.assertEqual(resp2.status_code, 302)
+        # Follow to see duplicate draft message
+        follow = self.client.get(reverse('intake:queue'))
+        messages = list(follow.context['messages'])
+        self.assertTrue(any("already in the intake queue" in str(m) for m in messages))
+
+        # Test duplicate against live contract
+        status_open = ContractStatus.objects.get_or_create(description='Open')[0]
+        Contract.objects.create(
+            contract_number='SPE7L1-26-P-5555',
+            company=self.company,
+            status=status_open,
+        )
+        resp3 = self.client.post(url, {
+            'contract_type': 'PO',
+            'contract_number': 'SPE7L1-26-P-5555',
+        })
+        follow2 = self.client.get(reverse('intake:queue'))
+        messages2 = list(follow2.context['messages'])
+        self.assertTrue(any("already exists in the contracts system" in str(m) for m in messages2))
+
+    def test_start_draft_worked_latching(self):
+        from intake.models import DraftContract, AwardLedger
+        from django.urls import reverse
+
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-6666',
+            contract_type=DraftContract.Type.AWD,
+            status=DraftContract.Status.QUEUED,
+            company=self.company,
+        )
+        ledger = AwardLedger.objects.create(
+            contract_number='SPE7L1-26-P-6666',
+            ingestion_source=AwardLedger.IngestionSource.PDF_UPLOAD,
+        )
+
+        self.client.force_login(self.user)
+        # Call start_draft
+        resp = self.client.post(reverse('intake:start_draft', kwargs={'pk': draft.pk}))
+        self.assertEqual(resp.status_code, 302)
+
+        ledger.refresh_from_db()
+        self.assertIsNotNone(ledger.draft_worked_at)
+        self.assertEqual(ledger.draft_worked_by, self.user)
+        self.assertEqual(ledger.lifecycle_state, AwardLedger.Lifecycle.DRAFT_WORKED)
+
+    def test_finalize_passes_user_to_ledger(self):
+        from intake.models import DraftContract, AwardLedger
+        from contracts.models import ContractStatus, Contract
+        from django.urls import reverse
+        
+        status_open = ContractStatus.objects.get_or_create(description='Open')[0]
+        # Create a ready-for-review draft
+        draft = DraftContract.objects.create(
+            contract_number='SPE7L1-26-P-7777',
+            contract_type=DraftContract.Type.AWD,
+            status=DraftContract.Status.READY_FOR_REVIEW,
+            company=self.company,
+            locked_by=self.user,
+            locked_at=timezone.now(),
+            data={
+                'pr_number': 'PR-100',
+                'award_date': '2026-05-01',
+                'buyer_id': self.buyer.id,
+                'buyer_text': 'Acme Buying Office',
+                'contract_value': '12345.67',
+                'company_slug': self.company.slug,
+                'clins': [
+                    {
+                        'item_number': '0001',
+                        'item_type': 'P',
+                        'nsn_id': self.nsn1.id,
+                        'nsn_text': '1111-11-111-1111',
+                        'supplier_id': self.supplier1.id,
+                        'supplier_text': 'Supp A',
+                        'order_qty': 10,
+                        'unit_price': '5.00',
+                        'item_value': '50.00',
+                        'ia': 'O',
+                        'fob': 'D',
+                    },
+                ],
+            }
+        )
+        ledger = AwardLedger.objects.create(
+            contract_number='SPE7L1-26-P-7777',
+            ingestion_source=AwardLedger.IngestionSource.PDF_UPLOAD,
+        )
+
+        self.client.force_login(self.user)
+        # Call finalize view
+        resp = self.client.post(reverse('intake:finalize_draft', kwargs={'pk': draft.pk}))
+        self.assertEqual(resp.status_code, 302)
+
+        # Check that target Contract actually exists
+        self.assertTrue(Contract.objects.filter(contract_number='SPE7L1-26-P-7777').exists())
+
+        ledger.refresh_from_db()
+        self.assertIsNotNone(ledger.live_contract_at)
+        self.assertEqual(ledger.finalized_by, self.user)
+        self.assertEqual(ledger.lifecycle_state, AwardLedger.Lifecycle.LIVE_CONTRACT)
+
+    def test_ledger_page_source_filtering_and_csv_columns(self):
+        from intake.models import AwardLedger
+        from django.urls import reverse
+
+        # Create rows with different sources
+        AwardLedger.objects.create(contract_number='SPE7L1-26-P-8881', awardee_cage=self.cage, ingestion_source=AwardLedger.IngestionSource.PDF_UPLOAD)
+        AwardLedger.objects.create(contract_number='SPE7L1-26-P-8882', awardee_cage=self.cage, ingestion_source=AwardLedger.IngestionSource.DIBBS_SCRAPE)
+
+        self.client.force_login(self.user)
+        url = reverse('intake:award_ledger')
+
+        # Filter by source
+        resp = self.client.get(url, {'source': 'pdf_upload'})
+        self.assertEqual(resp.status_code, 200)
+        entries = list(resp.context['entries'])
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0].contract_number, 'SPE7L1-26-P-8881')
+
+        # CSV Columns
+        csv_resp = self.client.get(url, {'export': 'csv'})
+        self.assertEqual(csv_resp.status_code, 200)
+        content = csv_resp.content.decode('utf-8')
+        # Check column headers
+        self.assertIn('Ingestion Source', content)
+        self.assertIn('Created By', content)
+        self.assertIn('Draft Worked By', content)
+        self.assertIn('Finalized By', content)
+        # Check contents
+        self.assertIn('PDF Upload', content)
+        self.assertIn('DIBBS Scrape', content)
+
+

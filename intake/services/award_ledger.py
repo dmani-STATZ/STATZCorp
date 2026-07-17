@@ -173,7 +173,11 @@ def _apply_mod_mirror(row, mod: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def upsert_ledger_for_batch(batch, activity_log: Optional[Callable[[str], None]] = None) -> dict:
+def upsert_ledger_for_batch(
+    batch,
+    activity_log: Optional[Callable[[str], None]] = None,
+    source: str = 'legacy',
+) -> dict:
     """Upsert ledger rows for every our-CAGE award and mod in ``batch``.
 
     For each ``DibbsAward`` whose awardee CAGE is one of our active CAGEs and
@@ -302,6 +306,9 @@ def upsert_ledger_for_batch(batch, activity_log: Optional[Callable[[str], None]]
             if draft is not None:
                 _latch(row, "draft_created_at", draft["created_at"])
 
+            if not row.ingestion_source:
+                row.ingestion_source = source
+
             _advance_state(row)
             row.save()
             result["created" if created else "updated"] += 1
@@ -324,6 +331,9 @@ def upsert_ledger_for_batch(batch, activity_log: Optional[Callable[[str], None]]
             draft = draft_map.get(cn)
             if draft is not None:
                 _latch(row, "draft_created_at", draft["created_at"])
+
+            if not row.ingestion_source:
+                row.ingestion_source = source
 
             _advance_state(row)
             row.save()
@@ -509,7 +519,7 @@ def _contract_id_map(Contract, cns: list[str]) -> dict[str, int]:
 # ---------------------------------------------------------------------------
 
 
-def stamp_live_contract(contract_number: str, contract) -> None:
+def stamp_live_contract(contract_number: str, contract, user=None) -> None:
     """Latch ``live_contract_at`` when a draft finalizes into a live contract.
 
     Called from ``intake.finalize`` inside the finalize transaction, right
@@ -528,6 +538,9 @@ def stamp_live_contract(contract_number: str, contract) -> None:
             return
 
         changed = _latch(row, "live_contract_at", timezone.now())
+        if user is not None:
+            if _latch(row, "finalized_by", user):
+                changed = True
         if row.contract_id is None and contract is not None:
             row.contract_id = contract.pk
             changed = True
@@ -538,4 +551,85 @@ def stamp_live_contract(contract_number: str, contract) -> None:
     except Exception:
         logger.exception(
             "%s stamp_live_contract failed for %r", _LOG_PREFIX, contract_number
+        )
+
+
+def log_draft_ingestion(draft, source: str, user=None) -> None:
+    """Ensure a ledger row exists the moment a draft enters intake.
+
+    get_or_create on _canonical(draft.contract_number); latch first_seen_at
+    and draft_created_at; latch ingestion_source (first-touch); latch
+    created_by; populate awardee_cage per D3 when creating a non-DIBBS row;
+    then reconcile the row. Guarded end-to-end — never raises to the caller.
+    """
+    try:
+        from intake.models import AwardLedger
+
+        cn = _canonical(draft.contract_number)
+        if not cn:
+            return
+
+        now = timezone.now()
+        row, created = AwardLedger.objects.get_or_create(
+            contract_number=cn,
+            defaults={"first_seen_at": now},
+        )
+
+        changed = False
+
+        if _latch(row, "draft_created_at", draft.created_at or now):
+            changed = True
+
+        if not row.ingestion_source:
+            row.ingestion_source = source
+            changed = True
+
+        if user is not None:
+            if _latch(row, "created_by", user):
+                changed = True
+
+        # D3: CAGE resolution order
+        if not row.awardee_cage:
+            cage = (draft.data or {}).get("contractor_cage")
+            if cage:
+                row.awardee_cage = str(cage).strip().upper()
+                changed = True
+            else:
+                if draft.company:
+                    from sales.models import CompanyCAGE
+                    active_cages = list(
+                        CompanyCAGE.objects.filter(
+                            company=draft.company, is_active=True
+                        ).values_list("cage_code", flat=True)
+                    )
+                    if len(active_cages) == 1:
+                        row.awardee_cage = active_cages[0].strip().upper()
+                        changed = True
+                    elif len(active_cages) > 1:
+                        logger.warning(
+                            "%s log_draft_ingestion: company %s has multiple active CAGE codes %s — cannot auto-assign CAGE for draft %s",
+                            _LOG_PREFIX, draft.company.pk, active_cages, draft.pk
+                        )
+                if not row.awardee_cage:
+                    logger.warning(
+                        "%s log_draft_ingestion: could not resolve CAGE for draft %s (number %s)",
+                        _LOG_PREFIX, draft.pk, draft.contract_number
+                    )
+
+        if _advance_state(row):
+            changed = True
+
+        if changed:
+            row.save()
+
+        # Reconcile just this row
+        reconcile_open_ledger_rows(
+            activity_log=None,
+            contract_numbers=[cn],
+        )
+
+    except Exception:
+        logger.exception(
+            "%s log_draft_ingestion failed for draft %s (number %s)",
+            _LOG_PREFIX, getattr(draft, "pk", None), getattr(draft, "contract_number", None)
         )

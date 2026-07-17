@@ -141,7 +141,7 @@ def finalize_draft(draft: DraftContract, user: User) -> CanonicalTarget:
         # failure must never abort finalization, so this is fully guarded.
         try:
             from intake.services.award_ledger import stamp_live_contract
-            stamp_live_contract(draft.contract_number, target)
+            stamp_live_contract(draft.contract_number, target, user=user)
         except Exception:
             logger.exception(
                 'AwardLedger stamp_live_contract failed for %s (finalization '

@@ -94,13 +94,14 @@ class DraftContractAdmin(admin.ModelAdmin):
 class AwardLedgerAdmin(admin.ModelAdmin):
     """Read-mostly durable award-lifecycle ledger.
 
-    All lifecycle timestamps and FK links are read-only — the ledger is
+    All lifecycle timestamps, FK links, and provenance fields are read-only — the ledger is
     maintained by the sweep service, not by hand.
     """
 
     list_display = (
         'contract_number',
         'lifecycle_state',
+        'ingestion_source',
         'is_we_won',
         'has_award',
         'awardee_cage',
@@ -112,6 +113,7 @@ class AwardLedgerAdmin(admin.ModelAdmin):
     )
     list_filter = (
         'lifecycle_state',
+        'ingestion_source',
         'is_we_won',
         'has_award',
         'awardee_cage',
@@ -130,8 +132,14 @@ class AwardLedgerAdmin(admin.ModelAdmin):
         'updated_at',
         'dibbs_award',
         'contract',
+        'ingestion_source',
+        'created_by',
+        'draft_worked_by',
+        'finalized_by',
     )
     date_hierarchy = 'first_seen_at'
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related('dibbs_award', 'contract')
+        return super().get_queryset(request).select_related(
+            'dibbs_award', 'contract', 'created_by', 'draft_worked_by', 'finalized_by'
+        )

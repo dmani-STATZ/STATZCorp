@@ -465,9 +465,9 @@ naturally disappears on next page load.
 the award → draft → live-contract lifecycle. `DraftContract.final_contract` is
 deleted with the draft on finalization, so the ledger is where "did we win,
 was a draft created/worked, is there a mod, when did it go live" is answered.
-One row per canonical `contract_number` (the upsert key). Scope: DIBBS
-awards/mods for our own CAGEs (`sales.CompanyCAGE`) only — non-DIBBS manual
-drafts are intentionally out of scope.
+One row per canonical `contract_number` (the upsert key). Scope: all contracts
+entering the intake queue, regardless of source (including DIBBS scrape/poll,
+PDF upload, and manual creation).
 
 **Sweep service — `intake/services/award_ledger.py`.** Mirrors the
 `queue_we_won_drafts` conventions: module logger + `_LOG_PREFIX`, lazy

@@ -562,7 +562,7 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             from intake.services.award_ledger import upsert_ledger_for_batch
 
             ledger_result = upsert_ledger_for_batch(
-                batch, activity_log=self._activity
+                batch, activity_log=self._activity, source="dibbs_scrape"
             )
             self._activity(
                 f"Award ledger sweep: "

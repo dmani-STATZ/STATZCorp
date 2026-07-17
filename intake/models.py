@@ -157,7 +157,11 @@ class DraftContract(models.Model):
     @property
     def is_dibbs_draft(self) -> bool:
         """True if this draft originated from the DIBBS awards scraper."""
-        return (self.data or {}).get('parser', {}).get('source') == 'dibbs'
+        data = self.data or {}
+        parser = data.get('parser')
+        if not isinstance(parser, dict):
+            return False
+        return parser.get('source') == 'dibbs'
 
     @property
     def lock_active(self) -> bool:
@@ -194,8 +198,8 @@ class AwardLedger(models.Model):
     each sweep but may only advance (never regress). Mirror columns and the
     boolean/link fields are refreshed on every sweep.
 
-    Scope: only DIBBS awards/mods for our own CAGEs (via `sales.CompanyCAGE`)
-    are recorded here. Non-DIBBS manual drafts are intentionally out of scope.
+    Scope: all contracts entering the intake queue (regardless of source)
+    are recorded here.
     """
 
     class Lifecycle(models.TextChoices):
@@ -215,6 +219,13 @@ class AwardLedger(models.Model):
         Lifecycle.DRAFT_WORKED: 4,
         Lifecycle.LIVE_CONTRACT: 5,
     }
+
+    class IngestionSource(models.TextChoices):
+        DIBBS_SCRAPE = 'dibbs_scrape', 'DIBBS Scrape'
+        DIBBS_POLL = 'dibbs_poll', 'DIBBS Poll'
+        PDF_UPLOAD = 'pdf_upload', 'PDF Upload'
+        MANUAL = 'manual', 'Manual Entry'
+        LEGACY = 'legacy', 'Legacy (pre-tracking)'
 
     # -- Identity (upsert key) ------------------------------------------------
     contract_number = models.CharField(
@@ -267,6 +278,35 @@ class AwardLedger(models.Model):
     draft_worked_at = models.DateTimeField(null=True, blank=True)
     mod_record_created_at = models.DateTimeField(null=True, blank=True)
     live_contract_at = models.DateTimeField(null=True, blank=True)
+
+    # -- User & Ingestion Provenance (latching write-once logic applies) ------
+    ingestion_source = models.CharField(
+        max_length=20,
+        choices=IngestionSource.choices,
+        blank=True,
+        default='',
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ledger_created_contracts',
+    )
+    draft_worked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ledger_worked_contracts',
+    )
+    finalized_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ledger_finalized_contracts',
+    )
 
     # -- Derived / display (recomputed each sweep; advance-only) --------------
     lifecycle_state = models.CharField(

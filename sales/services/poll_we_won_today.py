@@ -192,7 +192,7 @@ def poll_we_won_today(
         try:
             from intake.services.award_ledger import upsert_ledger_for_batch
 
-            ledger_result = upsert_ledger_for_batch(batch, activity_log=emit)
+            ledger_result = upsert_ledger_for_batch(batch, activity_log=emit, source="dibbs_poll")
             _emit(
                 f"upsert_ledger_for_batch: created={ledger_result['created']} "
                 f"updated={ledger_result['updated']} "

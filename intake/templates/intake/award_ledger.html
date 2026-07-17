@@ -157,6 +157,17 @@
                     </select>
                 </div>
                 <div class="col-auto">
+                    <label class="form-label small mb-1">Source</label>
+                    <select name="source" class="form-select form-select-sm">
+                        <option value="">All sources</option>
+                        <option value="dibbs_scrape" {% if filters.source == 'dibbs_scrape' %}selected{% endif %}>DIBBS Scrape</option>
+                        <option value="dibbs_poll" {% if filters.source == 'dibbs_poll' %}selected{% endif %}>DIBBS Poll</option>
+                        <option value="pdf_upload" {% if filters.source == 'pdf_upload' %}selected{% endif %}>PDF Upload</option>
+                        <option value="manual" {% if filters.source == 'manual' %}selected{% endif %}>Manual Entry</option>
+                        <option value="legacy" {% if filters.source == 'legacy' %}selected{% endif %}>Legacy</option>
+                    </select>
+                </div>
+                <div class="col-auto">
                     <label class="form-label small mb-1">CAGE</label>
                     <select name="cage" class="form-select form-select-sm">
                         <option value="">All CAGEs</option>
@@ -253,6 +264,13 @@
                             {% else %}
                                 <span class="fw-semibold">{{ e.contract_number }}</span>
                             {% endif %}
+                            {% if e.ingestion_source %}
+                                <div class="mt-1">
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size: 0.65rem; padding: 0.1rem 0.35rem; font-weight: 500;">
+                                        {{ e.get_ingestion_source_display }}
+                                    </span>
+                                </div>
+                            {% endif %}
                         </td>
                         <td>
                             {{ e.award_basic_number|default:"—" }}
@@ -273,10 +291,14 @@
                             {% else %}—{% endif %}
                         </td>
                         <td>
-                            {% if e.is_we_won %}
-                                <span class="badge bg-success-subtle text-success-emphasis">Won</span>
+                            {% if e.ingestion_source == 'dibbs_scrape' or e.ingestion_source == 'dibbs_poll' %}
+                                {% if e.is_we_won %}
+                                    <span class="badge bg-success-subtle text-success-emphasis">Won</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">No</span>
+                                {% endif %}
                             {% else %}
-                                <span class="badge bg-secondary-subtle text-secondary-emphasis">No</span>
+                                <span class="text-muted" style="font-size: 0.75rem;">N/A</span>
                             {% endif %}
                         </td>
                         <td>
@@ -305,18 +327,40 @@
                                 <div class="intake-ledger-timeline-step">
                                     <span class="intake-ledger-timeline-label">Imported</span>
                                     <span class="intake-ledger-timeline-value{% if not e.first_seen_at %} is-empty{% endif %}">{{ e.first_seen_at|date:"M j, Y"|default:"—" }}</span>
+                                    {% if e.first_seen_at %}
+                                    <div class="text-muted" style="font-size: 0.6rem; white-space: nowrap;">
+                                        {% if e.created_by %}by {{ e.created_by.get_full_name|default:e.created_by.username }}
+                                        {% elif e.ingestion_source == 'dibbs_scrape' or e.ingestion_source == 'dibbs_poll' %}by System{% endif %}
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 <div class="intake-ledger-timeline-step">
                                     <span class="intake-ledger-timeline-label">Draft</span>
                                     <span class="intake-ledger-timeline-value{% if not e.draft_created_at %} is-empty{% endif %}">{{ e.draft_created_at|date:"M j, Y"|default:"—" }}</span>
+                                    {% if e.draft_created_at %}
+                                    <div class="text-muted" style="font-size: 0.6rem; white-space: nowrap;">
+                                        {% if e.created_by %}by {{ e.created_by.get_full_name|default:e.created_by.username }}
+                                        {% elif e.ingestion_source == 'dibbs_scrape' or e.ingestion_source == 'dibbs_poll' %}by System{% endif %}
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 <div class="intake-ledger-timeline-step">
                                     <span class="intake-ledger-timeline-label">Worked</span>
                                     <span class="intake-ledger-timeline-value{% if not e.draft_worked_at %} is-empty{% endif %}">{{ e.draft_worked_at|date:"M j, Y"|default:"—" }}</span>
+                                    {% if e.draft_worked_at and e.draft_worked_by %}
+                                    <div class="text-muted" style="font-size: 0.6rem; white-space: nowrap;">
+                                        by {{ e.draft_worked_by.get_full_name|default:e.draft_worked_by.username }}
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 <div class="intake-ledger-timeline-step">
                                     <span class="intake-ledger-timeline-label">Live</span>
                                     <span class="intake-ledger-timeline-value{% if not e.live_contract_at %} is-empty{% endif %}">{{ e.live_contract_at|date:"M j, Y"|default:"—" }}</span>
+                                    {% if e.live_contract_at and e.finalized_by %}
+                                    <div class="text-muted" style="font-size: 0.6rem; white-space: nowrap;">
+                                        by {{ e.finalized_by.get_full_name|default:e.finalized_by.username }}
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </td>

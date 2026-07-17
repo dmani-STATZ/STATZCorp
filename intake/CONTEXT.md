@@ -44,7 +44,7 @@ journey. `DraftContract.final_contract` is deleted together with the draft on
 finalization, so nothing else survives to answer "did we win it, was a draft
 created and worked, does a mod exist, and when did it become a live contract?".
 One row per contract identity (`contract_number`, the upsert key). Scope is
-limited to DIBBS awards/mods for **our own CAGEs** (`sales.CompanyCAGE`).
+all contracts entering the intake queue (regardless of source).
 
 | Column | Purpose |
 |---|---|

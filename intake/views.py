@@ -134,6 +134,37 @@ def start_draft(request, pk: int):
         if draft.status == DraftContract.Status.QUEUED:
             draft.status = DraftContract.Status.IN_PROGRESS
             draft.save(update_fields=['status', 'modified_at'])
+
+    # Guarded real-time Award Ledger latch for draft worked event
+    try:
+        from intake.services.award_ledger import _latch, _canonical, _advance_state
+        from intake.models import AwardLedger
+        from django.utils import timezone
+
+        cn = _canonical(draft.contract_number)
+        if cn:
+            row, created = AwardLedger.objects.get_or_create(
+                contract_number=cn,
+                defaults={
+                    "first_seen_at": draft.created_at or timezone.now(),
+                    "draft_created_at": draft.created_at or timezone.now(),
+                    "ingestion_source": AwardLedger.IngestionSource.LEGACY,
+                }
+            )
+            changed = False
+            if _latch(row, "draft_created_at", draft.created_at or timezone.now()):
+                changed = True
+            if _latch(row, "draft_worked_at", timezone.now()):
+                changed = True
+            if _latch(row, "draft_worked_by", request.user):
+                changed = True
+            if _advance_state(row):
+                changed = True
+            if changed or created:
+                row.save()
+    except Exception as exc:
+        logger.warning('Ledger start_draft worked-hook error: %s', exc)
+
     return redirect('intake:edit_draft', pk=draft.pk)
 
 
@@ -197,6 +228,106 @@ def update_draft_company(request, pk: int):
     except Exception as e:
         logger.exception('Error updating company for draft %s', pk)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def create_draft(request):
+    """Create a manual skeleton DraftContract from the queue modal."""
+    from django.urls import reverse
+    from django.http import JsonResponse
+    from contracts.models import Contract, Company
+    from contracts.services.contract_number import canonicalize_contract_number
+
+    contract_type = request.POST.get('contract_type', '').strip()
+    raw_cn = request.POST.get('contract_number', '').strip()
+    company_id = request.POST.get('company')
+
+    # 1. Gating/Gaining Company
+    if request.user.is_staff or request.user.is_superuser:
+        if company_id:
+            company = Company.objects.filter(id=company_id, is_active=True).first()
+        else:
+            company = getattr(request, 'active_company', None)
+    else:
+        company = getattr(request, 'active_company', None)
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    if not company:
+        err = "No active company context. Please select a company."
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': err}, status=400)
+        messages.error(request, err)
+        return redirect('intake:queue')
+
+    # 2. Canonicalize & validate contract number
+    normalized_cn = canonicalize_contract_number(raw_cn)
+    if not normalized_cn:
+        err = f"Invalid contract number format: '{raw_cn}'."
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': err}, status=400)
+        messages.error(request, err)
+        return redirect('intake:queue')
+
+    # 3. Gating type
+    if contract_type not in DraftContract.Type.values:
+        err = f"Invalid contract type: '{contract_type}'."
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': err}, status=400)
+        messages.error(request, err)
+        return redirect('intake:queue')
+
+    # 4. Dedup checks
+    if DraftContract.objects.filter(contract_number=normalized_cn).exists():
+        err = f"{normalized_cn} is already in the intake queue."
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': err}, status=400)
+        messages.error(request, err)
+        return redirect('intake:queue')
+    if Contract.objects.filter(contract_number=normalized_cn).exists():
+        err = f"{normalized_cn} already exists in the contracts system."
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': err}, status=400)
+        messages.error(request, err)
+        return redirect('intake:queue')
+
+    # 5. Creation
+    with transaction.atomic():
+        draft = DraftContract.objects.create(
+            contract_number=normalized_cn,
+            contract_type=contract_type,
+            status=DraftContract.Status.QUEUED,
+            pdf_parse_status=DraftContract.PdfParseStatus.NO_PDF,
+            company=company,
+            data={},
+        )
+
+        # Non-blocking Award Ledger ingestion tracking
+        try:
+            from intake.services.award_ledger import log_draft_ingestion
+            from intake.models import AwardLedger
+            log_draft_ingestion(
+                draft,
+                AwardLedger.IngestionSource.MANUAL,
+                user=request.user,
+            )
+        except Exception as ledger_exc:
+            logger.warning("Ledger log error for manual draft %s: %s", draft.pk, ledger_exc)
+
+        # SharePoint: probe only
+        try:
+            from intake.services.sharepoint_intake import probe_draft_sharepoint_folder
+            probe_draft_sharepoint_folder(draft)
+        except Exception as sp_exc:
+            logger.warning("SP probe failed for manual draft %s: %s", draft.pk, sp_exc)
+
+    messages.success(request, f"Draft {normalized_cn} created successfully.")
+    if is_ajax:
+        return JsonResponse({'success': True, 'redirect_url': reverse('intake:queue')})
+    return redirect('intake:queue')
+
+
 # ---------------------------------------------------------------------------
 # Editor (Phase 2a)
 # ---------------------------------------------------------------------------
@@ -646,6 +777,18 @@ def upload_pdfs(request):
                 logger.warning('SP folder create error for draft %s: %s', draft.pk, _sp_exc)
                 outcome['sp_folder_status'] = 'error'
                 outcome['sp_folder_path'] = ''
+
+            # Non-blocking Award Ledger ingestion tracking
+            try:
+                from intake.services.award_ledger import log_draft_ingestion
+                from intake.models import AwardLedger
+                log_draft_ingestion(
+                    draft,
+                    AwardLedger.IngestionSource.PDF_UPLOAD,
+                    user=request.user,
+                )
+            except Exception as _ledger_exc:
+                logger.warning('Ledger log error for draft %s: %s', draft.pk, _ledger_exc)
         results.append(outcome)
     return JsonResponse({'results': results})
 
@@ -1262,7 +1405,9 @@ class AwardLedgerListView(ListView):
 
     def _scoped_queryset(self):
         """Base queryset after auth/company scoping, before filters/sort."""
-        qs = AwardLedger.objects.select_related('dibbs_award', 'contract')
+        qs = AwardLedger.objects.select_related(
+            'dibbs_award', 'contract', 'created_by', 'draft_worked_by', 'finalized_by'
+        )
         if self.request.user.is_superuser:
             return qs
         cages = self._in_scope_cages()
@@ -1281,6 +1426,12 @@ class AwardLedgerListView(ListView):
         we_won = (g.get('we_won') or '').strip().lower()
         if we_won not in ('yes', 'no'):
             we_won = ''
+
+        valid_sources = {c[0] for c in AwardLedger.IngestionSource.choices}
+        source = (g.get('source') or '').strip()
+        if source not in valid_sources:
+            source = ''
+
         return {
             'state': state,
             'we_won': we_won,
@@ -1288,6 +1439,7 @@ class AwardLedgerListView(ListView):
             'q': (g.get('q') or '').strip(),
             'from': (g.get('from') or '').strip(),
             'to': (g.get('to') or '').strip(),
+            'source': source,
         }
 
     def _apply_filters(self, qs, filters):
@@ -1299,6 +1451,8 @@ class AwardLedgerListView(ListView):
             qs = qs.filter(is_we_won=False)
         if filters['cage']:
             qs = qs.filter(awardee_cage=filters['cage'])
+        if filters['source']:
+            qs = qs.filter(ingestion_source=filters['source'])
         if filters['q']:
             term = filters['q']
             qs = qs.filter(
@@ -1384,6 +1538,10 @@ class AwardLedgerListView(ListView):
             'Has Award',
             'Lifecycle State',
             'Live Contract ID',
+            'Ingestion Source',
+            'Created By',
+            'Draft Worked By',
+            'Finalized By',
             'First Seen At',
             'Draft Created At',
             'Draft Worked At',
@@ -1393,6 +1551,13 @@ class AwardLedgerListView(ListView):
 
         def _dt(value):
             return value.isoformat() if value else ''
+
+        def _user_display(user, source):
+            if user:
+                return user.get_full_name() or user.username
+            if source in ('dibbs_scrape', 'dibbs_poll'):
+                return 'System'
+            return ''
 
         for e in qs.iterator():
             writer.writerow([
@@ -1415,6 +1580,10 @@ class AwardLedgerListView(ListView):
                 'Yes' if e.has_award else 'No',
                 e.lifecycle_state,
                 e.contract_id or '',
+                e.get_ingestion_source_display() if e.ingestion_source else '',
+                _user_display(e.created_by, e.ingestion_source),
+                _user_display(e.draft_worked_by, None),
+                _user_display(e.finalized_by, None),
                 _dt(e.first_seen_at),
                 _dt(e.draft_created_at),
                 _dt(e.draft_worked_at),
