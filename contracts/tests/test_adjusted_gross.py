@@ -8,6 +8,7 @@ from contracts.models import (
     Clin,
     ClinSplit,
     ContractStatus,
+    ContractLevelCharge,
 )
 
 class AdjustedGrossTests(TestCase):
@@ -107,3 +108,35 @@ class AdjustedGrossTests(TestCase):
         split_b2 = ClinSplit.objects.get(company_name='Company B', clin=self.clin2)
         self.assertEqual(split_b1.split_value, Decimal('15.46'))
         self.assertEqual(split_b2.split_value, Decimal('621.29'))
+
+    def test_cia_advance_reduces_adjusted_gross(self):
+        # Regression test for SPE7L3-24-P-8222: a CIA advance (action_type='advance')
+        # is real cash paid to the supplier and must reduce Contract.adjusted_gross,
+        # same as a regular charge. Previously advance rows were excluded from
+        # charges_deduction, which overstated adj_gross by the full advance amount.
+        base_adj_gross = self.contract.adjusted_gross  # 1100.00 from setUp fallback path
+        self.assertEqual(base_adj_gross, Decimal('1100.00'))
+
+        # Unpaid CIA advance (billed_paid_amount not yet set) must NOT reduce adj_gross —
+        # estimated_amount is always 0.00 for advance rows.
+        cia = ContractLevelCharge.objects.create(
+            contract=self.contract,
+            label='CIA Advance',
+            action_type='advance',
+            estimated_amount=Decimal('0.00'),
+        )
+        self.assertEqual(self.contract.adjusted_gross, Decimal('1100.00'))
+
+        # Once funded, the advance reduces adj_gross exactly like a charge would.
+        cia.billed_paid_amount = Decimal('300.00')
+        cia.save()
+        self.assertEqual(self.contract.adjusted_gross, Decimal('800.00'))
+
+        # A regular charge stacks on top of the advance deduction.
+        ContractLevelCharge.objects.create(
+            contract=self.contract,
+            label='GSI Fee',
+            action_type='charge',
+            estimated_amount=Decimal('50.00'),
+        )
+        self.assertEqual(self.contract.adjusted_gross, Decimal('750.00'))

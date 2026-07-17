@@ -211,7 +211,13 @@ class Contract(AuditModel):
 
         where:
         charges_deduction = SUM(COALESCE(charge.billed_paid_amount, charge.estimated_amount))
-        across ContractLevelCharge rows where action_type='charge' (CIA advances excluded).
+        across ALL ContractLevelCharge rows, both action_type='charge' and 'advance' (CIA).
+        CIA advances have estimated_amount always 0.00, so an unpaid advance contributes
+        $0 to the deduction; once billed_paid_amount is set, that real cash paid to the
+        supplier reduces adj gross exactly like a charge would (2026-07-17 fix — CIA
+        advances were previously excluded here, which overstated adj gross by the full
+        advance amount whenever the matching final CLIN payment only covered the
+        remainder, e.g. SPE7L3-24-P-8222).
 
         packaging_deduction = COALESCE(amount_paid, quote_amount, 0) — the full packaging
         cost is deducted from adj gross. If paid, use the actual paid amount. If not yet
@@ -247,7 +253,7 @@ class Contract(AuditModel):
             pass
 
         charges_deduction = Decimal('0.00')
-        for charge in self.level_charges.filter(action_type='charge'):
+        for charge in self.level_charges.all():
             if charge.billed_paid_amount is not None and Decimal(str(charge.billed_paid_amount)) != Decimal('0'):
                 charges_deduction += Decimal(str(charge.billed_paid_amount))
             else:
@@ -421,7 +427,9 @@ class ContractLevelCharge(AuditModel):
         max_length=20,
         choices=ACTION_TYPE_CHOICES,
         default='charge',
-        help_text="'charge' deducts from adj_gross. 'advance' is a CIA pre-payment tracked separately.",
+        help_text="'charge' is a misc contract-level cost (e.g. GSI Fee, Freight). "
+                  "'advance' is a CIA pre-payment to the supplier. Both deduct from "
+                  "adj_gross once billed_paid_amount is set — see Contract.adjusted_gross.",
     )
     estimated_amount = models.DecimalField(max_digits=10, decimal_places=2)
     billed_paid_amount = models.DecimalField(

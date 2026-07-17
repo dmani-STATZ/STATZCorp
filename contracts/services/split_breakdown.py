@@ -90,8 +90,6 @@ def build_split_breakdown_context(contract):
         contract.level_charges.select_related('supplier').order_by('id')
     )
     for charge in level_charges:
-        if charge.action_type != 'charge':
-            continue
         if (
             charge.billed_paid_amount is not None
             and Decimal(str(charge.billed_paid_amount)) != Decimal('0')
@@ -112,8 +110,6 @@ def build_split_breakdown_context(contract):
                 continue
             charge_rows = []
             for charge in level_charges:
-                if charge.action_type != 'charge':
-                    continue
                 if (
                     charge.billed_paid_amount is not None
                     and Decimal(str(charge.billed_paid_amount)) != Decimal('0')

@@ -841,9 +841,13 @@
                         </td>
                         <td>—</td>
                         <td>—</td>
-                        <td class="text-end {% if charge.action_type != 'advance' %}text-danger{% endif %}">
+                        <td class="text-end {% if charge.billed_paid_amount or charge.action_type != 'advance' %}text-danger{% endif %}">
                           {% if charge.action_type == 'advance' %}
-                            —
+                            {% if charge.billed_paid_amount %}
+                              -${{ charge.billed_paid_amount|floatformat:2|intcomma }}
+                            {% else %}
+                              —
+                            {% endif %}
                           {% else %}
                             {% if charge.billed_paid_amount %}
                               -${{ charge.billed_paid_amount|floatformat:2|intcomma }}
