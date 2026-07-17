@@ -140,6 +140,30 @@ class DibbsAward(models.Model):
             "grid document-link anchor at scrape time (blank when absent)."
         ),
     )
+    award_basic_number_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="The Award/Basic PDF document href (blank when absent)."
+    )
+    award_basic_package_view_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="The Award/Basic Package View AwdRec.aspx href (blank when absent)."
+    )
+    delivery_order_number_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="The Delivery Order PDF document href (blank when absent)."
+    )
+    delivery_order_package_view_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="The Delivery Order Package View AwdRec.aspx href (blank when absent)."
+    )
 
     class Meta:
         db_table = "dibbs_award"
@@ -281,6 +305,10 @@ class DibbsAwardStaging(models.Model):
     dibbs_solicitation_number = models.CharField(max_length=50, blank=True, null=True)
     aw_file_date = models.CharField(max_length=20, blank=True, null=True)
     pdf_url = models.CharField(max_length=500, blank=True, default="")
+    award_basic_number_url = models.CharField(max_length=500, blank=True, default="")
+    award_basic_package_view_url = models.CharField(max_length=500, blank=True, default="")
+    delivery_order_number_url = models.CharField(max_length=500, blank=True, default="")
+    delivery_order_package_view_url = models.CharField(max_length=500, blank=True, default="")
 
     # Set by stored proc — null on insert
     row_type = models.CharField(max_length=5, blank=True, null=True)

@@ -470,6 +470,18 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             self._activity(
                 f"Scrape finished with error for {batch.scrape_date}: {result['error']}"
             )
+        elif len(all_records) != result["expected_rows"]:
+            error_msg = (
+                f"Reconciliation failure: parsed {len(all_records)} row(s), "
+                f"but DIBBS expected {result['expected_rows']} row(s)."
+            )
+            batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
+            self.stderr.write(f"  FAILED: {error_msg}")
+            sys.stderr.flush()
+            self._activity(
+                f"Scrape finished with reconciliation error for {batch.scrape_date}: {error_msg}"
+            )
+            result["error"] = error_msg
         else:
             if all_records:
                 self.stdout.write(
@@ -490,25 +502,13 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                     f"{batch.scrape_date} (batch_id={batch.pk})."
                 )
 
-            if result["success"]:
-                batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
-                self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
-                sys.stdout.flush()
-                self._activity(
-                    f"Scrape SUCCESS for {batch.scrape_date}: "
-                    f"{result['actual_rows']} row(s)."
-                )
-            else:
-                batch.scrape_status = AwardImportBatch.SCRAPE_PARTIAL
-                self.stdout.write(
-                    f"  PARTIAL: {result['actual_rows']} of "
-                    f"{result['expected_rows']} expected"
-                )
-                sys.stdout.flush()
-                self._activity(
-                    f"Scrape PARTIAL for {batch.scrape_date}: "
-                    f"{result['actual_rows']} of {result['expected_rows']} expected."
-                )
+            batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
+            self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
+            sys.stdout.flush()
+            self._activity(
+                f"Scrape SUCCESS for {batch.scrape_date}: "
+                f"{result['actual_rows']} row(s)."
+            )
 
         batch.expected_rows = result["expected_rows"]
         batch.pages_scraped = result["pages_scraped"]

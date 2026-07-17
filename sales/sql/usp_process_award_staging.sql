@@ -99,6 +99,7 @@ BEGIN
     -- --------------------------------------------------------
 
     -- 5a: Upgrade faux awards where real award now exists
+    -- 5a: Upgrade faux awards where real award now exists
     UPDATE da
     SET
         da.is_faux = 0,
@@ -117,6 +118,22 @@ BEGIN
         da.pdf_url = CASE
                         WHEN LTRIM(RTRIM(ISNULL(s.pdf_url, ''))) <> '' THEN s.pdf_url
                         ELSE da.pdf_url
+                     END,
+        da.award_basic_number_url = CASE
+                        WHEN LTRIM(RTRIM(ISNULL(s.award_basic_number_url, ''))) <> '' THEN s.award_basic_number_url
+                        ELSE da.award_basic_number_url
+                     END,
+        da.award_basic_package_view_url = CASE
+                        WHEN LTRIM(RTRIM(ISNULL(s.award_basic_package_view_url, ''))) <> '' THEN s.award_basic_package_view_url
+                        ELSE da.award_basic_package_view_url
+                     END,
+        da.delivery_order_number_url = CASE
+                        WHEN LTRIM(RTRIM(ISNULL(s.delivery_order_number_url, ''))) <> '' THEN s.delivery_order_number_url
+                        ELSE da.delivery_order_number_url
+                     END,
+        da.delivery_order_package_view_url = CASE
+                        WHEN LTRIM(RTRIM(ISNULL(s.delivery_order_package_view_url, ''))) <> '' THEN s.delivery_order_package_view_url
+                        ELSE da.delivery_order_package_view_url
                      END,
         da.we_won = CASE 
                         WHEN EXISTS (
@@ -138,9 +155,13 @@ BEGIN
 
     SET @faux_upgraded = @@ROWCOUNT;
 
-    -- 5a2: Fill blank pdf_url on existing awards when staging has a value
+    -- 5a2: Fill blank pdf_url and split url columns on existing awards when staging has a value
     UPDATE da
-    SET da.pdf_url = s.pdf_url
+    SET da.pdf_url = CASE WHEN LTRIM(RTRIM(ISNULL(da.pdf_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.pdf_url, ''))) <> '' THEN s.pdf_url ELSE da.pdf_url END,
+        da.award_basic_number_url = CASE WHEN LTRIM(RTRIM(ISNULL(da.award_basic_number_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.award_basic_number_url, ''))) <> '' THEN s.award_basic_number_url ELSE da.award_basic_number_url END,
+        da.award_basic_package_view_url = CASE WHEN LTRIM(RTRIM(ISNULL(da.award_basic_package_view_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.award_basic_package_view_url, ''))) <> '' THEN s.award_basic_package_view_url ELSE da.award_basic_package_view_url END,
+        da.delivery_order_number_url = CASE WHEN LTRIM(RTRIM(ISNULL(da.delivery_order_number_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.delivery_order_number_url, ''))) <> '' THEN s.delivery_order_number_url ELSE da.delivery_order_number_url END,
+        da.delivery_order_package_view_url = CASE WHEN LTRIM(RTRIM(ISNULL(da.delivery_order_package_view_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.delivery_order_package_view_url, ''))) <> '' THEN s.delivery_order_package_view_url ELSE da.delivery_order_package_view_url END
     FROM dibbs_award da
     INNER JOIN dibbs_award_staging s
         ON s.award_basic_number = da.award_basic_number
@@ -149,8 +170,13 @@ BEGIN
         AND ISNULL(s.purchase_request, '') = ISNULL(da.purchase_request, '')
     WHERE s.stage_id = @stage_id
       AND s.row_type = 'AWARD'
-      AND LTRIM(RTRIM(ISNULL(s.pdf_url, ''))) <> ''
-      AND LTRIM(RTRIM(ISNULL(da.pdf_url, ''))) = '';
+      AND (
+          (LTRIM(RTRIM(ISNULL(da.pdf_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.pdf_url, ''))) <> '') OR
+          (LTRIM(RTRIM(ISNULL(da.award_basic_number_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.award_basic_number_url, ''))) <> '') OR
+          (LTRIM(RTRIM(ISNULL(da.award_basic_package_view_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.award_basic_package_view_url, ''))) <> '') OR
+          (LTRIM(RTRIM(ISNULL(da.delivery_order_number_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.delivery_order_number_url, ''))) <> '') OR
+          (LTRIM(RTRIM(ISNULL(da.delivery_order_package_view_url, ''))) = '' AND LTRIM(RTRIM(ISNULL(s.delivery_order_package_view_url, ''))) <> '')
+      );
 
     -- 5b: Insert new award rows that don't exist at all
     INSERT INTO dibbs_award (
@@ -159,7 +185,8 @@ BEGIN
         total_contract_price, award_date, posted_date, nsn, nomenclature,
         purchase_request, dibbs_solicitation_number, sol_number,
         solicitation_id, is_faux, aw_file_date, aw_import_batch_id, we_won,
-        pdf_url
+        pdf_url, award_basic_number_url, award_basic_package_view_url,
+        delivery_order_number_url, delivery_order_package_view_url
     )
     SELECT
         s.notice_id,
@@ -191,7 +218,11 @@ BEGIN
             ) THEN 1 
             ELSE 0 
         END,
-        ISNULL(s.pdf_url, '')
+        ISNULL(s.pdf_url, ''),
+        ISNULL(s.award_basic_number_url, ''),
+        ISNULL(s.award_basic_package_view_url, ''),
+        ISNULL(s.delivery_order_number_url, ''),
+        ISNULL(s.delivery_order_package_view_url, '')
     FROM dibbs_award_staging s
     WHERE s.stage_id = @stage_id
       AND s.row_type = 'AWARD'
@@ -215,7 +246,8 @@ BEGIN
         total_contract_price, award_date, posted_date, nsn, nomenclature,
         purchase_request, dibbs_solicitation_number, sol_number,
         solicitation_id, is_faux, aw_file_date, aw_import_batch_id, we_won,
-        pdf_url
+        pdf_url, award_basic_number_url, award_basic_package_view_url,
+        delivery_order_number_url, delivery_order_package_view_url
     )
     SELECT DISTINCT
         s.notice_id,
@@ -244,7 +276,11 @@ BEGIN
         TRY_CONVERT(DATE, s.aw_file_date, 110),
         @batch_id, 
         0,
-        ISNULL(s.pdf_url, '')
+        ISNULL(s.pdf_url, ''),
+        ISNULL(s.award_basic_number_url, ''),
+        ISNULL(s.award_basic_package_view_url, ''),
+        ISNULL(s.delivery_order_number_url, ''),
+        ISNULL(s.delivery_order_package_view_url, '')
     FROM dibbs_award_staging s
     WHERE s.stage_id = @stage_id
       AND s.row_type = 'MOD'

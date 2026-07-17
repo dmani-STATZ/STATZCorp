@@ -21,6 +21,10 @@ class AwardRow:
     purchase_request: str | None
     dibbs_solicitation_number: str | None
     pdf_url: str = ""
+    award_basic_number_url: str = ""
+    award_basic_package_view_url: str = ""
+    delivery_order_number_url: str = ""
+    delivery_order_package_view_url: str = ""
 
 
 @dataclass

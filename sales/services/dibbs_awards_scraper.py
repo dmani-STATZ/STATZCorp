@@ -199,6 +199,25 @@ def extract_row_pdf_url(tr) -> str:
     return ""
 
 
+def _find_href_by_title(cell, title: str) -> str:
+    if cell is None:
+        return ""
+    a = cell.find("a", href=True, title=title)
+    if a:
+        return (a.get("href") or "").strip()
+    return ""
+
+
+def _find_href_containing(cell, substring: str) -> str:
+    if cell is None:
+        return ""
+    for a in cell.find_all("a", href=True):
+        href = (a.get("href") or "").strip()
+        if substring in href:
+            return href
+    return ""
+
+
 def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
     """Parse the awards grid HTML into row dicts matching COLUMNS (+ Pdf_Url)."""
     _ = award_date
@@ -213,24 +232,37 @@ def parse_awards_table(html: str, award_date: date) -> list[dict[str, str]]:
         return []
 
     all_trs = table.find_all("tr")
-    if len(all_trs) < 4:
+    if not all_trs:
         return []
 
     rows_out: list[dict[str, str]] = []
-    for tr in all_trs[3:]:
-        if not tr.get("class"):
+    for tr in all_trs:
+        # Identity-based row selection: every data row has a basic number label span
+        abn_span = tr.find("span", id=lambda x: x and x.endswith("_lblAwardBasicNumber"))
+        if abn_span is None:
             continue
+
         cells = tr.find_all("td")
         if not cells:
             continue
         first = _cell_text(cells[0])
         if not first or not first.isdigit():
             continue
+
         row: dict[str, str] = {}
         for i, col in enumerate(COLUMNS):
             cell = cells[i] if i < len(cells) else None
             row[col] = _cell_text(cell)
-        row["Pdf_Url"] = extract_row_pdf_url(tr)
+
+        # Parse dedicated split URL columns
+        row["award_basic_number_url"] = _find_href_by_title(cells[1] if len(cells) > 1 else None, _PDF_TITLE_BASIC)
+        row["award_basic_package_view_url"] = _find_href_containing(cells[1] if len(cells) > 1 else None, "AwdRec.aspx")
+        row["delivery_order_number_url"] = _find_href_by_title(cells[2] if len(cells) > 2 else None, _PDF_TITLE_DO)
+        row["delivery_order_package_view_url"] = _find_href_containing(cells[2] if len(cells) > 2 else None, "AwdRec.aspx")
+
+        # Keep pdf_url consistent as coalesce(do_url, basic_url)
+        row["Pdf_Url"] = row["delivery_order_number_url"] or row["award_basic_number_url"]
+
         rows_out.append(row)
     return rows_out
 
@@ -255,9 +287,12 @@ def normalize_award_record_for_importer(
     if not out.get("Award_Date"):
         out["Award_Date"] = award_date.strftime("%m-%d-%Y")
 
-    # Preserve document-link URL (additive; blank when row has no PDF icon).
-    pdf_url = (raw.get("Pdf_Url") or "").strip()
-    out["Pdf_Url"] = pdf_url
+    # Preserve document-link URLs
+    out["Pdf_Url"] = (raw.get("Pdf_Url") or "").strip()
+    out["award_basic_number_url"] = (raw.get("award_basic_number_url") or "").strip()
+    out["award_basic_package_view_url"] = (raw.get("award_basic_package_view_url") or "").strip()
+    out["delivery_order_number_url"] = (raw.get("delivery_order_number_url") or "").strip()
+    out["delivery_order_package_view_url"] = (raw.get("delivery_order_package_view_url") or "").strip()
 
     return out
 

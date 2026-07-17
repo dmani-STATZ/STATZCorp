@@ -94,6 +94,10 @@ def _stage_rows(
             # Defense in depth: the proc bypasses Django's default="" and must
             # never receive SQL NULL for this non-nullable destination column.
             (getattr(row, "pdf_url", None) or "")[:500],
+            (getattr(row, "award_basic_number_url", None) or "")[:500],
+            (getattr(row, "award_basic_package_view_url", None) or "")[:500],
+            (getattr(row, "delivery_order_number_url", None) or "")[:500],
+            (getattr(row, "delivery_order_package_view_url", None) or "")[:500],
             None,  # row_type — set by proc
             None,  # solicitation_id — set by proc
         )
@@ -184,6 +188,10 @@ def import_aw_records(
                 # Keep this explicit: usp_process_award_staging bypasses the
                 # ORM-level default="" when it writes dibbs_award.
                 pdf_url=(d.get("Pdf_Url") or "").strip()[:500],
+                award_basic_number_url=(d.get("award_basic_number_url") or "").strip()[:500],
+                award_basic_package_view_url=(d.get("award_basic_package_view_url") or "").strip()[:500],
+                delivery_order_number_url=(d.get("delivery_order_number_url") or "").strip()[:500],
+                delivery_order_package_view_url=(d.get("delivery_order_package_view_url") or "").strip()[:500],
             )
         )
 
