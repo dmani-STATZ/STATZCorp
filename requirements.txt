@@ -36,7 +36,7 @@ pillow>=12.2.0
 reportlab==4.3.0
 
 # PDF processing - Migrated to pypdf for better security and maintenance
-pypdf==6.10.1  # Latest version with enhanced security and performance
+pypdf>=6.13.3  # Latest version with enhanced security and performance
 pdfplumber==0.11.5
 
 # LLM — solicitation PDF analysis (workbench)
@@ -56,7 +56,7 @@ django-browser-reload==1.15.0
 python-dotenv==1.2.2
 
 # Security
-cryptography==46.0.6
+cryptography>=48.0.1
 
 #Extras
 pyOpenSSL==26.0.0
