@@ -59,7 +59,7 @@ python-dotenv==1.2.2
 cryptography>=48.0.1
 
 #Extras
-pyOpenSSL==26.0.0
+pyOpenSSL>=26.0.0
 
 tqdm==4.67.1
 
