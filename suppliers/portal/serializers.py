@@ -1,5 +1,7 @@
 """Serialize supplier portal payloads (allowlisted fields only)."""
 
+from datetime import timezone as datetime_timezone
+
 from django.utils import timezone
 
 
@@ -50,7 +52,7 @@ def _iso_datetime(value):
         return None
     if timezone.is_naive(value):
         value = timezone.make_aware(value, timezone.get_current_timezone())
-    return value.astimezone(timezone.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return value.astimezone(datetime_timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def serialize_address(address):

@@ -490,6 +490,11 @@ if IS_PRODUCTION:
                 "level": "INFO",
                 "propagate": True,
             },
+            "suppliers": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": True,
+            },
         },
     }
 else:
@@ -555,6 +560,11 @@ else:
                 "level": "INFO",
                 "propagate": True,
             },
+            "suppliers": {
+                "handlers": ["console", "file"],
+                "level": "INFO",
+                "propagate": True,
+            },
         },
     }
 
@@ -564,7 +574,7 @@ if APPLICATIONINSIGHTS_ENABLED:
         "class": "opencensus.ext.azure.log_exporter.AzureLogHandler",
         "connection_string": APPLICATIONINSIGHTS_CONNECTION_STRING,
     }
-    for logger_name in ["django", "STATZWeb", "users", "contracts", "processing"]:
+    for logger_name in ["django", "STATZWeb", "users", "contracts", "processing", "suppliers"]:
         if logger_name in LOGGING.get("loggers", {}):
             LOGGING["loggers"][logger_name]["handlers"].append("azure")
 
