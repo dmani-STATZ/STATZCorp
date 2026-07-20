@@ -152,7 +152,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - The enrichment views (`SupplierEnrichView`, `SupplierApplyEnrichmentView`, `SupplierEnrichPageView`) all require login — preserve `LoginRequiredMixin` on these.
 - `AuditModel.save` stamps `modified_by`/`created_by` — do not bypass `super().save()` in subclass overrides.
 - OpenRouter API key and fallback model list come from environment settings. Never commit these to VCS.
-- **Supplier portal API** (`/api/supplier-portal/`): public to session auth (middleware allow-list) but requires `X-API-Key` + HMAC (`X-Timestamp` / `X-Signature`). Secrets: `SUPPLIER_PORTAL_API_KEY`, `SUPPLIER_PORTAL_HMAC_SECRET`. Never expand the Phase 2 field allowlist without review. Excluded Supplier fields (probation, notes, cage_code, etc.) must stay unreadable/unwritable. Archived suppliers always `404`. Write audit goes to `SupplierPortalChangeLog` + optional `SUPPLIER_PORTAL_NOTIFY_EMAIL` — do not rely on `transactions.Transaction` for portal history.
+- **Supplier portal API** (`/api/supplier-portal/`): public to session auth (middleware allow-list) but requires `X-API-Key` + HMAC (`X-Timestamp` / `X-Signature`). Secrets: `SUPPLIER_PORTAL_API_KEY`, `SUPPLIER_PORTAL_HMAC_SECRET`. Never expand the Phase 2 field allowlist without review. Excluded Supplier fields (probation, notes, cage_code, etc.) must stay unreadable/unwritable. Archived suppliers always `404`. Write audit goes to `SupplierPortalChangeLog` + optional `SUPPLIER_PORTAL_NOTIFY_EMAIL` — do not rely on `transactions.Transaction` for portal history. `POST …/send-email/` accepts only `{to, subject, body}` and always sends HTML via Graph from `GRAPH_MAIL_SENDER_CONTRACT` (caller cannot set From).
 
 ---
 

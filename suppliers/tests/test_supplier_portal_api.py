@@ -256,3 +256,93 @@ class SupplierPortalAPITests(TestCase):
         path = reverse("supplier_portal:verify", kwargs={"cage_code": "NOPE0"})
         resp = self._get(path)
         self.assertEqual(resp.status_code, 404)
+
+    def test_send_email_missing_auth_401(self):
+        path = reverse("supplier_portal:send_email")
+        resp = self.client.post(
+            path,
+            data=json.dumps(
+                {
+                    "to": "user@example.com",
+                    "subject": "Login",
+                    "body": "<p>Hi</p>",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(resp.json()["error"]["code"], "unauthorized")
+
+    def test_send_email_rejects_extra_fields(self):
+        path = reverse("supplier_portal:send_email")
+        resp = self._json(
+            "POST",
+            path,
+            {
+                "to": "user@example.com",
+                "subject": "Login",
+                "body": "<p>Hi</p>",
+                "from": "spoof@example.com",
+            },
+        )
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.json()["error"]["code"], "forbidden")
+        self.assertIn("from", resp.json()["error"]["fields"])
+
+    def test_send_email_validation_errors(self):
+        path = reverse("supplier_portal:send_email")
+        resp = self._json("POST", path, {"to": "", "subject": "", "body": ""})
+        self.assertEqual(resp.status_code, 422)
+        fields = resp.json()["error"]["fields"]
+        self.assertIn("to", fields)
+        self.assertIn("subject", fields)
+        self.assertIn("body", fields)
+
+        resp = self._json(
+            "POST",
+            path,
+            {"to": "not-an-email", "subject": "Login", "body": "<p>Hi</p>"},
+        )
+        self.assertEqual(resp.status_code, 422)
+        self.assertIn("to", resp.json()["error"]["fields"])
+
+    @override_settings(GRAPH_MAIL_SENDER_CONTRACT="info@statzcorp.com")
+    @patch("suppliers.portal.views.send_mail_via_graph", return_value=True)
+    def test_send_email_success(self, mock_send):
+        path = reverse("supplier_portal:send_email")
+        resp = self._json(
+            "POST",
+            path,
+            {
+                "to": "supplier@example.com",
+                "subject": "Your login link",
+                "body": "<p>Click <a href='https://example.com'>here</a></p>",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"ok": True})
+        mock_send.assert_called_once_with(
+            "supplier@example.com",
+            "Your login link",
+            "<p>Click <a href='https://example.com'>here</a></p>",
+            sender="info@statzcorp.com",
+            is_html=True,
+        )
+
+    @override_settings(GRAPH_MAIL_SENDER_CONTRACT="info@statzcorp.com")
+    @patch("suppliers.portal.views.send_mail_via_graph", return_value=False)
+    def test_send_email_graph_failure_502(self, mock_send):
+        path = reverse("supplier_portal:send_email")
+        resp = self._json(
+            "POST",
+            path,
+            {
+                "to": "supplier@example.com",
+                "subject": "Login",
+                "body": "<p>Hi</p>",
+            },
+        )
+        self.assertEqual(resp.status_code, 502)
+        self.assertEqual(resp.json()["error"]["code"], "bad_gateway")
+        mock_send.assert_called_once()
+

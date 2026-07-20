@@ -6,6 +6,11 @@ app_name = "supplier_portal"
 
 urlpatterns = [
     path(
+        "send-email/",
+        views.SendEmailView.as_view(),
+        name="send_email",
+    ),
+    path(
         "suppliers/<str:cage_code>/verify/",
         views.SupplierVerifyView.as_view(),
         name="verify",

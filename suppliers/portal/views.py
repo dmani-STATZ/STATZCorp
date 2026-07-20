@@ -2,7 +2,9 @@
 
 import json
 import logging
+import re
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import FileResponse, JsonResponse
@@ -11,6 +13,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from contracts.models import Address
+from mailer.services.graph_mail import send_mail_via_graph
 from suppliers.models import (
     Contact,
     Supplier,
@@ -22,6 +25,7 @@ from .audit import record_change
 from .auth import authenticate_request
 from .downloads import mint_download_url, verify_download_token
 from .errors import (
+    bad_gateway,
     bad_request,
     conflict,
     forbidden,
@@ -47,6 +51,12 @@ from .serializers import (
 from .throttling import check_rate_limit
 
 logger = logging.getLogger(__name__)
+
+SEND_EMAIL_FIELDS = frozenset({"to", "subject", "body"})
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_MAX_SUBJECT_LEN = 998
+_MAX_BODY_LEN = 100_000
+_MAX_TO_LEN = 254
 
 
 def get_active_supplier(cage_code):
@@ -169,6 +179,81 @@ class PortalAPIView(View):
         except Exception:
             logger.exception("Supplier portal API error")
             return server_error()
+
+
+class SendEmailView(PortalAPIView):
+    """
+    Generic Graph mail send for statzcorp-com (e.g. supplier login emails).
+    Always sends from GRAPH_MAIL_SENDER_CONTRACT as HTML.
+    """
+
+    def post(self, request):
+        data, err = _parse_json_body(request)
+        if err is not None:
+            return err
+        if not data:
+            return bad_request("Request body must include to, subject, and body.")
+
+        rejected = sorted(set(data.keys()) - SEND_EMAIL_FIELDS)
+        if rejected:
+            return forbidden(
+                "One or more fields are not allowed on send-email.",
+                fields={k: "not allowed" for k in rejected},
+            )
+
+        fields = {}
+        to_raw = data.get("to")
+        subject_raw = data.get("subject")
+        body_raw = data.get("body")
+
+        if to_raw is None or (isinstance(to_raw, str) and not to_raw.strip()):
+            fields["to"] = "This field is required."
+        elif not isinstance(to_raw, str):
+            fields["to"] = "Must be a string."
+        else:
+            to_addr = to_raw.strip()
+            if len(to_addr) > _MAX_TO_LEN or not _EMAIL_RE.match(to_addr):
+                fields["to"] = "Invalid email address."
+
+        if subject_raw is None or (
+            isinstance(subject_raw, str) and not subject_raw.strip()
+        ):
+            fields["subject"] = "This field is required."
+        elif not isinstance(subject_raw, str):
+            fields["subject"] = "Must be a string."
+        elif len(subject_raw.strip()) > _MAX_SUBJECT_LEN:
+            fields["subject"] = f"Must be at most {_MAX_SUBJECT_LEN} characters."
+
+        if body_raw is None or (isinstance(body_raw, str) and not body_raw.strip()):
+            fields["body"] = "This field is required."
+        elif not isinstance(body_raw, str):
+            fields["body"] = "Must be a string."
+        elif len(body_raw) > _MAX_BODY_LEN:
+            fields["body"] = f"Must be at most {_MAX_BODY_LEN} characters."
+
+        if fields:
+            return validation_error("Invalid send-email payload.", fields=fields)
+
+        to_addr = to_raw.strip()
+        subject = subject_raw.strip()
+        body = body_raw
+
+        ok = send_mail_via_graph(
+            to_addr,
+            subject,
+            body,
+            sender=settings.GRAPH_MAIL_SENDER_CONTRACT,
+            is_html=True,
+        )
+        if not ok:
+            logger.warning(
+                "portal send-email: Graph send failed for to=%s subject_len=%s",
+                to_addr,
+                len(subject),
+            )
+            return bad_gateway()
+
+        return JsonResponse({"ok": True})
 
 
 class SupplierVerifyView(PortalAPIView):

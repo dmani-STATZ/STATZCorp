@@ -40,3 +40,7 @@ def rate_limited(message="Rate limit exceeded."):
 
 def server_error(message="An unexpected server error occurred."):
     return error_response(500, "server_error", message)
+
+
+def bad_gateway(message="Email could not be sent."):
+    return error_response(502, "bad_gateway", message)

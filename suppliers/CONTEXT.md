@@ -15,7 +15,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 - Render the supplier detail report that shows contacts, docs, certifications, classifications, contracts, and status flags.
 - Implement the OpenRouter-backed enrichment pipeline (fetch HTML, build prompts, normalize JSON, and apply approved values) plus the global AI model configuration endpoint.
 - Provide scraper/address/contact normalization helpers for enrichment flows (`_parse_address_text`, `_normalize_*`, `utils.scrape_supplier_site`) and UI wiring.
-- Expose the supplier portal HTTP API at `/api/supplier-portal/v1/` (API key + HMAC) for profile/contact/document read-write used by the public site.
+- Expose the supplier portal HTTP API at `/api/supplier-portal/v1/` (API key + HMAC) for profile/contact/document read-write used by the public site, plus `POST …/send-email/` for HTML Graph mail via `GRAPH_MAIL_SENDER_CONTRACT`.
 
 ## 4. Key Files and What They Do
 
@@ -29,7 +29,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 | `admin.py` | Registers `Supplier` and `Contact` with tailored `list_display`, search, filters, and grouped `fieldsets` for compliance metadata. |
 | `templates/suppliers/...` | Server-rendered templates for the dashboard, detail page, info-by-type page, enrichment console, edit form (for `contracts` views), list/search screens, and include partials (`address_picker`, `toggle_switch`). |
 | `static/suppliers/js` | `supplier_edit.js` (change-tracking/highlight helpers for the edit form) and `supplier_enrich.js` (AJAX apply-suggestion bindings) that are bundled into the templates. |
-| `portal/` | Server-to-server supplier portal API (`auth`, `views`, `serializers`, `audit`, `notify`, `downloads`). Mounted at `/api/supplier-portal/v1/` in root urls. |
+| `portal/` | Server-to-server supplier portal API (`auth`, `views`, `serializers`, `audit`, `notify`, `downloads`). Mounted at `/api/supplier-portal/v1/` in root urls. Includes `POST send-email/` which calls `mailer.services.graph_mail.send_mail_via_graph` as HTML from `GRAPH_MAIL_SENDER_CONTRACT`. |
 | `migrations/` | `0001_initial` bootstraps tables with `contracts_*` naming; `0002`–`0003` add enrichment/AI model settings; `0004` adds `Supplier.rfq_email` (deprecated — dormant fallback after `0013`); `0005` added `SupplierContactGroup` (removed in `0011`); `0009`–`0013` add `SupplierContactCategory`, migrate legacy data, drop `Contact.is_primary`, and backfill Sales contacts from `rfq_email`; `0014` normalizes `cage_code` (trim/upper, purge sentinels), filtered unique constraint, + `SupplierPortalChangeLog`. |
 | `tests/` | Portal API coverage in `tests/test_supplier_portal_api.py`. |
 
