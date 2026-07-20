@@ -435,6 +435,14 @@ REQUIRE_LOGIN = (
     == "true"
 )
 
+# Supplier portal API (statzcorp-com server-to-server)
+SUPPLIER_PORTAL_API_KEY = os.environ.get("SUPPLIER_PORTAL_API_KEY", "")
+SUPPLIER_PORTAL_HMAC_SECRET = os.environ.get("SUPPLIER_PORTAL_HMAC_SECRET", "")
+SUPPLIER_PORTAL_NOTIFY_EMAIL = os.environ.get("SUPPLIER_PORTAL_NOTIFY_EMAIL", "")
+SUPPLIER_PORTAL_RATE_LIMIT_PER_MIN = int(
+    os.environ.get("SUPPLIER_PORTAL_RATE_LIMIT_PER_MIN", "60") or "60"
+)
+
 INTERNAL_IPS = ["127.0.0.1", "localhost"]
 
 # Logging configuration - Environment aware

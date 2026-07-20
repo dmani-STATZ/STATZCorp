@@ -6,6 +6,7 @@ from .models import (
     Contact,
     Supplier,
     SupplierContactCategory,
+    SupplierPortalChangeLog,
     SupplierType,
 )
 
@@ -67,3 +68,29 @@ class CertificationTypeAdmin(admin.ModelAdmin):
 class ClassificationTypeAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
+
+
+@admin.register(SupplierPortalChangeLog)
+class SupplierPortalChangeLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'cage_code', 'action', 'entity_type', 'entity_id', 'supplier')
+    list_filter = ('action', 'entity_type', 'created_at')
+    search_fields = ('cage_code', 'supplier__name')
+    readonly_fields = (
+        'supplier',
+        'cage_code',
+        'action',
+        'entity_type',
+        'entity_id',
+        'changes',
+        'created_at',
+    )
+    ordering = ('-created_at',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

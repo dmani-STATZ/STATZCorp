@@ -48,6 +48,7 @@ class LoginRequiredMiddleware:
             '/api/system-test/',  # System test API endpoint
             '/health/',
             '/api/azure-health/',
+            '/api/supplier-portal/',  # Server-to-server supplier portal API (HMAC auth)
         ]
         #logger.info(f"Middleware initialized with public_urls: {self.public_urls}")
 

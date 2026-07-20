@@ -114,6 +114,10 @@ urlpatterns = [
     path("health/", core_views.health_plain, name="health_check"),
     # Azure App Service: set Health check path to /api/azure-health/
     path("api/azure-health/", core_views.azure_health, name="azure_health"),
+    path(
+        "api/supplier-portal/v1/",
+        include("suppliers.portal.urls", namespace="supplier_portal"),
+    ),
     path("reports/", include("reports.urls")),
     path("transactions/", include("transactions.urls")),
     path("core/", include("core.urls")),

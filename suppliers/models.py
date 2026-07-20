@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 
@@ -86,6 +87,13 @@ class Supplier(AuditModel):
 
     class Meta:
         db_table = 'contracts_supplier'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cage_code'],
+                condition=Q(cage_code__isnull=False),
+                name='uniq_supplier_cage_code',
+            ),
+        ]
 
     def __str__(self):
         name_display = self.name.upper() if self.name else "NO NAME"
@@ -218,6 +226,42 @@ class SupplierDocument(AuditModel):
     def __str__(self):
         label = self.get_doc_type_display() or 'Document'
         return f"{label} for {self.supplier.name if self.supplier else 'Unknown'}"
+
+
+class SupplierPortalChangeLog(models.Model):
+    """Append-only audit of supplier-portal API writes (statzcorp-com → STATZWeb)."""
+
+    ACTION_CHOICES = [
+        ('patch_profile', 'Patch profile'),
+        ('create_contact', 'Create contact'),
+        ('update_contact', 'Update contact'),
+        ('delete_contact', 'Delete contact'),
+        ('upload_document', 'Upload document'),
+    ]
+    ENTITY_CHOICES = [
+        ('supplier', 'Supplier'),
+        ('contact', 'Contact'),
+        ('document', 'Document'),
+    ]
+
+    supplier = models.ForeignKey(
+        'Supplier',
+        on_delete=models.CASCADE,
+        related_name='portal_change_logs',
+    )
+    cage_code = models.CharField(max_length=10, db_index=True)
+    action = models.CharField(max_length=32, choices=ACTION_CHOICES, db_index=True)
+    entity_type = models.CharField(max_length=16, choices=ENTITY_CHOICES)
+    entity_id = models.PositiveIntegerField(null=True, blank=True)
+    changes = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'contracts_supplierportalchangelog'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.cage_code} {self.action} @ {self.created_at}"
 
 
 class OpenRouterModelSetting(models.Model):

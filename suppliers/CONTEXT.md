@@ -7,7 +7,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 - Django app name: `suppliers`, configured by `SuppliersConfig` in `suppliers/apps.py`.
 - Filesystem path: `suppliers/` inside the project root.
 - Registry: included in `STATZWeb/settings.py`'s `INSTALLED_APPS` and mounted at `path("suppliers/", include("suppliers.urls"))` in `STATZWeb/urls.py`.
-- Role: a feature/support app that owns supplier metadata, dashboards, AI enrichment, and helper assets rather than the core contract CRUD (that lives in `contracts`).
+- Role: a feature/support app that owns supplier metadata, dashboards, AI enrichment, helper assets, and the **supplier portal API** (`suppliers/portal/`) consumed server-to-server by `statzcorp-com`, rather than the core contract CRUD (that lives in `contracts`).
 
 ## 3. High-Level Responsibilities
 - Define supplier-related domain objects (`Supplier`, `Contact`, `SupplierDocument`, certifications/classifications, and OpenRouter model settings) that reference `contracts.Address`, `Contract`, `Clin`, and `SpecialPaymentTerms`.
@@ -15,6 +15,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 - Render the supplier detail report that shows contacts, docs, certifications, classifications, contracts, and status flags.
 - Implement the OpenRouter-backed enrichment pipeline (fetch HTML, build prompts, normalize JSON, and apply approved values) plus the global AI model configuration endpoint.
 - Provide scraper/address/contact normalization helpers for enrichment flows (`_parse_address_text`, `_normalize_*`, `utils.scrape_supplier_site`) and UI wiring.
+- Expose the supplier portal HTTP API at `/api/supplier-portal/v1/` (API key + HMAC) for profile/contact/document read-write used by the public site.
 
 ## 4. Key Files and What They Do
 
@@ -28,13 +29,16 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 | `admin.py` | Registers `Supplier` and `Contact` with tailored `list_display`, search, filters, and grouped `fieldsets` for compliance metadata. |
 | `templates/suppliers/...` | Server-rendered templates for the dashboard, detail page, info-by-type page, enrichment console, edit form (for `contracts` views), list/search screens, and include partials (`address_picker`, `toggle_switch`). |
 | `static/suppliers/js` | `supplier_edit.js` (change-tracking/highlight helpers for the edit form) and `supplier_enrich.js` (AJAX apply-suggestion bindings) that are bundled into the templates. |
-| `migrations/` | `0001_initial` bootstraps tables with `contracts_*` naming; `0002`–`0003` add enrichment/AI model settings; `0004` adds `Supplier.rfq_email` (deprecated — dormant fallback after `0013`); `0005` added `SupplierContactGroup` (removed in `0011`); `0009`–`0013` add `SupplierContactCategory`, migrate legacy data, drop `Contact.is_primary`, and backfill Sales contacts from `rfq_email`. |
-| `tests.py` | Placeholder file with no tests yet. |
+| `portal/` | Server-to-server supplier portal API (`auth`, `views`, `serializers`, `audit`, `notify`, `downloads`). Mounted at `/api/supplier-portal/v1/` in root urls. |
+| `migrations/` | `0001_initial` bootstraps tables with `contracts_*` naming; `0002`–`0003` add enrichment/AI model settings; `0004` adds `Supplier.rfq_email` (deprecated — dormant fallback after `0013`); `0005` added `SupplierContactGroup` (removed in `0011`); `0009`–`0013` add `SupplierContactCategory`, migrate legacy data, drop `Contact.is_primary`, and backfill Sales contacts from `rfq_email`; `0014` unique `cage_code` (non-null) + `SupplierPortalChangeLog`. |
+| `tests/` | Portal API coverage in `tests/test_supplier_portal_api.py`. |
 
 ## 5. Data Model / Domain Objects
 `AuditModel` supplies `created_by`, `modified_by`, `created_on`, `modified_on`, and a `save` override so derived models automatically timestamp updates.
 
-`Supplier` maps to `contracts_supplier` and centralizes the supplier metadata: name, `cage_code`, `dodaac`, phone/email/web, status flags (`probation`, `conditional`, `archived` plus tracking fields), optional `special_terms`, `prime`, certifications (`ppi`, `iso`), `allows_gsi` choices, references to three `contracts.Address` rows (billing/shipping/physical), optional `packhouse` self-reference, `logo_url`, `last_enriched_at`, and the `files_url`/`notes` fields that drive detail templates. Primary contact is not stored on `Supplier`; use related `Contact` rows with the global **Primary** category (`categories__name="Primary"`).
+`Supplier` maps to `contracts_supplier` and centralizes the supplier metadata: name, `cage_code` (unique when non-null), `dodaac`, phone/email/web, status flags (`probation`, `conditional`, `archived` plus tracking fields), optional `special_terms`, `prime`, certifications (`ppi`, `iso`), `allows_gsi` choices, references to three `contracts.Address` rows (billing/shipping/physical), optional `packhouse` self-reference, `logo_url`, `last_enriched_at`, and the `files_url`/`notes` fields that drive detail templates. Primary contact is not stored on `Supplier`; use related `Contact` rows with the global **Primary** category (`categories__name="Primary"`).
+
+`SupplierPortalChangeLog` (`contracts_supplierportalchangelog`) is an append-only audit of portal API writes (`patch_profile`, contact CRUD, `upload_document`) with JSON `changes` old/new maps. Staff email notify uses `SUPPLIER_PORTAL_NOTIFY_EMAIL`. Django admin is read-only.
 
 `SupplierType`, `CertificationType`, and `ClassificationType` are lookups persisted as `contracts_suppliertype`, `contracts_certificationtype`, and `contracts_classificationtype`. `Supplier` links to `SupplierType`, and the certification/classification models point back to `Supplier` plus the respective type table; each has `__str__` helpers for UI labels.
 

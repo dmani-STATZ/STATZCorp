@@ -14,10 +14,11 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 ## 2. App Scope
 
 **Owns:**
-- `Supplier`, `SupplierType`, `Contact`, `SupplierContactCategory`, `SupplierCertification`, `CertificationType`, `SupplierClassification`, `ClassificationType`, `SupplierDocument`, `OpenRouterModelSetting` models
+- `Supplier`, `SupplierType`, `Contact`, `SupplierContactCategory`, `SupplierCertification`, `CertificationType`, `SupplierClassification`, `ClassificationType`, `SupplierDocument`, `SupplierPortalChangeLog`, `OpenRouterModelSetting` models
 - Supplier dashboard, per-type lists, and detail/enrichment UI
 - OpenRouter-backed AI enrichment pipeline (`views.py`, `openrouter_config.py`)
 - Templates and static JS for supplier edit, enrichment, and detail views
+- Supplier portal API package `suppliers/portal/` (HMAC + API-key auth; mounted at `/api/supplier-portal/v1/`)
 
 **Does not own:**
 - Supplier CRUD views — those live in `contracts/views/supplier_views.py` and only reuse `suppliers` templates and models
@@ -151,6 +152,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - The enrichment views (`SupplierEnrichView`, `SupplierApplyEnrichmentView`, `SupplierEnrichPageView`) all require login — preserve `LoginRequiredMixin` on these.
 - `AuditModel.save` stamps `modified_by`/`created_by` — do not bypass `super().save()` in subclass overrides.
 - OpenRouter API key and fallback model list come from environment settings. Never commit these to VCS.
+- **Supplier portal API** (`/api/supplier-portal/`): public to session auth (middleware allow-list) but requires `X-API-Key` + HMAC (`X-Timestamp` / `X-Signature`). Secrets: `SUPPLIER_PORTAL_API_KEY`, `SUPPLIER_PORTAL_HMAC_SECRET`. Never expand the Phase 2 field allowlist without review. Excluded Supplier fields (probation, notes, cage_code, etc.) must stay unreadable/unwritable. Archived suppliers always `404`. Write audit goes to `SupplierPortalChangeLog` + optional `SUPPLIER_PORTAL_NOTIFY_EMAIL` — do not rely on `transactions.Transaction` for portal history.
 
 ---
 
@@ -162,6 +164,8 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - `OpenRouterModelSetting` is a singleton keyed on `key="default"`. Never add a migration that deletes or renames this row. Access it via `get_default()`.
 - `SupplierDocument.file` uploads to `supplier-docs/` — confirm storage config before changing the `upload_to` path.
 - Adding a field to `Supplier` that should appear in the edit form requires updating `contracts/forms.py` (`SupplierForm`), not `suppliers/` alone.
+- `Supplier.cage_code` has a conditional unique constraint (`uniq_supplier_cage_code`) for non-null values. Portal lookup is by cage code — do not drop this constraint.
+- `SupplierPortalChangeLog` is append-only; admin is read-only. Do not add update/delete paths in application code.
 
 ---
 
@@ -197,7 +201,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 
 ## 12. Testing and Verification Expectations
 
-- `suppliers/tests.py` is an empty stub — **zero automated coverage exists in this app.**
+- Portal API tests live in `suppliers/tests/test_supplier_portal_api.py`. Run `python manage.py test suppliers.tests.test_supplier_portal_api` after portal auth/serializer/view changes.
 - After model changes: verify Django admin loads for `Supplier` and `Contact`, check that `contracts` supplier views (create, edit, list) function, run any existing `contracts` tests.
 - After enrichment pipeline changes: manually trigger enrichment for a known supplier via `/suppliers/<pk>/enrich/run/`, confirm the JSON response shape, verify the apply flow POSTs and saves correctly.
 - After URL changes: spot-check `contracts` templates that reverse `suppliers:` URLs (contract management page, contact detail page) and the `reports/admin_dashboard.html`.
