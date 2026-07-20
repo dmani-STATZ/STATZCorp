@@ -90,7 +90,9 @@ class Supplier(AuditModel):
         constraints = [
             models.UniqueConstraint(
                 fields=['cage_code'],
-                condition=Q(cage_code__isnull=False),
+                # __gt='' instead of ~Q(cage_code=''): MSSQL filtered indexes
+                # reject NOT (...) in the WHERE clause (mssql-django output).
+                condition=Q(cage_code__isnull=False) & Q(cage_code__gt=''),
                 name='uniq_supplier_cage_code',
             ),
         ]

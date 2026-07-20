@@ -217,6 +217,13 @@ class SupplierForm(BaseModelForm):
             return None
         return sales_class.id
 
+    def clean_cage_code(self):
+        value = self.cleaned_data.get('cage_code')
+        if not value:
+            return None
+        value = value.strip().upper()
+        return value or None
+
     def clean_allows_gsi(self):
         value = self.cleaned_data.get('allows_gsi')
         if value in (None, ''):

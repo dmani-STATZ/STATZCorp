@@ -164,7 +164,8 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - `OpenRouterModelSetting` is a singleton keyed on `key="default"`. Never add a migration that deletes or renames this row. Access it via `get_default()`.
 - `SupplierDocument.file` uploads to `supplier-docs/` — confirm storage config before changing the `upload_to` path.
 - Adding a field to `Supplier` that should appear in the edit form requires updating `contracts/forms.py` (`SupplierForm`), not `suppliers/` alone.
-- `Supplier.cage_code` has a conditional unique constraint (`uniq_supplier_cage_code`) for non-null values. Portal lookup is by cage code — do not drop this constraint.
+- `Supplier.cage_code` is normalized (trim/uppercase; blank/`NONE`/`NO CAGE` → NULL) and enforced unique via conditional `UniqueConstraint` `uniq_supplier_cage_code` (non-null and non-blank only). Portal lookup is by cage code — do not drop this constraint. Form-layer guard: `SupplierForm.clean_cage_code` in `contracts/forms.py` — do not remove it.
+- TODO: junk supplier rows deferred for later cleanup — ids 417 (MULTIPLE), 752 (MULTIPLE SUPPLIERS), 908 (OWN PACKAGE), 1033 (x), 1098 (New supplier), 1250 (0).
 - `SupplierPortalChangeLog` is append-only; admin is read-only. Do not add update/delete paths in application code.
 
 ---

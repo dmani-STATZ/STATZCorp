@@ -1,53 +1,29 @@
-# Normalize cage_code blanks/duplicates, add unique constraint + portal change log.
-
-from collections import defaultdict
+# Normalize cage_code, add filtered unique constraint + portal change log.
 
 from django.db import migrations, models
 import django.db.models.deletion
+from django.db.models import Q, Value
+from django.db.models.functions import Replace, Trim, Upper
 
 
 def normalize_cage_codes(apps, schema_editor):
     Supplier = apps.get_model('suppliers', 'Supplier')
-
-    # Materialize first — MSSQL cannot iterate a lazy queryset while writing.
-    rows = list(Supplier.objects.values('id', 'cage_code'))
-
-    # Blank / whitespace-only → NULL
-    blank_ids = [
-        row['id']
-        for row in rows
-        if row['cage_code'] is not None and not str(row['cage_code']).strip()
-    ]
-    if blank_ids:
-        for i in range(0, len(blank_ids), 500):
-            batch = blank_ids[i:i + 500]
-            Supplier.objects.filter(id__in=batch).update(cage_code=None)
-
-    # Refresh after blanking
-    rows = list(
-        Supplier.objects.exclude(cage_code__isnull=True).values('id', 'cage_code')
+    Supplier.objects.filter(cage_code__isnull=False).update(
+        cage_code=Upper(
+            Trim(
+                Replace(
+                    Replace(
+                        Replace('cage_code', Value('\r'), Value('')),
+                        Value('\n'),
+                        Value(''),
+                    ),
+                    Value('\t'),
+                    Value(''),
+                )
+            )
+        )
     )
-    by_code = defaultdict(list)
-    for row in rows:
-        code = str(row['cage_code']).strip()
-        by_code[code].append(row['id'])
-
-    updates = []
-    for code, ids in by_code.items():
-        if len(ids) < 2:
-            continue
-        ids_sorted = sorted(ids)
-        # Keep lowest pk; suffix the rest.
-        for dup_id in ids_sorted[1:]:
-            new_code = f"{code[:6]}-D{dup_id}"[:10]
-            updates.append((dup_id, new_code))
-
-    for dup_id, new_code in updates:
-        Supplier.objects.filter(id=dup_id).update(cage_code=new_code)
-
-
-def noop_reverse(apps, schema_editor):
-    pass
+    Supplier.objects.filter(cage_code__in=['', 'NONE', 'NO CAGE']).update(cage_code=None)
 
 
 class Migration(migrations.Migration):
@@ -57,11 +33,13 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(normalize_cage_codes, noop_reverse),
+        migrations.RunPython(normalize_cage_codes, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='supplier',
             constraint=models.UniqueConstraint(
-                condition=models.Q(('cage_code__isnull', False)),
+                # Use __gt='' (not ~Q(...)): mssql-django emits NOT (...) which
+                # SQL Server rejects in filtered unique index WHERE clauses.
+                condition=Q(cage_code__isnull=False) & Q(cage_code__gt=''),
                 fields=('cage_code',),
                 name='uniq_supplier_cage_code',
             ),
