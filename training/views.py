@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 import io
+from urllib.parse import urljoin
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -1239,6 +1240,19 @@ def arctic_wolf_audit_export(request):
     return response
 
 
+def _absolute_training_url(request, path):
+    """Build the absolute URL embedded in outbound Arctic Wolf email.
+
+    Prefers settings.TRAINING_EMAIL_BASE_URL so that generating an email from
+    localhost or an internal hostname does not distribute an unreachable link
+    to recipients. Falls back to the request host when unset.
+    """
+    base = getattr(settings, "TRAINING_EMAIL_BASE_URL", None)
+    if base:
+        return urljoin(base.rstrip("/") + "/", path.lstrip("/"))
+    return request.build_absolute_uri(path)
+
+
 @login_required
 def arctic_wolf_email_preview(request, slug):
     """Render a preview of the email to send to users for a given course.
@@ -1249,7 +1263,7 @@ def arctic_wolf_email_preview(request, slug):
     path = reverse(
         "training:arctic_wolf_training_completion", kwargs={"slug": course.slug}
     )
-    full_link = request.build_absolute_uri(path)
+    full_link = _absolute_training_url(request, path)
 
     # Optional audience name in greeting (defaults to Team)
     audience = request.GET.get("audience") or "Team"
@@ -1277,7 +1291,7 @@ def arctic_wolf_email_eml(request, slug):
     path = reverse(
         "training:arctic_wolf_training_completion", kwargs={"slug": course.slug}
     )
-    full_link = request.build_absolute_uri(path)
+    full_link = _absolute_training_url(request, path)
     audience = request.GET.get("audience") or "Team"
 
     subject = f"Today's Security Awareness Session: {course.name}"

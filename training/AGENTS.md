@@ -91,6 +91,9 @@ This file guides AI coding agents and developers making changes to the `training
 ### Changing `TrainingDoc` storage
 `models.py` → migration → `forms.py` (`TrainingDocForm.save()`) → `admin.py` (`TrainingDocInline` `fields`/`readonly_fields`) → `views.py` (`admin_cmmc_upload`, `review_course_link`, `latest_training_docs_by_course_ids`)
 
+### Changing Arctic Wolf email content or CTA
+`_arctic_wolf_sign_button.html` (CTA only) → `arctic_wolf_email_body.html` (canonical body, all three languages) → `arctic_wolf_email.html` (preview chrome only; includes the body) → `arctic_wolf_email_preview` / `arctic_wolf_email_eml` in `views.py` (context keys `course`, `full_link`, `audience`)
+
 ---
 
 ## 6. Cross-App Dependency Warnings
@@ -148,6 +151,9 @@ grep -r "training:" --include="*.html" --include="*.py" .
 - `user_requirements.html` iterates `required_courses_data` — dict keys (`matrix_entry`, `completed`, `is_current`, `tracker_id`, etc.) are used in template conditionals. Primary actions: **Click to Certify** (`mark_complete`, non-cert) and **Upload to Certify** (`upload_document`, cert-required). Secondary **Replace Document** (`replace_document`) only when `item.completed and item.document`. `mark_complete` must reject `Course.upload=True` if template gating is bypassed.
 - AW completion URLs use `<slug:slug>` routing. Slugs are generated from course name — renaming a live AW course invalidates distributed completion links.
 - `training_base.html` wraps all training templates. If the block structure changes, all child templates must be checked.
+- The Arctic Wolf email body lives in exactly one file, `arctic_wolf_email_body.html`. The preview page includes it; it is never duplicated. The Sign CTA lives in exactly one file, `_arctic_wolf_sign_button.html`.
+- **Do not reintroduce VML (`<v:roundrect>`, `<w:anchorlock/>`) into any email template.** The previous implementation rendered as an unclickable blue box in Outlook because `xmlns:w` was never declared on `<html>`, and the `<a>` fallback was sealed inside `<!--[if !mso]>` where Outlook discards it. The current table-cell button uses a real `<a href>` in all clients and requires no namespaces. Square corners in classic Outlook are expected and accepted.
+- The plain-URL fallback beneath the button is required. These are compliance-tracking emails; the completion link must remain reachable even if the CTA fails to render.
 
 ---
 
@@ -264,6 +270,7 @@ python manage.py test training
 - Adding columns to audit views without updating PDF export pagination
 - Removing or renaming the `dashboard` URL name
 - Weakening validation in `CmmcDocumentUploadForm.clean()`
+- Reintroducing conditional comments or VML into Arctic Wolf email templates
 
 
 ## 16. Release Notes (Changelog) Rules

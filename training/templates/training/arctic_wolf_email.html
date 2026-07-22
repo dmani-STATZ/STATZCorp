@@ -23,11 +23,6 @@
             hr { background: #374151; }
         }
     </style>
-    <!--[if mso]>
-    <style>
-      .mso-btn a { padding: 0 !important; }
-    </style>
-    <![endif]-->
 </head>
 <body>
     <div class="wrapper">
@@ -40,122 +35,7 @@
                 <button class="action-btn" onclick="copyHtml()">Copy HTML</button>
             </div>
 
-            <div class="inner" id="email-root">
-                <!-- Full-width wrapper table so pasted HTML centers nicely in Outlook -->
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; background:#f4f4f4;">
-                    <tr>
-                        <td align="center" style="padding:24px;">
-                            <!-- Fixed-width container table -->
-                            <table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0" style="width:680px; max-width:680px; background:#ffffff; color:#000000; text-align:left;">
-                                <tr>
-                                    <td style="padding:24px;">
-                                        <div style="font-size:12px; text-align:right; margin-bottom:12px;">
-                                            <a href="#Spanish" style="color:#1f2937; text-decoration:none;">Espanol</a> | <a href="#German" style="color:#1f2937; text-decoration:none;">Deutsch</a>
-                                        </div>
-
-                                        <!-- English -->
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Hello {{ audience }},</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">It's time for another security awareness session.</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Today's session is: <span style="font-weight:bold;">{{ course.name }}</span></p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Duration: <span style="font-weight:bold;">Less than 5 minutes</span></p>
-                                        <br>
-                                        <p style="margin:0; color:#444444; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">We appreciate your participation in the program. Keeping everyone up to date with these topics is very important to our cybersecurity.</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">When you're ready, click the "Sign" button:</p>
-                                        <br>
-
-                                        <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:28px;v-text-anchor:middle;width:72px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
-                                          <w:anchorlock/>
-                                          <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;">Sign</center>
-                                        </v:roundrect>
-                                        <![endif]-->
-                                        <!--[if !mso]><!-- -->
-                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:6px 12px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; line-height:12px;">
-                                            <span style="color:#ffffff; text-decoration:none;">Sign</span>
-                                        </a>
-                                        <!--<![endif]-->
-                                        <br><br>
-
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Thank you,</p>
-                                        <br>
-                                        <p style="margin:0; font-weight:bold; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Arctic Wolf Managed Security Awareness Team</p>
-
-                                        <hr style="border:0; height:1px; background:#e5e5e5; margin:24px 0;">
-
-                                        <!-- Spanish -->
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;" id="Spanish">Hola {{ audience }},</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Es hora de otra sesion de concienciacion sobre seguridad.</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">La sesion de hoy es: <span style="font-weight:bold;">{{ course.name }}</span></p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Duracion: <span style="font-weight:bold;">Less than 5 minutes</span></p>
-                                        <br>
-                                        <p style="margin:0; color:#444444; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Agradecemos su participacion en el programa. Mantener a todos al dia sobre estos temas es muy importante para nuestra seguridad cibernetica.</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Cuando este listo, haga clic en el boton "Sign":</p>
-                                        <br>
-
-                                        <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:28px;v-text-anchor:middle;width:72px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
-                                          <w:anchorlock/>
-                                          <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;">Sign</center>
-                                        </v:roundrect>
-                                        <![endif]-->
-                                        <!--[if !mso]><!-- -->
-                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:6px 12px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; line-height:12px;">
-                                            <span style="color:#ffffff; text-decoration:none;">Sign</span>
-                                        </a>
-                                        <!--<![endif]-->
-                                        <br><br>
-
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Muchas gracias,</p>
-                                        <br>
-                                        <p style="margin:0; font-weight:bold; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Arctic Wolf Managed Security Awareness Team</p>
-
-                                        <hr style="border:0; height:1px; background:#e5e5e5; margin:24px 0;">
-
-                                        <!-- German -->
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;" id="German">Hallo {{ audience }},</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Es ist Zeit fuer eine weitere Schulung zum Thema "Security Awareness".</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Das heutige Thema heisst: <span style="font-weight:bold;">{{ course.name }}</span></p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Dauer: <span style="font-weight:bold;">Less than 5 minutes</span></p>
-                                        <br>
-                                        <p style="margin:0; color:#444444; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Wir freuen uns ueber Ihre Teilnahme. Es ist fuer unsere IT-Sicherheit sehr wichtig, dass alle ueber diese Themen auf dem Laufenden sind.</p>
-                                        <br>
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Klicken Sie jetzt auf "Sign", wenn Sie bereit sind:</p>
-                                        <br>
-
-                                        <!--[if mso]>
-                                        <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:28px;v-text-anchor:middle;width:72px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
-                                          <w:anchorlock/>
-                                          <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;">Sign</center>
-                                        </v:roundrect>
-                                        <![endif]-->
-                                        <!--[if !mso]><!-- -->
-                                        <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:6px 12px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; line-height:12px;">
-                                            <span style="color:#ffffff; text-decoration:none;">Sign</span>
-                                        </a>
-                                        <!--<![endif]-->
-                                        <br><br>
-
-                                        <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Vielen Dank,</p>
-                                        <br>
-                                        <p style="margin:0; font-weight:bold; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Arctic Wolf Managed Security Awareness Team</p>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
-            </div>
+            <div class="inner" id="email-root">{% include "training/arctic_wolf_email_body.html" %}</div>
         </div>
     </div>
 

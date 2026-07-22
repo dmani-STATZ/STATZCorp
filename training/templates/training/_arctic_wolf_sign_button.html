@@ -1,0 +1,30 @@
+{% comment %}
+  Shared "Sign" CTA for Arctic Wolf security awareness emails.
+
+  Rendered identically by the preview page (arctic_wolf_email.html) and the
+  .eml body (arctic_wolf_email_body.html). Do not duplicate this markup.
+
+  Context:
+    full_link      (required) absolute URL to the AW completion page
+    fallback_label (optional) localized lead-in for the plain-text URL fallback
+
+  Deliberately contains NO VML and NO conditional comments. The previous
+  VML bulletproof-button implementation rendered as an unclickable blue
+  box in Outlook because the Word namespace was never declared. This
+  table-cell pattern uses a real <a href> in every client, including
+  Word-engine Outlook.
+{% endcomment %}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0"
+       style="border-collapse:separate; line-height:100%;">
+  <tr>
+    <td align="center" bgcolor="#2563eb"
+        style="border-radius:6px; background-color:#2563eb; mso-padding-alt:12px 32px;">
+      <a href="{{ full_link }}" target="_blank" rel="noopener"
+         style="display:inline-block; padding:12px 32px; border-radius:6px; background-color:#2563eb; font-family:Arial,Helvetica,sans-serif; font-size:16px; font-weight:bold; line-height:120%; color:#ffffff; text-decoration:none; mso-text-raise:3px;">Sign</a>
+    </td>
+  </tr>
+</table>
+<p style="margin:12px 0 0; line-height:18px; mso-line-height-rule:exactly; font-size:12px; color:#444444; font-family:Arial,Helvetica,sans-serif;">
+  {% if fallback_label %}{{ fallback_label }}{% else %}Button not working? Copy and paste this link into your browser:{% endif %}<br>
+  <a href="{{ full_link }}" target="_blank" rel="noopener" style="color:#2563eb; text-decoration:underline; word-break:break-all;">{{ full_link }}</a>
+</p>

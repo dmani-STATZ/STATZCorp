@@ -1,18 +1,29 @@
 {% comment %}
-  Standalone HTML body for the Arctic Wolf email. Intended for direct inclusion
-  in an .eml or embedding in the preview page. Expects context:
-  - course, full_link, audience
+  Canonical HTML body for the Arctic Wolf email. Used by the .eml download and
+  included by the preview page. Expects context: course, full_link, audience
 {% endcomment %}
+<!DOCTYPE html>
+<html lang="en" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Today's Security Awareness Session: {{ course.name }}</title>
+  <!--[if mso]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <![endif]-->
+</head>
+<body style="margin:0; padding:0; background:#f4f4f4;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; background:#f4f4f4;">
   <tr>
     <td align="center" style="padding:24px;">
       <table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0" style="width:680px; max-width:680px; background:#ffffff; color:#000000; text-align:left;">
         <tr>
           <td style="padding:24px;">
-            <div style="font-size:12px; text-align:right; margin-bottom:12px;">
-              <a href="#" style="color:#1f2937; text-decoration:none;">Espanol</a> | <a href="#" style="color:#1f2937; text-decoration:none;">Deutsch</a>
-            </div>
-
             <!-- English -->
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Hello {{ audience }},</p>
             <br>
@@ -27,18 +38,9 @@
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">When you're ready, click the "Sign" button:</p>
             <br>
 
-            <!--[if mso]>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:28px;v-text-anchor:middle;width:72px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
-              <w:anchorlock/>
-              <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;">Sign</center>
-            </v:roundrect>
-            <![endif]-->
-            <!--[if !mso]><!-- -->
-            <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:6px 12px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; line-height:12px;">
-              <span style="color:#ffffff; text-decoration:none;">Sign</span>
-            </a>
-            <!--<![endif]-->
+            {% include "training/_arctic_wolf_sign_button.html" %}
             <br>
+
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Thank you,</p>
             <br>
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px; font-weight:bold;">Arctic Wolf Managed Security Awareness Team</p>
@@ -59,18 +61,9 @@
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Cuando este listo, haga clic en el boton "Sign":</p>
             <br>
 
-            <!--[if mso]>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:28px;v-text-anchor:middle;width:72px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
-              <w:anchorlock/>
-              <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;">Sign</center>
-            </v:roundrect>
-            <![endif]-->
-            <!--[if !mso]><!-- -->
-            <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:6px 12px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; line-height:12px;">
-              <span style="color:#ffffff; text-decoration:none;">Sign</span>
-            </a>
-            <!--<![endif]-->
+            {% include "training/_arctic_wolf_sign_button.html" with fallback_label="El boton no funciona? Copie y pegue este enlace en su navegador:" %}
             <br>
+
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Muchas gracias,</p>
             <br>
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px; font-weight:bold;">Arctic Wolf Managed Security Awareness Team</p>
@@ -91,18 +84,9 @@
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Klicken Sie jetzt auf "Sign", wenn Sie bereit sind:</p>
             <br>
 
-            <!--[if mso]>
-            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{{ full_link }}" style="height:28px;v-text-anchor:middle;width:72px;" arcsize="10%" strokecolor="#2563eb" fillcolor="#2563eb">
-              <w:anchorlock/>
-              <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;">Sign</center>
-            </v:roundrect>
-            <![endif]-->
-            <!--[if !mso]><!-- -->
-            <a href="{{ full_link }}" target="_blank" rel="noopener" style="display:inline-block; padding:6px 12px; background:#2563eb; color:#ffffff !important; text-decoration:none; border-radius:6px; font-family:Arial,Helvetica,sans-serif; font-size:12px; font-weight:bold; line-height:12px;">
-              <span style="color:#ffffff; text-decoration:none;">Sign</span>
-            </a>
-            <!--<![endif]-->
+            {% include "training/_arctic_wolf_sign_button.html" with fallback_label="Button funktioniert nicht? Kopieren Sie diesen Link in Ihren Browser:" %}
             <br>
+
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px;">Vielen Dank,</p>
             <br>
             <p style="margin:0; line-height:18px; mso-line-height-rule:exactly; font-size:14px; font-weight:bold;">Arctic Wolf Managed Security Awareness Team</p>
@@ -112,3 +96,5 @@
     </td>
   </tr>
 </table>
+</body>
+</html>
