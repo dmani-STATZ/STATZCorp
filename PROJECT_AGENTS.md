@@ -1,17 +1,17 @@
-# Repository AGENTS.md
+# Repository PROJECT_AGENTS.md
 
 ## 1. Purpose of This File
 This file defines repository-wide safe-edit rules for AI coding agents and developers working anywhere in this codebase.
 
-Before significant edits, read project-level context first (`PROJECT_CONTEXT.md` when present), then relevant app-level `CONTEXT.md` and `AGENTS.md` files.
+Before significant edits, read project-level context first (`PROJECT_CONTEXT.md` when present), then relevant app-level `CONTEXT_<app>.md` and `AGENTS_<app>.md` files.
 
 ## 2. How to Start Work in This Repo
 Use this reading order before editing:
 
 - `PROJECT_CONTEXT.md` — cross-app master reference; read this first for any task that crosses app boundaries.
 - `PROJECT_STRUCTURE.md` plus `STATZWeb/settings.py` and `STATZWeb/urls.py` for global wiring.
-- Target app `CONTEXT.md`.
-- Target app `AGENTS.md`.
+- Target app `CONTEXT_<app>.md`.
+- Target app `AGENTS_<app>.md`.
 - Coupled app docs when changing shared concepts:
 - `contracts` + `processing` + `transactions` for `Contract`/`Clin` changes.
 - `suppliers` + `contracts` + `sales` + `transactions` for supplier changes.
@@ -255,7 +255,7 @@ After behavior changes, expected verification is:
 
 ## 12. Standard Safe Change Workflow
 1. Read project-level context (`PROJECT_CONTEXT.md` if present; otherwise `PROJECT_STRUCTURE.md`, `STATZWeb/settings.py`, `STATZWeb/urls.py`).
-2. Read target app `CONTEXT.md` and `AGENTS.md`.
+2. Read target app `CONTEXT_<app>.md` and `PROJECT_AGENTS.md`.
 3. Identify owning app and coupled consumers.
 4. Run repo-wide search for symbols you plan to change (fields, URL names, templates, JSON keys, settings keys).
 5. Implement minimal scoped edits in owner and coupled files together.
@@ -280,7 +280,7 @@ Slow down and inspect deeply before editing when changes involve:
 - First docs to read:
 - `PROJECT_CONTEXT.md` (cross-app master reference), then `PROJECT_STRUCTURE.md`.
 - `STATZWeb/settings.py`, `STATZWeb/urls.py`.
-- Target app `CONTEXT.md` and `AGENTS.md`.
+- Target app `CONTEXT_<app>.md` and `PROJECT_AGENTS.md`.
 - Most coupled areas:
 - `contracts` <-> `processing` <-> `transactions`.
 - `contracts` <-> `suppliers` <-> `sales`.
