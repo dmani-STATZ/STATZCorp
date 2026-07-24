@@ -1,12 +1,15 @@
 import hashlib
+import logging
 import uuid
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from django.db import connection
 
-from sales.models import AwardImportBatch, DibbsAwardStaging
+from sales.models import AwardImportBatch, DibbsAward, DibbsAwardStaging
 from sales.services.awards_file_parser import AwardFileParseResult, AwardRow
+
+logger = logging.getLogger(__name__)
 
 
 def _chunked(lst, n):
@@ -109,12 +112,64 @@ def _stage_rows(
             cursor.executemany(sql, chunk)
 
 
-def _call_proc(stage_id: uuid.UUID) -> None:
-    """Execute the staging stored procedure for this stage_id."""
+def _delete_staging_for_stage(stage_id: uuid.UUID) -> int:
+    """Delete dibbs_award_staging rows for stage_id. Returns deleted count."""
     with connection.cursor() as cursor:
         cursor.execute(
-            "EXEC usp_process_award_staging @stage_id = %s",
+            "DELETE FROM dibbs_award_staging WHERE stage_id = %s",
             [str(stage_id)],
+        )
+        return cursor.rowcount if cursor.rowcount is not None else 0
+
+
+def _call_proc(stage_id: uuid.UUID) -> None:
+    """
+    Execute the staging stored procedure for this stage_id.
+
+    Staging rows are committed under autocommit before this call. On proc
+    failure, delete those rows explicitly — the proc's own transaction cannot
+    roll them back, and Step 9 never runs. Do not wrap _stage_rows + this call
+    in transaction.atomic() (nested TRANCOUNT / doomed-transaction hazard).
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "EXEC usp_process_award_staging @stage_id = %s",
+                [str(stage_id)],
+            )
+    except Exception:
+        deleted = _delete_staging_for_stage(stage_id)
+        logger.error(
+            "usp_process_award_staging failed for stage_id=%s; "
+            "deleted %s orphaned staging row(s)",
+            stage_id,
+            deleted,
+        )
+        raise
+
+
+def _warn_if_url_population_looks_like_drift(
+    batch: AwardImportBatch, stage_id: uuid.UUID, imported_row_count: int
+) -> None:
+    """Tripwire: empty award_basic_number_url on a non-empty import batch."""
+    if imported_row_count <= 0:
+        return
+    batch_awards = DibbsAward.objects.filter(aw_import_batch_id=batch.pk)
+    award_ids = list(batch_awards.values_list("id", flat=True))
+    if not award_ids:
+        return
+    populated = (
+        DibbsAward.objects.filter(id__in=award_ids)
+        .exclude(award_basic_number_url="")
+        .count()
+    )
+    if populated == 0:
+        logger.warning(
+            "possible stored proc drift: batch_id=%s stage_id=%s imported %s "
+            "award row(s) but zero have a non-empty award_basic_number_url",
+            batch.pk,
+            stage_id,
+            len(award_ids),
         )
 
 
@@ -198,6 +253,7 @@ def import_aw_records(
     stage_id = uuid.uuid4()
     _stage_rows(rows, batch, stage_id, aw_file_date)
     _call_proc(stage_id)
+    _warn_if_url_population_looks_like_drift(batch, stage_id, len(rows))
     match_new_mods_after_import(
         before_max_mod_id=before_max_mod_id,
         active_cages=active_company_cage_codes(),

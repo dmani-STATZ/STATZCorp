@@ -98,6 +98,7 @@ last_run_at     — None (null — task will run on first heartbeat)
 - Keep SQL execution guardrails in `reports/utils.py` (`run_select`, `is_safe_select`) and do not bypass them in views.
 - Treat export/download endpoints as sensitive. Keep access controls, filters, and expected columns intact.
 - Ignore legacy snapshot files unless explicitly asked (`contracts/views.orig`, `contracts/migrations/0002_create_views.py.bak`).
+- **Stored procedures deploy out-of-band from the repo.** Any migration that adds a `NOT NULL` column to a table written by a stored procedure must ship with a matching proc update and a `PROC_VERSION` bump in the same PR. The change is not "shipped" until the proc is redeployed in production SSMS. `python manage.py verify_stored_procs` gates CI/on-demand checks (exit non-zero on drift) but must never abort App Service startup.
 
 ## 5. When Repo-Wide Search Is Mandatory
 Run repo-wide search before any of these changes:

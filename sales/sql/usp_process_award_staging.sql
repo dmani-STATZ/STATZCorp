@@ -7,6 +7,8 @@ CREATE OR ALTER PROCEDURE usp_process_award_staging
     @stage_id UNIQUEIDENTIFIER
 AS
 BEGIN
+    -- Bump PROC_VERSION on every functional change to this proc; verify_stored_procs compares it against the live deployment.
+    -- PROC_VERSION: 2026-07-24.1
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 

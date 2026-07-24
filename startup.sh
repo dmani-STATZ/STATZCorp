@@ -29,7 +29,10 @@ echo "[startup] Importing release notes"
 $PYTHON_EXE manage.py import_release_notes || echo "import_release_notes failed; continuing startup"
 
 echo "[startup] Verifying manually deployed stored procedures"
-$PYTHON_EXE manage.py verify_stored_procs || echo "verify_stored_procs failed; continuing startup"
+# Non-blocking (D11): drift must never abort App Service container start.
+if ! $PYTHON_EXE manage.py verify_stored_procs; then
+  echo "[startup] CRITICAL: stored procedure drift detected by verify_stored_procs — continuing startup (non-blocking)"
+fi
 
 # Install Playwright system dependencies in the background AFTER gunicorn starts.
 # Playwright tasks check last_run_at intervals before executing, providing a safe

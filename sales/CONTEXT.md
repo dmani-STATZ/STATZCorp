@@ -192,7 +192,7 @@ Background workers: DIBBS awards scraper, DIBBS solicitation PDF fetcher, automa
 
 **Entry point:** `python manage.py scrape_awards [--date YYYY-MM-DD] [--dry-run]`
 **Scheduler:** Azure WebJob (`webjobs/run_scrape_awards/run.sh`) — nightly schedule
-**Reconciliation:** Reconciliation path filters out `date.today()` before Phase 2 sync — today is never queued.
+**Reconciliation:** Reconciliation path filters out `date.today()` before Phase 2 sync — today is never queued. Phase 3 scrapes non-SUCCESS dates oldest-first; a single date's import/DB failure marks only that batch `FAILED` and the loop continues. After `MAX_CONSECUTIVE_FAILURES` (3) consecutive failures the remaining queue is aborted (circuit breaker) so a systemic fault does not hammer DIBBS. Batches are never left `IN_PROGRESS` after an exception (`finally` clears status). Staging orphans for a failed `stage_id` are deleted on the import failure path; `purge_stale_award_staging` is only a crash backstop. Drift detection: `verify_stored_procs` (`PROC_VERSION` + INSERT column coverage) and a post-import WARNING when a non-empty batch has zero populated `award_basic_number_url` values (`possible stored proc drift`).
 **Service:** `sales/services/dibbs_awards_scraper.py`
 
 `parse_awards_table` now uses simple `get_text()` extraction for all columns. The `»` character and DIBBS package-view link text is stripped via `re.sub(r"\s*».*$", "", v)` in `normalize_award_record_for_importer`. Do not add per-column anchor surgery — it is fragile against DIBBS HTML structure changes.

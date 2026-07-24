@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import time
@@ -5,7 +6,7 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.utils import timezone
 
 from mailer.services.graph_mail import send_mail_via_graph
@@ -14,11 +15,16 @@ from sales.services.awards_file_importer import import_aw_records
 from sales.services.dibbs_awards_scraper import scrape_awards_for_date
 from sales.services.queue_we_won_awards import queue_we_won_awards
 
+logger = logging.getLogger(__name__)
+
 _CHROMIUM_ARGS = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
 
 # Retry config for per-date scrapes  connection-level errors only
 _MAX_SCRAPE_RETRIES = 3
 _SCRAPE_BACKOFF_SECONDS = [90, 180, 360]   # wait before attempt 2, 3, 4
+
+# Abort remaining queue after this many consecutive failed dates (systemic fault).
+MAX_CONSECUTIVE_FAILURES = 3
 
 # Playwright/Chromium network error prefixes that are worth retrying.
 # Parse errors, 404s, and assertion failures are NOT retryable.
@@ -345,7 +351,8 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
         print(f"[scrape_awards] Today ({today}) excluded from scrape queue. {len(dates_to_sync)} date(s) eligible.")
         self._sync_dates_to_db(dates_to_sync)
 
-        queue = self._build_work_queue()
+        # Materialize before the write loop (no MARS).
+        queue = list(self._build_work_queue())
         self.stdout.write(f"Work queue: {len(queue)} date(s) to scrape.")
         self._activity(f"Phase 3: work queue has {len(queue)} date(s) (non-SUCCESS).")
 
@@ -358,6 +365,7 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             return
 
         failed_dates: list[tuple[date, str]] = []
+        consecutive_failures = 0
         for idx, batch in enumerate(queue):
             ok = False
             fail_reason = None
@@ -380,13 +388,38 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                     else:
                         break
 
-            if not ok:
+            if ok:
+                consecutive_failures = 0
+            else:
+                consecutive_failures += 1
                 failed_dates.append(
                     (
                         batch.scrape_date,
                         fail_reason or "Scrape marked FAILED (see logs).",
                     )
                 )
+                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                    last_reason = fail_reason or "Scrape marked FAILED (see logs)."
+                    logger.critical(
+                        "scrape_awards circuit breaker: %s consecutive failures; "
+                        "aborting remaining queue. Last fail_reason=%s",
+                        consecutive_failures,
+                        last_reason,
+                    )
+                    self._activity(
+                        f"CRITICAL: {consecutive_failures} consecutive failures — "
+                        f"aborting remaining queue. Last reason: {last_reason}"
+                    )
+                    remaining = len(queue) - idx - 1
+                    self._check_and_notify_expiring_dates()
+                    self._exit_with_failure(
+                        "circuit breaker — consecutive scrape failures",
+                        f"Aborted after {consecutive_failures} consecutive failed "
+                        f"dates (MAX_CONSECUTIVE_FAILURES={MAX_CONSECUTIVE_FAILURES}). "
+                        f"Last fail_reason: {last_reason}\n"
+                        f"{remaining} remaining date(s) left untouched.",
+                    )
+
             if idx < len(queue) - 1:
                 self._activity("Sleeping 30s before next scrape to avoid DIBBS rate limiting.")
                 time.sleep(30)
@@ -446,6 +479,13 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
         )
 
         all_records: list[dict] = []
+        result: dict = {
+            "error": None,
+            "expected_rows": None,
+            "pages_scraped": 0,
+            "actual_rows": 0,
+        }
+        fail_reason: str | None = None
 
         def on_page_complete(records: list, page_num: int, total_pages: int) -> None:
             if records:
@@ -456,74 +496,124 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             )
             sys.stdout.flush()
 
-        result = scrape_awards_for_date(
-            award_date=batch.scrape_date,
-            batch_id=batch.pk,
-            on_page_complete=on_page_complete,
-            activity_log=self._activity,
-        )
-
-        if result["error"]:
-            batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
-            self.stderr.write(f"  FAILED: {result['error']}")
-            sys.stderr.flush()
-            self._activity(
-                f"Scrape finished with error for {batch.scrape_date}: {result['error']}"
+        try:
+            result = scrape_awards_for_date(
+                award_date=batch.scrape_date,
+                batch_id=batch.pk,
+                on_page_complete=on_page_complete,
+                activity_log=self._activity,
             )
-        elif len(all_records) != result["expected_rows"]:
-            error_msg = (
-                f"Reconciliation failure: parsed {len(all_records)} row(s), "
-                f"but DIBBS expected {result['expected_rows']} row(s)."
-            )
-            batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
-            self.stderr.write(f"  FAILED: {error_msg}")
-            sys.stderr.flush()
-            self._activity(
-                f"Scrape finished with reconciliation error for {batch.scrape_date}: {error_msg}"
-            )
-            result["error"] = error_msg
-        else:
-            if all_records:
-                self.stdout.write(
-                    f"  Browser closed. Saving {len(all_records)} records to DB..."
-                )
-                sys.stdout.flush()
 
-                result2 = import_aw_records(all_records, batch, batch.scrape_date)
-                for w in result2.get("warnings", []):
-                    print(f"  WARN: {w}")
-                print(
-                    f"  created={result2['created_count']} faux={result2['faux_created_count']} "
-                    f"mods={result2['mod_created_count']} skipped={result2['mod_skipped_count']}"
-                )
-
+            if result["error"]:
+                batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
+                fail_reason = result["error"]
+                self.stderr.write(f"  FAILED: {result['error']}")
+                sys.stderr.flush()
                 self._activity(
-                    f"Persisting {len(all_records)} scraped row(s) for "
-                    f"{batch.scrape_date} (batch_id={batch.pk})."
+                    f"Scrape finished with error for {batch.scrape_date}: {result['error']}"
                 )
+            elif len(all_records) != result["expected_rows"]:
+                error_msg = (
+                    f"Reconciliation failure: parsed {len(all_records)} row(s), "
+                    f"but DIBBS expected {result['expected_rows']} row(s)."
+                )
+                batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
+                fail_reason = error_msg
+                self.stderr.write(f"  FAILED: {error_msg}")
+                sys.stderr.flush()
+                self._activity(
+                    f"Scrape finished with reconciliation error for "
+                    f"{batch.scrape_date}: {error_msg}"
+                )
+                result["error"] = error_msg
+            else:
+                if all_records:
+                    self.stdout.write(
+                        f"  Browser closed. Saving {len(all_records)} records to DB..."
+                    )
+                    sys.stdout.flush()
 
-            batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
-            self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
-            sys.stdout.flush()
-            self._activity(
-                f"Scrape SUCCESS for {batch.scrape_date}: "
-                f"{result['actual_rows']} row(s)."
+                    try:
+                        result2 = import_aw_records(
+                            all_records, batch, batch.scrape_date
+                        )
+                    except (DatabaseError, IntegrityError) as exc:
+                        logger.exception(
+                            "import_aw_records failed for scrape_date=%s batch_id=%s",
+                            batch.scrape_date,
+                            batch.pk,
+                        )
+                        reason = str(exc)[:500]
+                        batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
+                        fail_reason = reason
+                        result["error"] = reason
+                        self.stderr.write(f"  FAILED: {reason}")
+                        sys.stderr.flush()
+                        self._activity(
+                            f"Import failed for {batch.scrape_date}: {reason}"
+                        )
+                    else:
+                        for w in result2.get("warnings", []):
+                            print(f"  WARN: {w}")
+                        print(
+                            f"  created={result2['created_count']} "
+                            f"faux={result2['faux_created_count']} "
+                            f"mods={result2['mod_created_count']} "
+                            f"skipped={result2['mod_skipped_count']}"
+                        )
+                        self._activity(
+                            f"Persisting {len(all_records)} scraped row(s) for "
+                            f"{batch.scrape_date} (batch_id={batch.pk})."
+                        )
+                        batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
+                        self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
+                        sys.stdout.flush()
+                        self._activity(
+                            f"Scrape SUCCESS for {batch.scrape_date}: "
+                            f"{result['actual_rows']} row(s)."
+                        )
+                else:
+                    batch.scrape_status = AwardImportBatch.SCRAPE_SUCCESS
+                    self.stdout.write(f"  SUCCESS: {result['actual_rows']} rows")
+                    sys.stdout.flush()
+                    self._activity(
+                        f"Scrape SUCCESS for {batch.scrape_date}: "
+                        f"{result['actual_rows']} row(s)."
+                    )
+        except Exception as exc:
+            logger.exception(
+                "Unexpected scrape failure for scrape_date=%s batch_id=%s",
+                batch.scrape_date,
+                batch.pk,
             )
-
-        batch.expected_rows = result["expected_rows"]
-        batch.pages_scraped = result["pages_scraped"]
-        batch.last_attempted_at = timezone.now()
-        batch.save(
-            update_fields=[
-                "scrape_status",
-                "expected_rows",
-                "pages_scraped",
-                "last_attempted_at",
-            ]
-        )
+            reason = str(exc)[:500]
+            batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
+            fail_reason = reason
+            result["error"] = reason
+            self.stderr.write(f"  FAILED: {reason}")
+            sys.stderr.flush()
+        finally:
+            if batch.scrape_status == AwardImportBatch.SCRAPE_IN_PROGRESS:
+                batch.scrape_status = AwardImportBatch.SCRAPE_FAILED
+                if not fail_reason:
+                    fail_reason = "Scrape left IN_PROGRESS; marked FAILED in finally."
+                    result["error"] = fail_reason
+            batch.expected_rows = result.get("expected_rows")
+            batch.pages_scraped = result.get("pages_scraped") or 0
+            batch.last_attempted_at = timezone.now()
+            batch.save(
+                update_fields=[
+                    "scrape_status",
+                    "expected_rows",
+                    "pages_scraped",
+                    "last_attempted_at",
+                ]
+            )
 
         if batch.scrape_status == AwardImportBatch.SCRAPE_FAILED:
-            return False, result.get("error") or "Scrape ended with status FAILED."
+            return False, fail_reason or result.get("error") or (
+                "Scrape ended with status FAILED."
+            )
 
         # Piggyback: inject we-won awards into the processing queue.
         # Runs on SUCCESS and PARTIAL. Never allowed to crash the scrape job.
