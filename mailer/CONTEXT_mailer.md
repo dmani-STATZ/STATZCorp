@@ -1,4 +1,4 @@
-# CONTEXT.md — `mailer` App
+# CONTEXT_mailer.md — `mailer` App
 
 ## 1. Domain Purpose
 The `mailer` app is responsible for orchestrating highly personalized, large-scale outbound email campaigns to suppliers or contacts. It provides the ability to import recipients (either via CSV or a dynamic SQL audience builder), generate AI-driven personalized icebreakers or content via Anthropic's Claude, and dispatch those emails using Microsoft Graph API. It also handles sequenced follow-up emails based on predefined intervals.

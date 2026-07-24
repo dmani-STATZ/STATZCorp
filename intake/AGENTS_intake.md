@@ -1,6 +1,6 @@
-# intake — AGENTS.md
+# intake — AGENTS_intake.md
 
-Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
+Read `CONTEXT_intake.md` first for app purpose, model shape, and lock semantics.
 
 ## Safe-Edit Rules
 
@@ -74,7 +74,7 @@ Read `CONTEXT.md` first for app purpose, model shape, and lock semantics.
   a type variant (or splitting one), update the dispatcher AND add a
   happy-path test in `FinalizeExtendedTypesTests`.
 - JSON → canonical mapping lives in the `finalize.py` module docstring
-  and the table in `CONTEXT.md`. Any new `data` key that needs to land
+  and the table in `CONTEXT_intake.md`. Any new `data` key that needs to land
   somewhere on finalization MUST be added to the mapping AND to a
   `FinalizationTests` or `FinalizeExtendedTypesTests` case.
 - **MOD/AMD are special**: they do NOT create a new Contract. They

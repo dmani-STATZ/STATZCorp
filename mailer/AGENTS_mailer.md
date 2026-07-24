@@ -1,5 +1,5 @@
-# AGENTS.md — `mailer` App
-> Read `mailer/CONTEXT.md` first.
+# AGENTS_mailer.md — `mailer` App
+> Read `mailer/CONTEXT_mailer.md` first.
 
 ## 1. Purpose of This File
 Safe-edit guidance for the `mailer` backend (campaign management, CSV import, AI generation, Graph dispatch, and follow-ups).

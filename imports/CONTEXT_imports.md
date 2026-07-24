@@ -1,4 +1,4 @@
-# imports/CONTEXT.md
+# imports/CONTEXT_imports.md
 
 ## Current State
 Full implementation complete. Services, views, templates, and AJAX endpoints 

@@ -1,9 +1,9 @@
-# AGENTS.md — `sales` App
+# AGENTS_sales.md — `sales` App
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 ## 1. Purpose of This File
 
-This file defines safe-edit guidance for the `sales` Django app for AI coding agents and future developers. It is not a repeat of `CONTEXT.md` — read `sales/CONTEXT.md` first for domain context and the `DIBBS_System_Spec` for intent and vision, then use this file when making code changes.
+This file defines safe-edit guidance for the `sales` Django app for AI coding agents and future developers. It is not a repeat of `CONTEXT_sales.md` — read `sales/CONTEXT_sales.md` first for domain context and the `DIBBS_System_Spec` for intent and vision, then use this file when making code changes.
 
 ---
 
@@ -88,7 +88,7 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 **Background processing:** Azure WebJobs run `scrape_awards`, `auto_import_dibbs`, optionally `fetch_pending_pdfs` (deprecated as a 5‑minute default; use for manual/queue catch-up), and **`background_tasks`** (`manage.py run_background_tasks` in **`core/management/commands/`** → **`sales/tasks/send_queued_rfqs.py`** for grouped Graph sends of `READY_TO_SEND` RFQs on an NCrontab schedule — see `webjobs/background_tasks/README.md`). **`auto_import_dibbs`** is a **three-phase** nightly job: **Loop A** — missing DIBBS dates → `fetch_dibbs_archive_files` (IN + BQ zip only; AS inside zip) + `run_import()`. **Loop B** — set-aside sols (`small_business_set_aside != 'N'`) with no `pdf_blob`, fetch PDFs in **batches of 10**, **one Playwright session per batch** (full browser restart between batches for connection hygiene). **Loop C** — after all B sessions close, `parse_pdf_data_backlog()` parses every sol with a blob and null `pdf_data_pulled` (procurement history + packaging; `pdf_data_pulled` always set). When **`SOL_ANALYSIS_ENABLED=True`**, the same pass may run LLM **`SolAnalysis`** for sols that lack a stored analysis row. `fetch_pending_pdfs` mirrors the batch-of-10 fetch pattern for PENDING/FAILED queue sols, then runs the same parse backlog. The interactive import pipeline runs via four sequential AJAX HTTP POSTs, not an internal task queue.
 
-**`dibbs_solicitation_match_counts` view (match count refresh source):** DDL lives in `sales/sql/dibbs_solicitation_match_counts.sql` — deploy changes via SSMS with `CREATE OR ALTER VIEW` — **never** via Django migrations or management commands. Unmanaged Django model: **`SolicitationMatchCount`** in `sales/models/suppliers.py` (`managed=False`, `db_table='dibbs_solicitation_match_counts'`). **`match_count`** is now a real indexed integer column on `Solicitation` (table `dibbs_solicitation`, default 0), refreshed by the `refresh_match_counts` management command (`sales/management/commands/refresh_match_counts.py`) and nightly WebJob (`webjobs/refresh_match_counts/run.sh`). The view is queried **once per refresh run**, not on every list page load. **`has_matches=1`** and **`?tab=matches`** filter on `match_count__gt=0` (the column directly); sorting by the Matches column (`?sort=match_count`) orders by the column — no Subquery. The view exposes an **additive T1+T2+T3** total (not deduplicated) for display only. The on-demand refresh button lives on the Suppliers tab page header (`sales/templates/sales/suppliers/list.html`, staff only). The **Review Workbench** sidebar reads **`get_live_workbench_matches()`**, not **`dibbs_supplier_match`**; the match table is still written at import time by the matching engine. If the tiers or counting rules for that display total change: update the `.sql` file, redeploy in SSMS, re-run `refresh_match_counts`, and refresh `sales/CONTEXT.md` / `sales/DIBBS_System_Spec.md`.
+**`dibbs_solicitation_match_counts` view (match count refresh source):** DDL lives in `sales/sql/dibbs_solicitation_match_counts.sql` — deploy changes via SSMS with `CREATE OR ALTER VIEW` — **never** via Django migrations or management commands. Unmanaged Django model: **`SolicitationMatchCount`** in `sales/models/suppliers.py` (`managed=False`, `db_table='dibbs_solicitation_match_counts'`). **`match_count`** is now a real indexed integer column on `Solicitation` (table `dibbs_solicitation`, default 0), refreshed by the `refresh_match_counts` management command (`sales/management/commands/refresh_match_counts.py`) and nightly WebJob (`webjobs/refresh_match_counts/run.sh`). The view is queried **once per refresh run**, not on every list page load. **`has_matches=1`** and **`?tab=matches`** filter on `match_count__gt=0` (the column directly); sorting by the Matches column (`?sort=match_count`) orders by the column — no Subquery. The view exposes an **additive T1+T2+T3** total (not deduplicated) for display only. The on-demand refresh button lives on the Suppliers tab page header (`sales/templates/sales/suppliers/list.html`, staff only). The **Review Workbench** sidebar reads **`get_live_workbench_matches()`**, not **`dibbs_supplier_match`**; the match table is still written at import time by the matching engine. If the tiers or counting rules for that display total change: update the `.sql` file, redeploy in SSMS, re-run `refresh_match_counts`, and refresh `sales/CONTEXT_sales.md` / `sales/DIBBS_System_Spec.md`.
 
 ---
 
@@ -119,21 +119,21 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 → `sales/urls.py` + `sales/views/imports.py` + `sales/templates/sales/import/progress.html` (step checklist) + `sales/services/importer.py` if new service logic needed
 
 ### Changing `SupplierNSN` or `SupplierFSC` fields
-→ `sales/models/suppliers.py` + new migration + `sales/services/matching.py` + `sales/views/suppliers.py` + `sales/templates/sales/suppliers/detail.html` + `sales/sql/dibbs_supplier_nsn_scored.sql` — if scoring formula changes, update this file and redeploy via SSMS using `CREATE OR ALTER VIEW` + unmanaged `SupplierNSNScored` field alignment + `sales/CONTEXT.md` / `DIBBS_System_Spec.md` score description
+→ `sales/models/suppliers.py` + new migration + `sales/services/matching.py` + `sales/views/suppliers.py` + `sales/templates/sales/suppliers/detail.html` + `sales/sql/dibbs_supplier_nsn_scored.sql` — if scoring formula changes, update this file and redeploy via SSMS using `CREATE OR ALTER VIEW` + unmanaged `SupplierNSNScored` field alignment + `sales/CONTEXT_sales.md` / `DIBBS_System_Spec.md` score description
 
 ### Changing the SupplierNSN live scoring formula
 → Edit `sales/sql/dibbs_supplier_nsn_scored.sql`  
 → Deploy via SSMS: `CREATE OR ALTER VIEW [dbo].[dibbs_supplier_nsn_scored]`  
 → Never deploy via Django migrations or management commands  
 → Unmanaged Django model: `SupplierNSNScored` in `sales/models/suppliers.py` (`managed=False`, `db_table='dibbs_supplier_nsn_scored'`)  
-→ Update scoring formula description in `sales/CONTEXT.md` and `sales/DIBBS_System_Spec.md`  
+→ Update scoring formula description in `sales/CONTEXT_sales.md` and `sales/DIBBS_System_Spec.md`  
 → No migration required — the view is not managed by Django  
 → Score formula: **+1.0** per row in `dibbs_supplier_nsn` (manual confirmation bonus) + **+1.0** per contract ≤ 2 years old (from `contracts_clin` via `contracts_contract`), **+0.75** per contract ≤ 4 years, **+0.5** per contract > 4 years  
 
 ### `dibbs_supplier_nsn_scored` view (tier-1 NSN scores)
 → DDL lives in `sales/sql/dibbs_supplier_nsn_scored.sql` — deploy changes via SSMS with `CREATE OR ALTER VIEW` — **never** run this file from Django migrations or management commands  
 → Unmanaged Django model: `SupplierNSNScored` in `sales/models/suppliers.py` (`managed=False`, `db_table='dibbs_supplier_nsn_scored'`)  
-→ If the scoring formula or selected columns change: update the `.sql` file, redeploy in SSMS, align `SupplierNSNScored` fields, refresh `sales/CONTEXT.md` and `DIBBS_System_Spec.md`
+→ If the scoring formula or selected columns change: update the `.sql` file, redeploy in SSMS, align `SupplierNSNScored` fields, refresh `sales/CONTEXT_sales.md` and `DIBBS_System_Spec.md`
 
 ### Flagging or restoring a No Quote CAGE
 → `sales/models/no_quote.py` + migration + `sales/services/no_quote.py` + `sales/views/suppliers.py` + `sales/views/entity_lookup.py` + `sales/views/settings.py` + `sales/views/solicitations.py` + `sales/views/rfq.py` (batch send, queue add/send, `supplier_create_and_queue`) + `sales/templates/sales/suppliers/detail.html` + `sales/entity_lookup.html` + `sales/templates/sales/solicitations/detail.html` + `sales/templates/sales/rfq/pending.html` + `sales/base.html` / `sales/settings/cages.html` nav
@@ -146,8 +146,8 @@ This file defines safe-edit guidance for the `sales` Django app for AI coding ag
 
 ### Changing inbox claim expiry duration
 → `sales/models/inbox.py` — `claim_for()` method timedelta value
-→ `CONTEXT.md` — update the 20-minute reference
-→ `AGENTS.md` — update this entry
+→ `CONTEXT_sales.md` — update the 20-minute reference
+→ `AGENTS_sales.md` — update this entry
 
 ---
 
@@ -350,8 +350,8 @@ After any change, manually verify these flows:
 
 ## 14. Safe Change Workflow
 
-1. **Read `sales/CONTEXT.md`** for domain background.
-2. **Read the specific model/service/view files** directly involved — do not rely on CONTEXT.md alone for field names.
+1. **Read `sales/CONTEXT_sales.md`** for domain background.
+2. **Read the specific model/service/view files** directly involved — do not rely on CONTEXT_sales.md alone for field names.
 3. **Search for cross-file dependencies** before any rename:
    - Field renames: search `sales/services/`, `sales/views/`, `sales/templates/` for the field name.
    - URL name changes: `grep -r "sales:<name>" sales/templates/` and `sales/base.html`.

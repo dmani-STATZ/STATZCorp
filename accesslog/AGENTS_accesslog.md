@@ -1,4 +1,4 @@
-# AGENTS.md — accesslog
+# AGENTS_accesslog.md — accesslog
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 ## ⚠️ Deprecation Notice
@@ -9,7 +9,7 @@ This app is **planned for removal**. Do not add new features, expand models, or 
 ## 1. Purpose of This File
 This file defines safe-edit guidance for the `accesslog` Django app. It is written for AI coding agents and future developers making changes to this app.
 
-Read `accesslog/CONTEXT.md` first if present — it describes the domain model, flows, and high-level responsibilities. This file focuses on execution safety, edit patterns, and known failure modes.
+Read `accesslog/CONTEXT_accesslog.md` first if present — it describes the domain model, flows, and high-level responsibilities. This file focuses on execution safety, edit patterns, and known failure modes.
 
 ---
 
@@ -183,7 +183,7 @@ If `reportlab` is missing or outdated, `generate_report` will raise an import er
 
 ## 14. Safe Change Workflow
 
-1. Read `CONTEXT.md` to understand the domain and flows.
+1. Read `CONTEXT_accesslog.md` to understand the domain and flows.
 2. Read the specific files involved (`models.py`, `views.py`, `forms.py`, template).
 3. Search repo-wide for any references to the symbol being changed — though for this app, cross-app references are minimal.
 4. Make the smallest scoped change needed.

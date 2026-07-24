@@ -255,7 +255,7 @@ After behavior changes, expected verification is:
 
 ## 12. Standard Safe Change Workflow
 1. Read project-level context (`PROJECT_CONTEXT.md` if present; otherwise `PROJECT_STRUCTURE.md`, `STATZWeb/settings.py`, `STATZWeb/urls.py`).
-2. Read target app `CONTEXT_<app>.md` and `PROJECT_AGENTS.md`.
+2. Read target app `CONTEXT_<app>.md` and `AGENTS_<app>.md`.
 3. Identify owning app and coupled consumers.
 4. Run repo-wide search for symbols you plan to change (fields, URL names, templates, JSON keys, settings keys).
 5. Implement minimal scoped edits in owner and coupled files together.
@@ -280,7 +280,7 @@ Slow down and inspect deeply before editing when changes involve:
 - First docs to read:
 - `PROJECT_CONTEXT.md` (cross-app master reference), then `PROJECT_STRUCTURE.md`.
 - `STATZWeb/settings.py`, `STATZWeb/urls.py`.
-- Target app `CONTEXT_<app>.md` and `PROJECT_AGENTS.md`.
+- Target app `CONTEXT_<app>.md` and `AGENTS_<app>.md`.
 - Most coupled areas:
 - `contracts` <-> `processing` <-> `transactions`.
 - `contracts` <-> `suppliers` <-> `sales`.

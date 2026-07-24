@@ -1,7 +1,7 @@
-# AGENTS.md — `training` App
+# AGENTS_training.md — `training` App
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
-Read `training/CONTEXT.md` before editing. This file defines safe-edit rules specific to the `training` app as implemented.
+Read `training/CONTEXT_training.md` before editing. This file defines safe-edit rules specific to the `training` app as implemented.
 
 ---
 
@@ -122,7 +122,7 @@ grep -r "training:" --include="*.html" --include="*.py" .
 - **Never remove `@login_required`** from any view — all 20+ views require authentication.
 - `training_audit`, `training_audit_export`, `arctic_wolf_audit`, `arctic_wolf_audit_export` must check `request.user.is_superuser` at entry. These are inline guards, not decorator-based.
 - `admin_cmmc_upload` checks `request.user.is_staff`. Keep this guard.
-- `manage_matrix` has **no staff/superuser guard** despite being admin-only in intent. Do not rely on obscurity; consider adding a guard (noted as a known gap in CONTEXT.md).
+- `manage_matrix` has **no staff/superuser guard** despite being admin-only in intent. Do not rely on obscurity; consider adding a guard (noted as a known gap in CONTEXT_training.md).
 - `review_course_link` validates `UserAccount` membership before streaming binary file content. Do not bypass this check or widen the queryset.
 - `view_document` streams `Tracker.document` binary blobs without ownership check beyond authentication — verify this is acceptable for the threat model before exposing to new user roles.
 - `CmmcDocumentUploadForm.clean()` prevents staff from uploading documents for invalid user/course pairs. Do not weaken this validation.
@@ -209,7 +209,7 @@ python manage.py test training
 
 ## 13. Known Footguns
 
-1. **`manage_matrix` missing permission guard.** The view is `@login_required` only. Any authenticated user who guesses `/training/matrix/manage/` can modify the training matrix for any account. This is confirmed in `CONTEXT.md` as a known gap.
+1. **`manage_matrix` missing permission guard.** The view is `@login_required` only. Any authenticated user who guesses `/training/matrix/manage/` can modify the training matrix for any account. This is confirmed in `CONTEXT_training.md` as a known gap.
 
 2. **Slug invalidation on AW course rename.** `ArcticWolfCourse.slug` is regenerated on every `save()`. Renaming a course silently breaks all previously distributed completion URLs. There is no redirect or slug history mechanism.
 
@@ -229,7 +229,7 @@ python manage.py test training
 
 ## 14. Safe Change Workflow
 
-1. **Read `training/CONTEXT.md`** for domain background.
+1. **Read `training/CONTEXT_training.md`** for domain background.
 2. **Read the relevant local files** — at minimum: `models.py`, the affected view(s) in `views.py`, and matching templates.
 3. **Search repo-wide for URL name and context key usage** before renaming anything:
    - `grep -r "training:" --include="*.html" --include="*.py" .`

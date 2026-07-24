@@ -1,7 +1,7 @@
-# AGENTS.md — `processing` App
+# AGENTS_processing.md — `processing` App
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
-> **Read `processing/CONTEXT.md` first.** This file adds editing-safety rules on top of it; it does not duplicate it.
+> **Read `processing/CONTEXT_processing.md` first.** This file adds editing-safety rules on top of it; it does not duplicate it.
 
 ---
 
@@ -135,7 +135,7 @@ As of the Bootstrap-in-`<head>` fix in `base_template.html`, the timing race no 
 - **"Add Split" now persists immediately on company-name blur.** `addBlankClinSplitRow` renders a DOM-only row with `data-new="1"` and a yellow `clin-split-unsaved-badge`. When the analyst blurs the company name input, `_persistNewSplitRow` fires a POST to `/processing/clin/<clinId>/splits/add/`, rewrites the row's `name` attributes to use the real server-assigned `split_id`, removes `data-new`, and clears the badge. On failure the row stays as `data-new="1"` so Save CLIN can still persist it as a fallback. Existing saved rows show the Unsaved badge when their value/paid inputs are edited; the badge clears on Save CLIN success.
 
 ### Plan Gross formula change
-`models.py` `ProcessContract.calculate_plan_gross` → `views/api_views.py` `update_contract_values` and `update_process_contract_field` (must use `calculate_plan_gross` / `update_calculated_values` on the model — do not duplicate the formula) → `CONTEXT.md` to document the formula → frontend: verify any cached/displayed `plan_gross` values refresh after CLIN edits (inline `updateContractCalculations` mirrors the server formula). The current formula is **`plan_gross = item_total - quote_total - packhouse_quote_amount - SUM(ProcessContractCharge.estimated_amount)`** (CLIN aggregates for the first two terms), with **null `packhouse_quote_amount` treated as zero**. This is intentional: **estimated costs known at bid time** (including the packhouse quote) reduce Plan Gross; **unexpected or actual cost variances** are handled via **Adjusted Gross** on the Finance Audit page, not Plan Gross.
+`models.py` `ProcessContract.calculate_plan_gross` → `views/api_views.py` `update_contract_values` and `update_process_contract_field` (must use `calculate_plan_gross` / `update_calculated_values` on the model — do not duplicate the formula) → `CONTEXT_processing.md` to document the formula → frontend: verify any cached/displayed `plan_gross` values refresh after CLIN edits (inline `updateContractCalculations` mirrors the server formula). The current formula is **`plan_gross = item_total - quote_total - packhouse_quote_amount - SUM(ProcessContractCharge.estimated_amount)`** (CLIN aggregates for the first two terms), with **null `packhouse_quote_amount` treated as zero**. This is intentional: **estimated costs known at bid time** (including the packhouse quote) reduce Plan Gross; **unexpected or actual cost variances** are handled via **Adjusted Gross** on the Finance Audit page, not Plan Gross.
 
 ### Finalization change
 `views/processing_views.py` `finalize_contract` + `finalize_and_email_contract` → `contracts/models.py` (target model fields) → test by completing a full queue-to-finalize flow manually
@@ -306,7 +306,7 @@ defeat the supplier-matching prefill flow.
 
 ## 14. Safe Change Workflow
 
-1. Read `processing/CONTEXT.md` for domain context
+1. Read `processing/CONTEXT_processing.md` for domain context
 2. Read the specific files involved in your change (models, views, forms, templates, JS)
 3. Run repo-wide grep for any field name, URL name, or function name you plan to change
 4. Make the minimum change needed — this app has no tests, so partial changes are hard to catch

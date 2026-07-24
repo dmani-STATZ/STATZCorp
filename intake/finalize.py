@@ -5,7 +5,7 @@ Phase 3 — supports AWD, PO, DO, IDIQ, INTERNAL, MOD, AMD.
 Contract: this module is a *pure* function called inside a
 `transaction.atomic()` block by the view. On any failure the transaction
 rolls back, leaving the draft intact in its prior status. On success the
-draft is deleted (per CONTEXT.md: "drafts are not contracts" — once a
+draft is deleted (per CONTEXT_intake.md: "drafts are not contracts" — once a
 contract exists, the draft has served its purpose).
 
 This module is a thin adapter over `contracts.services.contract_create`

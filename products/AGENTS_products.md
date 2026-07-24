@@ -1,7 +1,7 @@
-# AGENTS.md — `products`
+# AGENTS_products.md — `products`
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
-Read `products/CONTEXT.md` first. This file complements it with concrete safe-edit rules grounded in the actual repository. It does not repeat the context file.
+Read `products/CONTEXT_products.md` first. This file complements it with concrete safe-edit rules grounded in the actual repository. It does not repeat the context file.
 
 ---
 
@@ -299,7 +299,7 @@ After editing, verify manually:
 
 ## 14. Safe Change Workflow
 
-1. Read `products/CONTEXT.md` and this file.
+1. Read `products/CONTEXT_products.md` and this file.
 2. Read `products/models.py` to confirm current field names.
 3. For any field change: search repo-wide for the field name before touching anything.
 4. For URL changes: search repo-wide for the URL name (`products:nsn_edit`, `products:nsn_search`).

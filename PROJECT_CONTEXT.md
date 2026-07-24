@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — STATZCorp Cross-App Reference
 
-Read this file first when a task crosses app boundaries. It gives enough context to make confident decisions without reading every app's individual CONTEXT.md. For single-app work, go straight to that app's own CONTEXT.md and AGENTS.md instead.
+Read this file first when a task crosses app boundaries. It gives enough context to make confident decisions without reading every app's individual CONTEXT_<app>.md. For single-app work, go straight to that app's own CONTEXT_<app>.md and AGENTS_<app>.md instead.
 
 ---
 

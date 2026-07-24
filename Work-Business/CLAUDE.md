@@ -13,9 +13,9 @@ This repo already has a real documentation system for coding agents. Follow it b
 
 1. `PROJECT_CONTEXT.md` (repo root) — cross-app reference, read first for anything crossing app boundaries
 2. `PROJECT_STRUCTURE.md` (repo root) — layout map
-3. The specific app's own `CONTEXT.md` — every app has one
-4. The specific app's own `AGENTS.md` — every app has one
-5. `AGENTS.md` (repo root) — repo-wide safe-edit rules
+3. The specific app's own `CONTEXT_<app>.md` — every app has one
+4. The specific app's own `AGENTS_<app>.md` — every app has one
+5. `PROJECT_AGENTS.md` (repo root) — repo-wide safe-edit rules
 
 This file doesn't replace any of that — it just adds Dion's personal preferences on top.
 

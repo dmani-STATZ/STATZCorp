@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from sales.models import ImportBatch, Solicitation, SolicitationLine, SupplierMatch
 
-# Pipeline counts exclude terminal / hidden-from-workflow statuses (see sales/CONTEXT.md dashboard).
+# Pipeline counts exclude terminal / hidden-from-workflow statuses (see sales/CONTEXT_sales.md dashboard).
 TERMINAL_STATUSES = ["Archived", "WON", "LOST", "NO_BID"]
 
 # Active pipeline for secondary stat tiles (must match Solicitation.STATUS_CHOICES values).
@@ -50,7 +50,7 @@ def dashboard(request):
         today               — date (timezone-aware calendar day)
         latest_batch        — most recent ImportBatch or None
         counts_by_status    — status -> count for pipeline solicitations; ``New`` / ``RFQ_PENDING``
-                              overridden for stat cards (see CONTEXT.md)
+                              overridden for stat cards (see CONTEXT_sales.md)
         counts_by_bucket    — dict of bucket -> count (all solicitations; legacy field)
         sdvosb_priority_count — pipeline sols (excludes TERMINAL_STATUSES) with set-aside ``S`` or ``R`` (top stat card)
         sdvosb_count        — pipeline (``PIPELINE_STATUSES``) sols with set-aside ``R`` (secondary tile / list link)

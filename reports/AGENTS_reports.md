@@ -1,5 +1,5 @@
-# AGENTS.md — `reports` app
-> Read `reports/CONTEXT.md` first.
+# AGENTS_reports.md — `reports` app
+> Read `reports/CONTEXT_reports.md` first.
 
 ## 1. Purpose of This File
 Safe-edit guidance for the rebuilt reports backend (ticket flow + report library + versioning + sharing + staff prototype builder).
@@ -183,7 +183,7 @@ Manual verification after changes:
 - SQL preview/run/export must always pass through `run_select`.
 
 ## 14. Safe Change Workflow
-1. Read `reports/CONTEXT.md`.
+1. Read `reports/CONTEXT_reports.md`.
 2. Trace model + form + view + URL + template coupling before edits.
 3. Search for URL references before renaming.
 4. Keep changes scoped and migration-backed.

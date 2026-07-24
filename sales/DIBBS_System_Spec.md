@@ -662,7 +662,7 @@ The score is recomputed on every query. Suppliers with proven contract history o
 
 **`dibbs_supplier_nsn` (table)** contains **manual entries only**. Each row means a sales rep confirmed the supplier can provide that NSN (bulk add UI, quote-driven `get_or_create`, etc.). Fields: `id`, `supplier_id`, `nsn` (normalized, no hyphens), `notes`, `added_at`, `added_by_id`.
 
-**Operations:** To change the scoring formula, edit the `.sql` file, redeploy with `CREATE OR ALTER VIEW` in SSMS, and update this section plus `sales/CONTEXT.md`.
+**Operations:** To change the scoring formula, edit the `.sql` file, redeploy with `CREATE OR ALTER VIEW` in SSMS, and update this section plus `sales/CONTEXT_sales.md`.
 
 ```
 Staff / quotes ──→ dibbs_supplier_nsn

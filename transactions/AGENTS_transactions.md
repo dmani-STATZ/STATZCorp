@@ -1,7 +1,7 @@
-# AGENTS.md — `transactions` app
+# AGENTS_transactions.md — `transactions` app
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
-Read `transactions/CONTEXT.md` first for domain overview. This file focuses on safe-edit mechanics and failure modes.
+Read `transactions/CONTEXT_transactions.md` first for domain overview. This file focuses on safe-edit mechanics and failure modes.
 
 ---
 
@@ -203,7 +203,7 @@ There are **no automated tests** in this app. After any edit, verify manually:
 
 ## 14. Safe Change Workflow
 
-1. Read `transactions/CONTEXT.md` for domain overview.
+1. Read `transactions/CONTEXT_transactions.md` for domain overview.
 2. Read the specific files involved in your change (signals, utils, field_types, forms, or views).
 3. Search `templates/suppliers/supplier_detail.html` and `contracts/templates/contracts/contract_management.html` for any field names or modal function calls you're modifying.
 4. If adding a tracked field: update both `TRACKED` and the `.values()` + dict in `store_old_state` for the correct model branch.

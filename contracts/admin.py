@@ -180,7 +180,7 @@ class DfasImportRowAdmin(admin.ModelAdmin):
 
 
 # =============================================================================
-# CLIN Fix Tool (sunset cleanup) — see CONTEXT.md / AGENTS.md
+# CLIN Fix Tool (sunset cleanup) — see CONTEXT_contracts.md / AGENTS_contracts.md
 # =============================================================================
 
 

@@ -32,7 +32,7 @@ Every final prompt must follow this specific structural hierarchy:
     * CSS/Bootstrap adjustment details.
 4.  **Backend View Logic**: Explicit Python logic for views, including error handling (try/except), status codes, and JSON response structures.
 5.  **JavaScript State Management**: Comprehensive script blocks that handle CSRF tokens, AJAX fetches, and UI state (loading, success, error).
-6.  **Documentation Loop**: Specific instructions to update `CONTEXT.md` and `AGENT.md` with the new logic, footguns, or endpoints.
+6.  **Documentation Loop**: Specific instructions to update `CONTEXT_processing.md` and `AGENTS_processing.md` with the new logic, footguns, or endpoints.
 
 
 ### Precision Standards
@@ -40,7 +40,7 @@ Every final prompt must follow this specific structural hierarchy:
 * **Tool Selection:**
     * **Cursor:** Use for backend logic, database migrations, Python/Django services, and general code architecture.
     * **Claude Code:** Use for UX/UI layouts, frontend styling, and complex dashboard components.
-* **Documentation Loop:** Every prompt **must** include a specific instruction for the agent to update `CONTEXT.md` (project state) and `AGENT.md` (active goals/tasks) within the sales app to ensure the project history remains accurate.
+* **Documentation Loop:** Every prompt **must** include a specific instruction for the agent to update `CONTEXT_processing.md` (project state) and `AGENTS_processing.md` (active goals/tasks) within the sales app to ensure the project history remains accurate.
 
 ## 4. Technical Environment
 * **Framework:** Django (Python).

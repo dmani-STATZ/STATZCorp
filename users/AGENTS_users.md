@@ -1,9 +1,9 @@
-# AGENTS.md — `users` app
+# AGENTS_users.md — `users` app
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
 ## 1. Purpose of This File
 
-This file defines safe-edit guidance for the `users` Django app. It is written for AI coding agents and developers making changes to this app. Read `users/CONTEXT.md` first if present — this file complements it, not replaces it.
+This file defines safe-edit guidance for the `users` Django app. It is written for AI coding agents and developers making changes to this app. Read `users/CONTEXT_users.md` first if present — this file complements it, not replaces it.
 
 ---
 
@@ -104,7 +104,7 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 | Change auth flow | `azure_auth.py` → `ms_views.py` → `views.py` (login_view, oauth_* views) → templates (login.html, oauth_*.html) |
 | Change password forms | `forms.py` → templates (password_change.html, password_set.html, oauth_password_set.html) |
 | Change `SystemMessage` | `models.py` → `migrations/` → `views.py` (message views) → `context_processors.py` (unread count) → `urls.py` → `templates/users/system_messages.html` |
-| SharePoint sync config change | `sharepoint_services.py` → `STATZWeb/settings.py` → `users/CONTEXT.md` |
+| SharePoint sync config change | `sharepoint_services.py` → `STATZWeb/settings.py` → `users/CONTEXT_users.md` |
 
 ---
 
@@ -246,7 +246,7 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 ## 14. Safe Change Workflow
 
-1. **Read `users/CONTEXT.md`** for high-level orientation.
+1. **Read `users/CONTEXT_users.md`** for high-level orientation.
 2. **Identify the exact file(s)** involved in your change — don't guess from the directory listing.
 3. **Read the full relevant file(s)** before editing; `views.py` is 1600+ lines and `models.py` has 16+ models.
 4. **Search repo-wide** for any URL names, model names, or function names you're changing:

@@ -1,7 +1,7 @@
-# AGENTS.md — `suppliers` app
+# AGENTS_suppliers.md — `suppliers` app
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
-Read `suppliers/CONTEXT.md` first. This file adds safe-edit guidance that CONTEXT.md does not cover.
+Read `suppliers/CONTEXT_suppliers.md` first. This file adds safe-edit guidance that CONTEXT_suppliers.md does not cover.
 
 ---
 
@@ -233,7 +233,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 
 ## 14. Safe Change Workflow
 
-1. Read `suppliers/CONTEXT.md`, then this file.
+1. Read `suppliers/CONTEXT_suppliers.md`, then this file.
 2. Read the specific files involved in the change (model, view, template, JS).
 3. Grep the full repo for field names, URL names, and import paths before renaming anything.
 4. Make the minimal scoped change in `suppliers/`.

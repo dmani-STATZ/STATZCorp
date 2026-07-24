@@ -1,4 +1,4 @@
-# AGENTS.md — `templates` Directory
+# AGENTS_templates.md — `templates` Directory
 
 ## Script Loading Order in base_template.html
 jQuery 3.6.0, jQuery UI 1.12.1, and Bootstrap 5.3.3 bundle are all

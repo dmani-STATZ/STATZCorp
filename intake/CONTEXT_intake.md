@@ -58,7 +58,7 @@ all contracts entering the intake queue (regardless of source).
 | `contract` | FK → `contracts.Contract` (`SET_NULL`); set when the live contract is detected |
 | `first_seen_at` | **Latched** — when the identity first entered the ledger |
 | `draft_created_at` | **Latched** — a `DraftContract` was created |
-| `draft_worked_at` | **Latched** — draft observed as worked (proxy; see AGENTS.md) |
+| `draft_worked_at` | **Latched** — draft observed as worked (proxy; see AGENTS_intake.md) |
 | `mod_record_created_at` | **Latched** — a `DibbsAwardMod` was first observed |
 | `live_contract_at` | **Latched** — draft finalized into / matched to a live `Contract` |
 | `lifecycle_state` | Derived enum; recomputed each sweep, **advance-only** |
@@ -73,7 +73,7 @@ Once set they are never overwritten or cleared. Every set goes through
 `not_we_won` → `mod_only` → `awaiting_draft` → `in_draft` → `draft_worked`
 → `live_contract`.
 
-The ledger is maintained by `intake/services/award_ledger.py` (see AGENTS.md).
+The ledger is maintained by `intake/services/award_ledger.py` (see AGENTS_intake.md).
 It is read-mostly in admin — all lifecycle timestamps and FK links are
 read-only.
 

@@ -1,7 +1,7 @@
-# AGENTS.md — `tools` App
+# AGENTS_tools.md — `tools` App
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
-Read `tools/CONTEXT.md` first. This file defines safe-edit rules for AI coding agents and developers modifying the `tools` app. It does not duplicate `CONTEXT.md`; it complements it with actionable guidance.
+Read `tools/CONTEXT_tools.md` first. This file defines safe-edit rules for AI coding agents and developers modifying the `tools` app. It does not duplicate `CONTEXT_tools.md`; it complements it with actionable guidance.
 
 ---
 
@@ -103,7 +103,7 @@ This is a **self-contained utility app**. It is thin in structure but non-trivia
 Do not add models to this app without a deliberate architectural decision. If a model is added:
 - Create and apply a migration
 - Register in `admin.py` if staff need visibility
-- Update `CONTEXT.md` and this file
+- Update `CONTEXT_tools.md` and this file
 
 ---
 
@@ -165,7 +165,7 @@ If tests are added, place them in `tools/tests.py` and target `merge_pdfs`, `del
 
 ## 14. Safe Change Workflow
 
-1. Read `tools/CONTEXT.md` for full behavioral context
+1. Read `tools/CONTEXT_tools.md` for full behavioral context
 2. Read the specific view function(s) in `tools/views.py` you intend to change
 3. Read `templates/tools/pdf_merger.html` — especially lines 100–end (the `<script>` block) — before touching anything URL- or input-related
 4. Search `templates/base_template.html` for any `tools:` URL reversal before renaming URL names

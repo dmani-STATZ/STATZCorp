@@ -34,12 +34,12 @@ Every final prompt must follow this specific structural hierarchy:
     * CSS/Bootstrap adjustment details.
 4.  **Backend View Logic**: Explicit Python logic for views, including error handling (try/except), status codes, and JSON response structures.
 5.  **JavaScript State Management**: Comprehensive script blocks that handle CSRF tokens, AJAX fetches, and UI state (loading, success, error).
-6.  **Documentation Loop**: Specific instructions to update `CONTEXT.md` and `AGENT.md` with the new logic, footguns, or endpoints.
+6.  **Documentation Loop**: Specific instructions to update `CONTEXT_contracts.md` and `AGENTS_contracts.md` with the new logic, footguns, or endpoints.
 
 
 ### Precision Standards
 * **Zero Assumption:** The prompt must be so detailed that the coding agent does not have to "guess" or "invent" logic. Specify variable names, logic gates, and error handling.
-* **Documentation Loop:** Every prompt **must** include a specific instruction for the agent to update `CONTEXT.md` (project state) and `AGENT.md` (active goals/tasks) within the sales app to ensure the project history remains accurate.
+* **Documentation Loop:** Every prompt **must** include a specific instruction for the agent to update `CONTEXT_contracts.md` (project state) and `AGENTS_contracts.md` (active goals/tasks) within the sales app to ensure the project history remains accurate.
 
 ## 4. Technical Environment
 * **Framework:** Django (Python).

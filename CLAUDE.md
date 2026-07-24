@@ -12,11 +12,11 @@ This repo already has its own established system for how AI agents should safely
 
 1. `PROJECT_CONTEXT.md` — cross-app master reference, read first for anything crossing app boundaries
 2. `PROJECT_STRUCTURE.md` + `STATZWeb/settings.py` + `STATZWeb/urls.py` — global wiring
-3. The target app's own `CONTEXT.md`
-4. The target app's own `AGENTS.md`
-5. `AGENTS.md` (repo root) for the full safe-edit rules
+3. The target app's own `CONTEXT_<app>.md`
+4. The target app's own `AGENTS_<app>.md`
+5. `PROJECT_AGENTS.md` (repo root) for the full safe-edit rules
 
-Every app in this Django project (`contracts`, `users`, `sales`, `products`, etc.) has its own `CONTEXT.md` and `AGENTS.md`. Always check the specific app folder you're working in for these before making changes there.
+Every app in this Django project (`contracts`, `users`, `sales`, `products`, etc.) has its own `CONTEXT_<app>.md` and `AGENTS_<app>.md`. Always check the specific app folder you're working in for these before making changes there.
 
 ## Subfolders and when to load them
 

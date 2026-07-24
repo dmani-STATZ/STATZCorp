@@ -1,7 +1,7 @@
-# AGENTS.md — inventory
+# AGENTS_inventory.md — inventory
 > **Cross-app work?** Read `PROJECT_CONTEXT.md` first — it maps every app's ownership, shared infrastructure, and cross-boundary change rules for all 13 apps.
 
-Read `inventory/CONTEXT.md` first. This file does not repeat that content; it defines safe-edit rules grounded in the actual code.
+Read `inventory/CONTEXT_inventory.md` first. This file does not repeat that content; it defines safe-edit rules grounded in the actual code.
 
 ---
 
@@ -166,7 +166,7 @@ None. No Celery tasks, signals, management commands, or scheduled jobs exist in 
 
 ## 14. Safe Change Workflow
 
-1. Read `inventory/CONTEXT.md` and this file.
+1. Read `inventory/CONTEXT_inventory.md` and this file.
 2. Read the specific files involved in your change (models, views, forms, or templates).
 3. Search `templates/base_template.html` for any URL names you plan to rename.
 4. Make the minimal scoped change.

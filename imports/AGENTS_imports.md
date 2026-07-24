@@ -1,4 +1,4 @@
-# imports/AGENTS.md
+# imports/AGENTS_imports.md
 
 ## Purpose
 Standalone generic data import manager. Allows importing CSV/Excel files,
