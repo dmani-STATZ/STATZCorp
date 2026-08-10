@@ -27,6 +27,12 @@
   {% endif %}
 </div>
 
+<div class="small text-muted mb-3">
+  Based on <span class="fw-semibold">{{ parsed_success_count|intcomma }}</span>
+  of <span class="fw-semibold">{{ awards_total|intcomma }}</span>
+  award{{ awards_total|pluralize }} analyzed ({{ coverage_pct|floatformat:1 }}%).
+</div>
+
 {% if total_intel_count == 0 %}
 <div class="alert alert-secondary small">
   No supplier intelligence has been parsed for this competitor yet.

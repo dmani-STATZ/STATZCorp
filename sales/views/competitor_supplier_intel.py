@@ -11,6 +11,7 @@ from sales.models import (
     CompetitorWatchlist,
     SAMEntityCache,
 )
+from sales.services.competitor_stats import get_extraction_scope_award_counts
 from sales.views.competitor_watchlist import _name_is_available
 
 _ROLE_LABELS = dict(CompetitorAwardEntity.ROLE_CHOICES)
@@ -24,6 +25,17 @@ def competitor_supplier_intel(request, cage_code):
 
     parse_qs = CompetitorAwardParseStatus.objects.filter(award__awardee_cage=cage)
     total_intel_count = parse_qs.count()
+
+    # True coverage: successful parses over the whole in-scope award universe,
+    # not over the rows that happen to have a parse record already. Without the
+    # denominator a 2-of-828 ranking reads exactly like a 2-of-2 one.
+    parsed_success_count = parse_qs.filter(
+        parse_status=CompetitorAwardParseStatus.STATUS_SUCCESS
+    ).count()
+    awards_total = get_extraction_scope_award_counts([cage]).get(cage, 0)
+    coverage_pct = (
+        (parsed_success_count / awards_total * 100) if awards_total else 0
+    )
 
     entity_base = CompetitorAwardEntity.objects.filter(award__awardee_cage=cage)
 
@@ -127,5 +139,8 @@ def competitor_supplier_intel(request, cage_code):
         "other_entities": other_entities,
         "unresolved_count": unresolved_count,
         "total_intel_count": total_intel_count,
+        "parsed_success_count": parsed_success_count,
+        "awards_total": awards_total,
+        "coverage_pct": coverage_pct,
     }
     return render(request, "sales/competitor_supplier_intel.html", context)

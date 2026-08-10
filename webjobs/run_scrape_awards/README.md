@@ -10,7 +10,7 @@ for watched-competitor awards that still need parsing. That phase is
 fault-isolated inside Python — a failure there is logged and never causes the
 WebJob to exit non-zero on its own. Tunables (optional App Service env vars):
 
-- `COMPETITOR_ENTITY_BATCH_SIZE` (default `50`)
+- `COMPETITOR_ENTITY_BATCH_SIZE` (default `100`)
 - `COMPETITOR_ENTITY_MAX_DURATION_SECONDS` (default `1800`)
 
 ## Azure Deployment Instructions

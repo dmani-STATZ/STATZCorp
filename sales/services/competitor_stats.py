@@ -129,6 +129,50 @@ def get_competitor_stats(cage_codes):
     return result
 
 
+def get_extraction_scope_award_counts(cage_codes):
+    """
+    All-time award count per CAGE, scoped exactly as the Competitor Supplier
+    Intelligence queue scopes it.
+
+    This is the denominator for "N of M awards analyzed" on the Supplier
+    Intelligence page. It deliberately mirrors
+    ``competitor_supplier_intel.get_pending_awards``: non-faux awards only,
+    with active ``CompanyCAGE`` codes excluded so a STATZ CAGE that somehow
+    landed on the watchlist reports the same empty scope the extractor gives
+    it. Unlike ``get_competitor_stats`` there is no date bucketing — the
+    backlog is historical and the whole history is fetchable.
+
+    Returns ``{cage_code: count}`` with an entry for every requested code.
+    """
+    normalized = [c for c in cage_codes if c]
+    if not normalized:
+        return {}
+
+    # Local import: sales.models is already imported above, but CompanyCAGE is
+    # only needed here and keeps this function's scope contract self-evident.
+    from sales.models import CompanyCAGE
+
+    our_cages = list(
+        CompanyCAGE.objects.filter(is_active=True).values_list(
+            "cage_code", flat=True
+        )
+    )
+
+    rows = (
+        DibbsAward.objects.filter(awardee_cage__in=normalized, is_faux=False)
+        .exclude(awardee_cage__in=our_cages)
+        .values("awardee_cage")
+        .annotate(award_count=Count("id"))
+    )
+
+    result = {cage: 0 for cage in normalized}
+    for row in rows:
+        cage = row["awardee_cage"]
+        if cage in result:
+            result[cage] = row["award_count"]
+    return result
+
+
 def get_earliest_award_date():
     """Earliest non-faux aw_file_date in DibbsAward, cached for one hour."""
     cached = cache.get(_EARLIEST_AWARD_DATE_CACHE_KEY, _SENTINEL)

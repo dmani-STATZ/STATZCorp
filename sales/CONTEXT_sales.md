@@ -214,9 +214,6 @@ from Playwright browser sessions — NO ORM inside any `with sync_playwright()` 
       (which saves records to DB) → waits 2 seconds → closes browser.
     - Updates AwardImportBatch with final status after browser closes.
 
-**Phase 4 — Notification check (pure ORM + Graph mail)**
-  Finds non-SUCCESS dates where scrape_date <= today - 38 days.
-  Sends email via Graph to AWARDS_ALERT_EMAIL env var + shows warning banner on UI.
 
 ### Scrape Status Values
 - MISSING — date exists on DIBBS, not yet attempted
@@ -224,11 +221,6 @@ from Playwright browser sessions — NO ORM inside any `with sync_playwright()` 
 - SUCCESS — actual_rows == expected_rows, complete
 - PARTIAL — completed but row count mismatch, eligible for retry
 - FAILED — exception thrown, eligible for retry
-
-### Danger Zone Logic
-DIBBS keeps ~45 days of award data. Any non-SUCCESS date where
-`today - scrape_date >= 38 days` is in the danger zone and triggers
-email notification + UI warning banner.
 
 ### Required Environment Variables
 - GRAPH_MAIL_ENABLED, GRAPH_MAIL_TENANT_ID, GRAPH_MAIL_CLIENT_ID,
@@ -341,16 +333,17 @@ Shared competitor intelligence page at `/sales/competitors/` (`sales:competitor_
 
 ## 22. Competitor Supplier Intelligence (2026-07-10)
 
-Background-job feature that fetches DD Form 1155 PDFs for awards won by watched competitor CAGEs, extracts role-tagged CAGE/DoDAAC entities (regex + LLM), and surfaces who those competitors source from.
+Background-job feature that fetches DD Form 1155 PDFs for awards won by watched competitor CAGEs, extracts role-tagged CAGE/DoDAAC entities via a single Haiku LLM pass, and surfaces who those competitors source from.
 
 - **Scope:** only `DibbsAward` rows where `awardee_cage` is on `CompetitorWatchlist` and `is_faux=False`. Full history for watched CAGEs is backfilled (multi-thousand-row backlog on first run is expected). Never processes the full awards table indiscriminately.
 - **Models (two-model split; replaced flat `CompetitorAwardSupplier`):**
   - **`CompetitorAwardParseStatus`** (`sales_competitor_award_parse_status`) — OneToOne to `DibbsAward` (`related_name=entity_parse_status`). Bookkeeping only: `parse_status`, `parse_notes`, `fetch_error`, `attempt_count`, `last_attempted_at`.
-  - **`CompetitorAwardEntity`** (`sales_competitor_award_entity`) — many per award (`related_name=entities`). Fields: `code`, `code_type` (`CAGE` / `DODAAC` / `UNKNOWN`), `role`, `entity_name`, `source_note`, `extraction_method` (`REGEX` / `LLM`).
+  - **`CompetitorAwardEntity`** (`sales_competitor_award_entity`) — many per award (`related_name=entities`). Fields: `code`, `code_type` (`CAGE` / `DODAAC` / `UNKNOWN`), `role`, `entity_name`, `source_note`, `extraction_method`. Every row written by the service is `LLM`. `METHOD_REGEX` survives only as an unused legacy choice (and as the field default) — nothing writes it; do not restore a regex path without a decision to do so.
 - **Role taxonomy:** `CONTRACTOR`, `OEM_DESIGN_AUTHORITY`, `MANUFACTURER`, `BUYER`, `PAYMENT_OFFICE`, `PACKAGING`, `OTHER`. Ranking UI excludes `BUYER` and `PAYMENT_OFFICE` (stored for audit only).
 - **CAGE vs DoDAAC gotcha:** both are 5-character alphanumeric. DoDAACs are government offices, not suppliers — never resolve them via `get_or_fetch_cage()` / SAM. Store printed names only (or blank).
-- **REGEX retags from `parse_award_pdf()`:** Block 9 `contractor_cage` → `CONTRACTOR`; Place of Inspection for Supplies (`contract_supplier_cage`) → `MANUFACTURER`; packhouse → `PACKAGING`; IDIQ approved manufacturer → `MANUFACTURER`; Block 16 `page1_reference_cage` → `MANUFACTURER` (not the prime).
 - **LLM pass:** Haiku (`claude-haiku-4-5-20251001`) broad entity extraction over full document text (second local pdfplumber/pypdf extract after download — no second DIBBS round-trip). Intake CLIN/IDIQ/CMMC extractors still use Sonnet.
-- **Service:** `sales/services/competitor_supplier_intel.py` — drafts-free fetch/parse. Lazily imports intake helpers; downloads via `make_dibbs2_session()`. Retries clear and replace prior entities. Max 3 attempts; successful / `unavailable` rows never re-fetched. Awards older than 38 days (same DIBBS retention danger threshold as `scrape_awards`) are excluded from the pending queue. Live HTTP 404 → `parse_status=unavailable` without burning attempt_count. Stops when `APIBudget.balance_usd <= 0`. Inter-award delay default 5.0s (+ 1.5s before the Haiku entity pass). Orchestration entry: `process_pending_competitor_extractions()`.
-- **Scheduling:** Final fault-isolated phase inside `scrape_awards` (after reconciliation or `--date` scrape; skipped on `--dry-run`). No separate WebJob, no `ScheduledTask`, no second shell step in `run.sh`. Optional env tunables: `COMPETITOR_ENTITY_BATCH_SIZE` (default 15), `COMPETITOR_ENTITY_MAX_DURATION_SECONDS` (default 1800). Manual/debug only: `manage.py run_competitor_supplier_backfill`.
-- **UI:** Supplier Intelligence page at `/sales/competitors/<cage>/suppliers/` (`sales:competitor_supplier_intel`) — primary ranking by role+code (BUYER/PAYMENT_OFFICE excluded), SAM name resolution for CAGEs only, smaller “other entities on file” section for buyer/payment codes. Linked from Competitors Numbers via **View Suppliers**.
+- **Service:** `sales/services/competitor_supplier_intel.py` — drafts-free fetch/parse. Lazily imports intake helpers; downloads via `make_dibbs2_session()`. Retries clear and replace prior entities. Max 3 attempts; successful / `unavailable` rows never re-fetched. Live HTTP 404 → `parse_status=unavailable` without burning attempt_count. Stops when `APIBudget.balance_usd <= 0`. Inter-award delay default 5.0s (+ 1.5s before the Haiku entity pass). Orchestration entry: `process_pending_competitor_extractions()`.
+- **Scheduling:** Final fault-isolated phase inside `scrape_awards` (after reconciliation or `--date` scrape; skipped on `--dry-run`). No separate WebJob, no `ScheduledTask`, no second shell step in `run.sh`. Optional env tunables: `COMPETITOR_ENTITY_BATCH_SIZE` (default 100), `COMPETITOR_ENTITY_MAX_DURATION_SECONDS` (default 1800). Manual/debug only: `manage.py run_competitor_supplier_backfill`, whose `--reset-stranded` flag re-queues every non-success parse row (clears `parse_status` + `attempt_count`, appends an audit line to `parse_notes`, never touches `success`).
+- **Silent-stall gotcha:** the queue is watchlist-driven. With `CompetitorWatchlist` empty, `get_pending_awards` short-circuits to `[]` and the whole phase no-ops without raising — the symptom looks identical to "no backlog". Check the watchlist first when extraction appears stopped.
+- **Coverage denominator:** the intel page reports `parsed_success / awards_total` from `competitor_stats.get_extraction_scope_award_counts()`, which mirrors `get_pending_awards` scoping (`is_faux=False`, active `CompanyCAGE` codes excluded). Without it the page showed a percentage of the rows that already had parse records, so a 2-of-828 ranking rendered the same as a complete one.
+- **UI:** Supplier Intelligence page at `/sales/competitors/<cage>/suppliers/` (`sales:competitor_supplier_intel`) — a "Based on N of M awards analyzed (P%)" coverage line above everything (always rendered, including at zero coverage), primary ranking by role+code (BUYER/PAYMENT_OFFICE excluded), SAM name resolution for CAGEs only, smaller “other entities on file” section for buyer/payment codes. Linked from Competitors Numbers via **View Suppliers**.

@@ -42,7 +42,19 @@
       "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake.tests.MatcherEndpointTests -v 2 --keepdb)",
       "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb 2>&1 | Select-Object -Last 80)",
       "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb 2>&1 | Select-Object -Last 25)",
-      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb 2>&1 | Select-Object -Last 20)"
+      "PowerShell(.\\\\.venv\\\\Scripts\\\\python.exe manage.py check; .\\\\.venv\\\\Scripts\\\\python.exe manage.py test intake -v 2 --keepdb 2>&1 | Select-Object -Last 20)",
+      "Bash(./.venv/Scripts/python.exe \"C:/Users/Dion/AppData/Local/Temp/claude/C--Users-Dion-Documents-STATZWeb-STATZCorp/32a45811-e0a8-478f-9944-8504ea0a99d9/scratchpad/census.py\")",
+      "Bash(./.venv/Scripts/python.exe \"C:/Users/Dion/AppData/Local/Temp/claude/C--Users-Dion-Documents-STATZWeb-STATZCorp/32a45811-e0a8-478f-9944-8504ea0a99d9/scratchpad/census2.py\")",
+      "Bash(./.venv/Scripts/python.exe manage.py check)",
+      "Bash(./.venv/Scripts/python.exe \"C:/Users/Dion/AppData/Local/Temp/claude/C--Users-Dion-Documents-STATZWeb-STATZCorp/32a45811-e0a8-478f-9944-8504ea0a99d9/scratchpad/add_watchlist.py\")",
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(./.venv/Scripts/python.exe manage.py run_competitor_supplier_backfill --reset-stranded --batch-size 5)",
+      "Bash(./.venv/Scripts/python.exe manage.py import_release_notes --dry-run)",
+      "Bash(grep -nE \"^#{1,3} \" sales/DIBBS_System_Spec.md)",
+      "Bash(timeout 500 ./.venv/Scripts/python.exe manage.py test sales.tests.test_awdrecs_parser sales.tests.test_contract_mods --keepdb)",
+      "Bash(./.venv/Scripts/python.exe manage.py run_competitor_supplier_backfill --batch-size 250 --max-duration-seconds 3600)",
+      "Bash(git diff *)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name = 'python.exe'\" | Select-Object ProcessId, @{n='CL';e={$_.CommandLine.Substring\\(0,[Math]::Min\\(150,$_.CommandLine.Length\\)\\)}} | Format-List)"
     ]
   }
 }

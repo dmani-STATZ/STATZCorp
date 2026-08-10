@@ -44,7 +44,14 @@ logger = logging.getLogger("sales.competitor_supplier_intel")
 
 # Inter-award delay (full fetch + Claude cycle), not just DIBBS download pacing.
 DEFAULT_REQUEST_DELAY_SECONDS = 5.0
-DEFAULT_BATCH_SIZE = 15
+# Sized against DEFAULT_MAX_DURATION_SECONDS, not against nightly volume: the
+# watched-CAGE backlog is historical, so the batch should fill the time box.
+# Per award the run spends 5.0s inter-award pacing, plus 2.0s
+# (_RESOLVE_TO_DOWNLOAD_DELAY_SECONDS) whenever the PDF URL had to be resolved
+# live from AwdRec.aspx, plus real download + pdfplumber + Haiku time. At a
+# conservative ~7s/award, 100 awards ≈ 700s — comfortably inside the 1800s
+# default time box, which stops the loop cleanly if awards run slow.
+DEFAULT_BATCH_SIZE = 100
 DEFAULT_MAX_DURATION_SECONDS = 1800.0
 MAX_ATTEMPTS = 3
 _DIBBS2_DOWNLOAD_TIMEOUT = 60
