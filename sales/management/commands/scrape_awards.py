@@ -527,6 +527,16 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
                 )
                 result["error"] = error_msg
             else:
+                if result.get("is_truncated"):
+                    trunc_msg = (
+                        f"NOTICE: DIBBS portal truncated query for {batch.scrape_date} "
+                        f"({result.get('raw_expected_rows')} reported by site, "
+                        f"{result.get('expected_rows')} displayable max). "
+                        f"Scraped all {len(all_records)} available records."
+                    )
+                    self.stdout.write(f"  {trunc_msg}")
+                    self._activity(trunc_msg)
+
                 if all_records:
                     self.stdout.write(
                         f"  Browser closed. Saving {len(all_records)} records to DB..."

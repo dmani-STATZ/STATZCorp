@@ -30,6 +30,10 @@ TABLE_TIMEOUT = 30_000
 PAGE_DELAY = 2.0
 GRID_CONTROL = "ctl00$cph1$grdAwardSearch"
 
+# DIBBS portal caps grid search results at 10,000 records (200 pages max at 50/page).
+DIBBS_MAX_DISPLAY_RECORDS = 10_000
+DIBBS_MAX_PAGES = 200
+
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -412,9 +416,11 @@ def scrape_awards_for_date(
 
     result: dict[str, Any] = {
         "success": False,
+        "raw_expected_rows": 0,
         "expected_rows": 0,
         "actual_rows": 0,
         "pages_scraped": 0,
+        "is_truncated": False,
         "error": None,
     }
 
@@ -457,14 +463,29 @@ def scrape_awards_for_date(
 
                     _emit("Browser: awards table loaded.")
                     html = page.content()
-                    expected_rows = get_expected_record_count(html)
+                    raw_expected_rows = get_expected_record_count(html)
+                    is_truncated = raw_expected_rows > DIBBS_MAX_DISPLAY_RECORDS
+                    if is_truncated:
+                        expected_rows = DIBBS_MAX_DISPLAY_RECORDS
+                        _emit(
+                            f"WARNING: DIBBS reports {raw_expected_rows:,} record(s), but DIBBS web portal "
+                            f"caps display at {DIBBS_MAX_DISPLAY_RECORDS:,} record(s) ({DIBBS_MAX_PAGES} pages max). "
+                            f"Scrape will fetch the maximum available {DIBBS_MAX_DISPLAY_RECORDS:,} records."
+                        )
+                    else:
+                        expected_rows = raw_expected_rows
+
+                    result["raw_expected_rows"] = raw_expected_rows
                     result["expected_rows"] = expected_rows
-                    last_page = max(
-                        1, math.ceil(expected_rows / 50) if expected_rows else 1
+                    result["is_truncated"] = is_truncated
+
+                    last_page = min(
+                        DIBBS_MAX_PAGES,
+                        max(1, math.ceil(expected_rows / 50) if expected_rows else 1),
                     )
                     _emit(
-                        f"Browser: DIBBS reports {expected_rows} row(s), "
-                        f"{last_page} page(s) to fetch."
+                        f"Browser: DIBBS reports {raw_expected_rows} row(s) "
+                        f"({expected_rows} displayable), {last_page} page(s) to fetch."
                     )
 
                     for p in range(1, last_page + 1):
