@@ -68,6 +68,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 - **Signal receivers are globally registered** via `@receiver(pre_save)` / `@receiver(post_save)` with no `sender=` filter — they fire on every model save in the app and filter by sender class inside the handler. This is intentional but means any import of `transactions.signals` activates them.
 - **Widget parity is essential.** `field_types.get_field_info` drives both the read-only `TransactionForm` and the editable `EditFieldForm`. A mismatch between widget type and `utils.set_field_value` coercion logic will cause silent bad saves or `400` errors.
 - **Inline edit flow is tightly coupled across layers.** The POST path is: `transaction_modal.html` (JS fetch) → `views.transaction_edit_field` → `EditFieldForm.is_valid()` → `utils.set_field_value` → `instance.save(update_fields=[field_name])` → `pre_save` signal → `post_save` signal → `Transaction.objects.create(...)`. Every link matters.
+- **PO number sync:** `Contract.po_number` and `Clin.clin_po_num` must always match across a contract and all its CLINs — edits to either propagate automatically via `contracts/services/clin_po_sync.py`, hooked into `transaction_edit_field`. Never use `.update()` for this. Do not confuse with `Clin.po_number` (legacy, untouched) or `contracts.PurchaseOrder.po_number` (unrelated PO Generator feature). Do not add `Clin.po_number` to `TRACKED`. Do not move this cascade into `post_save` (that would risk recursion / wide blast radius).
 
 ---
 

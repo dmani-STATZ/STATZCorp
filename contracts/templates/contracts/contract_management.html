@@ -1476,6 +1476,15 @@ window.onTransactionSaved = function(data) {
         var contractEl = document.getElementById('contract-' + fn.replace(/_/g, '-') + '-value');
         if (contractEl) contractEl.textContent = displayVal || 'N/A';
     }
+    // PO sync: CLIN Sub PO # edit may have updated Contract.po_number — refresh header live.
+    // Sibling CLIN rows are not in the DOM (only selected_clin), so no other CLIN updates.
+    var poSync = data.po_sync_updates;
+    if (poSync && Object.prototype.hasOwnProperty.call(poSync, 'contract_po_number')) {
+        var contractPoEl = document.getElementById('contract-po-number-value');
+        if (contractPoEl) {
+            contractPoEl.textContent = poSync.contract_po_number || 'N/A';
+        }
+    }
     if (data.content_type_id === window.clinContentTypeId) {
         var clinId = typeof currentClinIdForLogFields !== 'undefined' ? currentClinIdForLogFields : '';
         if (fn === 'supplier' || fn === 'nsn') {

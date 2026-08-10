@@ -200,6 +200,16 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
         if model_class.__name__ == 'Clin' and field_name in CLIN_FORWARD_DERIVE_FIELDS:
             from contracts.services.clin_compute import recompute_clin_derived_values
             derived = recompute_clin_derived_values(instance, request.user)
+        # Keep Contract.po_number and every Clin.clin_po_num on that contract in sync.
+        # View-layer only (mirrors derived-field pattern) so propagated saves audit
+        # via signals without re-entering this cascade.
+        po_sync = {}
+        if model_class.__name__ == 'Clin' and field_name == 'clin_po_num':
+            from contracts.services.clin_po_sync import sync_po_number
+            po_sync = sync_po_number(instance, getattr(instance, 'clin_po_num'), request.user)
+        elif model_class.__name__ == 'Contract' and field_name == 'po_number':
+            from contracts.services.clin_po_sync import sync_po_number
+            po_sync = sync_po_number(instance, getattr(instance, 'po_number'), request.user)
         new_display = get_display_value(instance, field_name)
         response_data = {
             "success": True,
@@ -212,6 +222,11 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
             response_data["derived_updates"] = {
                 k: str(v) for k, v in derived.items()
             }
+        if (
+            (model_class.__name__ == 'Clin' and field_name == 'clin_po_num')
+            or (model_class.__name__ == 'Contract' and field_name == 'po_number')
+        ):
+            response_data["po_sync_updates"] = po_sync
         return JsonResponse(response_data)
 
     old_value_str = get_field_value_display(instance, field_name)
