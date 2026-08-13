@@ -72,6 +72,8 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
         # Gov Actions for this contract
         active_company = getattr(self.request, 'active_company', None)
         context['gov_actions'] = GovAction.objects.filter(contract=contract, company=active_company).order_by('-date_submitted', '-created_on') if active_company else GovAction.objects.none()
+        context['gov_action_action_choices'] = GovAction.ACTION_CHOICES
+        context['gov_action_request_choices'] = GovAction.REQUEST_CHOICES
         
         # Get contract notes with entity_type for template
         contract_type = ContentType.objects.get_for_model(Contract)

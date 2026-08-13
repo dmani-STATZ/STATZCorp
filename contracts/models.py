@@ -1468,14 +1468,13 @@ class ClinAcknowledgment(AuditModel):
 
 
 class GovAction(AuditModel):
-    """Gov Actions linked to Contract (PAR, RFV, ECP, QN, NCR tracking)."""
+    """Gov Actions linked to Contract (PAR, RFV, ECP, QN, NCR, SWO tracking)."""
     ACTION_CHOICES = [
         ('PAR', 'PAR'),
         ('RFV', 'RFV'),
         ('ECP', 'ECP'),
         ('QN', 'QN'),
         ('NCR', 'NCR'),
-        ('SOW', 'SOW'),
         ('SWO', 'SWO'),
     ]
     REQUEST_CHOICES = [
@@ -1486,6 +1485,7 @@ class GovAction(AuditModel):
         ('Qty Change', 'Qty Change'),
         ('Litigation', 'Litigation'),
         ('Price', 'Price'),
+        ('Waiver', 'Waiver'),
         ('Other', 'Other'),
     ]
     INITIATED_CHOICES = [
