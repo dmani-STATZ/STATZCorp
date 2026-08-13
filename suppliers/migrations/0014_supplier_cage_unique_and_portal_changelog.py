@@ -1,9 +1,12 @@
 # Normalize cage_code, add filtered unique constraint + portal change log.
+# Production has duplicate non-null CAGE values; clear extras before the unique index.
 
-from django.db import migrations, models
+from django.db import migrations, models, transaction
 import django.db.models.deletion
-from django.db.models import Q, Value
+from django.db.models import Count, Q, Value
 from django.db.models.functions import Replace, Trim, Upper
+
+_BATCH = 500
 
 
 def normalize_cage_codes(apps, schema_editor):
@@ -26,6 +29,48 @@ def normalize_cage_codes(apps, schema_editor):
     Supplier.objects.filter(cage_code__in=['', 'NONE', 'NO CAGE']).update(cage_code=None)
 
 
+def clear_duplicate_cage_codes(apps, schema_editor):
+    """Keep one row per CAGE (prefer active, then lowest id); NULL the rest.
+
+    MSSQL/pyodbc: materialize reads before any writes (no MARS).
+    """
+    Supplier = apps.get_model('suppliers', 'Supplier')
+
+    dup_codes = list(
+        Supplier.objects.exclude(cage_code__isnull=True)
+        .exclude(cage_code='')
+        .values('cage_code')
+        .annotate(n=Count('id'))
+        .filter(n__gt=1)
+        .values_list('cage_code', flat=True)
+    )
+    if not dup_codes:
+        return
+
+    extra_ids = []
+    for code in dup_codes:
+        rows = list(
+            Supplier.objects.filter(cage_code=code)
+            .order_by('id')
+            .values('id', 'archived')
+        )
+        keep_id = next(
+            (row['id'] for row in rows if row['archived'] is False),
+            rows[0]['id'],
+        )
+        extra_ids.extend(row['id'] for row in rows if row['id'] != keep_id)
+
+    for i in range(0, len(extra_ids), _BATCH):
+        chunk = extra_ids[i : i + _BATCH]
+        with transaction.atomic():
+            Supplier.objects.filter(id__in=chunk).update(cage_code=None)
+
+    print(
+        f"clear_duplicate_cage_codes: nulled cage_code on {len(extra_ids)} "
+        f"supplier row(s) across {len(dup_codes)} duplicate CAGE value(s)."
+    )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -34,6 +79,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(normalize_cage_codes, migrations.RunPython.noop),
+        migrations.RunPython(clear_duplicate_cage_codes, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='supplier',
             constraint=models.UniqueConstraint(
