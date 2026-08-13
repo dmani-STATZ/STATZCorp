@@ -52,6 +52,8 @@ from .supplier_views import (
     update_supplier_files,
     save_supplier_contact,
     delete_supplier_contact,
+    save_supplier_alias,
+    delete_supplier_alias,
     addresses_lookup,
     supplier_autocomplete,
     update_supplier_header,

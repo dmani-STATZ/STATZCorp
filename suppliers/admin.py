@@ -5,10 +5,18 @@ from .models import (
     ClassificationType,
     Contact,
     Supplier,
+    SupplierAlias,
     SupplierContactCategory,
     SupplierPortalChangeLog,
     SupplierType,
 )
+
+
+class SupplierAliasInline(admin.TabularInline):
+    model = SupplierAlias
+    extra = 1
+    fields = ('name', 'created_on', 'created_by')
+    readonly_fields = ('created_on',)
 
 
 @admin.register(Supplier)
@@ -16,6 +24,7 @@ class SupplierAdmin(admin.ModelAdmin):
     list_display = ('name', 'cage_code', 'dodaac', 'supplier_type', 'primary_phone', 'primary_email', 'website_url', 'archived')
     search_fields = ('name', 'cage_code', 'dodaac', 'primary_phone', 'primary_email', 'website_url')
     list_filter = ('archived', 'supplier_type')
+    inlines = [SupplierAliasInline]
     fieldsets = (
         (None, {
             "fields": ("name", "cage_code", "dodaac", "supplier_type")

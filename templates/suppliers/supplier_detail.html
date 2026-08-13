@@ -64,6 +64,7 @@
     </div>
     <nav class="supplier-sidebar-nav" id="supplier-detail-nav">
       <a href="#section-overview" class="supplier-nav-link" data-section="section-overview">Overview</a>
+      <a href="#section-aliases" class="supplier-nav-link" data-section="section-aliases"><span>Also Known As</span><span class="badge rounded-pill bg-light text-dark">{{ aliases|length }}</span></a>
       <a href="#section-compliance" class="supplier-nav-link" data-section="section-compliance">Compliance &amp; Status</a>
       <a href="#section-contacts" class="supplier-nav-link" data-section="section-contacts"><span>Contacts</span><span class="badge rounded-pill bg-light text-dark">{{ contacts|length }}</span></a>
       <a href="#section-addresses" class="supplier-nav-link" data-section="section-addresses">Addresses</a>
@@ -223,6 +224,34 @@
     </div>
   </div>
 </div>
+</section>
+
+<section id="section-aliases" class="supplier-section-anchor">
+    <div class="card card-padded shadow-sm" id="aliases-section">
+      <div class="row-between mb-3">
+        <h2 class="text-lg font-semibold">Also Known As</h2>
+        <button type="button" id="open-alias-modal" class="btn btn-sm btn-outline-primary">Add Alias</button>
+      </div>
+      <div class="d-flex flex-column gap-2">
+        {% for alias in aliases %}
+          <div class="alias-row d-flex align-items-center justify-content-between gap-2 py-2 px-3 border rounded" data-alias-id="{{ alias.id }}">
+            <span class="text-break">{{ alias.name }}</span>
+            <div class="flex-shrink-0">
+              <button type="button" class="delete-alias-btn btn btn-sm btn-delete">Delete</button>
+              <div class="alias-delete-confirm hidden d-flex align-items-center gap-1 mt-1">
+                <span class="text-xs">Are you sure?</span>
+                <button type="button" class="alias-delete-yes btn btn-sm btn-delete">Yes</button>
+                <button type="button" class="alias-delete-no btn btn-sm btn-outline-secondary">Cancel</button>
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-gray-500 mb-0">No aliases yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+</section>
+
 <div class="row g-3 mb-3">
   <div class="col-8">
     <div class="card card-padded shadow-sm h-100">
@@ -334,7 +363,6 @@
     </div>
   </div>
 </div>
-</section>
 
 <section id="section-contacts" class="supplier-section-anchor">
     <div class="card card-padded shadow-sm" id="contacts-section">
@@ -605,6 +633,30 @@
     </div>
   </div>
 </section>
+
+<!-- Alias add modal -->
+<div id="alias-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+  <div class="card card-padded shadow-2xl w-full max-w-lg">
+    {% csrf_token %}
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h3 class="text-lg font-semibold">Add Alias</h3>
+        <p class="text-sm text-gray-500">Trade, DBA, or legacy name for this supplier</p>
+      </div>
+      <button type="button" id="alias-modal-close" class="btn-close"></button>
+    </div>
+    <p id="alias-modal-error" class="hidden text-sm text-red-600 mb-3"></p>
+    <div>
+      <label class="block label mb-1" for="alias-modal-name">Name <span class="text-red-600">*</span></label>
+      <input id="alias-modal-name" type="text" class="form-control form-control-sm" required maxlength="255" autocomplete="off">
+    </div>
+    <div class="mt-6 flex justify-end gap-2">
+      <button type="button" id="alias-modal-cancel" class="px-4 py-2 rounded-md border border-gray-300 btn btn-secondary text-sm">Cancel</button>
+      <button type="button" id="alias-modal-save" class="px-4 py-2 rounded-md btn btn-save text-sm font-semibold">Save</button>
+    </div>
+  </div>
+</div>
+
 
 <section id="section-certs" class="supplier-section-anchor">
 <div class="row g-3 mb-3">
@@ -933,6 +985,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- Notes edit modal -->
 <div id="notesEditModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
@@ -1492,6 +1545,175 @@
 </script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        var aliasModal = document.getElementById('alias-modal');
+        var aliasModalError = document.getElementById('alias-modal-error');
+        var aliasModalName = document.getElementById('alias-modal-name');
+        var openAliasBtn = document.getElementById('open-alias-modal');
+        var aliasCloseBtn = document.getElementById('alias-modal-close');
+        var aliasCancelBtn = document.getElementById('alias-modal-cancel');
+        var aliasSaveBtn = document.getElementById('alias-modal-save');
+        var saveAliasUrl = "{% url 'contracts:supplier_save_alias' pk=supplier.id %}";
+        var deleteAliasUrlTemplate = "{% url 'contracts:supplier_delete_alias' pk=supplier.id alias_id=0 %}";
+
+        function aliasModalCsrfToken() {
+            var input = aliasModal && aliasModal.querySelector('[name=csrfmiddlewaretoken]');
+            if (input && input.value) return input.value;
+            return getCookie('csrftoken');
+        }
+
+        function clearAliasModalError() {
+            if (aliasModalError) {
+                aliasModalError.textContent = '';
+                aliasModalError.classList.add('hidden');
+            }
+        }
+
+        function showAliasModalError(msg) {
+            if (!aliasModalError) return;
+            aliasModalError.textContent = msg || 'Something went wrong.';
+            aliasModalError.classList.remove('hidden');
+        }
+
+        function openAliasModal() {
+            clearAliasModalError();
+            if (aliasModalName) aliasModalName.value = '';
+            if (aliasModal) {
+                aliasModal.classList.remove('hidden');
+                aliasModal.classList.add('flex');
+            }
+            if (aliasModalName) aliasModalName.focus();
+        }
+
+        function closeAliasModal() {
+            if (aliasModal) {
+                aliasModal.classList.add('hidden');
+                aliasModal.classList.remove('flex');
+            }
+            clearAliasModalError();
+        }
+
+        function hideAllAliasDeleteConfirms() {
+            document.querySelectorAll('.alias-delete-confirm').forEach(function(el) {
+                el.classList.add('hidden');
+            });
+        }
+
+        if (openAliasBtn) {
+            openAliasBtn.addEventListener('click', function() {
+                hideAllAliasDeleteConfirms();
+                openAliasModal();
+            });
+        }
+        document.querySelectorAll('.delete-alias-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var row = btn.closest('.alias-row');
+                var confirmEl = row ? row.querySelector('.alias-delete-confirm') : null;
+                if (!confirmEl) return;
+                var wasHidden = confirmEl.classList.contains('hidden');
+                hideAllAliasDeleteConfirms();
+                if (wasHidden) confirmEl.classList.remove('hidden');
+            });
+        });
+        document.querySelectorAll('.alias-delete-no').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var c = btn.closest('.alias-delete-confirm');
+                if (c) c.classList.add('hidden');
+            });
+        });
+        document.querySelectorAll('.alias-delete-yes').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var row = btn.closest('.alias-row');
+                var aid = row ? row.getAttribute('data-alias-id') : null;
+                if (!aid) return;
+                btn.disabled = true;
+                var url = deleteAliasUrlTemplate.replace(/\/alias\/0\/delete\//, '/alias/' + aid + '/delete/');
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': aliasModalCsrfToken()
+                    }
+                })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.ok && !result.data.error) {
+                        window.location.reload();
+                    } else {
+                        alert(result.data.error || 'Failed to delete alias.');
+                    }
+                })
+                .catch(function() {
+                    alert('Failed to delete alias.');
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                });
+            });
+        });
+        [aliasCloseBtn, aliasCancelBtn].forEach(function(btn) {
+            if (btn) btn.addEventListener('click', closeAliasModal);
+        });
+        if (aliasModal) {
+            aliasModal.addEventListener('click', function(event) {
+                if (event.target === aliasModal) closeAliasModal();
+            });
+        }
+        if (aliasSaveBtn) {
+            aliasSaveBtn.addEventListener('click', function() {
+                clearAliasModalError();
+                var nameVal = aliasModalName ? aliasModalName.value.trim() : '';
+                if (!nameVal) {
+                    showAliasModalError('Name is required.');
+                    return;
+                }
+                aliasSaveBtn.disabled = true;
+                var formData = new FormData();
+                formData.append('name', nameVal);
+                fetch(saveAliasUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': aliasModalCsrfToken()
+                    },
+                    body: formData
+                })
+                .then(function(response) {
+                    return response.json().then(function(data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function(result) {
+                    if (result.ok && !result.data.error) {
+                        closeAliasModal();
+                        window.location.reload();
+                    } else {
+                        showAliasModalError(result.data.error || 'Save failed.');
+                    }
+                })
+                .catch(function() {
+                    showAliasModalError('Save failed.');
+                })
+                .finally(function() {
+                    aliasSaveBtn.disabled = false;
+                });
+            });
+        }
+        if (aliasModalName) {
+            aliasModalName.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    if (aliasSaveBtn) aliasSaveBtn.click();
+                }
+            });
+        }
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
         var metaEl = document.getElementById('supplier-address-slot-meta');
         var slotMeta = {};
         if (metaEl && metaEl.textContent) {
@@ -1730,7 +1952,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  var sectionIds = ['section-overview','section-compliance','section-contacts','section-addresses','section-contracts','section-certs','section-files','section-notes'];
+  var sectionIds = ['section-overview','section-aliases','section-compliance','section-contacts','section-addresses','section-contracts','section-certs','section-files','section-notes'];
   var navLinks = document.querySelectorAll('.supplier-nav-link[data-section]');
   var sections = sectionIds.map(function(id) { return document.getElementById(id); }).filter(Boolean);
   if (!sections.length || !navLinks.length) return;

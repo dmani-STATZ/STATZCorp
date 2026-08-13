@@ -61,6 +61,8 @@ from .views import (
     update_supplier_files,
     save_supplier_contact,
     delete_supplier_contact,
+    save_supplier_alias,
+    delete_supplier_alias,
     addresses_lookup,
     add_supplier_certification,
     update_supplier_certification,
@@ -451,6 +453,16 @@ urlpatterns = [
         "supplier/<int:pk>/contact/<int:contact_id>/delete/",
         delete_supplier_contact,
         name="supplier_delete_contact",
+    ),
+    path(
+        "supplier/<int:pk>/alias/save/",
+        save_supplier_alias,
+        name="supplier_save_alias",
+    ),
+    path(
+        "supplier/<int:pk>/alias/<int:alias_id>/delete/",
+        delete_supplier_alias,
+        name="supplier_delete_alias",
     ),
     path("addresses/lookup/", addresses_lookup, name="addresses_lookup"),
     # Supplier Certifications and Classifications

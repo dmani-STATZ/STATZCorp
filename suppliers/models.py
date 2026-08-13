@@ -147,6 +147,36 @@ class Contact(models.Model):
         return self.name
 
 
+class SupplierAlias(models.Model):
+    supplier = models.ForeignKey(
+        'Supplier',
+        on_delete=models.CASCADE,
+        related_name='aliases',
+    )
+    name = models.CharField(max_length=255)
+    created_on = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supplier_aliases_created',
+    )
+
+    class Meta:
+        db_table = 'contracts_supplieralias'
+        ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['supplier', 'name'],
+                name='uniq_supplieralias_supplier_name',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name} (AKA for {self.supplier.name})"
+
+
 class SupplierContactCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     is_active = models.BooleanField(default=True)

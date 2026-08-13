@@ -675,6 +675,7 @@ class SupplierDetailView(DetailView):
             .prefetch_related('categories')
             .order_by('name')
         )
+        context['aliases'] = list(supplier.aliases.all())
         documents = list(
             SupplierDocument.objects.filter(supplier=supplier)
             .select_related('certification', 'classification')
@@ -1046,6 +1047,7 @@ def supplier_search_api(request):
             Q(name__icontains=term)
             | Q(cage_code__icontains=term)
             | Q(clin__contract__contract_number__icontains=term)
+            | Q(aliases__name__icontains=term)
         ).distinct()
     qs = qs.order_by('name')[:15]
     results = [

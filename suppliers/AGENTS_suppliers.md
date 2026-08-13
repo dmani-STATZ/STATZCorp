@@ -14,7 +14,7 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 ## 2. App Scope
 
 **Owns:**
-- `Supplier`, `SupplierType`, `Contact`, `SupplierContactCategory`, `SupplierCertification`, `CertificationType`, `SupplierClassification`, `ClassificationType`, `SupplierDocument`, `SupplierPortalChangeLog`, `OpenRouterModelSetting` models
+- `Supplier`, `SupplierType`, `Contact`, `SupplierAlias`, `SupplierContactCategory`, `SupplierCertification`, `CertificationType`, `SupplierClassification`, `ClassificationType`, `SupplierDocument`, `SupplierPortalChangeLog`, `OpenRouterModelSetting` models
 - Supplier dashboard, per-type lists, and detail/enrichment UI
 - OpenRouter-backed AI enrichment pipeline (`views.py`, `openrouter_config.py`)
 - Templates and static JS for supplier edit, enrichment, and detail views
@@ -39,7 +39,8 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 
 ### Before changing views
 - Read `suppliers/views.py` — note which views lack `LoginRequiredMixin` (`DashboardView`, `SupplierDetailView`, `supplier_search_api`).
-- `supplier_search_api` — `Supplier` has no direct `contract` reverse relation. Contract number lookups must traverse `clin__contract__contract_number`. Always include `.distinct()` on any `Supplier` queryset that joins through `Clin` to avoid duplicate rows.
+- `supplier_search_api` — `Supplier` has no direct `contract` reverse relation. Contract number lookups must traverse `clin__contract__contract_number`. Always include `.distinct()` on any `Supplier` queryset that joins through `Clin` or `aliases` to avoid duplicate rows.
+- Alias search — all supplier name-search paths must OR `Q(aliases__name__icontains=…)` and call `.distinct()`: `supplier_search_api`, `SupplierSearchView`, `supplier_autocomplete`, `SupplierListView` name/`q` filters, and IDIQ `SupplierSearchView`. Do not leave one path matching only `Supplier.name`.
 - Read `contracts/views/supplier_views.py` — this file calls into `suppliers.models` and renders `suppliers/` templates. View changes here affect the supplier edit/create/toggle flows.
 
 ### Before changing templates
@@ -113,6 +114,15 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 
 ### Copy Category button change
 `templates/suppliers/supplier_detail.html` (dropdown markup + standalone `<script>` block reading `.contact-category-pill` / `.edit-contact-btn[data-contact-email]`) — purely client-side, no propagation to `views.py`, `urls.py`, or models. If the contact card markup, pill container selector, or `data-contact-email` attribute name changes, this script must be updated in lockstep.
+
+### SupplierAlias change
+`suppliers/models.py` → `suppliers/migrations/` →
+`contracts/views/supplier_views.py` (`save_supplier_alias`, `delete_supplier_alias`, search querysets) →
+`contracts/urls.py` + `contracts/views/__init__.py` →
+`suppliers/views.py` (`SupplierDetailView` context + `supplier_search_api`) →
+`templates/suppliers/supplier_detail.html` (Also Known As section + modal JS) →
+`suppliers/admin.py` (`SupplierAliasInline`) →
+`contracts/views/idiq_views.py` (IDIQ supplier picker)
 
 ---
 
@@ -206,7 +216,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - After model changes: verify Django admin loads for `Supplier` and `Contact`, check that `contracts` supplier views (create, edit, list) function, run any existing `contracts` tests.
 - After enrichment pipeline changes: manually trigger enrichment for a known supplier via `/suppliers/<pk>/enrich/run/`, confirm the JSON response shape, verify the apply flow POSTs and saves correctly.
 - After URL changes: spot-check `contracts` templates that reverse `suppliers:` URLs (contract management page, contact detail page) and the `reports/admin_dashboard.html`.
-- After template changes to `supplier_detail.html`: open a supplier detail page with contacts, certifications, classifications, and documents present. After layout changes, verify scroll spy activates the correct sidebar link for all eight sections, status flag banners render only when probation/conditional/archived are true, and sidebar supplier search returns results and navigates to `/suppliers/<id>/detail/`.
+- After template changes to `supplier_detail.html`: open a supplier detail page with contacts, aliases, certifications, classifications, and documents present. After layout changes, verify scroll spy activates the correct sidebar link for all nine sections, status flag banners render only when probation/conditional/archived are true, and sidebar supplier search returns results and navigates to `/suppliers/<id>/detail/`.
 - After changes to `openrouter_config.py`: GET `/suppliers/ai-model/config/` and verify the response fields match what `supplier_enrich.html` JS expects.
 
 ---
@@ -228,6 +238,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 13. **`Primary` category** — global `SupplierContactCategory` row (not per-supplier). Multiple contacts per supplier may hold the Primary category. Canonical lookup: `Contact.objects.filter(supplier=supplier, categories__name="Primary")`. First contact saved for a supplier is auto-assigned Primary via `assign_primary_category()` in `suppliers/contact_categories.py`.
 14. **`SupplierContactCategory` is global** — do not add a supplier FK; scope is implicit through `Contact.supplier`.
 15. **RFQ dispatch (implemented 2026-06-30):** RFQ emails target all contacts with the **Sales** category (`SALES_CATEGORY_NAME` in `suppliers/contact_categories.py`). Migration `0013_migrate_rfq_email_to_sales_contacts` backfilled Sales contacts from legacy `rfq_email` values. `Supplier.rfq_email` is deprecated/dormant — dispatch falls back to it only when no Sales contacts exist; see `sales/services/email.py::resolve_supplier_rfq_recipients`. On the supplier detail page, **Sales** category pills on contact cards are the canonical RFQ-recipient signal; the standalone RFQ Email section was removed.
+16. **`SupplierAlias` is manual-entry only.** Cori/Barb add and remove aliases on the supplier detail page (`save_supplier_alias` / `delete_supplier_alias`). The DIBBS scraper, SAM stub helpers (`sales/services/suppliers.py`), enrichment pipeline, and supplier portal API must never write `SupplierAlias`. Case-insensitive duplicate prevention lives in the view (`name__iexact`); the `UniqueConstraint` on `(supplier, name)` is a DB backstop only — do not rely on it for the user-facing error.
 
 ---
 

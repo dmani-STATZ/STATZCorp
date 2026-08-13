@@ -216,8 +216,9 @@ class SupplierSearchView(LoginRequiredMixin, View):
             
         suppliers = Supplier.objects.filter(
             Q(name__icontains=query) |
-            Q(cage_code__icontains=query)
-        )[:10]
+            Q(cage_code__icontains=query) |
+            Q(aliases__name__icontains=query)
+        ).distinct()[:10]
         
         results = [{
             'id': supplier.id,

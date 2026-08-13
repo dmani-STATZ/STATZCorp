@@ -7,7 +7,7 @@ from django.utils.decorators import method_decorator
 from django.http import HttpResponseRedirect, JsonResponse
 from django.views.decorators.http import require_POST
 from django.db.models import Q, Count, Sum, Case, When, DecimalField
-from django.db import DatabaseError
+from django.db import DatabaseError, IntegrityError
 from django.utils import timezone
 from datetime import timedelta, datetime
 
@@ -20,6 +20,7 @@ from suppliers.contact_categories import (
 from suppliers.models import (
     Supplier,
     Contact,
+    SupplierAlias,
     SupplierCertification,
     SupplierClassification,
     CertificationType,
@@ -92,11 +93,17 @@ class SupplierListView(ListView):
         
         # Apply filters
         if name:
-            queryset = queryset.filter(name__icontains=name)
+            queryset = queryset.filter(
+                Q(name__icontains=name) | Q(aliases__name__icontains=name)
+            )
         if cage_code:
             queryset = queryset.filter(cage_code__icontains=cage_code)
         if q:
-            queryset = queryset.filter(Q(name__icontains=q) | Q(cage_code__icontains=q))
+            queryset = queryset.filter(
+                Q(name__icontains=q)
+                | Q(cage_code__icontains=q)
+                | Q(aliases__name__icontains=q)
+            )
         if probation:
             queryset = queryset.filter(probation=True)
         if conditional:
@@ -672,6 +679,42 @@ def delete_supplier_contact(request, pk, contact_id):
     return JsonResponse(payload, safe=False)
 
 
+@conditional_login_required
+def save_supplier_alias(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    get_object_or_404(Supplier, pk=pk)
+    cleaned_name = (request.POST.get('name') or '').strip()
+    if not cleaned_name:
+        return JsonResponse({'error': 'Name is required'}, status=400)
+    if SupplierAlias.objects.filter(supplier_id=pk, name__iexact=cleaned_name).exists():
+        return JsonResponse(
+            {'error': 'That alias already exists for this supplier'},
+            status=400,
+        )
+    try:
+        SupplierAlias.objects.create(
+            supplier_id=pk,
+            name=cleaned_name,
+            created_by=request.user,
+        )
+    except IntegrityError:
+        return JsonResponse(
+            {'error': 'That alias already exists for this supplier'},
+            status=400,
+        )
+    return JsonResponse({'ok': True})
+
+
+@conditional_login_required
+def delete_supplier_alias(request, pk, alias_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+    get_object_or_404(Supplier, pk=pk)
+    SupplierAlias.objects.filter(pk=alias_id, supplier_id=pk).delete()
+    return JsonResponse({'ok': True})
+
+
 @method_decorator(conditional_login_required, name='dispatch')
 class SupplierSearchView(ListView):
     model = Supplier
@@ -694,11 +737,17 @@ class SupplierSearchView(ListView):
         
         # Apply filters
         if name:
-            queryset = queryset.filter(name__icontains=name)
+            queryset = queryset.filter(
+                Q(name__icontains=name) | Q(aliases__name__icontains=name)
+            )
         if cage_code:
             queryset = queryset.filter(cage_code__icontains=cage_code)
         if q:
-            queryset = queryset.filter(Q(name__icontains=q) | Q(cage_code__icontains=q))
+            queryset = queryset.filter(
+                Q(name__icontains=q)
+                | Q(cage_code__icontains=q)
+                | Q(aliases__name__icontains=q)
+            )
         if probation:
             queryset = queryset.filter(probation=True)
         if conditional:
@@ -714,7 +763,7 @@ class SupplierSearchView(ListView):
         else:
             queryset = queryset.filter(archived=False)
         
-        return queryset.order_by('name')
+        return queryset.order_by('name').distinct()
 
 
 @method_decorator(conditional_login_required, name='dispatch')
@@ -1244,7 +1293,11 @@ def supplier_autocomplete(request):
     # 'all' returns everything
 
     if term:
-        queryset = queryset.filter(Q(name__icontains=term) | Q(cage_code__icontains=term))
+        queryset = queryset.filter(
+            Q(name__icontains=term)
+            | Q(cage_code__icontains=term)
+            | Q(aliases__name__icontains=term)
+        ).distinct()
 
     results = list(
         queryset.order_by('name')[:10].values('id', 'name', 'cage_code')
