@@ -1,7 +1,7 @@
 ---
 id: 2026-08-10-po-number-sync
 title: Contract and CLIN PO numbers stay in sync
-published: false
+published: true
 publish_date: 2026-08-10
 tags: [improved, contracts]
 critical: false
