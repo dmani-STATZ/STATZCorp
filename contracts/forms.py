@@ -145,6 +145,37 @@ class NsnForm(BaseModelForm):
             }),
         }
 
+    def clean_nsn_code(self):
+        nsn_code = self.cleaned_data.get('nsn_code')
+        if not nsn_code:
+            return nsn_code
+
+        from products.nsn_utils import normalize_nsn
+
+        # Match Nsn.save(): overflow (>13) is stored as blank, not a dedup key.
+        computed = normalize_nsn(nsn_code)
+        normalized = computed if computed and len(computed) <= 13 else ''
+        if not normalized:
+            return nsn_code
+
+        is_new = self.instance.pk is None
+        code_changed = is_new or nsn_code != self.instance.nsn_code
+        if not code_changed:
+            return nsn_code
+
+        existing = (
+            Nsn.objects.exclude(pk=self.instance.pk or 0)
+            .filter(nsn_normalized=normalized)
+            .first()
+        )
+        if existing:
+            raise forms.ValidationError(
+                f"An NSN matching this code already exists "
+                f"(ID {existing.pk}: {existing.nsn_code}) — "
+                f"search for it instead of creating a duplicate."
+            )
+        return nsn_code
+
 class SupplierForm(BaseModelForm):
     prime = forms.ModelChoiceField(
         queryset=SalesClass.objects.all().order_by('sales_team'),

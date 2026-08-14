@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
 import json
@@ -423,53 +424,79 @@ def update_clin_field(request, clin_id):
 def create_nsn(request):
     """
     API endpoint to create a new NSN record.
-    Expects JSON data with:
-    - nsn: NSN code
-    - description: NSN description
+
+    Accepts JSON with ``nsn_code`` (preferred) or legacy ``nsn`` (processing
+    modal), plus optional ``description``. Dedupes on indexed ``nsn_normalized``
+    when that value is non-empty; falls back to exact ``nsn_code`` match for
+    overflow/malformed codes that cannot be stored on the index.
     """
+    from products.nsn_utils import normalize_nsn as catalog_normalize_nsn
+
     try:
         data = json.loads(request.body)
-        nsn_code = data.get('nsn')
-        description = data.get('description')
-
-        if not nsn_code:
-            return JsonResponse({
-                'success': False,
-                'error': 'NSN code is required'
-            }, status=400)
-
-        # Check if NSN already exists
-        if Nsn.objects.filter(nsn_code=nsn_code).exists():
-            return JsonResponse({
-                'success': False,
-                'error': 'NSN code already exists'
-            }, status=400)
-
-        # Create new NSN record
-        nsn = Nsn.objects.create(
-            nsn_code=nsn_code,
-            description=description,
-            created_by=request.user,
-            modified_by=request.user
-        )
-
-        return JsonResponse({
-            'success': True,
-            'id': nsn.id,
-            'nsn_code': nsn.nsn_code,
-            'description': nsn.description
-        })
-
     except json.JSONDecodeError:
         return JsonResponse({
             'success': False,
             'error': 'Invalid JSON data'
         }, status=400)
-    except Exception as e:
+
+    nsn_code = (data.get('nsn_code') or data.get('nsn') or '').strip()
+    description = (data.get('description') or '').strip() or None
+
+    if not nsn_code:
         return JsonResponse({
             'success': False,
-            'error': str(e)
-        }, status=500) 
+            'error': 'NSN code is required'
+        }, status=400)
+
+    computed = catalog_normalize_nsn(nsn_code)
+    normalized = computed if computed and len(computed) <= 13 else ''
+
+    if normalized:
+        existing = Nsn.objects.filter(nsn_normalized=normalized).first()
+        if existing:
+            return JsonResponse({
+                'success': False,
+                'error': (
+                    f"An NSN matching this code already exists "
+                    f"(ID {existing.pk}: {existing.nsn_code}) — "
+                    f"search for it instead of creating a duplicate."
+                ),
+                'existing_id': existing.pk,
+                'existing_display': (
+                    f"{existing.nsn_code} - {existing.description or ''}"
+                ),
+            }, status=400)
+    elif Nsn.objects.filter(nsn_code=nsn_code).exists():
+        return JsonResponse({
+            'success': False,
+            'error': 'NSN code already exists'
+        }, status=400)
+
+    try:
+        with transaction.atomic():
+            nsn = Nsn.objects.create(
+                nsn_code=nsn_code,
+                description=description,
+                created_by=request.user,
+                modified_by=request.user,
+            )
+    except IntegrityError:
+        return JsonResponse({
+            'success': False,
+            'error': 'NSN code already exists'
+        }, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'id': nsn.id,
+        'nsn_code': nsn.nsn_code,
+        'description': nsn.description,
+        'label': (
+            f"{nsn.nsn_code or 'Unknown'} - "
+            f"{nsn.description or 'No description'}"
+        ),
+    }) 
 
 
 @login_required

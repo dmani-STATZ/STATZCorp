@@ -100,3 +100,10 @@ class PortalSearchClassifierTests(TestCase):
         resp = self.client.get(reverse('products:portal_search'), {'q': 'ZZZZZ'})
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'No matches')
+
+    def test_unknown_nsn_empty_state_offers_create(self):
+        resp = self.client.get(reverse('products:portal_search'), {'q': '9999-99-999-9999'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, reverse('products:nsn_create'))
+        self.assertContains(resp, 'Create this NSN')
+        self.assertContains(resp, 'nsn_code=9999-99-999-9999')

@@ -294,10 +294,40 @@
 (function () {
     const API_NS = "{% url 'contracts:get_select_options' 'nsn' %}";
     const API_SUP = "{% url 'contracts:get_select_options' 'supplier' %}";
+    const API_NSN_CREATE = "{% url 'contracts:api_nsn_create' %}";
+
+    function getClinFormCsrfToken() {
+        var el = document.querySelector('[name=csrfmiddlewaretoken]');
+        return el ? el.value : '';
+    }
+
+    function resetNsnCreatePanel() {
+        var panel = document.getElementById('nsn-create-panel');
+        var status = document.getElementById('nsn-create-status');
+        var code = document.getElementById('nsn_create_code');
+        var desc = document.getElementById('nsn_create_description');
+        if (panel) panel.classList.add('hidden');
+        if (status) {
+            status.textContent = '';
+            status.className = 'mt-2 text-sm text-gray-500';
+        }
+        if (code) code.value = '';
+        if (desc) desc.value = '';
+    }
+
+    function applyNsnSelection(id, label) {
+        var idInput = document.getElementById('id_nsn');
+        var disp = document.getElementById('nsn_display');
+        if (idInput) idInput.value = String(id);
+        if (disp) disp.value = label || '';
+        if (window.updateMatchButtonState) window.updateMatchButtonState('nsn');
+        closeNsnModal();
+    }
 
     function openNsnModal() {
         var el = document.getElementById('nsn-modal');
         if (el) { el.style.display = 'flex'; }
+        resetNsnCreatePanel();
     }
     function closeNsnModal() {
         var el = document.getElementById('nsn-modal');
@@ -375,15 +405,10 @@
                         div.setAttribute('data-nsn-label', encodeURIComponent(option.label || ''));
                         div.textContent = option.label;
                         div.addEventListener('click', function () {
-                            var idInput = document.getElementById('id_nsn');
-                            var disp = document.getElementById('nsn_display');
                             var enc = div.getAttribute('data-nsn-label') || '';
-                            if (idInput) idInput.value = div.getAttribute('data-nsn-id');
-                            if (disp) {
-                                try { disp.value = decodeURIComponent(enc); } catch (e) { disp.value = ''; }
-                            }
-                            if (window.updateMatchButtonState) window.updateMatchButtonState('nsn');
-                            closeNsnModal();
+                            var label = '';
+                            try { label = decodeURIComponent(enc); } catch (e) { label = ''; }
+                            applyNsnSelection(div.getAttribute('data-nsn-id'), label);
                         });
                         frag.appendChild(div);
                     });
@@ -677,6 +702,95 @@
         if (nsnNext) {
             nsnNext.addEventListener('click', function () {
                 if (nsnCurrentPage < nsnTotalPages) { nsnCurrentPage++; fetchNsnResults(); }
+            });
+        }
+
+        var nsnCreateToggle = document.getElementById('nsn-create-toggle');
+        var nsnCreatePanel = document.getElementById('nsn-create-panel');
+        var nsnCreateSubmit = document.getElementById('nsn-create-submit');
+        if (nsnCreateToggle && nsnCreatePanel) {
+            nsnCreateToggle.addEventListener('click', function () {
+                var opening = nsnCreatePanel.classList.contains('hidden');
+                nsnCreatePanel.classList.toggle('hidden');
+                if (opening) {
+                    var search = document.getElementById('nsn_search');
+                    var code = document.getElementById('nsn_create_code');
+                    if (search && code && !code.value) {
+                        code.value = (search.value || '').trim();
+                    }
+                    var status = document.getElementById('nsn-create-status');
+                    if (status) {
+                        status.textContent = '';
+                        status.className = 'mt-2 text-sm text-gray-500';
+                    }
+                }
+            });
+        }
+        if (nsnCreateSubmit) {
+            nsnCreateSubmit.addEventListener('click', function () {
+                var codeEl = document.getElementById('nsn_create_code');
+                var descEl = document.getElementById('nsn_create_description');
+                var status = document.getElementById('nsn-create-status');
+                var nsnCode = codeEl ? (codeEl.value || '').trim() : '';
+                var description = descEl ? (descEl.value || '').trim() : '';
+                if (!nsnCode) {
+                    if (status) {
+                        status.textContent = 'NSN code is required';
+                        status.className = 'mt-2 text-sm text-red-600';
+                    }
+                    return;
+                }
+                if (status) {
+                    status.textContent = 'Creating…';
+                    status.className = 'mt-2 text-sm text-gray-500';
+                }
+                nsnCreateSubmit.disabled = true;
+                fetch(API_NSN_CREATE, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getClinFormCsrfToken(),
+                    },
+                    body: JSON.stringify({ nsn_code: nsnCode, description: description }),
+                })
+                    .then(function (r) {
+                        return r.json().then(function (data) {
+                            return { ok: r.ok, data: data };
+                        });
+                    })
+                    .then(function (result) {
+                        var data = result.data || {};
+                        if (result.ok && data.success) {
+                            applyNsnSelection(data.id, data.label);
+                            resetNsnCreatePanel();
+                            return;
+                        }
+                        if (!status) return;
+                        status.textContent = data.error || 'Could not create NSN';
+                        status.className = 'mt-2 text-sm text-red-600';
+                        if (data.existing_id) {
+                            var useBtn = document.createElement('button');
+                            useBtn.type = 'button';
+                            useBtn.className = 'mt-2 text-sm font-medium text-blue-600 hover:text-blue-800';
+                            useBtn.setAttribute('data-nsn-use-existing', String(data.existing_id));
+                            useBtn.textContent = 'Use this NSN instead';
+                            useBtn.addEventListener('click', function () {
+                                applyNsnSelection(data.existing_id, data.existing_display);
+                                resetNsnCreatePanel();
+                            });
+                            status.appendChild(document.createElement('br'));
+                            status.appendChild(useBtn);
+                        }
+                    })
+                    .catch(function () {
+                        if (status) {
+                            status.textContent = 'Could not create NSN';
+                            status.className = 'mt-2 text-sm text-red-600';
+                        }
+                    })
+                    .finally(function () {
+                        nsnCreateSubmit.disabled = false;
+                    });
             });
         }
 
