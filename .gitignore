@@ -90,4 +90,5 @@ staticfiles/
 #Stuff
 install_requirements.bat
 
-
+# Node modules
+node_modules/
