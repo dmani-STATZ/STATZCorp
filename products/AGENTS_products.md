@@ -16,18 +16,19 @@ Defines how to safely modify the `products` app for AI coding agents and develop
 **Owns:**
 - `Nsn` model (stored in legacy table `contracts_nsn`), including `nsn_normalized` (migration `0003`/`0004`), packout/logistics fields, and `products/nsn_utils.py`
 - **NSN Portal** — Observatory (`/products/`), Dossier (`/products/nsn/<pk>/`), Supplier NSN View (`/products/supplier/<pk>/nsns/`), omnibox search (`/products/search/`)
-- `NsnLogisticsForm` + `nsn_logistics_update` — **sole portal write path** (logistics modal POST)
+- `NsnLogisticsForm` + `nsn_logistics_update` — portal logistics write path (dossier modal POST)
+- `NsnCreateView` (`contracts/views/nsn_views.py`) via `products:nsn_create` — catalog Create NSN (dedupes on `nsn_normalized`)
 - `management/commands/backfill_nsn_normalized.py` — idempotent `nsn_normalized` recovery after raw SQL writes (blanks overflow rows)
 - `management/commands/list_unnormalized_nsns.py` — rerunnable audit of `nsn_code` values that normalize to >13 characters
-- URL namespace `products` with portal routes plus shims: `nsn_edit`, `nsn_search` → `contracts/views`
+- URL namespace `products` with portal routes plus shims: `nsn_create`, `nsn_edit`, `nsn_search` → `contracts/views`
 - Admin registrations for both models
 - Portal templates: `observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`, plus `nsn_edit.html` (extend `contract_base.html` only — no header/footer overrides)
 - `products/templatetags/nsn_filters.py` — `|format_nsn` display filter for all portal NSN output
 - Local views: `ObservatoryView`, `portal_search`, `NsnDetailView`, `nsn_logistics_update`, `SupplierNsnView`
-- Unit tests: `products/tests/test_nsn_utils.py`, `products/tests/test_search.py`, `products/tests/test_nsn_normalized.py`
+- Unit tests: `products/tests/test_nsn_utils.py`, `products/tests/test_search.py`, `products/tests/test_nsn_normalized.py`, `products/tests/test_nsn_form.py`
 
 **Does NOT own:**
-- NSN edit/update form rendering — lives in `contracts/views/nsn_views.py` (`NsnUpdateView`)
+- NSN create/edit form rendering — lives in `contracts/views/nsn_views.py` (`NsnCreateView`, `NsnUpdateView`)
 - NSN search view logic — lives in `contracts/views/idiq_views.py` (`NsnSearchView`)
 - NSN form definition — lives in `contracts/forms.py` (`NsnForm`); portal logistics edits use `products/forms.py` (`NsnLogisticsForm`) — keep both in sync when packout fields change
 - NSN API endpoint for select widgets — lives in `contracts/views/api_views.py`
@@ -88,6 +89,7 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 | Change `nsn_code` or `description` specifically | All of the above + `contracts/views/idiq_views.py` (search filter), `contracts/views/api_views.py` (select options), `SQL/migrate_data.sql` |
 | Add/rename a packout/logistics field on `Nsn` | `products/models.py`, `products/migrations/`, `products/forms.py` (`NsnLogisticsForm`), `products/views.py` (`nsn_logistics_update`), `contracts/forms.py` (`NsnForm`), `templates/products/nsn_detail.html` (modal + readout), `templates/products/nsn_edit.html`, `SQL/migrate_data.sql` |
 | Add a new NSN URL | `products/urls.py` + the view file in `products/views.py` (or `contracts/views/`) it points to |
+| Add/change NSN Create | `contracts/views/nsn_views.py` (`NsnCreateView`), `products/urls.py` (`nsn_create`), `templates/products/nsn_edit.html` (shared with Update; branch `{% if object %}`), `templates/products/observatory.html`, `templates/products/search_results.html`, `contracts/forms.py` (`NsnForm` dedup), `products/tests/test_nsn_form.py` |
 | Change to `ApprovedSource` fields used in detail page | `sales/models/approved_sources.py`, `products/views.py` (`get_approved_sources_data`), `templates/products/nsn_detail.html` (the approved-sources panel block) |
 
 ---
@@ -122,7 +124,7 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 
 ## 7. Security / Permissions Rules
 
-- `NsnUpdateView` (in `contracts`) is wrapped with `conditional_login_required`. Do not expose the `products:nsn_edit` URL without that decorator in place on the target view.
+- `NsnCreateView` and `NsnUpdateView` (in `contracts`) are wrapped with `conditional_login_required`. Do not expose `products:nsn_create` or `products:nsn_edit` without that decorator in place on the target view.
 - `NsnSearchView` (in `contracts`) uses `LoginRequiredMixin` and enforces `len(query) >= 3`. Do not modify the URL mapping in a way that bypasses or replaces the view with an unauthenticated equivalent.
 - `AuditModel` fields track who created/modified NSN records. Do not override `save()` in a way that skips the parent call or clears `created_by`/`modified_by`.
 - No object-level ACL exists in `products`. Any permission tightening must happen in the `contracts` views this app routes to.
@@ -154,7 +156,7 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 ## 9. View / URL / Template Change Rules
 
 - `products/views.py` owns portal views. NSN edit/search JSON still lives in `contracts/views`. Lazy-import `contracts.models` inside methods only.
-- Portal URL names: `products:observatory`, `products:portal_search`, `products:nsn_detail`, `products:nsn_logistics_update`, `products:supplier_nsns`, plus shims `products:nsn_edit`, `products:nsn_search`.
+- Portal URL names: `products:observatory`, `products:portal_search`, `products:nsn_detail`, `products:nsn_logistics_update`, `products:supplier_nsns`, plus shims `products:nsn_create`, `products:nsn_edit`, `products:nsn_search`.
 - `templates/products/nsn_edit.html` depends on:
   - `contracts/contract_base.html` (extends)
   - `contracts/includes/simple_field.html` (include — used for every form field)
@@ -183,7 +185,12 @@ Never annotate indexed NSN columns with `Replace()` or other DB string functions
 
 ### Portal write path
 
-Only `NsnLogisticsForm` → `nsn_logistics_update` may mutate portal-visible data. Do not add other POST endpoints in `products` without explicit scope expansion.
+Two approved write paths:
+
+1. `NsnLogisticsForm` → `nsn_logistics_update` — logistics fields on an existing dossier row.
+2. `NsnCreateView` → `products:nsn_create` (view lives in `contracts/views/nsn_views.py`) — creates a new `Nsn` row and redirects to the dossier. Dedupes on indexed `nsn_normalized` via `NsnForm.clean_nsn_code()`; overflow/blank normalized values skip that check. Do not add a DB unique constraint here.
+
+Do not add other POST endpoints in `products` without explicit scope expansion. Full identity edits remain at `products:nsn_edit` → `NsnUpdateView`.
 
 ### Inline editing JS contract on `nsn_detail.html` (removed 2026-07-07)
 
@@ -214,7 +221,7 @@ The "in our system" / "not in DB" indicators on the approved-sources panel are r
 
 - No forms are defined in `products`. All input handling for `Nsn` lives in `contracts/forms.py` (`NsnForm`).
 - Do not add form logic here — it would create a split between where the form is defined and where it is used, complicating future changes.
-- If `NsnForm` validation needs to change, edit `contracts/forms.py` and update `templates/products/nsn_edit.html` and `contracts/views/nsn_views.py` together.
+- If `NsnForm` validation needs to change, edit `contracts/forms.py` and update `templates/products/nsn_edit.html` and `contracts/views/nsn_views.py` together. `NsnForm.clean_nsn_code()` dedupes new records (and `nsn_code` changes) against `nsn_normalized`. It must **not** fire when editing other fields on an already-duplicate legacy row.
 
 ---
 
@@ -254,6 +261,7 @@ Note: `contracts/management/commands/refresh_nsn_view.py` touches `contracts_nsn
 After editing, verify manually:
 1. **Admin:** open `/admin/products/nsn/` — confirm list display, search, and edit form load without errors.
 2. **NSN edit flow:** navigate to `/products/nsn/<pk>/edit/` — confirm the form renders, saves, and redirects correctly.
+2b. **NSN create flow:** `/products/nsn/create/` (and Observatory / zero-results CTAs) — confirm create, `nsn_normalized` dedup rejection, and redirect to the dossier. Editing description on a known-duplicate dossier row must still save.
 3. **NSN search:** call `/products/nsn/search/?q=<3chars>` — confirm JSON response returns `id`/`text` pairs.
 4. **CLIN form autocomplete:** open a CLIN form in `contracts` and verify the NSN select widget populates.
 5. **IDIQ detail page:** confirm NSN display on an IDIQ contract detail page is intact.

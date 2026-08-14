@@ -5,9 +5,13 @@
 <div class="max-w-4xl mx-auto px-4 py-8">
     <div class="mb-6 flex items-center justify-between">
         <div>
-            <h1 class="text-3xl font-semibold text-gray-900">Edit NSN</h1>
+            <h1 class="text-3xl font-semibold text-gray-900">{% if object %}Edit NSN{% else %}Create NSN{% endif %}</h1>
             <p class="mt-2 text-gray-600">
+                {% if object %}
                 Update National Stock Number details, part information, and related data.
+                {% else %}
+                Add a new National Stock Number to the catalog.
+                {% endif %}
             </p>
         </div>
         <button onclick="history.back()"
@@ -56,7 +60,7 @@
             </button>
             <button type="submit"
                     class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm btn btn-save focus:outline-none focus:ring-2 focus:ring-offset-2">
-                Save Changes
+                {% if object %}Save Changes{% else %}Create NSN{% endif %}
             </button>
         </div>
     </form>

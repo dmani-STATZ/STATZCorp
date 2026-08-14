@@ -1,7 +1,7 @@
 ---
 id: 2026-08-13-supplier-aka
 title: Search suppliers by Also Known As names
-published: false
+published: true
 publish_date: 2026-08-13
 tags: [new, contracts]
 critical: false

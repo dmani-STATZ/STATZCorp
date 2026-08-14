@@ -1,7 +1,7 @@
 ---
 id: 2026-08-13-waiver-gov-action-request
 title: Added Waiver to Gov Action Request dropdown
-published: false
+published: true
 publish_date: 2026-08-13
 tags: [new, contracts]
 critical: false
