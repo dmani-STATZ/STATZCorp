@@ -1,0 +1,244 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block extra_head %}
+<style>
+    .lights-out-board {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        max-width: 420px;
+        margin: 0 auto;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+    }
+    [data-bs-theme="dark"] .lights-out-board {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .lo-cell {
+        aspect-ratio: 1;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: transform 0.1s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .lo-cell:active {
+        transform: scale(0.92);
+    }
+    .lo-cell.cell-off {
+        background-color: var(--bs-tertiary-bg, #e9ecef);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+    [data-bs-theme="dark"] .lo-cell.cell-off {
+        background-color: #2b3035;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    .lo-cell.cell-on {
+        background-color: #ffc107;
+        box-shadow: 0 0 12px rgba(255, 193, 7, 0.7);
+    }
+    [data-bs-theme="dark"] .lo-cell.cell-on {
+        background-color: #ffca28;
+        box-shadow: 0 0 16px rgba(255, 202, 40, 0.8);
+    }
+
+    /* 3x3 Demo Mini Board */
+    .demo-board {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        width: 160px;
+        height: 160px;
+        margin: 0 auto;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+    }
+    [data-bs-theme="dark"] .demo-board {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    .demo-cell {
+        aspect-ratio: 1;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: transform 0.1s ease, background-color 0.15s ease;
+    }
+    .demo-cell:active {
+        transform: scale(0.9);
+    }
+    .demo-cell.cell-off {
+        background-color: var(--bs-tertiary-bg, #dee2e6);
+    }
+    [data-bs-theme="dark"] .demo-cell.cell-off {
+        background-color: #343a40;
+    }
+    .demo-cell.cell-on {
+        background-color: #ffc107;
+        box-shadow: 0 0 8px rgba(255, 193, 7, 0.8);
+    }
+    .demo-cell.cell-highlight {
+        animation: pulse-border 1.2s infinite alternate;
+    }
+    @keyframes pulse-border {
+        0% { outline: 2px solid #0d6efd; box-shadow: 0 0 8px #0d6efd; }
+        100% { outline: 3px solid #0d6efd; box-shadow: 0 0 14px #0d6efd; }
+    }
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+<div class="container py-4">
+    <!-- Navigation & Title -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <a href="{% url 'arcade:lobby' %}" class="btn btn-sm btn-secondary mb-2">
+                &larr; Back to Arcade
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-info mb-2 ms-2" data-bs-toggle="collapse" data-bs-target="#demo-collapse" aria-expanded="false" aria-controls="demo-collapse">
+                💡 How to Play (2-Step Demo)
+            </button>
+            <h1 class="h3 mb-0 fw-bold">Lights Out</h1>
+            <span class="text-secondary small">{{ today|date:"F j, Y" }} Daily Puzzle</span>
+        </div>
+        <div class="text-end">
+            <span class="badge bg-secondary fs-6" id="handicap-badge">
+                Handicap: {% if handicap.handicap is not None %}{{ handicap.display }}{% else %}{{ handicap.display }}{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <!-- Collapsible 2-Step Interactive Demo Card -->
+    <div class="collapse mb-4" id="demo-collapse">
+        <div class="card card-body bg-body-tertiary border-info shadow-sm">
+            <div class="row align-items-center g-3">
+                <div class="col-md-7">
+                    <h5 class="fw-bold text-info mb-2">How to Play Lights Out</h5>
+                    <p class="small text-secondary mb-2">
+                        <strong>Goal:</strong> Turn <em>all</em> yellow lights OFF.
+                    </p>
+                    <p class="small text-secondary mb-3">
+                        <strong>Rule:</strong> Clicking any cell toggles itself <em>plus its orthogonal neighbors</em> (up, down, left, right) in a plus shape.
+                    </p>
+                    <div id="demo-instruction-box" class="alert alert-info py-2 px-3 small mb-2">
+                        <span id="demo-step-text"><strong>Step 1 of 2:</strong> Click the glowing center light below!</span>
+                    </div>
+                    <button type="button" id="demo-reset-btn" class="btn btn-sm btn-outline-secondary">
+                        ↺ Reset Demo
+                    </button>
+                </div>
+                <div class="col-md-5 text-center">
+                    <div class="fw-semibold small text-secondary mb-2">Interactive 3x3 Mini Demo</div>
+                    <div id="demo-board" class="demo-board">
+                        <!-- 3x3 demo grid cells populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Main Game Area -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border mb-4">
+                <div class="card-body text-center p-4">
+                    <!-- Stats Strip -->
+                    <div class="d-flex justify-content-center align-items-center gap-4 mb-4">
+                        <div class="text-center px-3 py-2 rounded bg-body-secondary">
+                            <div class="text-secondary fs-7 text-uppercase fw-bold">Par</div>
+                            <div class="fs-4 fw-bold text-primary" id="par-val">—</div>
+                        </div>
+                        <div class="text-center px-3 py-2 rounded bg-body-secondary">
+                            <div class="text-secondary fs-7 text-uppercase fw-bold">Moves</div>
+                            <div class="fs-4 fw-bold" id="moves-val">0</div>
+                        </div>
+                        <div class="text-center px-3 py-2 rounded bg-body-secondary">
+                            <div class="text-secondary fs-7 text-uppercase fw-bold">Active Time</div>
+                            <div class="fs-4 fw-bold font-monospace" id="timer-val">00:00</div>
+                        </div>
+                    </div>
+
+                    <!-- 5x5 Grid Container -->
+                    <div id="lights-out-board" class="lights-out-board mb-3">
+                        <!-- Grid buttons populated by JS -->
+                    </div>
+
+                    <p class="text-secondary small mb-0">
+                        Clicking a cell toggles itself and its orthogonal neighbors. Clear all lights to solve today's puzzle.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Completion Alert Panel (Hidden until solved) -->
+            <div id="completion-panel" class="card border-success shadow-sm d-none mb-4">
+                <div class="card-body text-center p-4">
+                    <div class="display-6 text-success mb-2">🎉 Puzzle Solved!</div>
+                    <p class="text-secondary mb-3">You completed today's Lights Out puzzle.</p>
+                    
+                    <div class="d-flex justify-content-center gap-4 mb-4">
+                        <div class="px-3 py-2 rounded bg-body-secondary">
+                            <div class="small text-secondary">Score</div>
+                            <div class="fs-4 fw-bold" id="res-over-par">—</div>
+                        </div>
+                        <div class="px-3 py-2 rounded bg-body-secondary">
+                            <div class="small text-secondary">Daily Rank</div>
+                            <div class="fs-4 fw-bold text-success" id="res-rank">—</div>
+                        </div>
+                        <div class="px-3 py-2 rounded bg-body-secondary">
+                            <div class="small text-secondary">Updated Handicap</div>
+                            <div class="fs-4 fw-bold" id="res-handicap">—</div>
+                        </div>
+                    </div>
+
+                    <a href="{% url 'arcade:lobby' %}" class="btn btn-success fw-medium px-4">
+                        Return to Lobby
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Sidebar -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border">
+                <div class="card-header bg-transparent fw-bold d-flex justify-content-between align-items-center">
+                    <span>Today's Standings</span>
+                    <span class="badge bg-primary rounded-pill small">{{ leaders|length }}</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if leaders %}
+                    <ul class="list-group list-group-flush small" id="leaderboard-list">
+                        {% for l in leaders %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold me-2 text-muted">#{{ l.rank }}</span>
+                                <span class="fw-medium">{{ l.username }}</span>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-secondary">{{ l.score_display }}</span>
+                                <span class="text-secondary font-monospace ms-1">{{ l.active_seconds }}s</span>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-secondary small p-3 mb-0 text-center" id="no-leaders-msg">
+                        No completions yet today. Be the first to claim #1!
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.ARCADE_GAME_KEY = "lights_out";
+    window.ARCADE_START_URL = "{% url 'arcade:start' 'lights_out' %}";
+    window.ARCADE_MOVE_URL = "{% url 'arcade:move' 'lights_out' %}";
+</script>
+{% endblock body %}
+
+{% block extra_js %}
+<script src="{% static 'arcade/js/lights_out.js' %}?v={{ cache_version }}-{% now 'U' %}"></script>
+{% endblock extra_js %}

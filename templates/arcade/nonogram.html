@@ -1,0 +1,271 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block extra_head %}
+<style>
+    .ng-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+    }
+    .ng-board-wrap {
+        display: inline-block;
+        min-width: min-content;
+    }
+    .ng-grid {
+        --ng-cell: 28px;
+        display: grid;
+        gap: 2px;
+        /* cols: clue gutter + N cells; rows: clue gutter + N cells — set by JS */
+    }
+    .ng-col-clues,
+    .ng-row-clues,
+    .ng-corner {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: var(--bs-secondary-color);
+        user-select: none;
+        line-height: 1.1;
+    }
+    .ng-col-clues {
+        flex-direction: column;
+        /* Column direction: align-items is the HORIZONTAL axis. Must be center to
+           line each clue stack up with the centered glyph in its grid column. */
+        align-items: center;
+        justify-content: flex-end;
+        min-height: 3.5rem;
+        padding-bottom: 2px;
+        position: sticky;
+        top: 0;
+        background: var(--bs-body-bg);
+        z-index: 1;
+    }
+    .ng-row-clues {
+        flex-direction: row;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.2rem;
+        min-width: 3.5rem;
+        padding-right: 4px;
+        position: sticky;
+        left: 0;
+        background: var(--bs-body-bg);
+        z-index: 1;
+    }
+    .ng-corner {
+        position: sticky;
+        top: 0;
+        left: 0;
+        z-index: 2;
+        background: var(--bs-body-bg);
+    }
+    .ng-cell {
+        width: var(--ng-cell);
+        height: var(--ng-cell);
+        border: 1px solid var(--bs-border-color);
+        background: var(--bs-body-bg);
+        color: var(--bs-body-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        font-weight: 700;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+        user-select: none;
+        -webkit-user-select: none;
+    }
+    .ng-cell.unknown {
+        background: var(--bs-body-bg);
+    }
+    .ng-cell.filled {
+        background: var(--bs-body-color);
+        border-color: var(--bs-body-color);
+        color: var(--bs-body-bg);
+    }
+    .ng-cell.filled::before {
+        content: "■";
+    }
+    .ng-cell.marked {
+        background: var(--bs-secondary-bg);
+        border-style: dashed;
+    }
+    .ng-cell.marked::before {
+        content: "×";
+        color: var(--bs-body-color);
+    }
+    /* Every-5 guide rules — the main miscount defence on a 15x15. */
+    .ng-cell.rule-left {
+        border-left-width: 3px;
+        border-left-color: var(--bs-emphasis-color);
+    }
+    .ng-cell.rule-top {
+        border-top-width: 3px;
+        border-top-color: var(--bs-emphasis-color);
+    }
+    /* Row/column tracking highlight */
+    .ng-cell.hl.unknown {
+        background: var(--bs-primary-bg-subtle);
+    }
+    .ng-col-clues.hl,
+    .ng-row-clues.hl {
+        color: var(--bs-primary);
+        background: var(--bs-primary-bg-subtle);
+    }
+    .ng-mode-btn.active {
+        outline: 2px solid var(--bs-primary);
+        outline-offset: 1px;
+    }
+    @media (min-width: 576px) {
+        .ng-grid {
+            --ng-cell: 32px;
+        }
+    }
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div>
+            <a href="{% url 'arcade:lobby' %}" class="btn btn-sm btn-secondary mb-2">
+                &larr; Back to Arcade
+            </a>
+            <h1 class="h3 mb-0 fw-bold">Nonogram</h1>
+            <span class="text-secondary small">{{ today|date:"F j, Y" }} Daily Puzzle</span>
+        </div>
+        <div class="text-end">
+            <span class="badge bg-secondary fs-6" id="handicap-badge">
+                Handicap: {{ handicap.display }}
+            </span>
+            <div class="mt-2">
+                <a href="{% url 'arcade:gallery' 'nonogram' %}" class="btn btn-sm btn-outline-secondary">Gallery</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border mb-4">
+                <div class="card-body p-3 p-md-4">
+                    <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 mb-3">
+                        <div class="text-center px-3 py-2 rounded bg-body-secondary">
+                            <div class="text-secondary fs-7 text-uppercase fw-bold">Free misses</div>
+                            <div class="fs-4 fw-bold" id="free-misses-val">2</div>
+                        </div>
+                        <div class="text-center px-3 py-2 rounded bg-body-secondary">
+                            <div class="text-secondary fs-7 text-uppercase fw-bold">Mistakes</div>
+                            <div class="fs-4 fw-bold" id="mistakes-val">0</div>
+                        </div>
+                        <div class="text-center px-3 py-2 rounded bg-body-secondary">
+                            <div class="text-secondary fs-7 text-uppercase fw-bold">Active Time</div>
+                            <div class="fs-4 fw-bold font-monospace" id="timer-val">00:00</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-center gap-2 mb-3" role="group" aria-label="Paint mode">
+                        <button type="button" class="btn btn-sm btn-dark ng-mode-btn active" id="mode-fill" data-mode="fill">
+                            Fill ■
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ng-mode-btn" id="mode-mark" data-mode="mark">
+                            Mark ×
+                        </button>
+                    </div>
+
+                    <div id="ng-message" class="small text-danger mb-2 text-center" role="status" aria-live="polite"></div>
+
+                    <div class="ng-scroll mb-2">
+                        <div class="ng-board-wrap mx-auto">
+                            <div id="ng-grid" class="ng-grid" aria-label="Nonogram board"></div>
+                        </div>
+                    </div>
+
+                    <p class="text-secondary small mb-0 text-center">
+                        Left click / tap fills. Right click or Mark mode places an × (free).
+                        Wrong fills cost a miss after two free ones. Server grades every cell.
+                    </p>
+                </div>
+            </div>
+
+            <div id="completion-panel" class="card border-success shadow-sm d-none mb-4">
+                <div class="card-body text-center p-4">
+                    <div class="display-6 mb-2 text-success" id="res-headline">Picture revealed!</div>
+                    <p class="fw-semibold mb-1" id="res-name"></p>
+                    <p class="text-secondary mb-3" id="res-subtitle">You completed today's Nonogram.</p>
+
+                    <div id="res-art" class="mb-3 d-inline-block" aria-hidden="true"></div>
+
+                    <div class="d-flex justify-content-center gap-3 mb-4 flex-wrap">
+                        <div class="px-3 py-2 rounded bg-body-secondary">
+                            <div class="small text-secondary">Score</div>
+                            <div class="fs-4 fw-bold" id="res-score">—</div>
+                        </div>
+                        <div class="px-3 py-2 rounded bg-body-secondary">
+                            <div class="small text-secondary">Daily Rank</div>
+                            <div class="fs-4 fw-bold text-success" id="res-rank">—</div>
+                        </div>
+                        <div class="px-3 py-2 rounded bg-body-secondary">
+                            <div class="small text-secondary">Updated Handicap</div>
+                            <div class="fs-4 fw-bold" id="res-handicap">—</div>
+                        </div>
+                    </div>
+
+                    <a href="{% url 'arcade:gallery' 'nonogram' %}" class="btn btn-outline-success fw-medium px-4 me-2">
+                        View Gallery
+                    </a>
+                    <a href="{% url 'arcade:lobby' %}" class="btn btn-success fw-medium px-4">
+                        Return to Lobby
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border">
+                <div class="card-header bg-transparent fw-bold d-flex justify-content-between align-items-center">
+                    <span>Today's Standings</span>
+                    <span class="badge bg-primary rounded-pill small">{{ leaders|length }}</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if leaders %}
+                    <ul class="list-group list-group-flush small">
+                        {% for l in leaders %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold me-2 text-muted">#{{ l.rank }}</span>
+                                <span class="fw-medium">{{ l.username }}</span>
+                                {% if l.detail %}<span class="text-secondary ms-1">({{ l.detail }})</span>{% endif %}
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-secondary">{{ l.score_display }}</span>
+                                <span class="text-secondary font-monospace ms-1">{{ l.active_seconds }}s</span>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-secondary small p-3 mb-0 text-center">
+                        No completions yet today. Be the first to claim #1!
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.ARCADE_GAME_KEY = "nonogram";
+    window.ARCADE_START_URL = "{% url 'arcade:start' 'nonogram' %}";
+    window.ARCADE_MOVE_URL = "{% url 'arcade:move' 'nonogram' %}";
+</script>
+{% endblock body %}
+
+{% block extra_js %}
+<script src="{% static 'arcade/js/nonogram.js' %}?v={{ cache_version }}-{% now 'U' %}"></script>
+{% endblock extra_js %}

@@ -9,6 +9,7 @@ Handles both development and production environments.
 from pathlib import Path
 import os
 import warnings
+from datetime import date
 from django.core.exceptions import ImproperlyConfigured
 
 warnings.filterwarnings("ignore", message="urllib3.*doesn't match a supported version")
@@ -38,6 +39,16 @@ except Exception as e:
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY", "django-insecure-dev-key-change-in-production-1234567890abcdef"
 )
+
+# Arcade seed salt (can be overridden per-environment in Azure/App Service)
+ARCADE_SEED_SALT = os.environ.get(
+    "ARCADE_SEED_SALT", "statzweb-arcade-default-seed-salt-change-in-production"
+)
+# Wordle daily answer epoch — permutation is fixed from this date; index advances daily.
+ARCADE_WORDLE_EPOCH = date(2026, 1, 1)
+# Nonogram flat art-pack rotation epoch. Pack growth remaps future dates only;
+# in-progress / gallery history use art_key persisted on each attempt at start.
+ARCADE_NONOGRAM_EPOCH = date(2026, 1, 1)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
@@ -107,6 +118,7 @@ INSTALLED_APPS = [
     "products",
     "tools.apps.ToolsConfig",
     "transactions.apps.TransactionsConfig",
+    "arcade.apps.ArcadeConfig",
     "core.apps.CoreConfig",
 ]
 

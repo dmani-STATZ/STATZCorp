@@ -142,6 +142,7 @@ urlpatterns = [
     path("tools/", include("tools.urls")),
     path("imports/", include("imports.urls", namespace="imports")),
     path("mailer/", include("mailer.urls", namespace="mailer")),
+    path("arcade/", include("arcade.urls", namespace="arcade")),
 ]
 
 # Always serve static/media files (even in production)

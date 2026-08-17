@@ -177,11 +177,11 @@
                 <p class="text-warning fw-semibold mb-0 me-2">Development Environment</p>
             {% endif %}
 
-            <!-- Version Information -->
-            <div class="small text-muted me-2">
+            <!-- Version Information — two lines must fit the 48px fixed-height header -->
+            <div class="small text-muted me-2 lh-1 d-flex flex-column justify-content-center gap-1">
                 <span title="Full version info: {{ detailed_version }}">{{ display_version }}</span>
                 {% if version_info.build_number %}
-                <br><span class="small text-secondary" id="build-number" style="cursor:pointer;">Build: {{ version_info.build_number }}</span>
+                <span class="small text-secondary" id="build-number" style="user-select:none;">Build: {{ version_info.build_number }}</span>
                 {% endif %}
             </div>
 
@@ -664,6 +664,7 @@
         };
     })();
     </script>
+    <script src="{% static 'js/arcade_trigger.js' %}?v={{ cache_version }}-{% now 'U' %}" data-arcade-url="{% url 'arcade:lobby' %}"></script>
     {% block extra_js %}
     <script>
     function updateUnreadMessageCount() {

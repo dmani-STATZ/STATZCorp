@@ -17,6 +17,19 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 
 ## App Registry
 
+### `arcade` — Hidden Daily-Puzzle Arcade
+**Purpose:** Daily shared puzzle games (Lights Out, Wordle-style, Nonogram) with server-authoritative grading, leaderboards, and handicap tracking.
+
+**Owns:** `ArcadeAttempt`
+
+**Consumes from other apps:** None (totally isolated). Uses `settings.AUTH_USER_MODEL` and base template `templates/base_template.html`.
+
+**Other apps consume from it:** None.
+
+**URL prefix:** `/arcade/`
+
+**Critical note:** Completely decoupled from domain models. Only touchpoint is the header logo 7-click trigger script in `base_template.html`.
+
 ### `contracts` — Core Contract Workspace
 **Purpose:** Full contract lifecycle — headers, CLINs, notes, reminders, payments, shipments, folder tracking, SharePoint links, and exports.
 

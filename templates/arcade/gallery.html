@@ -1,0 +1,81 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block extra_head %}
+<style>
+    .gallery-tile {
+        aspect-ratio: 1;
+        border: 1px solid var(--bs-border-color);
+        background: var(--bs-secondary-bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem;
+        min-height: 120px;
+    }
+    .gallery-tile.locked {
+        background: var(--bs-tertiary-bg);
+    }
+    .gallery-tile.locked::before {
+        content: "";
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.25rem;
+        background: var(--bs-border-color);
+    }
+    .gallery-art {
+        display: grid;
+        gap: 1px;
+        width: 100%;
+        max-width: 140px;
+        margin: 0 auto;
+    }
+    .gallery-art span {
+        aspect-ratio: 1;
+        background: var(--bs-body-bg);
+    }
+    .gallery-art span.on {
+        background: var(--bs-body-color);
+    }
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="mb-4">
+        <a href="{% url 'arcade:lobby' %}" class="btn btn-sm btn-secondary mb-2">
+            &larr; Back to Arcade
+        </a>
+        <h1 class="h3 mb-1 fw-bold">{{ game.display_name }} Gallery</h1>
+        <p class="text-secondary mb-0">
+            You've collected {{ collected }} of {{ total }}.
+        </p>
+    </div>
+
+    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+        {% for tile in tiles %}
+        <div class="col">
+            {% if tile.unlocked %}
+            <div class="gallery-tile unlocked rounded">
+                <div class="gallery-art mb-2"
+                     style="grid-template-columns: repeat({{ tile.grid.0|length }}, 1fr);">
+                    {% for row in tile.grid %}
+                        {% for ch in row %}
+                            <span class="{% if ch == '#' %}on{% endif %}"></span>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                <div class="small fw-semibold text-center">{{ tile.name }}</div>
+                <div class="text-secondary text-center" style="font-size: 0.7rem;">
+                    {% if tile.puzzle_date %}{{ tile.puzzle_date|date:"M j, Y" }}{% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="gallery-tile locked rounded" aria-label="Locked piece"></div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock body %}

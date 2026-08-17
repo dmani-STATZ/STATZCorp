@@ -1,0 +1,3 @@
+# Operator escape hatch: one 5-letter lowercase word per line.
+# Lines starting with # are ignored. Unioned into the guess set at import.
+# Populate from WordleRejectedGuess admin hits after review.
