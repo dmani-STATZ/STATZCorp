@@ -425,6 +425,31 @@ SHAREPOINT_SOURCE_TIMEZONE = os.environ.get(
     "America/Los_Angeles",
 )
 
+# --- Calendar push: WorkCalendarEvent -> SharePoint --------------------------
+# Master switch for writing portal-created events back to the SharePoint list.
+# When False the calendar stays read-only (pull-only, the pre-2026-08 behavior).
+SHAREPOINT_CALENDAR_PUSH_ENABLED = (
+    os.environ.get("SHAREPOINT_CALENDAR_PUSH_ENABLED", "True").strip().lower() == "true"
+)
+
+# Backlog sweep: push events that have no sharepoint_id yet (created while push
+# was off, or whose live push failed). Defaults to False on purpose — enabling it
+# writes historical portal events onto the shared company calendar. Turn it on
+# deliberately, once, after confirming the live push works.
+SHAREPOINT_CALENDAR_BACKFILL_ENABLED = (
+    os.environ.get("SHAREPOINT_CALENDAR_BACKFILL_ENABLED", "False").strip().lower()
+    == "true"
+)
+
+# How far back the backlog sweep reaches, in days, measured from event start_at.
+# Keeps an accidental enable from dumping years of history into SharePoint.
+try:
+    SHAREPOINT_CALENDAR_BACKFILL_SINCE_DAYS = int(
+        os.environ.get("SHAREPOINT_CALENDAR_BACKFILL_SINCE_DAYS", "30")
+    )
+except (TypeError, ValueError):
+    SHAREPOINT_CALENDAR_BACKFILL_SINCE_DAYS = 30
+
 # Canonical SharePoint documents root when Company.sharepoint_documents_path is unset.
 SHAREPOINT_PATH_PREFIX = "Statz-Public/data/V87/aFed-DOD"
 

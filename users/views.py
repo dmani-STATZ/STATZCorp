@@ -40,6 +40,7 @@ from .models import (
     EventAttachment,
     RecurrenceRule,
 )
+from users.sharepoint_services import schedule_event_delete, schedule_event_push
 from contracts.models import Company
 from django.contrib.auth.models import User
 from django.urls import reverse
@@ -1033,6 +1034,7 @@ def portal_event_create(request):
         event.save()
         # Optional recurrence payload
         _upsert_recurrence_for_event(event, payload)
+        schedule_event_push(event)
         return JsonResponse({'event': serialize_event(event, user=request.user)}, status=201)
     return JsonResponse({'errors': form.errors}, status=400)
 
@@ -1091,7 +1093,11 @@ def portal_event_delete(request, event_id):
     # Only the organizer can delete their own events (superusers cannot delete others)
     if event.organizer_id != request.user.id:
         return JsonResponse({'error': 'Permission denied.'}, status=403)
+    # Capture the link before the row goes away — the SharePoint item is removed
+    # after commit, so a rolled-back delete leaves the calendar untouched.
+    sharepoint_id = event.sharepoint_id
     event.delete()
+    schedule_event_delete(sharepoint_id)
     return JsonResponse({'success': True})
 
 
@@ -1113,6 +1119,16 @@ def portal_event_update(request, event_id):
         updated.organizer_id = event.organizer_id
         updated.save()
         _upsert_recurrence_for_event(updated, payload)
+        # An event flipped to private is withdrawn from the shared calendar
+        # rather than updated in place.
+        if updated.is_private and updated.sharepoint_id:
+            sharepoint_id = updated.sharepoint_id
+            WorkCalendarEvent.objects.filter(pk=updated.pk).update(
+                sharepoint_id=None, sharepoint_last_modified=None
+            )
+            schedule_event_delete(sharepoint_id)
+        else:
+            schedule_event_push(updated)
         return JsonResponse({'event': serialize_event(updated, user=request.user)})
     return JsonResponse({'errors': form.errors}, status=400)
 

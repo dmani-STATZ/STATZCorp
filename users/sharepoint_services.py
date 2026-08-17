@@ -15,6 +15,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import connection, transaction
+from django.db.models import Q
 from django.db.utils import Error as DjangoDbError
 from django.utils import dateparse
 from django.utils import timezone
@@ -126,6 +127,45 @@ def _correct_sharepoint_datetime(value: Any) -> Optional[datetime]:
     return corrected
 
 
+def _uncorrect_sharepoint_datetime(value: datetime) -> str:
+    """
+    Inverse of _correct_sharepoint_datetime, for values leaving Django for Graph.
+
+    Pipeline (mirror image of the inbound correction):
+      1. Take the stored aware datetime and convert to settings.TIME_ZONE
+         to recover the wall-clock the user actually meant.
+      2. Strip tz to get naive datetime.
+      3. Re-localize as SHAREPOINT_SOURCE_TIMEZONE (what the site assumes).
+      4. Convert to UTC and format as a Graph ISO-8601 'Z' string.
+
+    Pushing through this guarantees a round trip: an event written here and read
+    back by sync_sharepoint_calendar() lands on the exact same start/end it
+    started with. Do not send raw UTC to Graph for these fields.
+    """
+    source_tz = ZoneInfo(settings.SHAREPOINT_SOURCE_TIMEZONE)
+    target_tz = ZoneInfo(settings.TIME_ZONE)
+
+    if timezone.is_naive(value):
+        value = value.replace(tzinfo=target_tz)
+
+    target_wallclock = value.astimezone(target_tz)
+    naive = target_wallclock.replace(tzinfo=None)
+    as_source = naive.replace(tzinfo=source_tz)
+    return as_source.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
+
+
+def _map_kind_to_category(kind: str) -> str:
+    """Inverse of _map_category_to_kind, for the outbound Category column."""
+    return {
+        "meeting": "Meeting",
+        "focus": "Focus",
+        "training": "Training",
+        "travel": "Travel",
+        "break": "Break",
+        "one_on_one": "1:1",
+    }.get((kind or "").strip().lower(), "Meeting")
+
+
 def _event_title(fields: Dict[str, Any]) -> str:
     for key in ("Title", "EventName", "Event_x0020_Name"):
         v = fields.get(key)
@@ -198,6 +238,299 @@ def _ensure_db_connection() -> None:
     except Exception:
         pass
     # Django will automatically open a new connection on next query
+
+
+# ---------------------------------------------------------------------------
+# Push: WorkCalendarEvent -> SharePoint list
+#
+# The list schema is discovered at runtime rather than hard-coded, because the
+# calendar list is IT-managed and its columns vary by site template. Only
+# columns that actually exist and are writable are ever sent; anything missing
+# is silently dropped instead of 400-ing the whole request.
+# ---------------------------------------------------------------------------
+
+_TITLE_COLUMN_CANDIDATES = ("Title", "EventName", "Event_x0020_Name")
+_START_COLUMN_CANDIDATES = ("StartDate", "EventDate", "Start_x0020_Date")
+_END_COLUMN_CANDIDATES = ("EndDate", "End_x0020_Date")
+
+_column_cache: Dict[str, set] = {}
+
+
+def _get_writable_list_columns(
+    token: str, site_id: str, list_id: str, *, refresh: bool = False
+) -> set:
+    """
+    Return the set of writable column internal names on the calendar list.
+
+    Cached per list id for the life of the process; pass refresh=True after a
+    schema change. Read-only and hidden columns are excluded — Graph rejects
+    writes to those.
+    """
+    cache_key = str(list_id)
+    if not refresh and cache_key in _column_cache:
+        return _column_cache[cache_key]
+
+    enc_site = quote(site_id, safe="")
+    enc_list = quote(list_id, safe="")
+    url = (
+        f"{GRAPH_BASE}/sites/{enc_site}/lists/{enc_list}/columns"
+        f"?$select=name,readOnly,hidden"
+    )
+    resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=60)
+    if resp.status_code != 200:
+        raise RuntimeError(
+            f"Graph list columns request failed with HTTP {resp.status_code}: {resp.text}"
+        )
+
+    names = {
+        str(col.get("name"))
+        for col in (resp.json().get("value") or [])
+        if col.get("name") and not col.get("readOnly") and not col.get("hidden")
+    }
+    _column_cache[cache_key] = names
+    logger.info("Discovered %s writable columns on list %s.", len(names), cache_key)
+    return names
+
+
+def _pick_column(available: set, candidates: tuple, default: Optional[str] = None) -> Optional[str]:
+    """First candidate column that exists on the list, else `default`."""
+    for name in candidates:
+        if name in available:
+            return name
+    return default
+
+
+def _event_is_all_day(event) -> bool:
+    """
+    Infer all-day status from the stored times, since WorkCalendarEvent has no
+    all_day field. Matches the inbound convention in sync_sharepoint_calendar():
+    midnight start (local wall-clock) spanning a whole number of days.
+    """
+    local_tz = ZoneInfo(settings.TIME_ZONE)
+    start_local = event.start_at.astimezone(local_tz)
+    if start_local.time() != datetime.min.time():
+        return False
+    span = event.end_at - event.start_at
+    return span >= timedelta(hours=24) and span.total_seconds() % 86400 == 0
+
+
+def _build_sp_fields(event, available: set) -> Dict[str, Any]:
+    """
+    Map a WorkCalendarEvent onto SharePoint column names, dropping any column
+    the list doesn't have. Raises RuntimeError if the list has no usable
+    start/end columns, since a calendar item without dates is meaningless.
+    """
+    title_col = _pick_column(available, _TITLE_COLUMN_CANDIDATES, default="Title")
+    start_col = _pick_column(available, _START_COLUMN_CANDIDATES)
+    end_col = _pick_column(available, _END_COLUMN_CANDIDATES)
+
+    if not start_col or not end_col:
+        raise RuntimeError(
+            "SharePoint calendar list is missing a writable start and/or end date "
+            f"column (looked for {_START_COLUMN_CANDIDATES} and {_END_COLUMN_CANDIDATES}). "
+            "Cannot push events."
+        )
+
+    fields: Dict[str, Any] = {
+        title_col: event.title,
+        start_col: _uncorrect_sharepoint_datetime(event.start_at),
+        end_col: _uncorrect_sharepoint_datetime(event.end_at),
+    }
+
+    if "Description" in available:
+        fields["Description"] = event.description or ""
+    if "Location" in available:
+        fields["Location"] = event.location or ""
+    if "Category" in available:
+        fields["Category"] = _map_kind_to_category(event.kind)
+    if "fAllDayEvent" in available:
+        fields["fAllDayEvent"] = _event_is_all_day(event)
+
+    return fields
+
+
+def _calendar_target() -> tuple:
+    """Resolve (token, site_id, list_id) for calendar Graph calls."""
+    site_id = (getattr(settings, "SHAREPOINT_CALENDAR_SITE_ID", None) or "").strip()
+    list_id = (getattr(settings, "SHAREPOINT_CALENDAR_LIST_ID", None) or "").strip()
+    if not site_id or not list_id:
+        raise RuntimeError(
+            "SHAREPOINT_CALENDAR_SITE_ID and SHAREPOINT_CALENDAR_LIST_ID must be "
+            "set in settings before pushing calendar events."
+        )
+    return get_graph_service_token(), site_id, list_id
+
+
+def _get_sp_item_last_modified(
+    token: str, site_id: str, list_id: str, sp_id: str
+) -> Optional[datetime]:
+    """Re-read an item to capture the lastModifiedDateTime Graph assigned it."""
+    enc_site = quote(site_id, safe="")
+    enc_list = quote(list_id, safe="")
+    url = f"{GRAPH_BASE}/sites/{enc_site}/lists/{enc_list}/items/{quote(str(sp_id), safe='')}"
+    resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=60)
+    if resp.status_code != 200:
+        logger.warning(
+            "Could not re-read SharePoint item %s for lastModifiedDateTime: HTTP %s",
+            sp_id,
+            resp.status_code,
+        )
+        return None
+    return _parse_graph_datetime(resp.json().get("lastModifiedDateTime"))
+
+
+def event_is_pushable(event) -> tuple:
+    """
+    Decide whether an event may be written to the shared SharePoint calendar.
+    Returns (ok: bool, reason: str).
+
+    Private events never leave Django — the SharePoint list is company-wide.
+    """
+    if not getattr(settings, "SHAREPOINT_CALENDAR_PUSH_ENABLED", False):
+        return False, "push disabled (SHAREPOINT_CALENDAR_PUSH_ENABLED)"
+    if getattr(event, "is_private", False):
+        return False, "event is private"
+    return True, ""
+
+
+def push_event_to_sharepoint(event, target: Optional[tuple] = None) -> Optional[str]:
+    """
+    Create or update the SharePoint list item mirroring `event`.
+
+    Returns the SharePoint item id on success, None if the push was skipped.
+    Updates the event's sharepoint_id / sharepoint_last_modified so the next
+    pull recognizes the item as already in sync instead of re-importing it.
+
+    `target` is an optional pre-resolved (token, site_id, list_id) tuple, so a
+    batch caller can acquire one token for the whole run instead of one per
+    event. Single-event callers should omit it.
+
+    Raises on Graph failure — callers in the request path should use
+    schedule_event_push() instead, which swallows and logs.
+    """
+    ok, reason = event_is_pushable(event)
+    if not ok:
+        logger.info("Skipping SharePoint push for event %s: %s", event.pk, reason)
+        return None
+
+    token, site_id, list_id = target or _calendar_target()
+    available = _get_writable_list_columns(token, site_id, list_id)
+    fields = _build_sp_fields(event, available)
+
+    enc_site = quote(site_id, safe="")
+    enc_list = quote(list_id, safe="")
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    sp_id = (event.sharepoint_id or "").strip()
+
+    if sp_id:
+        url = (
+            f"{GRAPH_BASE}/sites/{enc_site}/lists/{enc_list}"
+            f"/items/{quote(sp_id, safe='')}/fields"
+        )
+        resp = requests.patch(url, headers=headers, json=fields, timeout=60)
+        if resp.status_code == 404:
+            # Item was deleted in SharePoint — fall through and recreate it.
+            logger.warning(
+                "SharePoint item %s for event %s no longer exists; recreating.",
+                sp_id,
+                event.pk,
+            )
+            sp_id = ""
+        elif resp.status_code not in (200, 201):
+            raise RuntimeError(
+                f"SharePoint item update failed for event {event.pk} "
+                f"(item {sp_id}) with HTTP {resp.status_code}: {resp.text}"
+            )
+
+    if not sp_id:
+        url = f"{GRAPH_BASE}/sites/{enc_site}/lists/{enc_list}/items"
+        resp = requests.post(url, headers=headers, json={"fields": fields}, timeout=60)
+        if resp.status_code not in (200, 201):
+            raise RuntimeError(
+                f"SharePoint item creation failed for event {event.pk} "
+                f"with HTTP {resp.status_code}: {resp.text}"
+            )
+        sp_id = str(resp.json().get("id") or "").strip()
+        if not sp_id:
+            raise RuntimeError(
+                f"SharePoint item creation for event {event.pk} returned no id: {resp.text}"
+            )
+
+    sp_lm = _get_sp_item_last_modified(token, site_id, list_id, sp_id)
+    WorkCalendarEvent.objects.filter(pk=event.pk).update(
+        sharepoint_id=sp_id,
+        sharepoint_last_modified=sp_lm,
+    )
+    event.sharepoint_id = sp_id
+    event.sharepoint_last_modified = sp_lm
+    logger.info("Pushed event %s to SharePoint item %s.", event.pk, sp_id)
+    return sp_id
+
+
+def delete_event_from_sharepoint(sharepoint_id: str) -> bool:
+    """
+    Delete the SharePoint list item with the given id.
+
+    Takes the raw id rather than an event because the Django row is usually
+    already gone by the time this runs. Returns True if the item was deleted or
+    was already absent.
+    """
+    sp_id = (sharepoint_id or "").strip()
+    if not sp_id:
+        return False
+    if not getattr(settings, "SHAREPOINT_CALENDAR_PUSH_ENABLED", False):
+        logger.info("Skipping SharePoint delete for item %s: push disabled.", sp_id)
+        return False
+
+    token, site_id, list_id = _calendar_target()
+    enc_site = quote(site_id, safe="")
+    enc_list = quote(list_id, safe="")
+    url = f"{GRAPH_BASE}/sites/{enc_site}/lists/{enc_list}/items/{quote(sp_id, safe='')}"
+    resp = requests.delete(url, headers={"Authorization": f"Bearer {token}"}, timeout=60)
+    if resp.status_code in (200, 204, 404):
+        logger.info("Deleted SharePoint item %s (HTTP %s).", sp_id, resp.status_code)
+        return True
+    raise RuntimeError(
+        f"SharePoint item delete failed for item {sp_id} "
+        f"with HTTP {resp.status_code}: {resp.text}"
+    )
+
+
+def schedule_event_push(event) -> None:
+    """
+    Queue a SharePoint push to run after the current transaction commits.
+
+    Never raises: a Graph outage must not roll back or 500 the user's save. A
+    failed push leaves sharepoint_id empty, so the backlog sweep can retry it.
+    """
+    event_pk = event.pk
+
+    def _run():
+        try:
+            # Re-read rather than closing over the instance: the row is the
+            # source of truth once the transaction has committed.
+            fresh = WorkCalendarEvent.objects.filter(pk=event_pk).first()
+            if fresh is not None:
+                push_event_to_sharepoint(fresh)
+        except Exception:
+            logger.exception("Deferred SharePoint push failed for event %s", event_pk)
+
+    transaction.on_commit(_run)
+
+
+def schedule_event_delete(sharepoint_id: str) -> None:
+    """Queue a SharePoint delete for after commit. Never raises."""
+    sp_id = (sharepoint_id or "").strip()
+    if not sp_id:
+        return
+
+    def _run():
+        try:
+            delete_event_from_sharepoint(sp_id)
+        except Exception:
+            logger.exception("Deferred SharePoint delete failed for item %s", sp_id)
+
+    transaction.on_commit(_run)
 
 
 def sync_sharepoint_calendar() -> Dict[str, int]:
@@ -331,9 +664,14 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
                             existing.end_at = end_at
                             if has_all_day_field:
                                 existing.all_day = is_all_day
-                            existing.organizer = owner
-                            existing.source_system = "sharepoint"
-                            existing.source_identifier = sp_id_str
+                            # Only SharePoint-origin rows get their ownership
+                            # rewritten. A portal-created event that we pushed up
+                            # is mirrored in SharePoint, not owned by it —
+                            # reassigning organizer here would strip the creator's
+                            # edit/delete rights in portal_event_update/delete.
+                            if existing.source_system == "sharepoint":
+                                existing.organizer = owner
+                                existing.source_identifier = sp_id_str
                             existing.sharepoint_id = sp_id_str
                             existing.sharepoint_last_modified = sp_lm
                             existing.full_clean()
@@ -406,6 +744,111 @@ def sync_sharepoint_calendar() -> Dict[str, int]:
     }
     logger.info("SharePoint calendar sync finished: %s", stats)
     return stats
+
+
+def push_pending_events_to_sharepoint() -> Dict[str, int]:
+    """
+    Sweep events that have no SharePoint item yet and push them.
+
+    Catches events created while the push was disabled and events whose live
+    push failed (Graph outage, transient 5xx). Gated by
+    SHAREPOINT_CALENDAR_BACKFILL_ENABLED, which defaults to False: enabling it
+    writes existing portal events onto the shared company calendar, so that is a
+    deliberate one-time decision, not a default.
+
+    Returns counts: candidates, pushed, skipped, errors.
+    """
+    stats = {"candidates": 0, "pushed": 0, "skipped": 0, "errors": 0}
+
+    if not getattr(settings, "SHAREPOINT_CALENDAR_PUSH_ENABLED", False):
+        logger.info("Backlog push skipped: SHAREPOINT_CALENDAR_PUSH_ENABLED is False.")
+        return stats
+    if not getattr(settings, "SHAREPOINT_CALENDAR_BACKFILL_ENABLED", False):
+        logger.info(
+            "Backlog push skipped: SHAREPOINT_CALENDAR_BACKFILL_ENABLED is False."
+        )
+        return stats
+
+    since_days = getattr(settings, "SHAREPOINT_CALENDAR_BACKFILL_SINCE_DAYS", 30)
+    floor = timezone.now() - timedelta(days=since_days)
+
+    candidates = WorkCalendarEvent.objects.filter(
+        Q(sharepoint_id__isnull=True) | Q(sharepoint_id=""),
+        is_private=False,
+        start_at__gte=floor,
+    ).order_by("start_at")
+
+    stats["candidates"] = candidates.count()
+    logger.info(
+        "Backlog push: %s candidate event(s) with start_at >= %s.",
+        stats["candidates"],
+        floor.isoformat(),
+    )
+
+    if not stats["candidates"]:
+        return stats
+
+    # One token and one schema lookup for the whole sweep.
+    target = _calendar_target()
+
+    for event in candidates:
+        try:
+            if push_event_to_sharepoint(event, target=target) is None:
+                stats["skipped"] += 1
+            else:
+                stats["pushed"] += 1
+        except Exception:
+            stats["errors"] += 1
+            logger.exception("Backlog push failed for event %s", event.pk)
+
+    logger.info("Backlog push finished: %s", stats)
+    return stats
+
+
+def sync_sharepoint_calendar_two_way() -> Dict[str, Any]:
+    """
+    Full sync: pull SharePoint into Django, then push any events SharePoint is
+    missing. Backs the superuser "Sync SP" button and the scheduled WebJob.
+
+    The pull runs first so a locally-created event that already exists in
+    SharePoint gets linked by sharepoint_id before the push considers it.
+
+    Returns a merged stat dict. The *_local / *_sp key names are what the index
+    page toast renders.
+    """
+    errors: List[str] = []
+
+    pull = {"fetched": 0, "created": 0, "updated": 0, "skipped": 0, "errors": 0}
+    try:
+        pull = sync_sharepoint_calendar()
+    except Exception as exc:
+        logger.exception("Two-way sync: pull phase failed")
+        errors.append(f"Pull failed: {exc}")
+
+    push = {"candidates": 0, "pushed": 0, "skipped": 0, "errors": 0}
+    try:
+        push = push_pending_events_to_sharepoint()
+    except Exception as exc:
+        logger.exception("Two-way sync: push phase failed")
+        errors.append(f"Push failed: {exc}")
+
+    if pull.get("errors"):
+        errors.append(f"{pull['errors']} item(s) failed to import from SharePoint")
+    if push.get("errors"):
+        errors.append(f"{push['errors']} event(s) failed to push to SharePoint")
+
+    result = {
+        "fetched": pull.get("fetched", 0),
+        "created_local": pull.get("created", 0),
+        "updated_local": pull.get("updated", 0),
+        "skipped_local": pull.get("skipped", 0),
+        "created_sp": push.get("pushed", 0),
+        "updated_sp": 0,
+        "skipped_sp": push.get("skipped", 0),
+        "errors": errors,
+    }
+    logger.info("Two-way SharePoint calendar sync finished: %s", result)
+    return result
 
 
 _DEFAULT_DOCS_PATH = "Statz-Public/data/V87/aFed-DOD"

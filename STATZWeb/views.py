@@ -10,7 +10,7 @@ from django.conf import settings
 from users.forms import PortalResourceForm, PortalSectionForm, WorkCalendarEventForm, WorkCalendarTaskForm
 from users.models import Announcement
 from users.portal_services import build_portal_context
-from users.sharepoint_sync import SharePointCalendarSync
+from users.sharepoint_services import sync_sharepoint_calendar_two_way
 from .system_test_utils import run_system_tests
 from .version_utils import get_version_info, get_display_version
 
@@ -161,7 +161,7 @@ def delete_announcement(request, announcement_id):
 def sharepoint_sync_view(request):
     """Run two-way SharePoint list sync for work calendar events (Microsoft Graph)."""
     try:
-        result = SharePointCalendarSync().run_sync()
+        result = sync_sharepoint_calendar_two_way()
         return JsonResponse(result)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
