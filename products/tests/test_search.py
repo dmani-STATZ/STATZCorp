@@ -107,3 +107,34 @@ class PortalSearchClassifierTests(TestCase):
         self.assertContains(resp, reverse('products:nsn_create'))
         self.assertContains(resp, 'Create this NSN')
         self.assertContains(resp, 'nsn_code=9999-99-999-9999')
+
+    def test_text_search_matches_nonstandard_nsn_code_hyphenated(self):
+        Nsn.objects.create(
+            nsn_code='RSM-B-BL-EZ',
+            part_number='Robust Steel Max Black/Blue',
+        )
+        resp = self.client.get(reverse('products:portal_search'), {'q': 'RSM-B-BL-EZ'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'RSM-B-BL-EZ')
+
+    def test_text_search_matches_nonstandard_nsn_code_dashless(self):
+        nsn = Nsn.objects.create(
+            nsn_code='RSM-B-BL-EZ',
+            part_number='Robust Steel Max Black/Blue',
+        )
+        resp = self.client.get(reverse('products:portal_search'), {'q': 'RSMBBLEZ'})
+        self.assertEqual(resp.status_code, 200)
+        # Results table renders format_nsn(nsn_normalized) for non-13-char codes (dashless).
+        self.assertContains(resp, 'RSMBBLEZ')
+        self.assertTrue(any(h.pk == nsn.pk and h.nsn_code == 'RSM-B-BL-EZ' for h in resp.context['nsn_hits']))
+
+    def test_cage_shaped_nonstandard_code_falls_back_to_text_search(self):
+        Nsn.objects.create(
+            nsn_code='AAA-B-R',
+            part_number='Adjustable Armrests Black/Red',
+        )
+        self.assertFalse(Supplier.objects.filter(cage_code__iexact='AAABR').exists())
+        self.assertFalse(SAMEntityCache.objects.filter(cage_code__iexact='AAABR').exists())
+        resp = self.client.get(reverse('products:portal_search'), {'q': 'AAA-B-R'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'AAA-B-R')

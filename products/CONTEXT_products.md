@@ -208,6 +208,11 @@ The migration uses `SeparateDatabaseAndState` to avoid touching the existing dat
 - **Drift counts (local MSSQL dev, 43 rows):** before fix `normalize_nsn(nsn_code) != nsn_normalized` → **0**; `nsn_code` populated but `nsn_normalized` empty → **0**. Production (~13k rows) expected to show the empty-column pattern on MERGE-sourced rows; run `python manage.py backfill_nsn_normalized` there and inspect `SELECT COUNT(*) FROM contracts_nsn WHERE nsn_code IS NOT NULL AND nsn_code <> '' AND (nsn_normalized IS NULL OR nsn_normalized = '')`.
 - **Fix:** (1) Idempotent `backfill_nsn_normalized` to repopulate the column. (2) `_nsns_matching_normalized()` / `_nsns_matching_niin()` in `products/views.py` — primary `nsn_normalized` index lookup, then sargable `nsn_code__in=nsn_query_variants()` / bounded NIIN fallback so search works before backfill completes. Regression tests: `test_golden_production_nsn`, `test_full_nsn_matches_when_nsn_normalized_empty`, `test_niin_matches_when_nsn_normalized_empty`.
 
+### Omnibox search missed non-standard nsn_code values (2026-08-17)
+- **Symptom:** Non-government part identifiers stored in `nsn_code` (e.g. `RSM-B-BL-EZ`, `AAA-B-R`) returned "No matches" in the portal omnibox even though the row existed.
+- **Root cause:** `_search_text()` filtered only `part_number`/`description`, never `nsn_code`/`nsn_normalized`. Separately, 5-char-normalized codes (e.g. `AAA-B-R` → `AAABR`) were captured by the CAGE bucket in `portal_search()` and never reached a part search when no matching supplier/SAM row existed.
+- **Fix:** `_search_text()` in `products/views.py` now also matches `nsn_code__icontains` and (when non-empty) `nsn_normalized__icontains=normalize_nsn(query)`. `_search_cage()` now falls back to `_search_text()` when no supplier and no SAM match is found for a 5-char token.
+
 
 ## CSS Architecture
 

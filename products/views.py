@@ -302,7 +302,7 @@ def portal_search(request):
 
     cage_token = _cage_search_token(raw_stripped)
     if cage_token:
-        return _search_cage(request, cage_token)
+        return _search_cage(request, cage_token, raw_stripped)
 
     return _search_text(request, raw_stripped)
 
@@ -354,7 +354,7 @@ def _search_niin(request, niin):
     })
 
 
-def _search_cage(request, cage):
+def _search_cage(request, cage, raw_query=''):
     from sales.models.sam_cache import SAMEntityCache
 
     cage = (cage or '').strip().upper()
@@ -372,6 +372,7 @@ def _search_cage(request, cage):
                 'part_hits': [],
                 'sam_only': sam,
             })
+        return _search_text(request, raw_query or cage)
 
     return render(request, 'products/search_results.html', {
         'query': cage,
@@ -412,10 +413,17 @@ def _search_text(request, query):
             if len(part_hits) >= 50:
                 break
 
+    nsn_filter = (
+        Q(part_number__icontains=query)
+        | Q(description__icontains=query)
+        | Q(nsn_code__icontains=query)
+    )
+    normalized_query = normalize_nsn(query)
+    if normalized_query:
+        nsn_filter |= Q(nsn_normalized__icontains=normalized_query)
+
     nsn_hits = list(
-        Nsn.objects.filter(
-            Q(part_number__icontains=query) | Q(description__icontains=query)
-        ).order_by('nsn_code')[:50]
+        Nsn.objects.filter(nsn_filter).order_by('nsn_code')[:50]
     )
 
     return render(request, 'products/search_results.html', {
