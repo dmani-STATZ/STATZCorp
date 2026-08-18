@@ -153,6 +153,8 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 **Matching / lookup patterns (external contract numbers):** When matching externally sourced contract numbers against the STATZ database, normalize both sides using `strip_contract_number_dashes()` from `contracts/services/dfas_matcher.py` and `_norm_qs()` for the ORM-annotated queryset side. Do not use raw string equality on `contract_number` fields when the source is outside STATZ (for example DFAS CSVs, other imports, or external API feeds).
 
+**Contract numbers are not DLA-only.** The PIID validators in `contracts/services/contract_number.py`, `contracts/services/dfas_matcher.py`, and `processing/services/contract_utils.py` accept any 6-character activity code — `SPE*` (DLA), `W912PB` (Army), `STATZ1` (STATZ internal / COTS), and so on. Do not reintroduce an `SPE`-anchored pattern: it silently made W912PB numbers unusable as match keys and rejected STATZ1 numbers that `_CONTRACT_TYPE_MAP` already documented. The shape that *is* enforced is 6 alphanumeric + 2-digit fiscal year + 1 letter instrument type + 4 alphanumeric serial (optionally + `P` and 5 digits for a DO call number). `contracts.tests.test_contract_number.NonDlaContractNumberTests` guards this.
+
 **Forms own validation, but views own object creation.** `ClinForm` intentionally strips NSN/Supplier errors because the view handles those objects separately. Do not move that responsibility without updating both sides.
 
 **AJAX/HTMX patterns are common.** Many views return HTML fragments (notes list, shipments, splits, payment history popup) for HTMX targets. These views often have both a "full page" and "partial" rendering path. Be careful not to break partial rendering when editing view context.

@@ -14,6 +14,7 @@ from contracts.services.dfas_matcher import (
     match_dfas_row,
     strip_contract_number_dashes,
 )
+from processing.services.contract_utils import normalize_contract_number
 from contracts.services.dfas_parser import ParsedDfasRow
 
 
@@ -178,3 +179,80 @@ class PartnerReconciliationNoneKeyTests(TestCase):
             statuses.count(PartnerReconciliationRow.STATUS_MISSING_IN_STATZ),
             2,
         )
+
+
+class NonDlaContractNumberTests(TestCase):
+    """
+    STATZ is not DLA-only. COTS and other non-DLA work is booked under activity
+    codes like W912PB (Army) and STATZ1 (internal), and those must normalize and
+    match exactly like SPE* numbers do.
+
+    Before 2026-08-18 the dashed patterns hard-coded an ``SPE`` prefix and the
+    undashed ones required three leading letters, so W912PB numbers were
+    silently unusable as match keys and STATZ1 numbers failed canonicalization
+    even though _CONTRACT_TYPE_MAP already documented STATZ1-FY-N-####.
+    """
+
+    NON_DLA = [
+        ("W912PB-24-C-0001", "W912PB24C0001", "Army"),
+        ("STATZ1-26-N-1001", "STATZ126N1001", "STATZ internal / COTS"),
+        ("N00019-24-D-0012", "N0001924D0012", "Navy"),
+        ("FA8620-23-C-1234", "FA862023C1234", "Air Force"),
+    ]
+
+    def test_canonicalize_accepts_non_dla_dashed(self):
+        for dashed, _undashed, label in self.NON_DLA:
+            with self.subTest(agency=label):
+                self.assertEqual(canonicalize_contract_number(dashed), dashed)
+
+    def test_canonicalize_dashes_non_dla_undashed(self):
+        for dashed, undashed, label in self.NON_DLA:
+            with self.subTest(agency=label):
+                self.assertEqual(canonicalize_contract_number(undashed), dashed)
+
+    def test_canonicalize_logs_no_warning_for_non_dla(self):
+        """The whole point: these must stop being treated as malformed."""
+        import logging as _logging
+        for dashed, undashed, label in self.NON_DLA:
+            with self.subTest(agency=label):
+                with self.assertNoLogs("contracts.services.contract_number", level=_logging.WARNING):
+                    canonicalize_contract_number(dashed)
+                    canonicalize_contract_number(undashed)
+
+    def test_strip_accepts_non_dla(self):
+        for dashed, undashed, label in self.NON_DLA:
+            with self.subTest(agency=label):
+                self.assertEqual(strip_contract_number_dashes(dashed), undashed)
+                self.assertEqual(strip_contract_number_dashes(undashed), undashed)
+
+    def test_processing_normalizer_agrees(self):
+        """processing.contract_utils is a second copy of this logic - keep them in step."""
+        for dashed, undashed, label in self.NON_DLA:
+            with self.subTest(agency=label):
+                self.assertEqual(normalize_contract_number(undashed), dashed)
+                self.assertEqual(normalize_contract_number(dashed), dashed)
+
+    def test_dla_numbers_still_work(self):
+        """Widening the prefix must not disturb the DLA path."""
+        self.assertEqual(canonicalize_contract_number("SPE7L126P7653"), "SPE7L1-26-P-7653")
+        self.assertEqual(canonicalize_contract_number("SPE7M5-26-D-60JK"), "SPE7M5-26-D-60JK")
+        self.assertEqual(strip_contract_number_dashes("SPE7L1-26-P-7653"), "SPE7L126P7653")
+        self.assertEqual(
+            strip_contract_number_dashes("SPE4A624PAR82P00003"), "SPE4A624PAR82P00003"
+        )
+
+    def test_p_suffix_do_number_accepts_non_dla(self):
+        self.assertEqual(
+            strip_contract_number_dashes("W912PB-24-F-AR82-P00003"),
+            "W912PB24FAR82P00003",
+        )
+
+    def test_still_rejects_non_piid_shapes(self):
+        """
+        Widening the prefix must not turn the validator into a pass-through.
+        A 13-character run of letters has no 2-digit fiscal year and no
+        instrument-type letter in position 9, so it is not a PIID.
+        """
+        for junk in ["ABCDEFGHIJKLM", "NOT-A-CONTRACT", "GARBAGE!!!", "SHORT"]:
+            with self.subTest(value=junk):
+                self.assertIsNone(strip_contract_number_dashes(junk))

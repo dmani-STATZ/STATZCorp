@@ -1,8 +1,16 @@
 """
-DLA contract number normalization for cross-app matching.
+Contract number normalization for cross-app matching.
 
 Canonical dashed format (e.g. SPE7M5-26-D-60JK) used when storing or looking up
 ``contracts.Contract.contract_number`` from external DIBBS / award sources.
+
+Accepts any DoD PIID shape, not just DLA. The structure is fixed at 6-char
+activity code + 2-digit fiscal year + 1-letter instrument type + 4-char serial,
+but the activity code is not restricted to ``SPE*``:
+
+    SPE7L1-26-P-7653   DLA Troop Support
+    W912PB-24-C-0001   Army
+    STATZ1-26-N-1001   STATZ internal / COTS (non-DLA) tracking numbers
 """
 from __future__ import annotations
 
@@ -12,9 +20,12 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-_RE_UNDASHED_13 = re.compile(r"^[A-Z]{3}[A-Z0-9]{10}$", re.IGNORECASE)
-_RE_DASHED_DLA = re.compile(
-    r"^(SPE[A-Z0-9]{2,3})-(\d{2})-([A-Z])-([A-Z0-9]{4})$",
+# PIID structure: 6-char activity code, 2-digit FY, 1-letter type, 4-char serial.
+# The activity code is deliberately NOT restricted to SPE* - STATZ books COTS and
+# other non-DLA work under prefixes like W912PB (Army) and STATZ1 (internal).
+_RE_UNDASHED_13 = re.compile(r"^[A-Z0-9]{6}\d{2}[A-Z][A-Z0-9]{4}$", re.IGNORECASE)
+_RE_DASHED_PIID = re.compile(
+    r"^([A-Z0-9]{6})-(\d{2})-([A-Z])-([A-Z0-9]{4})$",
     re.IGNORECASE,
 )
 
@@ -22,9 +33,10 @@ _RE_DASHED_DLA = re.compile(
 # NOTE: This is the only function that does this. Before adding another contract-number normalizer anywhere in this codebase, check here first.
 def canonicalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
     """
-    Normalize a DLA contract number to the standard dashed format.
+    Normalize a DoD PIID contract number to the standard dashed format.
 
-    Handles already-dashed values and clean 13-character undashed strings.
+    Handles already-dashed values and clean 13-character undashed strings, for
+    any activity-code prefix (DLA, other services, or STATZ internal numbers).
     Unrecognized formats are returned uppercased/stripped with a warning.
     """
     if not contract_number:
@@ -43,11 +55,11 @@ def canonicalize_contract_number(contract_number: Optional[str]) -> Optional[str
         return None
 
     if "-" in s:
-        if _RE_DASHED_DLA.match(s):
+        if _RE_DASHED_PIID.match(s):
             return s
         logger.warning(
             "canonicalize_contract_number: dashed input does not match expected "
-            "DLA pattern, passing through as-is: %r",
+            "PIID pattern, passing through as-is: %r",
             s,
         )
         return s
