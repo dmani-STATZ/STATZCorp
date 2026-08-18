@@ -10,10 +10,7 @@ from django.utils import timezone
 from arcade.models import ArcadeAttempt
 from arcade.puzzles.lights_out import (
     LightsOutGame,
-    solve_lights_out_par,
-    NULL_SPACE_MASKS,
-    PIVOT_SOLVER_MASKS,
-    CELL_TOGGLES,
+    solve_lights_out_solution,
 )
 from arcade.services import compute_handicap, get_arcade_today, make_attempt_token
 
@@ -66,21 +63,11 @@ class ArcadeViewsTestCase(TestCase):
         grid = puzzle["initial_grid"]
         grid_mask = sum((grid[r][c] << (r * 5 + c)) for r in range(5) for c in range(5))
 
-        # Solve via fast PIVOT_SOLVER_MASKS
-        x0 = 0
-        for pc, mask in PIVOT_SOLVER_MASKS:
-            if bin(grid_mask & mask).count("1") & 1:
-                x0 |= (1 << pc)
-
-        # Pick minimal solution (par)
-        best_sol = None
-        min_w = 25
-        for ns in NULL_SPACE_MASKS:
-            sol = x0 ^ ns
-            w = bin(sol).count("1")
-            if w < min_w:
-                min_w = w
-                best_sol = sol
+        # Ask the production solver for the optimal press set. This test used to
+        # reimplement the GF(2) math inline, which meant it agreed with a broken
+        # NULL_SPACE_MASKS instead of catching it.
+        best_sol = solve_lights_out_solution(grid_mask)
+        self.assertEqual(bin(best_sol).count("1"), puzzle["par"])
 
         # Convert solution bitmask into coordinate moves
         moves_list = []

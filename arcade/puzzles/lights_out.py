@@ -15,8 +15,23 @@ for r in range(5):
                 mask |= (1 << (nr * 5 + nc))
         CELL_TOGGLES.append(mask)
 
-# Null space coset masks over GF(2) (dimension 2 -> 4 solution sets per board)
-NULL_SPACE_MASKS = [0, 0x00EAEAEA, 0x015A005A5, 0x01B03603B]
+# Quiet patterns: the GF(2) null space of the 5x5 toggle matrix (dimension 2,
+# so 4 cosets -> 4 candidate solutions for any solvable board). Pressing every
+# cell of a quiet pattern leaves the board unchanged, so XOR-ing one into a
+# solution yields another valid solution of possibly lower weight.
+#
+#   0x0EAEEAE      0x15A82B5      0x1B06C1B
+#    . # # # .      # . # . #      # # . # #
+#    # . # . #      # . # . #      . . . . .
+#    # # . # #      . . . . .      # # . # #
+#    # . # . #      # . # . #      . . . . .
+#    . # # # .      # . # . #      # # . # #
+#
+# Every value must be < 2**25 (the board is 25 cells) and must XOR to zero
+# through CELL_TOGGLES. QuietPatternTestCase.test_null_space_masks_are_quiet
+# enforces both - do not hand-edit these without rerunning it. A wrong value
+# here silently corrupts par for roughly half of all generated puzzles.
+NULL_SPACE_MASKS = [0x0000000, 0x0EAEEAE, 0x15A82B5, 0x1B06C1B]
 
 # Precomputed solver masks for pivot columns over GF(2)
 # Allows O(1) solving (~1 microsecond) without running matrix elimination per call.
@@ -41,8 +56,20 @@ WEEKDAY_PAR_BANDS = {
 }
 
 
-def solve_lights_out_par(grid_mask: int) -> int:
-    """Computes the minimal solution weight (par) for a 5x5 Lights Out grid state over GF(2)."""
+def solve_lights_out_solution(grid_mask: int) -> int:
+    """
+    Return the minimal-weight press set that clears `grid_mask`, as a 25-bit mask.
+
+    Single source of truth for solving. Callers needing only the move count use
+    solve_lights_out_par(); tests must call this rather than reimplementing the
+    GF(2) math, so a bad constant fails loudly in one place instead of silently
+    disagreeing between the game and its tests.
+
+    Precondition: `grid_mask` is reachable by pressing cells from a cleared
+    board - which is how generate() builds every puzzle. Only 2**23 of the 2**25
+    grid states are solvable at all; passing an unsolvable state returns a mask
+    that does not clear the board.
+    """
     if grid_mask == 0:
         return 0
 
@@ -52,14 +79,18 @@ def solve_lights_out_par(grid_mask: int) -> int:
         if bin(grid_mask & mask).count("1") & 1:
             x0 |= (1 << pc)
 
-    # Find minimum popcount across all 4 nullspace coset solutions
-    min_par = 25
+    # x0 ^ quiet_pattern is also a solution; keep the one needing fewest presses.
+    best = x0
     for ns in NULL_SPACE_MASKS:
         sol = x0 ^ ns
-        w = bin(sol).count("1")
-        if w < min_par:
-            min_par = w
-    return min_par
+        if bin(sol).count("1") < bin(best).count("1"):
+            best = sol
+    return best
+
+
+def solve_lights_out_par(grid_mask: int) -> int:
+    """Computes the minimal solution weight (par) for a 5x5 Lights Out grid state over GF(2)."""
+    return bin(solve_lights_out_solution(grid_mask)).count("1")
 
 
 class LightsOutGame(PuzzleGame):
