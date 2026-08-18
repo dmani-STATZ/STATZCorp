@@ -17,8 +17,11 @@ from contracts.services.dfas_parser import ParsedDfasRow
 logger = logging.getLogger(__name__)
 
 _PSUFFIX_RE = re.compile(r'^P\d{5}$')
-_RE_STRIPPED_13 = re.compile(r"^[A-Z]{3}[A-Z0-9]{10}$")
-_RE_STRIPPED_19_PSUFFIX = re.compile(r"^[A-Z]{3}[A-Z0-9]{10}P\d{5}$")
+# PIID structure: 6-char activity code, 2-digit FY, 1-letter type, 4-char serial.
+# The activity code is deliberately NOT restricted to SPE* - STATZ books COTS and
+# other non-DLA work under prefixes like W912PB (Army) and STATZ1 (internal).
+_RE_STRIPPED_13 = re.compile(r"^[A-Z0-9]{6}\d{2}[A-Z][A-Z0-9]{4}$")
+_RE_STRIPPED_19_PSUFFIX = re.compile(r"^[A-Z0-9]{6}\d{2}[A-Z][A-Z0-9]{4}P\d{5}$")
 
 
 # NOTE: This is the only function that does this. Before adding another contract-number normalizer anywhere in this codebase, check here first.
@@ -29,15 +32,19 @@ def strip_contract_number_dashes(value: Optional[str]) -> Optional[str]:
     W912PB-24-C-0001) comparable to DFAS export values (no dashes, e.g.
     W912PB24C0001).
 
-    Validates the stripped result against known DLA shapes:
-      - 13 chars: 3-letter prefix + 10 alphanumeric (standard contract/IDIQ/DO number)
+    Validates the stripped result against the DoD PIID shapes STATZ uses:
+      - 13 chars: 6-char activity code + 2-digit FY + 1-letter instrument type
+        + 4-char serial (standard contract/IDIQ/DO number)
       - 19 chars: the above 13 chars + a P-suffix (P + 5 digits), for DO
         call numbers carrying the delivery-order modifier
 
+    The activity code is not restricted to DLA's SPE* prefixes — W912PB (Army)
+    and STATZ1 (STATZ internal / COTS) are equally valid.
+
     Returns None (instead of a best-effort guess) if the stripped value
-    doesn't match either shape — this means the input is not a DIBBS-format
-    contract number and should not be used as a comparison key. Callers
-    MUST treat a None return as "no match attempt", not as an empty string.
+    doesn't match either shape — this means the input is not a contract number
+    and should not be used as a comparison key. Callers MUST treat a None
+    return as "no match attempt", not as an empty string.
     """
     if not value:
         return None
@@ -48,7 +55,7 @@ def strip_contract_number_dashes(value: Optional[str]) -> Optional[str]:
         return stripped
     logger.warning(
         "strip_contract_number_dashes: input does not match a recognized "
-        "DLA shape (len=%d after stripping), rejecting: %r",
+        "PIID shape (len=%d after stripping), rejecting: %r",
         len(stripped), value,
     )
     return None

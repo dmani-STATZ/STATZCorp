@@ -12,12 +12,15 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Matches a clean 13-character undashed DLA contract number: SPE + 10 alphanum chars
-_RE_UNDASHED_13 = re.compile(r"^[A-Z]{3}[A-Z0-9]{10}$", re.IGNORECASE)
+# PIID structure: 6-char activity code, 2-digit FY, 1-letter type, 4-char serial.
+# The activity code is deliberately NOT restricted to SPE* - STATZ books COTS and
+# other non-DLA work under prefixes like W912PB (Army) and STATZ1 (internal), and
+# the "N" entry in _CONTRACT_TYPE_MAP below documents STATZ1-FY-N-#### explicitly.
+_RE_UNDASHED_13 = re.compile(r"^[A-Z0-9]{6}\d{2}[A-Z][A-Z0-9]{4}$", re.IGNORECASE)
 
-# Matches the standard dashed DLA format: SPE7M5-26-D-60JK
-_RE_DASHED_DLA = re.compile(
-    r"^(SPE[A-Z0-9]{2,3})-(\d{2})-([A-Z])-([A-Z0-9]{4})$",
+# Matches the standard dashed PIID format: SPE7M5-26-D-60JK, W912PB-24-C-0001
+_RE_DASHED_PIID = re.compile(
+    r"^([A-Z0-9]{6})-(\d{2})-([A-Z])-([A-Z0-9]{4})$",
     re.IGNORECASE,
 )
 
@@ -38,7 +41,7 @@ _CONTRACT_TYPE_MAP = {
 
 def normalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
     """
-    Normalize a DLA contract number to the standard dashed format.
+    Normalize a DoD PIID contract number to the standard dashed format.
 
     Handles two input cases:
     - Already dashed: "SPE7M5-26-D-60JK" → returned as-is (uppercased, stripped)
@@ -56,7 +59,7 @@ def normalize_contract_number(contract_number: Optional[str]) -> Optional[str]:
 
     # Already dashed — validate it matches the expected pattern
     if "-" in s:
-        if _RE_DASHED_DLA.match(s):
+        if _RE_DASHED_PIID.match(s):
             return s
         # Has dashes but doesn't match — pass through with warning
         logger.warning(
