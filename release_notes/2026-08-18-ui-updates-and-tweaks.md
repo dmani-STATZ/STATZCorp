@@ -3,7 +3,7 @@ id: 2026-08-18-ui-updates-and-tweaks
 title: UI Updates and Tweaks Plus
 published: true
 publish_date: 2026-08-18
-tags: [new, improved]
+tags: [new, system]
 critical: false
 ---
 **UI Tweaks** Updates the functions.
