@@ -1,0 +1,165 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block extra_head %}
+<style>
+    /* Backyard Marauder — full-bleed retro arcade cabinet */
+    #mar-stage {
+        position: relative;
+        width: 100%;
+        min-height: calc(100vh - 120px);
+        background: #05060f;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border-radius: .5rem;
+        box-shadow: inset 0 0 120px rgba(0, 0, 0, .9);
+    }
+    #mar-canvas {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        display: block;
+        background: #05060f;
+    }
+    /* CRT scanline overlay — kept off the per-frame render path */
+    #mar-crt {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0) 0px,
+            rgba(0, 0, 0, 0) 2px,
+            rgba(0, 0, 0, .18) 3px,
+            rgba(0, 0, 0, .18) 4px
+        );
+        mix-blend-mode: multiply;
+        z-index: 5;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        #mar-crt { display: none; }
+    }
+    .mar-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(3, 4, 12, .82);
+        color: #d7e3ff;
+        font-family: "Courier New", monospace;
+    }
+    .mar-panel {
+        max-width: 640px;
+        width: 100%;
+        border: 2px solid #37d6ff;
+        border-radius: .5rem;
+        background: rgba(6, 10, 26, .96);
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 0 24px rgba(55, 214, 255, .35);
+    }
+    .mar-panel h2 { color: #ffd83b; letter-spacing: 2px; text-transform: uppercase; }
+    .mar-scores { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .mar-scores > div { flex: 1 1 240px; }
+    .mar-scores table { width: 100%; font-size: .85rem; color: #b9c9ee; }
+    .mar-scores th { color: #37d6ff; text-align: left; border-bottom: 1px solid #26406b; }
+    .mar-scores td { padding: 1px 0; }
+    .mar-key { color: #ffd83b; }
+    #mar-mute {
+        position: absolute; top: 8px; right: 10px; z-index: 20;
+        background: rgba(6,10,26,.8); color:#37d6ff; border:1px solid #37d6ff;
+        border-radius: 4px; font-family: monospace; cursor: pointer; padding: 2px 8px;
+    }
+    .mar-hidden { display: none !important; }
+</style>
+{% endblock extra_head %}
+
+{% block body %}
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+        <div>
+            <h1 class="h4 mb-0 fw-bold text-body">Backyard Marauder</h1>
+            <p class="text-secondary small mb-0">Salvage rights don't defend themselves. Good luck, {{ callsign }}.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <span class="badge bg-warning text-dark align-self-center" id="mar-credits-badge">{{ credits }} cr</span>
+            <a href="{% url 'arcade:marauder_leaderboard' %}" class="btn btn-sm btn-outline-secondary">High Scores</a>
+            <a href="{% url 'arcade:lobby' %}" class="btn btn-sm btn-outline-secondary">Back to Arcade</a>
+        </div>
+    </div>
+
+    <div id="mar-stage">
+        <canvas id="mar-canvas" width="320" height="240"></canvas>
+        <div id="mar-crt"></div>
+        <button type="button" id="mar-mute" title="Toggle sound">SND: ON</button>
+
+        <!-- Start overlay -->
+        <div class="mar-overlay" id="mar-start-overlay">
+            <div class="mar-panel">
+                <h2>Backyard Marauder</h2>
+                <p class="small mb-2">A jerry-rigged terrestrial craft against the whole ultra-capitalist galactic fringe. Endless. Permadeath. One-shot take.</p>
+                <ul class="small mb-3">
+                    <li><span class="mar-key">Move</span> — mouse (the hull drifts with inertia)</li>
+                    <li><span class="mar-key">Fire</span> — hold left mouse (auto-fires)</li>
+                    <li><span class="mar-key">EMP flare</span> — right click / spacebar (limited charges)</li>
+                    <li>Grab branded crates: plating, overclock modules, sub-prime nukes, bounty multipliers</li>
+                </ul>
+                <div class="mar-scores mb-3">
+                    <div>
+                        <table><thead><tr><th>#</th><th>Pilot</th><th>Score</th></tr></thead>
+                        <tbody id="mar-start-global"></tbody></table>
+                    </div>
+                    <div>
+                        <table><thead><tr><th>#</th><th>Your Best Runs</th><th>Score</th></tr></thead>
+                        <tbody id="mar-start-personal"></tbody></table>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-danger w-100 fw-bold" id="mar-launch-btn">LAUNCH RUN</button>
+                <p class="small text-secondary mt-2 mb-0" id="mar-start-msg"></p>
+            </div>
+        </div>
+
+        <!-- Game-over overlay -->
+        <div class="mar-overlay mar-hidden" id="mar-over-overlay">
+            <div class="mar-panel">
+                <h2 id="mar-over-title">Hull Breached</h2>
+                <p class="small mb-2" id="mar-over-killed"></p>
+                <div class="row small mb-3" id="mar-over-stats"></div>
+                <div class="mar-scores mb-3">
+                    <div>
+                        <table><thead><tr><th>#</th><th>Pilot</th><th>Score</th></tr></thead>
+                        <tbody id="mar-over-global"></tbody></table>
+                    </div>
+                    <div>
+                        <table><thead><tr><th>#</th><th>Your Best Runs</th><th>Score</th></tr></thead>
+                        <tbody id="mar-over-personal"></tbody></table>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-danger w-100 fw-bold" id="mar-again-btn">FLY AGAIN</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.MARAUDER = {
+        startUrl: "{% url 'arcade:marauder_start' %}",
+        submitUrl: "{% url 'arcade:marauder_submit' %}",
+        leaderboardUrl: "{% url 'arcade:marauder_leaderboard' %}",
+        callsign: "{{ callsign|escapejs }}",
+        credits: {{ credits }},
+        globalTop: {{ global_top_json|default:"[]"|safe }},
+        personalTop: {{ personal_top_json|default:"[]"|safe }},
+    };
+</script>
+{% endblock body %}
+
+{% block extra_js %}
+<link rel="modulepreload" href="{% static 'arcade/js/marauder/loop.js' %}">
+<link rel="modulepreload" href="{% static 'arcade/js/marauder/canvas.js' %}">
+<link rel="modulepreload" href="{% static 'arcade/js/marauder/entities.js' %}">
+<script type="module" src="{% static 'arcade/js/marauder/main.js' %}?v={{ cache_version }}-{% now 'U' %}"></script>
+{% endblock extra_js %}

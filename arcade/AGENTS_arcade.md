@@ -62,6 +62,22 @@ Adding a new game to `arcade/registry.py`:
 
 ---
 
+## 2b. Backyard Marauder is NOT a PuzzleGame — don't force it through the registry
+
+Backyard Marauder (`/arcade/marauder/`) is a real-time shooter, separate from the daily-puzzle machinery. Do **not** register it in `registry.py`, give it a `PuzzleGame` subclass, or route it through `start`/`move`. It owns: `views_marauder.py`, `services_marauder.py`, the `PilotProfile` + `MarauderRun` models, `templates/arcade/marauder*.html`, and `static/arcade/js/marauder/` (ES modules).
+
+- **`MarauderRun.score` is HIGHER-is-better** (opposite of `ArcadeAttempt`). Never compare or aggregate the two. Never copy leaderboard ordering between them.
+- Keep the `marauder/*` URL paths **before** the `<game_key>` catch-all in `urls.py`.
+- Only `status='valid'` runs count on leaderboards; keep the `idx_marauder_*` indexes if you touch query shape.
+- `CHECKSUM_FIELDS` in `services_marauder.py` and the joined array in `net.js::submitRun` must change in the same commit or every submit 403s.
+- Constants marked `[SERVER]` in `const.js` must change in the same commit as their mirrors in `services_marauder.py`.
+- Do not change the Marauder signing salt without accepting that every in-flight run token dies on deploy.
+- Anti-cheat is layered deterrence (salted signed token + token-keyed HMAC + plausibility bounds + unique one-shot seeds). Don't claim it's tamper-proof; the honest hardening path is server-side re-simulation from the run seed.
+- Client is vanilla ES modules, no bundler. If you add gameplay randomness, route it through `rng.js` (seeded) so runs stay reproducible.
+- Never modify Wordle, Nonogram, or Lights Out code when working on Marauder.
+
+---
+
 ## 3. Adding Nonogram Art
 
 Canonical guide: [`docs/ART_AUTHORING.md`](../docs/ART_AUTHORING.md).

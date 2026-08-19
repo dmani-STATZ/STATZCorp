@@ -1,0 +1,71 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 pb-2 border-bottom">
+        <div>
+            <h1 class="h2 mb-1 fw-bold text-body">Backyard Marauder — High Scores</h1>
+            <p class="text-secondary small mb-0">All-time top runs across the galactic fringe.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'arcade:marauder_play' %}" class="btn btn-danger">Launch Run</a>
+            <a href="{% url 'arcade:lobby' %}" class="btn btn-outline-secondary">Back to Arcade</a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header fw-semibold">Top 5 Overall</div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead>
+                            <tr><th class="ps-3">#</th><th>Pilot</th><th>Score</th><th>Wave</th><th class="pe-3">Date</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for r in global_top %}
+                            <tr>
+                                <td class="ps-3">{{ r.rank }}</td>
+                                <td>{{ r.username }}</td>
+                                <td class="fw-medium">{{ r.score }}</td>
+                                <td>{{ r.wave_reached }}</td>
+                                <td class="pe-3 text-secondary small">{{ r.date }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center text-muted py-3">No runs yet. Be the first.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header fw-semibold">Your Top 5</div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead>
+                            <tr><th class="ps-3">#</th><th>Score</th><th>Distance</th><th>Wave</th><th class="pe-3">Date</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for r in personal_top %}
+                            <tr>
+                                <td class="ps-3">{{ r.rank }}</td>
+                                <td class="fw-medium">{{ r.score }}</td>
+                                <td>{{ r.distance_m }}m</td>
+                                <td>{{ r.wave_reached }}</td>
+                                <td class="pe-3 text-secondary small">{{ r.date }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center text-muted py-3">No runs yet. Go fly.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock body %}

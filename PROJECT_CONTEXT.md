@@ -18,9 +18,9 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 ## App Registry
 
 ### `arcade` — Hidden Daily-Puzzle Arcade
-**Purpose:** Daily shared puzzle games (Lights Out, Wordle-style, Nonogram) with server-authoritative grading, leaderboards, and handicap tracking.
+**Purpose:** Daily shared puzzle games (Lights Out, Wordle-style, Nonogram) with server-authoritative grading, leaderboards, and handicap tracking. Also hosts **Backyard Marauder**, a real-time shooter that lives *alongside* the daily-puzzle engine (not in `registry.py` / `ArcadeAttempt`).
 
-**Owns:** `ArcadeAttempt`
+**Owns:** `ArcadeAttempt`, `PilotProfile`, `MarauderRun`
 
 **Consumes from other apps:** None (totally isolated). Uses `settings.AUTH_USER_MODEL` and base template `templates/base_template.html`.
 

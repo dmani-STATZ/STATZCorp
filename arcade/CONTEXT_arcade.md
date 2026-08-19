@@ -3,7 +3,7 @@
 ## 1. Purpose & Scope
 The `arcade` app is a hidden daily-puzzle arcade hosted within STATZWeb. It features a lobby shell, shared per-day deterministic puzzles, server-authoritative grading, leaderboard standings, and player handicap tracking.
 
-Playable games: **Lights Out** (5×5), **Wordle** (5 letters / 6 guesses), and **Nonogram** (authored picture logic, 5×5 / 10×10 / 15×15).
+Playable games: **Lights Out** (5×5), **Wordle** (5 letters / 6 guesses), **Nonogram** (authored picture logic, 5×5 / 10×10 / 15×15), and **Backyard Marauder** (real-time shooter, not a daily puzzle).
 
 ---
 
@@ -95,3 +95,18 @@ Random number streams use explicit local `random.Random(seed_int)` instances. Mo
 
 ## 6. Views & Client Contract
 Generic `start` / `move` / `leaderboard` / `gallery` endpoints — no `if game_key ==` branching. Games raise `MoveRejected` for structured 400/409 reasons. Wordle `not_in_list` increments `WordleRejectedGuess` without breaking play. Gallery is opt-in via `PuzzleGame.has_gallery`.
+
+---
+
+## 7. Backyard Marauder — real-time shooter (NOT a PuzzleGame)
+
+A vertical-scrolling arcade shooter living **inside** the arcade app but deliberately **alongside** the daily-puzzle framework, never inside it. It does not use `PuzzleGame`, `ArcadeAttempt`, `registry.py`, or the generic `start`/`move` endpoints.
+
+- **Models** (`models.py`): `PilotProfile` (per-user economy: callsign, credits, total_runs, denormalized `best_score`) and `MarauderRun` (one row per completed run = the leaderboard). **`MarauderRun.score` is HIGHER-is-better** — the opposite of `ArcadeAttempt.score`. They never mix: separate tables, services, templates. `MarauderRun.seed` is **UNIQUE** (one-shot replay defense). Indexes `idx_marauder_global_top` (`status`, `-score`) and `idx_marauder_user_top` (`user`, `status`, `-score`) serve the two top-N queries; only `status='valid'` runs appear on boards.
+- **Views** (`views_marauder.py`): `play`, `run_start`, `run_submit`, `leaderboard`. **Services** (`services_marauder.py`): salted token, checksum, derived plausibility bounds, leaderboard reads — imports no registry. Contractually coupled to `static/arcade/js/marauder/const.js` (`[SERVER]` constants).
+- **URLs**: `/arcade/marauder/...` declared **before** the generic `<game_key>` catch-all in `urls.py`.
+- **Leaderboard**: all-time. User sees global top-5 (score, username, date) + their own top-5 (score, date). No visibility into other users' run lists.
+- **Anti-cheat** (deterrence, not prevention — a client-authoritative 60fps game cannot be fully cheat-proofed): distinct signing salt (`arcade.marauder.v1`, must not share the daily-puzzle signer namespace) → HMAC checksum keyed by the token (`CHECKSUM_FIELDS` must match `net.js::submitRun`) → plausibility bounds in `verify_submission` (flag borderline, reject absurd) → unique seed. Server owns the seed; the client PRNG (`rng.js`) is seeded from it, enabling future headless re-simulation of top scores.
+- **Phase 1 complete.** Phase 2 outstanding: replay-guard wiring in `views_marauder.py`, `IntegrityError` → 409, rate limiting on `run_start`.
+- **Client**: native ES modules under `static/arcade/js/marauder/` (entry `main.js`, `<script type="module">`, no bundler). Fixed 60Hz loop + interpolated render, 320×240 integer-upscaled canvas, procedural pixel-art sprite factory + WebAudio chiptune (no binary assets), object pools, threat-budget wave director. Logic-only modules are smoke-tested by `static/arcade/js/marauder/__selftest__.html`.
+- **Tests**: `tests/test_marauder.py`.

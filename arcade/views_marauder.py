@@ -1,0 +1,205 @@
+"""
+Views for Backyard Marauder — the real-time arcade shooter.
+
+Kept separate from views.py (the daily-puzzle views) on purpose: Marauder does
+not use the PuzzleGame/ArcadeAttempt turn-based machinery. All endpoints live
+under the /arcade/marauder/ prefix (see urls.py) declared before the generic
+``<game_key>`` catch-all.
+"""
+
+import json
+
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.shortcuts import render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from .models import PilotProfile, MarauderRun
+from .services_marauder import (
+    _new_seed,
+    make_run_token,
+    verify_run_token,
+    compute_run_checksum,
+    verify_submission,
+    get_global_top,
+    get_user_top,
+    get_user_rank,
+)
+
+
+def _get_or_create_profile(user) -> PilotProfile:
+    profile, _ = PilotProfile.objects.get_or_create(
+        user=user,
+        defaults={"callsign": user.get_short_name() or user.username},
+    )
+    return profile
+
+
+@login_required
+def play(request):
+    profile = _get_or_create_profile(request.user)
+    global_top = get_global_top(limit=5)
+    personal_top = get_user_top(request.user, limit=5)
+    context = {
+        "profile": profile,
+        "credits": profile.credits,
+        "callsign": profile.callsign or request.user.username,
+        "personal_top": personal_top,
+        "global_top": global_top,
+        "global_top_json": json.dumps(global_top),
+        "personal_top_json": json.dumps(personal_top),
+    }
+    return render(request, "arcade/marauder.html", context)
+
+
+@login_required
+@require_POST
+def run_start(request):
+    """Issue a fresh seed + signed session token. No DB row is created yet."""
+    profile = _get_or_create_profile(request.user)
+    seed = _new_seed()
+    started_at = timezone.now()
+    started_at_iso = started_at.isoformat()
+    token = make_run_token(request.user.id, seed, started_at_iso)
+    return JsonResponse({
+        "status": "ok",
+        "seed": seed,
+        "session_token": token,
+        "started_at": started_at_iso,
+        "server_time": started_at_iso,
+        "callsign": profile.callsign or request.user.username,
+    })
+
+
+@login_required
+@require_POST
+def run_submit(request):
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        data = request.POST
+
+    token = data.get("session_token")
+    seed = data.get("seed")
+    checksum = data.get("checksum")
+    if not token or not seed or not checksum:
+        return HttpResponseBadRequest("Missing session_token, seed, or checksum.")
+
+    verified = verify_run_token(token, request.user.id)
+    if verified is None:
+        return JsonResponse({"error": "Invalid or expired session token."}, status=403)
+    token_seed, started_at_iso = verified
+    if token_seed != seed:
+        return JsonResponse({"error": "Seed does not match session token."}, status=403)
+
+    # Normalize the stats we grade + persist.
+    def _int(key):
+        try:
+            return max(0, int(data.get(key, 0)))
+        except (TypeError, ValueError):
+            return 0
+
+    stats = {
+        "user_id": request.user.id,
+        "seed": seed,
+        "score": _int("score"),
+        "distance_m": _int("distance_m"),
+        "duration_ms": _int("duration_ms"),
+        "credits_earned": _int("credits_earned"),
+        "enemies_killed": _int("enemies_killed"),
+        "wave_reached": _int("wave_reached"),
+        "max_weapon_tier": max(1, _int("max_weapon_tier") or 1),
+    }
+
+    # Integrity check: recompute the HMAC and compare (constant-time).
+    expected = compute_run_checksum(token, stats)
+    from hmac import compare_digest
+    if not compare_digest(expected, str(checksum)):
+        return JsonResponse({"error": "Checksum mismatch.", "reason": "checksum"}, status=403)
+
+    status, flag_reason = verify_submission(started_at_iso, stats)
+
+    from datetime import datetime
+    try:
+        started_at = datetime.fromisoformat(started_at_iso)
+        if timezone.is_naive(started_at):
+            started_at = timezone.make_aware(started_at, timezone.get_default_timezone())
+    except (ValueError, TypeError):
+        started_at = timezone.now()
+
+    summary = data.get("summary")
+    state_json = json.dumps(summary) if summary is not None else "{}"
+
+    with transaction.atomic():
+        run = MarauderRun.objects.create(
+            user=request.user,
+            seed=seed,
+            score=stats["score"],
+            distance_m=stats["distance_m"],
+            duration_ms=stats["duration_ms"],
+            credits_earned=stats["credits_earned"],
+            enemies_killed=stats["enemies_killed"],
+            max_weapon_tier=stats["max_weapon_tier"],
+            wave_reached=stats["wave_reached"],
+            status=status,
+            flag_reason=flag_reason,
+            state=state_json,
+            started_at=started_at,
+        )
+        # Always count the run + bank credits; only valid runs move the PB.
+        profile = _get_or_create_profile(request.user)
+        profile.total_runs += 1
+        if status == MarauderRun.STATUS_VALID:
+            profile.credits += stats["credits_earned"]
+            if stats["score"] > profile.best_score:
+                profile.best_score = stats["score"]
+        profile.save()
+
+    global_rank = None
+    personal_rank = None
+    if status == MarauderRun.STATUS_VALID:
+        global_rank = get_user_rank(request.user, run.score)
+        # Personal rank among this user's valid runs.
+        personal_rank = (
+            MarauderRun.objects.filter(
+                user=request.user,
+                status=MarauderRun.STATUS_VALID,
+                score__gt=run.score,
+            ).count()
+            + 1
+        )
+
+    return JsonResponse({
+        "status": "ok",
+        "run_id": run.id,
+        "run_status": status,
+        "score": run.score,
+        "global_rank": global_rank,
+        "personal_rank": personal_rank,
+        "credits_total": profile.credits,
+        "global_top": get_global_top(limit=5),
+        "personal_top": get_user_top(request.user, limit=5),
+    })
+
+
+@login_required
+def leaderboard(request):
+    global_top = get_global_top(limit=5)
+    personal_top = get_user_top(request.user, limit=5)
+
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.GET.get("format") == "json":
+        return JsonResponse({
+            "global_top": global_top,
+            "personal_top": personal_top,
+        })
+
+    return render(
+        request,
+        "arcade/marauder_leaderboard.html",
+        {
+            "global_top": global_top,
+            "personal_top": personal_top,
+        },
+    )

@@ -56,12 +56,28 @@ def lobby(request):
             games_data[-1]["gallery_collected"] = gallery["collected"]
             games_data[-1]["gallery_total"] = gallery["total"]
 
+    # Backyard Marauder is a real-time shooter, not a PuzzleGame — build its
+    # lobby card separately so the puzzle grid stays untouched.
+    from .services_marauder import get_global_top
+    from .models import PilotProfile
+
+    profile = PilotProfile.objects.filter(user=request.user).first()
+    top = get_global_top(1)
+    marauder_card = {
+        "display_name": "Backyard Marauder",
+        "blurb": "Real-time vertical shooter. Endless permadeath runs, all-time high scores.",
+        "top_leader": top[0] if top else None,
+        "personal_best": profile.best_score if profile else 0,
+        "credits": profile.credits if profile else 0,
+    }
+
     return render(
         request,
         "arcade/lobby.html",
         {
             "games": games_data,
             "today": today,
+            "marauder_card": marauder_card,
         },
     )
 

@@ -1,0 +1,80 @@
+<!doctype html>
+<!--
+  Standalone, no-server smoke test for the DOM-free game logic. Open directly in
+  a browser (file://) — it exercises rng determinism, the object pool, collision
+  helpers, and weapon spread counts. Not part of the Django app.
+-->
+<html>
+<head><meta charset="utf-8"><title>Marauder self-test</title>
+<style>body{font:13px monospace;background:#05060f;color:#cfe} .ok{color:#5f5} .fail{color:#f66}</style>
+</head>
+<body>
+<h3>Backyard Marauder — logic self-test</h3>
+<div id="out"></div>
+<script type="module">
+import { makeRng } from "./rng.js";
+import { Pool } from "./pool.js";
+import { aabb, hitsPlayer } from "./collision.js";
+import { WEAPONS } from "./weapons.js";
+
+const out = document.getElementById("out");
+let pass = 0, fail = 0;
+function check(name, cond) {
+    const div = document.createElement("div");
+    div.className = cond ? "ok" : "fail";
+    div.textContent = (cond ? "PASS " : "FAIL ") + name;
+    out.appendChild(div);
+    cond ? pass++ : fail++;
+}
+
+// rng determinism
+const a = makeRng("seed-123"); const b = makeRng("seed-123");
+let same = true;
+for (let i = 0; i < 100; i++) if (a.next() !== b.next()) same = false;
+check("rng deterministic for same seed", same);
+check("rng differs across seeds", makeRng("x").next() !== makeRng("y").next());
+check("rng.int within range", (() => { const r = makeRng("z"); for (let i=0;i<1000;i++){const v=r.int(3,7); if(v<3||v>7)return false;} return true; })());
+
+// pool
+const p = new Pool(4, () => ({ v: 0 }), (o) => { o.v = 0; });
+const o1 = p.acquire(); o1.v = 1;
+const o2 = p.acquire(); o2.v = 2;
+check("pool count after 2 acquire", p.count === 2);
+p.releaseAt(0);
+check("pool count after release", p.count === 1);
+p.acquire(); p.acquire(); p.acquire();
+check("pool respects capacity (null when full)", p.acquire() === null);
+p.clear();
+check("pool clear empties", p.count === 0);
+
+// collision
+check("aabb overlap true", aabb({x:0,y:0,w:10,h:10},{x:4,y:4,w:10,h:10}));
+check("aabb overlap false", !aabb({x:0,y:0,w:4,h:4},{x:50,y:50,w:4,h:4}));
+check("hitsPlayer close", hitsPlayer({x:0,y:0,radius:5},{x:2,y:2,w:4,h:4}));
+check("hitsPlayer far", !hitsPlayer({x:0,y:0,radius:5},{x:80,y:80,w:4,h:4}));
+
+// weapon spread counts (fake game with a counting pool)
+function fakeGame() {
+    return {
+        pools: { pBullets: new Pool(64, () => ({}), null) },
+        player: { x: 160, y: 200 },
+        rng: makeRng("w"),
+    };
+}
+let g = fakeGame();
+WEAPONS.scatter.fire(g, g.player, 1);
+check("scatter tier1 emits 2 pellets", g.pools.pBullets.count === 2);
+g = fakeGame();
+WEAPONS.scatter.fire(g, g.player, 5);
+check("scatter tier5 emits 6 pellets", g.pools.pBullets.count === 6);
+g = fakeGame();
+WEAPONS.vulcan.fire(g, g.player, 1);
+check("vulcan tier1 emits 2 bolts", g.pools.pBullets.count === 2);
+
+const summary = document.createElement("h3");
+summary.textContent = `${pass} passed, ${fail} failed`;
+summary.className = fail ? "fail" : "ok";
+out.appendChild(summary);
+</script>
+</body>
+</html>
