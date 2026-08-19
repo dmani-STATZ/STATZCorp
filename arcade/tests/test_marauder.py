@@ -314,3 +314,48 @@ class MarauderRateLimitTests(TestCase):
             200,
             "a different user must not inherit another user's rate limit",
         )
+
+
+# Phase 4: core service-layer coverage that Phase 2 explicitly skipped.
+# Token-bound-to-user and the VALID/FLAGGED/REJECTED submit paths already
+# exist above; this class fills the remaining gaps without duplicating those.
+
+
+class MarauderCoreLogicTests(TestCase):
+    def test_puzzle_signer_token_is_rejected_as_marauder_run_token(self):
+        """
+        arcade.services (daily puzzles) and arcade.services_marauder must not
+        share a signing-salt namespace. A structurally valid user:seed:iso
+        payload signed by the puzzle signer must not unsign as a Marauder token.
+        """
+        from arcade.services import signer as puzzle_signer
+
+        user_id = 42
+        seed = "a" * 32
+        started_at = timezone.now().isoformat()
+        puzzle_token = puzzle_signer.sign(f"{user_id}:{seed}:{started_at}")
+        self.assertIsNone(verify_run_token(puzzle_token, user_id))
+
+    def test_checksum_changes_when_any_checksum_field_changes(self):
+        from arcade.services_marauder import CHECKSUM_FIELDS
+
+        token = "session-token-not-a-real-signer-output"
+        stats = {
+            "seed": "b" * 32,
+            "score": 1000,
+            "distance_m": 300,
+            "duration_ms": 8000,
+            "enemies_killed": 30,
+            "wave_reached": 5,
+        }
+        self.assertEqual(len(CHECKSUM_FIELDS), 6)
+        baseline = compute_run_checksum(token, stats)
+        for field in CHECKSUM_FIELDS:
+            mutated = dict(stats)
+            original = mutated[field]
+            mutated[field] = original + 1 if isinstance(original, int) else original + "x"
+            self.assertNotEqual(
+                compute_run_checksum(token, mutated),
+                baseline,
+                f"checksum ignored field {field}",
+            )

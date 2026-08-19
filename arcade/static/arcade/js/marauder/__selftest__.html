@@ -16,6 +16,9 @@ import { makeRng } from "./rng.js";
 import { Pool } from "./pool.js";
 import { aabb, hitsPlayer } from "./collision.js";
 import { WEAPONS } from "./weapons.js";
+import { createDirector, updateDirector } from "./director.js";
+import { createPools } from "./entities.js";
+import { WAVE_INTERVAL, HAULER_UNLOCK_S, MAX_HAULERS_PER_WAVE, BOSS_EVERY_M } from "./const.js";
 
 const out = document.getElementById("out");
 let pass = 0, fail = 0;
@@ -70,6 +73,135 @@ check("scatter tier5 emits 6 pellets", g.pools.pBullets.count === 6);
 g = fakeGame();
 WEAPONS.vulcan.fire(g, g.player, 1);
 check("vulcan tier1 emits 2 bolts", g.pools.pBullets.count === 2);
+
+// ---- director.js -----------------------------------------------------
+//
+// Phase 1 rewrote this module's difficulty ramp. These checks exist to
+// guard the three specific regressions that were fixed, plus the
+// determinism property the GDD calls out as the primary JS test strategy.
+// If any of these fail, do NOT loosen the assertion to force a pass --
+// report the failure. A failure here means the ramp fix regressed, which
+// is exactly the class of bug this file exists to catch before a human
+// notices it thirty seconds into a run.
+
+// A fully deterministic stand-in for game.rng. Real seeded randomness is
+// exercised separately below (the determinism test uses makeRng for real);
+// this stub exists so the hauler-cap and wave-size tests can force specific
+// branches without hunting for a "lucky" seed.
+function stubRng({ chance = true, pickIndex = 0 } = {}) {
+    return {
+        next: () => 0.5,
+        range: (lo) => lo,
+        int: (lo) => lo,
+        pick: (arr) => arr[pickIndex],
+        chance: () => chance,
+    };
+}
+
+function snapshotEnemies(game) {
+    const pool = game.pools.enemies;
+    const out = [];
+    for (let i = 0; i < pool.count; i++) {
+        const e = pool.active[i];
+        out.push(e.type + ":" + Math.round(e.x) + "," + Math.round(e.y) + ":" + e.hp);
+    }
+    return out.sort().join("|");
+}
+
+// Determinism: two independently-constructed games seeded identically must
+// produce byte-identical enemy spawn sequences at every checkpoint. Uses
+// coarse dt=1 steps across 90 "seconds" of sim time (real seeded rng, not
+// the stub) -- determinism only requires the two runs match each other, not
+// that the stepping matches real 60Hz gameplay pacing, so this is both valid
+// and cheap. Also exercises at least one boss spawn (distanceM crosses
+// BOSS_EVERY_M around t=75 with the progression below).
+{
+    function makeDeterminismGame(seed) {
+        return {
+            pools: createPools(),
+            rng: makeRng(seed),
+            elapsed: 0,
+            distanceM: 0,
+            boss: null,
+            wave: 0,
+            director: createDirector(),
+        };
+    }
+    const gA = makeDeterminismGame("selftest-determinism-seed");
+    const gB = makeDeterminismGame("selftest-determinism-seed");
+    let allMatch = true;
+    for (let t = 1; t <= 90; t++) {
+        gA.elapsed = t; gB.elapsed = t;
+        gA.distanceM = t * 20; gB.distanceM = t * 20;
+        updateDirector(gA, 1);
+        updateDirector(gB, 1);
+        if (snapshotEnemies(gA) !== snapshotEnemies(gB)) { allMatch = false; break; }
+    }
+    check("director.js: same seed produces identical wave sequence", allMatch);
+}
+
+function fireOneWave(elapsed, rngOpts) {
+    const game = {
+        pools: createPools(),
+        rng: stubRng(rngOpts),
+        elapsed,
+        distanceM: 0,
+        boss: null,
+        wave: 0,
+        director: createDirector(),
+    };
+    updateDirector(game, WAVE_INTERVAL); // forces exactly one wave tick
+    return game;
+}
+
+// Regression: wave size must GROW with elapsed time, not flatten. The
+// original bug hardcoded a 12-purchase ceiling, so every budget point earned
+// after ~36s was silently discarded -- this compares an early wave to a late
+// one and asserts the late one is actually bigger.
+{
+    const early = fireOneWave(10, { chance: true });
+    const late = fireOneWave(200, { chance: true });
+    check(
+        "director.js: wave size grows with elapsed instead of flattening",
+        late.pools.enemies.count > early.pools.enemies.count
+    );
+}
+
+// Regression: rolling a hauler must NOT end the wave early. chance() is
+// forced to always succeed so every eligible purchase attempts a hauler;
+// once MAX_HAULERS_PER_WAVE is hit, the wave must keep buying non-hauler
+// formations instead of stopping (the original bug did `break` on any
+// hauler roll, so difficulty visibly dropped the moment haulers unlocked).
+{
+    const g = fireOneWave(HAULER_UNLOCK_S + 5, { chance: true });
+    const enemies = g.pools.enemies.active.slice(0, g.pools.enemies.count);
+    const haulers = enemies.filter((e) => e.type === "hauler").length;
+    const others = enemies.length - haulers;
+    check("director.js: hauler count respects MAX_HAULERS_PER_WAVE", haulers === MAX_HAULERS_PER_WAVE);
+    check("director.js: wave keeps buying after the hauler cap (not ending early)", others > 0);
+}
+
+// Regression: a boss-due tick must NOT silently advance nextBossM and skip
+// the boss when the enemy pool is full. The original bug advanced the
+// milestone regardless of whether spawnEnemy actually succeeded.
+{
+    const game = {
+        pools: createPools(),
+        rng: stubRng({}),
+        elapsed: 100,
+        distanceM: BOSS_EVERY_M,
+        boss: null,
+        wave: 0,
+        director: createDirector(),
+    };
+    while (game.pools.enemies.acquire()) { /* fill the pool to capacity */ }
+    const beforeNextBoss = game.director.nextBossM;
+    updateDirector(game, 0.016);
+    check(
+        "director.js: nextBossM does not advance when the boss spawn fails (pool full)",
+        game.director.nextBossM === beforeNextBoss
+    );
+}
 
 const summary = document.createElement("h3");
 summary.textContent = `${pass} passed, ${fail} failed`;

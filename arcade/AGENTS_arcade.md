@@ -78,6 +78,8 @@ Backyard Marauder (`/arcade/marauder/`) is a real-time shooter, separate from th
 - Any new sprite in `sprites.js` must have every row the same length as `rows[0]`. If the design is meant to be left-right symmetric, every row should be a true palindrome. Verify both with a script before committing (not by eye) — same check used for the Phase 3 enforcer fix.
 - Any leaderboard field that renders another user's server-supplied data via `innerHTML` or `insertAdjacentHTML` must go through `escapeHtml()` first. Fields sourced from the *current* player's own local run state are not subject to this rule.
 - `game.autoFire` in `main.js` must default to `false`. If a future settings/accessibility feature exposes it as a toggle, gate the default through that setting rather than hardcoding `true` again.
+- Any display value derived from a tunable `const.js` constant (bounty multiplier, difficulty numbers, anything a player sees on screen) must read the constant, never a hardcoded literal that happens to match it today.
+- `director.js` changes must be re-verified against `__selftest__.html` before being considered safe to ship — that file is the regression guard for the exact bugs Phase 1 fixed (wave-size flattening, hauler-cap wave-ending, boss-skip-on-pool-full) plus same-seed wave-sequence determinism.
 
 ---
 

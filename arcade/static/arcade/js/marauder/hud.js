@@ -1,6 +1,6 @@
 // Heads-up display drawn directly onto the 320x240 buffer each frame.
 
-import { VW } from "./const.js";
+import { VW, BOUNTY_SCORE_MULT } from "./const.js";
 import { WEAPONS } from "./weapons.js";
 
 export function drawHud(ctx, game) {
@@ -46,7 +46,13 @@ export function drawHud(ctx, game) {
     if (game.bountyMs > 0) {
         ctx.fillStyle = "#ffbf00";
         ctx.textAlign = "center";
-        ctx.fillText(`x2 BOUNTY ${(game.bountyMs / 1000).toFixed(1)}s`, VW / 2, 4);
+        // Reads BOUNTY_SCORE_MULT directly instead of a hardcoded "x2" -- the
+        // old literal would silently go stale the moment const.js is retuned.
+        // BOUNTY_SCORE_MULT and BOUNTY_CREDIT_MULT are currently equal, so a
+        // single number is accurate for both; if they're ever tuned to differ,
+        // this display needs an actual redesign (two numbers), not a bigger
+        // string -- that's out of scope here since there's no such tuning yet.
+        ctx.fillText(`x${BOUNTY_SCORE_MULT} BOUNTY ${(game.bountyMs / 1000).toFixed(1)}s`, VW / 2, 4);
         ctx.textAlign = "left";
     }
 
