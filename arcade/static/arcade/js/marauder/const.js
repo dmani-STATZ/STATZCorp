@@ -3,7 +3,8 @@
 //
 // EVERY number that changes how the game FEELS lives in this file. If you find
 // yourself editing a magic number inside a function body, it belongs here
-// instead. Native render surface is 320x240, integer-upscaled.
+// instead. Native render surface is 480x360, integer-upscaled (3x = 1440x1080
+// on a 1920x1080 monitor — readable HUD, pixel-crisp sprites).
 //
 // !! SERVER COUPLING !!
 // Constants marked [SERVER] are mirrored in arcade/services_marauder.py, which
@@ -15,8 +16,8 @@
 // -----------------------------------------------------------------------------
 // Render surface (structural — not a tuning knob)
 // -----------------------------------------------------------------------------
-export const VW = 320;
-export const VH = 240;
+export const VW = 480;
+export const VH = 360;
 
 
 // -----------------------------------------------------------------------------
@@ -28,6 +29,8 @@ export const VH = 240;
 // Past that the world speed is FLAT by design — the director carries the ramp
 // from there (see WAVE_* below). Raise SCROLL_MAX and you must raise
 // MAX_SCROLL_MPS server-side to match.
+// NOTE: scroll speeds are world-space px/s — they do not need adjusting when
+// VW/VH changes; only the CSS upscale factor changes.
 // -----------------------------------------------------------------------------
 export const SCROLL_BASE = 42;          // px/sec at run start
 export const SCROLL_GROWTH = 0.9;       // extra px/sec per second elapsed
@@ -66,7 +69,7 @@ export const PLAYER_MAX_HULL = 5;
 export const PLAYER_START_EMP = 2;
 export const PLAYER_RADIUS = 5;         // collision radius (structural-ish)
 export const PLAYER_INVULN_MS = 1200;   // i-frames after taking a hit
-export const START_Y = VH - 40;
+export const START_Y = VH - 60;
 
 
 // -----------------------------------------------------------------------------
@@ -115,7 +118,12 @@ export const WAVE_PURCHASE_GROWTH = 0.04; // extra formations per second elapsed
 export const WAVE_PURCHASE_CAP = 20;      // hard ceiling (hits it at ~475s now)
 
 export const MAX_HAULERS_PER_WAVE = 2;    // was effectively 1-and-end-the-wave
-export const MAX_LIVE_ENEMIES = 48;       // throughput guard; keep < CAP_ENEMY
+export const MAX_LIVE_ENEMIES = 64;       // throughput guard; keep < CAP_ENEMY (96)
+// The director stops buying new formations once the live count exceeds
+// SPAWN_SOFT_CAP_FRAC * MAX_LIVE_ENEMIES (~51). This lets the screen thin out
+// naturally rather than packing to a wall, while the hard MAX_LIVE_ENEMIES cap
+// in spawnEnemy() still prevents runaway accumulation.
+export const SPAWN_SOFT_CAP_FRAC = 0.80;
 
 // Formation size ramps from (BASE) at t=0 to (FINAL) by GROUP_RAMP_SECONDS,
 // then holds at FINAL for the rest of the run. FINAL values equal the old
@@ -146,6 +154,13 @@ export const PINCER_UNLOCK_S = 20;        // matches SKIFF_UNLOCK_S
 
 export const BOSS_EVERY_M = 1500;         // Corporate Enforcer cadence, in meters
                                           // (first boss lands at ~78s)
+// When the boss milestone is reached, the director halts normal wave spawning
+// and waits up to BOSS_CLEAR_WAIT_S seconds for the player to thin the field.
+// If live enemies drop to BOSS_CLEAR_THRESHOLD first, the boss drops immediately
+// (reward for aggressive play). Either way, the boss never stacks on top of a
+// full screen of fodder.
+export const BOSS_CLEAR_WAIT_S = 8;       // max pre-boss quiet window (seconds)
+export const BOSS_CLEAR_THRESHOLD = 5;    // enemy count that ends the wait early
 
 // -----------------------------------------------------------------------------
 // Loot drop rate  [independent of the difficulty ramps above]

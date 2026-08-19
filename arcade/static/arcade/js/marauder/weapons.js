@@ -1,7 +1,7 @@
 // Weapon archetypes. Upgrading a weapon widens/alters its coverage pattern
 // rather than only boosting raw damage. Tier ranges 1..5.
 
-import { VH } from "./const.js";
+import { VW, VH } from "./const.js";
 
 function spawn(game, x, y, vx, vy, opts) {
     const b = game.pools.pBullets.acquire();
@@ -124,7 +124,7 @@ export function updatePlayerBullets(game, dt) {
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         b.life -= dt;
-        if (b.y < -10 || b.y > VH + 10 || b.x < -10 || b.x > 330 || b.life <= 0) {
+        if (b.y < -10 || b.y > VH + 10 || b.x < -10 || b.x > VW + 10 || b.life <= 0) {
             pool.releaseAt(i);
         }
     }

@@ -18,7 +18,7 @@ import { aabb, hitsPlayer } from "./collision.js";
 import { WEAPONS } from "./weapons.js";
 import { createDirector, updateDirector } from "./director.js";
 import { createPools } from "./entities.js";
-import { WAVE_INTERVAL, HAULER_UNLOCK_S, MAX_HAULERS_PER_WAVE, BOSS_EVERY_M } from "./const.js";
+import { WAVE_INTERVAL, HAULER_UNLOCK_S, MAX_HAULERS_PER_WAVE, BOSS_EVERY_M, MAX_LIVE_ENEMIES, SPAWN_SOFT_CAP_FRAC, BOSS_CLEAR_THRESHOLD } from "./const.js";
 import { pincer, EARLY_FORMATIONS } from "./formations.js";
 
 const out = document.getElementById("out");
@@ -211,6 +211,76 @@ check(
     "formations.js: EARLY_FORMATIONS excludes pincer",
     !EARLY_FORMATIONS.includes(pincer)
 );
+
+// Soft cap: the wave spend-loop must stop buying formations when the live
+// enemy count is at or above SPAWN_SOFT_CAP (80% of MAX_LIVE_ENEMIES).
+// Fill the pool just above the soft cap and confirm no new enemies spawn.
+{
+    const g = {
+        pools: createPools(),
+        rng: stubRng({ chance: true }),
+        elapsed: 10,
+        distanceM: 0,
+        boss: null,
+        wave: 0,
+        director: createDirector(),
+    };
+    // Acquire exactly SPAWN_SOFT_CAP enemies so the pool is at the threshold.
+    const SOFT = Math.floor(MAX_LIVE_ENEMIES * SPAWN_SOFT_CAP_FRAC);
+    for (let i = 0; i < SOFT; i++) g.pools.enemies.acquire();
+    const before = g.pools.enemies.count;
+    updateDirector(g, WAVE_INTERVAL); // trigger a wave
+    check(
+        "director.js: soft cap stops purchases when screen is at 80% of MAX_LIVE_ENEMIES",
+        g.pools.enemies.count === before  // no new enemies beyond the soft cap
+    );
+}
+
+// Pre-boss quiet period: hitting the distance milestone must set preBoss=true
+// and NOT spawn the Enforcer immediately (the pool is not full here so it's
+// not a capacity issue — the director must be intentionally waiting).
+{
+    const g = {
+        pools: createPools(),
+        rng: stubRng({}),
+        elapsed: 100,
+        distanceM: BOSS_EVERY_M,   // exactly at the first milestone
+        boss: null,
+        wave: 0,
+        director: createDirector(),
+    };
+    updateDirector(g, 0.016);  // one tick
+    const bossSpawnedImmediately = g.boss !== null;
+    const preBossSet = g.director.preBoss === true;
+    check(
+        "director.js: boss milestone sets preBoss without spawning immediately",
+        !bossSpawnedImmediately && preBossSet
+    );
+}
+
+// Pre-boss fires early when enemies drain to BOSS_CLEAR_THRESHOLD.
+// Simulate entering preBoss with a near-empty field; the very next tick
+// should spawn the Enforcer without waiting the full BOSS_CLEAR_WAIT_S.
+{
+    const g = {
+        pools: createPools(),
+        rng: stubRng({}),
+        elapsed: 100,
+        distanceM: BOSS_EVERY_M + 1,  // already past milestone
+        boss: null,
+        wave: 0,
+        director: { ...createDirector(), preBoss: true, preBossTimer: 999 },
+        banner: "", bannerMs: 0,
+        audio: null,
+    };
+    // Put BOSS_CLEAR_THRESHOLD - 1 enemies on the field (field is "clear enough")
+    for (let i = 0; i < BOSS_CLEAR_THRESHOLD - 1; i++) g.pools.enemies.acquire();
+    updateDirector(g, 0.016);
+    check(
+        "director.js: pre-boss fires early when enemies <= BOSS_CLEAR_THRESHOLD",
+        g.boss !== null
+    );
+}
 
 const summary = document.createElement("h3");
 summary.textContent = `${pass} passed, ${fail} failed`;

@@ -7,12 +7,12 @@ export const ENEMY_DEFS = {
     // Repo Scout — fast zig-zag dives, straight kinetic bursts. Swarm fodder.
     scout: {
         w: 10, h: 8, radius: 5, hp: 2, points: 10, credits: 3, loot: "low",
-        fireEvery: 1.6, speed: 70, sprite: "scout",
+        fireEvery: 3.2, speed: 70, sprite: "scout",
     },
     // Syndicate Skiff — drifts along the top third, matches player X, aimed bursts.
     skiff: {
         w: 12, h: 8, radius: 6, hp: 3, points: 25, credits: 6, loot: "low",
-        fireEvery: 1.9, speed: 40, sprite: "skiff",
+        fireEvery: 4.0, speed: 40, sprite: "skiff",
     },
     // Guild Hauler — slow heavy barricade down the center, big loot on death.
     hauler: {
@@ -84,7 +84,7 @@ export function updateEnemies(game, dt) {
             }
             case "skiff": {
                 // Descend into the top third, then hold and track player X.
-                const holdY = 34 + (e.baseX % 3) * 8;
+                const holdY = 51 + (e.baseX % 3) * 12;
                 if (e.y < holdY) e.y += e.vy * dt;
                 e.x += (p.x - e.x) * Math.min(1, dt * 0.6);
                 if (e.fireTimer <= 0) {
@@ -108,10 +108,10 @@ export function updateEnemies(game, dt) {
             }
             case "enforcer": {
                 // Enter, then hover and sweep dual rotating hardpoints.
-                if (e.y < 46) e.y += e.vy * dt;
+                if (e.y < 69) e.y += e.vy * dt;
                 else e.x = VW / 2 + Math.sin(e.t * 0.6) * 70;
                 e.angle += dt * 1.4;
-                if (e.y >= 46 && e.fireTimer <= 0) {
+                if (e.y >= 69 && e.fireTimer <= 0) {
                     e.fireTimer = e.fireEvery;
                     // Two hardpoints firing along a rotating (sweeping) direction.
                     for (const hp of [-16, 16]) {

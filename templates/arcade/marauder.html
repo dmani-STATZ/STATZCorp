@@ -7,7 +7,8 @@
     #mar-stage {
         position: relative;
         width: 100%;
-        min-height: calc(100vh - 120px);
+        min-height: calc(100vh - 100px);
+        max-height: calc(100vh - 80px);
         background: #05060f;
         display: flex;
         align-items: center;
@@ -92,7 +93,7 @@
     </div>
 
     <div id="mar-stage">
-        <canvas id="mar-canvas" width="320" height="240"></canvas>
+        <canvas id="mar-canvas" width="480" height="360"></canvas>
         <div id="mar-crt"></div>
         <button type="button" id="mar-mute" title="Toggle sound">SND: ON</button>
 

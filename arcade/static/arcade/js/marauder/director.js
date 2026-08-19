@@ -26,15 +26,20 @@ import {
     WAVE_INTERVAL, WAVE_INTERVAL_MIN, WAVE_INTERVAL_DECAY,
     THREAT_BASE, THREAT_SCALING,
     WAVE_PURCHASE_BASE, WAVE_PURCHASE_GROWTH, WAVE_PURCHASE_CAP,
-    MAX_HAULERS_PER_WAVE, MAX_LIVE_ENEMIES,
+    MAX_HAULERS_PER_WAVE, MAX_LIVE_ENEMIES, SPAWN_SOFT_CAP_FRAC,
     GROUP_MIN_BASE, GROUP_MAX_BASE, GROUP_MIN_FINAL, GROUP_MAX_FINAL, GROUP_RAMP_SECONDS,
     SKIFF_UNLOCK_S, HAULER_UNLOCK_S, SKIFF_CHANCE, HAULER_CHANCE,
-    PINCER_UNLOCK_S, BOSS_EVERY_M,
+    PINCER_UNLOCK_S, BOSS_EVERY_M, BOSS_CLEAR_WAIT_S, BOSS_CLEAR_THRESHOLD,
 } from "./const.js";
 import { FORMATIONS, EARLY_FORMATIONS } from "./formations.js";
 import { spawnEnemy } from "./enemies.js";
 
 const COST = { scout: 1, skiff: 3, hauler: 8 };
+
+// Soft cap: stop buying new formations once live count exceeds this.
+// Allows enemies to thin out naturally instead of packing to a wall.
+// The hard MAX_LIVE_ENEMIES in spawnEnemy() is the absolute backstop.
+const SPAWN_SOFT_CAP = Math.floor(MAX_LIVE_ENEMIES * SPAWN_SOFT_CAP_FRAC);
 
 export function createDirector() {
     return {
@@ -42,6 +47,11 @@ export function createDirector() {
         wave: 0,
         nextBossM: BOSS_EVERY_M,
         bossActive: false,
+        // Pre-boss quiet period: when the milestone is hit we pause normal waves
+        // and give the player BOSS_CLEAR_WAIT_S seconds to thin the field.
+        preBoss: false,       // true while we're in the quiet window
+        preBossTimer: 0,      // counts down; boss drops when this hits 0 or
+                              // when live enemies <= BOSS_CLEAR_THRESHOLD
     };
 }
 
@@ -75,30 +85,50 @@ export function updateDirector(game, dt) {
 
     d.bossActive = !!game.boss;
 
-    // --- Boss cadence by distance -------------------------------------------
-    if (!d.bossActive && game.distanceM >= d.nextBossM) {
-        const boss = spawnEnemy(game, "enforcer", VW / 2, -30);
-        if (boss) {
-            d.nextBossM += BOSS_EVERY_M;
-            game.wave++;
-            if (game.audio) game.audio.sfx("boss");
+    // ---- Pre-boss quiet period ------------------------------------------------
+    // When distanceM crosses the boss milestone we stop spawning regular waves
+    // and wait up to BOSS_CLEAR_WAIT_S seconds. This gives the player a moment
+    // to clear the screen before the Enforcer drops. Aggressive players who
+    // kill down to BOSS_CLEAR_THRESHOLD get the boss immediately as a reward.
+    if (d.preBoss && !d.bossActive) {
+        d.preBossTimer -= dt;
+        const fieldClear = game.pools.enemies.count <= BOSS_CLEAR_THRESHOLD;
+        if (d.preBossTimer <= 0 || fieldClear) {
+            const boss = spawnEnemy(game, "enforcer", VW / 2, -30);
+            if (boss) {
+                d.preBoss = false;
+                d.preBossTimer = 0;
+                d.nextBossM += BOSS_EVERY_M;
+                game.wave++;
+                if (game.audio) game.audio.sfx("boss");
+            }
+            // If the pool was somehow full (very unlikely during quiet), retry
+            // next tick without consuming more of the timer.
         }
-        // If the pool was full, nextBossM is left alone so we retry next tick
-        // rather than losing the boss. Either way, no normal wave this tick.
+        return; // no normal waves while pre-boss or boss is alive
+    }
+
+    // ---- Boss milestone check -------------------------------------------------
+    // Trigger the quiet period; do NOT spawn the boss immediately.
+    if (!d.bossActive && !d.preBoss && game.distanceM >= d.nextBossM) {
+        d.preBoss = true;
+        d.preBossTimer = BOSS_CLEAR_WAIT_S;
+        game.banner = "ENFORCER INBOUND";
+        game.bannerMs = BOSS_CLEAR_WAIT_S;
         return;
     }
 
     // Hold off new waves while a boss is alive — the Enforcer is a duel.
     if (d.bossActive) return;
 
-    // --- Wave timer ----------------------------------------------------------
+    // ---- Wave timer ----------------------------------------------------------
     d.timer -= dt;
     if (d.timer > 0) return;
     d.timer = waveInterval(game.elapsed);
     d.wave++;
     game.wave = Math.max(game.wave, d.wave);
 
-    // --- Spend the threat budget --------------------------------------------
+    // ---- Spend the threat budget --------------------------------------------
     let budget = THREAT_BASE + game.elapsed * THREAT_SCALING;
     const maxPurchases = purchaseLimit(game.elapsed);
 
@@ -115,9 +145,10 @@ export function updateDirector(game, dt) {
     let haulers = 0;
 
     while (budget >= COST.scout && purchases < maxPurchases) {
-        // Throughput guard: stop feeding a screen that's already saturated.
-        // Without this a late wave can drain CAP_ENEMY and tank the framerate.
-        if (game.pools.enemies.count >= MAX_LIVE_ENEMIES) break;
+        // Soft throughput guard: stop buying once screen is 80% full, letting
+        // enemies drain before the next wave fills it completely. The hard
+        // MAX_LIVE_ENEMIES guard in spawnEnemy() is the absolute backstop.
+        if (game.pools.enemies.count >= SPAWN_SOFT_CAP) break;
 
         // Pick the richest affordable enemy, weighted by depth.
         let type = "scout";
