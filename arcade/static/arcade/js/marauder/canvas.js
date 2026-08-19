@@ -1,6 +1,19 @@
 // Canvas setup: a native 320x240 buffer drawn with nearest-neighbor scaling,
 // integer-upscaled and letterboxed to fill the stage. Also maps pointer
 // coordinates from screen space into the 320x240 world.
+//
+// Uses a ResizeObserver on #mar-stage instead of only listening for the
+// window's `resize` event. The old code measured the stage's size exactly
+// once, synchronously, when this module first ran, then only re-measured on
+// an actual browser window resize. If that one measurement landed before the
+// page's layout had fully settled (a web font swapping in, a flex/grid
+// container not yet resolved, etc.), the stage's rect could read back small
+// or zero -- and since `scale` is floored with a minimum of 1, a bad
+// measurement doesn't degrade to a smaller-but-sane scale, it collapses
+// straight to the raw unscaled 320x240 canvas, permanently, because nothing
+// ever re-measured it afterward. ResizeObserver fires on every real size
+// change of the observed element for any reason, including layout settling
+// after the initial paint, so this can no longer get stuck.
 
 import { VW, VH } from "./const.js";
 
@@ -35,7 +48,21 @@ export function setupCanvas() {
         ctx.imageSmoothingEnabled = false;
     }
 
-    window.addEventListener("resize", resize);
-    resize();
+    if (window.ResizeObserver) {
+        // Fires immediately on observe() with the current size, then again on
+        // every subsequent real size change -- covers the initial-layout-not-
+        // settled case AND ordinary window resizes AND any later reflow
+        // (sidebar toggle, font swap, orientation change) with one mechanism.
+        const ro = new ResizeObserver(resize);
+        ro.observe(stage);
+    } else {
+        // Fallback for the rare browser without ResizeObserver support. Not
+        // expected to matter in practice -- this project already assumes
+        // native ES modules, which have equal-or-broader support -- but the
+        // fallback is two lines and costs nothing to keep.
+        window.addEventListener("resize", resize);
+        resize();
+    }
+
     return api;
 }

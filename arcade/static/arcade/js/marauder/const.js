@@ -89,26 +89,80 @@ export const WAVE_INTERVAL_MIN = 1.6;     // floor — waves never come faster
 export const WAVE_INTERVAL_DECAY = 0.012; // seconds shaved per second elapsed
                                           // (hits the floor at ~283s)
 
-export const THREAT_BASE = 4;             // budget at t=0
+// THREAT_BASE stays at 2 from the previous pass -- WAVE_PURCHASE_BASE below is
+// now the binding constraint on wave size from t=0 onward (2 budget covers far
+// more than 1 purchase's worth of scouts), so tuning THREAT_BASE further would
+// have no visible effect on the opening.
+export const THREAT_BASE = 2;             // budget at t=0
 export const THREAT_SCALING = 0.9;        // extra budget per second elapsed
 
-export const WAVE_PURCHASE_BASE = 10;     // formations per wave at t=0
+// WAVE_PURCHASE_BASE: 10 -> 1. Playtest feedback: even after the previous
+// pass, wave 1 (~9 enemies, still budget-limited rather than purchase-
+// limited) felt unreachable -- multiple independently-positioned formations
+// spawned in the same wave, spread across the full screen width, faster than
+// a player can physically cover 320px of lateral distance. At BASE=1,
+// purchase count (not budget) becomes the binding constraint from wave 1:
+//   t=5s   (wave 1): 1 purchase  -> 1-2 enemies   (was ~9)
+//   t=25s:           2 purchases -> 2-4 enemies
+//   t=50s:           3 purchases -> 3-6 enemies
+//   t=225s:          10 purchases (matches the OLD flat WAVE_PURCHASE_BASE)
+//   t=475s:          20 purchases (WAVE_PURCHASE_CAP, unchanged) -- was ~250s
+// The ramp to full intensity now takes roughly twice as long. That's
+// deliberate, not a side effect: "start real easy, get comfortable, then ramp
+// up" means the whole curve stretches, not just the first wave.
+export const WAVE_PURCHASE_BASE = 1;      // formations per wave at t=0
 export const WAVE_PURCHASE_GROWTH = 0.04; // extra formations per second elapsed
-export const WAVE_PURCHASE_CAP = 20;      // hard ceiling (hits it at ~250s)
+export const WAVE_PURCHASE_CAP = 20;      // hard ceiling (hits it at ~475s now)
 
 export const MAX_HAULERS_PER_WAVE = 2;    // was effectively 1-and-end-the-wave
 export const MAX_LIVE_ENEMIES = 48;       // throughput guard; keep < CAP_ENEMY
 
-export const GROUP_MIN = 3;               // formation size for scouts/skiffs
-export const GROUP_MAX = 5;
+// Formation size ramps from (BASE) at t=0 to (FINAL) by GROUP_RAMP_SECONDS,
+// then holds at FINAL for the rest of the run. FINAL values equal the old
+// flat constants exactly, so nothing about gameplay past GROUP_RAMP_SECONDS
+// changes on this axis. Left as-is from the previous pass -- not implicated
+// in this round's feedback, and WAVE_PURCHASE_BASE above is now doing most of
+// the work on headcount.
+export const GROUP_MIN_BASE = 1;          // formation size at t=0
+export const GROUP_MAX_BASE = 2;
+export const GROUP_MIN_FINAL = 3;         // == old GROUP_MIN
+export const GROUP_MAX_FINAL = 5;         // == old GROUP_MAX
+export const GROUP_RAMP_SECONDS = 90;     // time to reach FINAL group sizes
 
 export const SKIFF_UNLOCK_S = 20;         // seconds before skiffs appear
 export const HAULER_UNLOCK_S = 45;        // seconds before haulers appear
 export const SKIFF_CHANCE = 0.5;          // roll per purchase, once unlocked
 export const HAULER_CHANCE = 0.2;
 
+// pincer (formations.js) spawns at BOTH screen edges (x=16 and x=VW-16)
+// simultaneously, unconditionally -- by construction it is the one formation
+// shape that guarantees enemies on opposite sides of the screen at the same
+// time. That is a fair, deliberate challenge once a player has room to
+// maneuver, but it is exactly the mechanic behind "enemies spread across the
+// entire screen, a player can't shoot all of them" during the opening.
+// Excluded from the formation pool (see director.js's EARLY_FORMATIONS use)
+// until PINCER_UNLOCK_S.
+export const PINCER_UNLOCK_S = 20;        // matches SKIFF_UNLOCK_S
+
 export const BOSS_EVERY_M = 1500;         // Corporate Enforcer cadence, in meters
                                           // (first boss lands at ~78s)
+
+// -----------------------------------------------------------------------------
+// Loot drop rate  [independent of the difficulty ramps above]
+//
+// "high"/"boss" tier loot (haulers, the Enforcer) always drops -- unconditional
+// in powerups.js, unaffected by anything here. "low" tier (scouts -- the only
+// enemy present in the true opening) drops on a flat percentage roll per kill.
+// The old flat 8% meant most players got zero crates across their first
+// couple of waves, directly contradicting "give the player power-ups before
+// we start to overwhelm them." Ramps from BASE down to FINAL (the old flat
+// value, so late-game loot scarcity/economy is unchanged) over
+// LOOT_RAMP_SECONDS, chosen SHORTER than the difficulty ramps above so
+// generosity front-loads ahead of difficulty, not merely alongside it.
+// -----------------------------------------------------------------------------
+export const LOW_LOOT_CHANCE_BASE = 0.4;   // per-kill crate chance at t=0
+export const LOW_LOOT_CHANCE_FINAL = 0.08; // == old flat chance, unchanged
+export const LOOT_RAMP_SECONDS = 60;       // time to decay to FINAL
 
 
 // -----------------------------------------------------------------------------

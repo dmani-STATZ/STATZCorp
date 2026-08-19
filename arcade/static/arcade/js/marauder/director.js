@@ -27,11 +27,11 @@ import {
     THREAT_BASE, THREAT_SCALING,
     WAVE_PURCHASE_BASE, WAVE_PURCHASE_GROWTH, WAVE_PURCHASE_CAP,
     MAX_HAULERS_PER_WAVE, MAX_LIVE_ENEMIES,
-    GROUP_MIN, GROUP_MAX,
+    GROUP_MIN_BASE, GROUP_MAX_BASE, GROUP_MIN_FINAL, GROUP_MAX_FINAL, GROUP_RAMP_SECONDS,
     SKIFF_UNLOCK_S, HAULER_UNLOCK_S, SKIFF_CHANCE, HAULER_CHANCE,
-    BOSS_EVERY_M,
+    PINCER_UNLOCK_S, BOSS_EVERY_M,
 } from "./const.js";
-import { FORMATIONS } from "./formations.js";
+import { FORMATIONS, EARLY_FORMATIONS } from "./formations.js";
 import { spawnEnemy } from "./enemies.js";
 
 const COST = { scout: 1, skiff: 3, hauler: 8 };
@@ -57,6 +57,17 @@ function purchaseLimit(elapsed) {
         WAVE_PURCHASE_CAP,
         Math.floor(WAVE_PURCHASE_BASE + elapsed * WAVE_PURCHASE_GROWTH),
     );
+}
+
+// Formation size ramps in the same spirit as purchaseLimit above: linear from
+// BASE to FINAL over GROUP_RAMP_SECONDS, then clamped at FINAL. This is the
+// "how many enemies does one purchase actually deliver" lever -- it used to
+// be a flat GROUP_MIN..GROUP_MAX for the whole run.
+function groupRange(elapsed) {
+    const t = Math.min(1, elapsed / GROUP_RAMP_SECONDS);
+    const min = Math.round(GROUP_MIN_BASE + (GROUP_MIN_FINAL - GROUP_MIN_BASE) * t);
+    const max = Math.round(GROUP_MAX_BASE + (GROUP_MAX_FINAL - GROUP_MAX_BASE) * t);
+    return [min, max];
 }
 
 export function updateDirector(game, dt) {
@@ -94,6 +105,11 @@ export function updateDirector(game, dt) {
     // Unlock tougher enemies as the run deepens.
     const canSkiff = game.elapsed > SKIFF_UNLOCK_S;
     const canHauler = game.elapsed > HAULER_UNLOCK_S;
+    const [groupMin, groupMax] = groupRange(game.elapsed);
+    // pincer spawns at both screen edges at once -- excluded until
+    // PINCER_UNLOCK_S so the opening never hands the player an unreachable,
+    // full-width split. See the const.js comment on PINCER_UNLOCK_S.
+    const formationPool = game.elapsed > PINCER_UNLOCK_S ? FORMATIONS : EARLY_FORMATIONS;
 
     let purchases = 0;
     let haulers = 0;
@@ -121,8 +137,8 @@ export function updateDirector(game, dt) {
         if (type === "hauler") haulers++;
 
         // Group size + formation. Haulers arrive alone; they're a wall, not a swarm.
-        const formation = game.rng.pick(FORMATIONS);
-        const count = type === "hauler" ? 1 : game.rng.int(GROUP_MIN, GROUP_MAX);
+        const formation = game.rng.pick(formationPool);
+        const count = type === "hauler" ? 1 : game.rng.int(groupMin, groupMax);
         formation(game, type, count);
     }
 }

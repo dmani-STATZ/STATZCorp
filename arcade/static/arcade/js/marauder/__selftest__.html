@@ -19,6 +19,7 @@ import { WEAPONS } from "./weapons.js";
 import { createDirector, updateDirector } from "./director.js";
 import { createPools } from "./entities.js";
 import { WAVE_INTERVAL, HAULER_UNLOCK_S, MAX_HAULERS_PER_WAVE, BOSS_EVERY_M } from "./const.js";
+import { pincer, EARLY_FORMATIONS } from "./formations.js";
 
 const out = document.getElementById("out");
 let pass = 0, fail = 0;
@@ -202,6 +203,14 @@ function fireOneWave(elapsed, rngOpts) {
         game.director.nextBossM === beforeNextBoss
     );
 }
+
+// Regression: pincer (spawns at both screen edges simultaneously) must not be
+// selectable during the opening window -- that's the exact mechanic behind
+// "enemies spread across the entire screen, can't reach them."
+check(
+    "formations.js: EARLY_FORMATIONS excludes pincer",
+    !EARLY_FORMATIONS.includes(pincer)
+);
 
 const summary = document.createElement("h3");
 summary.textContent = `${pass} passed, ${fail} failed`;

@@ -1,11 +1,23 @@
 // Branded crate drops + effects. Crates float down with a slight spin and are
 // scooped on contact. Effects follow the GDD economy.
 
-import { VH, BOUNTY_MS, PLAYER_START_EMP } from "./const.js";
+import {
+    VH, BOUNTY_MS, PLAYER_START_EMP,
+    LOW_LOOT_CHANCE_BASE, LOW_LOOT_CHANCE_FINAL, LOOT_RAMP_SECONDS,
+} from "./const.js";
 import { WEAPON_ORDER } from "./weapons.js";
 import { hitsPlayer } from "./collision.js";
 
 const KINDS = ["plating", "overclock", "nuke", "bounty"];
+
+// Ramps the low-tier (scout) crate-drop chance from LOW_LOOT_CHANCE_BASE down
+// to LOW_LOOT_CHANCE_FINAL (the old flat 8%) over LOOT_RAMP_SECONDS. See the
+// const.js comment on this block for why: with wave 1 now only 1-2 enemies,
+// an 8% roll meant most players got zero crates in their first couple waves.
+function lowLootChance(elapsed) {
+    const t = Math.min(1, elapsed / LOOT_RAMP_SECONDS);
+    return LOW_LOOT_CHANCE_BASE + (LOW_LOOT_CHANCE_FINAL - LOW_LOOT_CHANCE_BASE) * t;
+}
 
 export function spawnPowerup(game, x, y, kind) {
     const c = game.pools.powerups.acquire();
@@ -31,8 +43,9 @@ export function maybeDrop(game, e) {
         spawnPowerup(game, e.x, e.y, r.pick(["overclock", "nuke", "bounty", "plating"]));
         return;
     }
-    // low tier
-    if (r.chance(0.08)) {
+    // low tier -- chance ramps down from LOW_LOOT_CHANCE_BASE to
+    // LOW_LOOT_CHANCE_FINAL; see lowLootChance() above.
+    if (r.chance(lowLootChance(game.elapsed))) {
         spawnPowerup(game, e.x, e.y, r.pick(KINDS));
     }
 }

@@ -32,3 +32,12 @@ export function centerRush(game, type, count) {
 }
 
 export const FORMATIONS = [vFormation, pincer, centerRush];
+
+// Subset used during the opening (see PINCER_UNLOCK_S in const.js). pincer is
+// excluded on purpose: it spawns at x=16 AND x=VW-16 simultaneously, which by
+// construction puts enemies on opposite edges of the 320px play field at the
+// same instant. That's a fair challenge once a player has room to maneuver,
+// but during the true opening it's unreachable-by-design -- exactly what
+// playtest feedback described as "enemies spread across the entire screen, a
+// player can't shoot all of them."
+export const EARLY_FORMATIONS = [vFormation, centerRush];
