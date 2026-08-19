@@ -51,7 +51,13 @@ function newGame(session) {
         maxTier: 1,
         weapon: { type: "vulcan", tier: 1 },
         fireCd: 0,
-        autoFire: true,
+        // false = fire only while input.firing is true (mouse held / touch
+        // active), matching the documented control ("hold left mouse" in
+        // marauder.html). autoFire itself is left in place as the toggle
+        // weapons.js already gates on, since a future accessibility or
+        // touch-friendliness setting may legitimately want to flip this --
+        // the bug was the hardcoded `true` default, not the field's existence.
+        autoFire: false,
         bountyMs: 0,
         boss: null,
         banner: "",
@@ -174,7 +180,13 @@ function resolveCollisions(g) {
         const b = pB.active[i];
         let consumed = false;
         for (let j = enemies.count - 1; j >= 0; j--) {
-            if (j >= enemies.count) continue;   // count shrank via killEnemy
+            if (j >= enemies.count) continue;
+            // Defensive only: given killEnemy's swap-from-top removal and this
+            // loop's downward iteration, an already-visited index can never be
+            // revisited here in the current code (verified by simulation). This
+            // guard exists in case that invariant is ever broken by a future
+            // change (e.g. one bullet or explosion killing more than one enemy
+            // per iteration) -- it is intentionally left in rather than removed.
             const e = enemies.active[j];
             if (!e._alive || !aabb(b, e)) continue;
             e.hp -= b.dmg;
@@ -201,6 +213,12 @@ function resolveCollisions(g) {
     // Enemy bodies vs player (ramming).
     for (let j = enemies.count - 1; j >= 0; j--) {
         if (j >= enemies.count) continue;
+        // Defensive only: given killEnemy's swap-from-top removal and this
+        // loop's downward iteration, an already-visited index can never be
+        // revisited here in the current code (verified by simulation). This
+        // guard exists in case that invariant is ever broken by a future
+        // change (e.g. one bullet or explosion killing more than one enemy
+        // per iteration) -- it is intentionally left in rather than removed.
         const e = enemies.active[j];
         if (hitsPlayer(g.player, e)) {
             const label = ENEMY_LABEL[e.type] || "an enemy";

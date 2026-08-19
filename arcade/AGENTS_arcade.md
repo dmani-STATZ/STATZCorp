@@ -75,6 +75,9 @@ Backyard Marauder (`/arcade/marauder/`) is a real-time shooter, separate from th
 - Anti-cheat is layered deterrence (salted signed token + token-keyed HMAC + plausibility bounds + unique one-shot seeds). Don't claim it's tamper-proof; the honest hardening path is server-side re-simulation from the run seed.
 - Client is vanilla ES modules, no bundler. If you add gameplay randomness, route it through `rng.js` (seeded) so runs stay reproducible.
 - Never modify Wordle, Nonogram, or Lights Out code when working on Marauder.
+- Any new sprite in `sprites.js` must have every row the same length as `rows[0]`. If the design is meant to be left-right symmetric, every row should be a true palindrome. Verify both with a script before committing (not by eye) — same check used for the Phase 3 enforcer fix.
+- Any leaderboard field that renders another user's server-supplied data via `innerHTML` or `insertAdjacentHTML` must go through `escapeHtml()` first. Fields sourced from the *current* player's own local run state are not subject to this rule.
+- `game.autoFire` in `main.js` must default to `false`. If a future settings/accessibility feature exposes it as a toggle, gate the default through that setting rather than hardcoding `true` again.
 
 ---
 

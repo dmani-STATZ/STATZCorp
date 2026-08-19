@@ -3,6 +3,18 @@
 
 const $ = (id) => document.getElementById(id);
 
+// r.username on the global board is server-derived from get_full_name() or
+// username -- Django's default User model puts no character restriction on
+// first_name/last_name, so it must be escaped before it reaches innerHTML.
+// r.date (used on the personal board) is server-formatted and never
+// user-controlled, but it's escaped too rather than special-cased, so this
+// stays correct if that ever changes.
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[ch]));
+}
+
 function fillTable(tbodyId, rows, personal) {
     const tb = $(tbodyId);
     if (!tb) return;
@@ -12,7 +24,7 @@ function fillTable(tbodyId, rows, personal) {
         return;
     }
     for (const r of rows) {
-        const label = personal ? r.date : (r.username || "—");
+        const label = escapeHtml(personal ? r.date : (r.username || "—"));
         tb.insertAdjacentHTML(
             "beforeend",
             `<tr><td>${r.rank}</td><td>${label}</td><td>${r.score}</td></tr>`

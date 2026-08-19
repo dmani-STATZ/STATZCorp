@@ -85,17 +85,25 @@ const SPRITES = {
         palette: { O: "#5a4a20", Y: "#c8a13a", S: "#8f7326", H: "#e8c85a" },
     },
     enforcer: {
+        // Every row is EXACTLY 28 characters and a true left-right palindrome.
+        // The old version had 7 of 12 rows short by 1-2 chars against the 28-wide
+        // grid the factory derives from rows[0].length -- build() silently reads
+        // undefined past a short row's end, which the palette lookup treats as
+        // transparent, so the boss rendered with a ragged right edge through the
+        // cockpit/weapon-pod band. If you edit this art, keep every row the same
+        // length as row 0 and keep each row a palindrome, or the asymmetry comes
+        // right back.
         rows: [
             "......TTTTTTTTTTTTTTTT......",
             "....TTNNNNNNNNNNNNNNNNTT....",
             "..TTNNMMMMMMMMMMMMMMMMNNTT..",
-            ".TNNMMCCMMMMMMMMMMCCMMNNT.",
-            "TNNMMCCCCMMMMMMMMCCCCMMNNT.",
-            "TNMMMCCMMMMRRRRMMMMCCMMMNNT",
-            "TNMMMMMMMMRRWWRRMMMMMMMMMNT",
-            "TNNMMMMMMMRRWWRRMMMMMMMMNNT",
-            ".TNNMMMMMMMRRRRMMMMMMMMNNT.",
-            "..TTNNMMMMMMMMMMMMMMMMNNTT.",
+            ".TNNMMCCMMMMMMMMMMMMCCMMNNT.",
+            "TNNMMCCCCMMMMMMMMMMCCCCMMNNT",
+            "TNMMMCCMMMMMRRRRMMMMMCCMMMNT",
+            "TNMMMMMMMMRRWWWWRRMMMMMMMMNT",
+            "TNNMMMMMMMRRWWWWRRMMMMMMMNNT",
+            ".TNNMMMMMMMRRRRRRMMMMMMMNNT.",
+            "..TTNNMMMMMMMMMMMMMMMMNNTT..",
             "....TTNNNNNNNNNNNNNNNNTT....",
             "......TTTTTTTTTTTTTTTT......",
         ],
