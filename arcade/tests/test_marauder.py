@@ -1,12 +1,15 @@
 import json
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase, Client
 from django.urls import reverse, resolve
+from django.utils import timezone
 
 from arcade.models import PilotProfile, MarauderRun
 from arcade.services_marauder import (
     compute_run_checksum,
+    make_run_token,
     verify_run_token,
     get_global_top,
     get_user_top,
@@ -198,3 +201,116 @@ class MarauderLeaderboardTests(MarauderTestBase):
         self._make_run(self.user, 800, status=MarauderRun.STATUS_FLAGGED)
         self._make_run(self.user, 400, status=MarauderRun.STATUS_VALID)
         self.assertEqual([r["score"] for r in get_global_top(5)], [400])
+
+
+# Phase 2: replay protection and rate limiting. Does not re-test Phase 1
+# (token signing, checksum computation, plausibility grading).
+
+
+class MarauderReplayGuardTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="pilot_replay", password="x")
+        self.client.force_login(self.user)
+        cache.clear()  # rate-limit counters must not leak between tests
+
+    def _valid_submit_payload(self, seed="a" * 32):
+        """
+        Builds a payload that should grade STATUS_VALID under Phase 1's
+        plausibility bounds: well inside every ceiling in services_marauder.py.
+        started_at is generated fresh each call so the wall-clock check
+        (duration_ms <= wall_ms + WALL_CLOCK_SLACK_MS) always passes regardless
+        of when the test suite actually runs.
+        """
+        started_at_iso = timezone.now().isoformat()
+        token = make_run_token(self.user.id, seed, started_at_iso)
+        stats = {
+            "seed": seed,
+            "score": 100,
+            "distance_m": 20,
+            "duration_ms": 5000,
+            "enemies_killed": 1,
+            "wave_reached": 1,
+        }
+        checksum = compute_run_checksum(token, stats)
+        return {
+            "session_token": token,
+            "seed": seed,
+            "checksum": checksum,
+            "score": stats["score"],
+            "distance_m": stats["distance_m"],
+            "duration_ms": stats["duration_ms"],
+            "credits_earned": 10,
+            "enemies_killed": stats["enemies_killed"],
+            "wave_reached": stats["wave_reached"],
+            "max_weapon_tier": 1,
+        }
+
+    def test_duplicate_seed_rejected_with_409(self):
+        url = reverse("arcade:marauder_submit")
+        payload = self._valid_submit_payload()
+
+        first = self.client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(MarauderRun.objects.filter(seed=payload["seed"]).count(), 1)
+
+        second = self.client.post(
+            url, data=json.dumps(payload), content_type="application/json"
+        )
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(
+            MarauderRun.objects.filter(seed=payload["seed"]).count(),
+            1,
+            "a duplicate submit must not create a second row",
+        )
+
+    def test_seed_unique_constraint_survives_a_direct_race(self):
+        """
+        Bypasses seed_already_submitted() entirely -- this proves the DATABASE
+        constraint, not just the view-level pre-check, is what actually stops
+        a genuine two-tabs-at-once race (the pre-check can't close that window
+        by itself; see the comment in run_submit).
+        """
+        now = timezone.now()
+        MarauderRun.objects.create(
+            user=self.user, seed="racecondition0000000000000000", score=1, started_at=now,
+        )
+        with self.assertRaises(Exception):
+            MarauderRun.objects.create(
+                user=self.user, seed="racecondition0000000000000000", score=2, started_at=now,
+            )
+
+
+class MarauderRateLimitTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="pilot_rate", password="x")
+        self.client.force_login(self.user)
+        cache.clear()
+
+    def test_run_start_rate_limited_after_threshold(self):
+        from arcade.views_marauder import RUN_START_RATE_LIMIT
+
+        url = reverse("arcade:marauder_start")
+        for _ in range(RUN_START_RATE_LIMIT):
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 200)
+
+        blocked = self.client.post(url)
+        self.assertEqual(blocked.status_code, 429)
+
+    def test_rate_limit_is_isolated_per_user(self):
+        from arcade.views_marauder import RUN_START_RATE_LIMIT
+
+        url = reverse("arcade:marauder_start")
+        for _ in range(RUN_START_RATE_LIMIT):
+            self.client.post(url)
+        self.assertEqual(self.client.post(url).status_code, 429)
+
+        other_user = User.objects.create_user(username="pilot_rate_2", password="x")
+        self.client.force_login(other_user)
+        self.assertEqual(
+            self.client.post(url).status_code,
+            200,
+            "a different user must not inherit another user's rate limit",
+        )
