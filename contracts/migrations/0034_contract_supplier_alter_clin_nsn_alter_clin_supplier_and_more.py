@@ -7,7 +7,6 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('processing', '0013_alter_processclin_nsn_alter_processclin_supplier_and_more'),
         ('contracts', '0033_remove_contact_address_remove_contact_supplier_and_more'),
         ('products', '0001_initial'),
         ('suppliers', '0001_initial'),

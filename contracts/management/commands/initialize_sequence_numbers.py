@@ -1,7 +1,8 @@
 import logging
 from django.core.management.base import BaseCommand
 from django.db.models import Max
-from contracts.models import Contract, SequenceNumber
+from contracts.models import Contract
+from intake.models import SequenceNumber
 
 logger = logging.getLogger(__name__)
 

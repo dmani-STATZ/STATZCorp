@@ -110,7 +110,6 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "corsheaders",
     "django_extensions",
-    "processing.apps.ProcessingConfig",
     "intake.apps.IntakeConfig",
     "training.apps.TrainingConfig",
     "reports.apps.ReportsConfig",
@@ -522,7 +521,7 @@ if IS_PRODUCTION:
                 "level": "INFO",
                 "propagate": True,
             },
-            "processing": {
+            "intake": {
                 "handlers": ["console"],
                 "level": "INFO",
                 "propagate": True,
@@ -592,7 +591,7 @@ else:
                 "level": "INFO",
                 "propagate": True,
             },
-            "processing": {
+            "intake": {
                 "handlers": ["console", "file"],
                 "level": "INFO",
                 "propagate": True,
@@ -611,7 +610,7 @@ if APPLICATIONINSIGHTS_ENABLED:
         "class": "opencensus.ext.azure.log_exporter.AzureLogHandler",
         "connection_string": APPLICATIONINSIGHTS_CONNECTION_STRING,
     }
-    for logger_name in ["django", "STATZWeb", "users", "contracts", "processing", "suppliers"]:
+    for logger_name in ["django", "STATZWeb", "users", "contracts", "intake", "suppliers"]:
         if logger_name in LOGGING.get("loggers", {}):
             LOGGING["loggers"][logger_name]["handlers"].append("azure")
 

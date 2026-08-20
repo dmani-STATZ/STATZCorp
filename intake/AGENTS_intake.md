@@ -292,13 +292,12 @@ Read `CONTEXT_intake.md` first for app purpose, model shape, and lock semantics.
   `_stamp_po_number` in `intake/finalize.py` (calls
   `intake/services/po_sequence.py::mint_intake_po_number`) for AWD/PO/DO/INTERNAL
   types. Uses a single atomic `UPDATE ... OUTPUT INSERTED.po_number` against
-  the shared `processing_sequencenumber` table (id=1). Written to
+  the `intake_sequencenumber` table (id=1). Written to
   `Contract.po_number` and all `Clin.po_number` / `Clin.clin_po_num`.
   Never add a POST field, schema key, or draft JSON key for
   `po_number`. Do not mint PO numbers for IDIQ, MOD, or AMD types.
-  **PO minting uses `intake/services/po_sequence.py` — raw cursor only, no
-  processing import. Never call `SequenceNumber` from processing in intake
-  code. Applies to AWD/PO/DO/INTERNAL only.**
+  **PO minting uses `intake/services/po_sequence.py` (or `intake.models.SequenceNumber`).
+  Applies to AWD/PO/DO/INTERNAL only.**
 
 ### PDF Ingestion (Phase 3c)
 

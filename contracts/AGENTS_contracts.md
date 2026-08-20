@@ -20,7 +20,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 **Does not own:**
 - `Supplier`, `Contact`, `Certification`, `Classification` data — owned by `suppliers` app; `contracts` only reads and displays them
 - `Nsn` (National Stock Number) — owned by `products` app; `Clin` holds an FK to it
-- `SequenceNumber` — owned by `processing` app; used for PO/TAB number defaults
+- `SequenceNumber` — owned by `intake` app (table `intake_sequencenumber`); used for PO/TAB number defaults
 - `UserCompanyMembership` — owned by `users` app; `CompanyForm` syncs to it but does not define it
 - The audit transaction trail — written by `transactions` app signals on `Contract`/`Clin` saves and on `ClinShipment` when **`ClinShipment.pod_date`** changes. **`Clin.pod_date`** is an optional CLIN-level `DateField` (null/blank, no late flag), distinct from shipment-level POD. `Clin.ship_date` and `Clin.ship_qty` are tracked in `transactions/signals.py`; do not manually create `Transaction` rows when saving those fields — normal `Clin.save()` (including `save(update_fields=[...])` from views such as `complete_clin_shipping`) is enough for the audit trail.
 
@@ -301,10 +301,10 @@ The Add Note flow uses the same modal as Edit Note and is opened from the notes 
 |-----|-------------|
 | `suppliers` | `Supplier`, `Contact`, `SupplierType`, `Certification`, `Classification`, `SupplierDocument` models |
 | `products` | `Nsn` model (FK on `Clin`; `PROTECT` delete behavior) |
-| `processing` | `SequenceNumber` for PO/TAB number defaults |
+| `intake` | `SequenceNumber` for PO/TAB number defaults |
 | `users` | `User`, `UserCompanyMembership`, `UserSettings`, `conditional_login_required` decorator, `request.active_company` middleware |
 
-NSN search is dash-agnostic. `get_select_options` in `contracts/views/api_views.py` normalizes the search term using `normalize_nsn` from `processing.services.contract_utils`. Do not replace this with raw `icontains` on `nsn_code` alone — that will break dashless search again.
+NSN search is dash-agnostic. `get_select_options` in `contracts/views/api_views.py` normalizes the search term using `normalize_nsn` from `contracts.services.contract_number`. Do not replace this with raw `icontains` on `nsn_code` alone — that will break dashless search again.
 
 **`POSnippet`** — company-scoped snippet store. No `ContentType`, no audit trail, no FK to `Contract` or `Clin`. Safe to query/filter freely. `snippet_views.py` is the only view file; do not add snippet logic elsewhere.
 

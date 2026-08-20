@@ -9,12 +9,14 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from contracts.models import Clin, Company, Contract, ContractStatus
-from contracts.services.contract_number import canonicalize_contract_number
+from contracts.services.contract_number import (
+    canonicalize_contract_number,
+    normalize_contract_number,
+)
 from contracts.services.dfas_matcher import (
     match_dfas_row,
     strip_contract_number_dashes,
 )
-from processing.services.contract_utils import normalize_contract_number
 from contracts.services.dfas_parser import ParsedDfasRow
 
 
@@ -225,8 +227,8 @@ class NonDlaContractNumberTests(TestCase):
                 self.assertEqual(strip_contract_number_dashes(dashed), undashed)
                 self.assertEqual(strip_contract_number_dashes(undashed), undashed)
 
-    def test_processing_normalizer_agrees(self):
-        """processing.contract_utils is a second copy of this logic - keep them in step."""
+    def test_normalize_contract_number_agrees(self):
+        """normalize_contract_number alias matches canonicalize_contract_number."""
         for dashed, undashed, label in self.NON_DLA:
             with self.subTest(agency=label):
                 self.assertEqual(normalize_contract_number(undashed), dashed)

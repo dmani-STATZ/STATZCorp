@@ -73,10 +73,6 @@ class ScrapeAwardsResilienceTests(TestCase):
                 side_effect=fake_import,
             ),
             patch(
-                "sales.management.commands.scrape_awards.queue_we_won_awards",
-                return_value={"queued": 0, "skipped": 0, "errors": 0},
-            ),
-            patch(
                 "intake.services.queue_we_won_drafts.queue_we_won_drafts",
                 return_value={
                     "queued": 0,

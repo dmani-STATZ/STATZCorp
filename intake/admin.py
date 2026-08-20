@@ -10,7 +10,7 @@ from django.contrib import admin, messages
 from django.utils.html import format_html
 
 from .locks import LOCK_DURATION, is_expired
-from .models import AwardLedger, DraftContract
+from .models import AwardLedger, DraftContract, SequenceNumber
 
 
 class StaleLockFilter(admin.SimpleListFilter):
@@ -143,3 +143,9 @@ class AwardLedgerAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related(
             'dibbs_award', 'contract', 'created_by', 'draft_worked_by', 'finalized_by'
         )
+
+
+@admin.register(SequenceNumber)
+class SequenceNumberAdmin(admin.ModelAdmin):
+    list_display = ('id', 'po_number', 'tab_number')
+

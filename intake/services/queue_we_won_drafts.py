@@ -1,7 +1,7 @@
 """
 Inject DIBBS awards we won (per WeWonAward view) into the intake queue as skeleton drafts.
 
-Called from scrape_awards after queue_we_won_awards. Must not raise to callers.
+Called from scrape_awards. Must not raise to callers.
 """
 from __future__ import annotations
 

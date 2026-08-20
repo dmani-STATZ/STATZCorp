@@ -8,7 +8,7 @@ from django.db.models import Count
 from contracts.models import Company
 from contracts.forms import CompanyForm
 from contracts.models import Contract, Clin
-from processing.models import QueueContract, QueueClin, ProcessContract, ProcessClin
+from intake.models import DraftContract
 from users.models import UserCompanyMembership
 
 
@@ -64,10 +64,7 @@ class CompanyDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateView
         context['related_counts'] = {
             'contracts': Contract.objects.filter(company=company).count(),
             'clins': Clin.objects.filter(company=company).count(),
-            'queue_contracts': QueueContract.objects.filter(company=company).count(),
-            'queue_clins': QueueClin.objects.filter(company=company).count(),
-            'process_contracts': ProcessContract.objects.filter(company=company).count(),
-            'process_clins': ProcessClin.objects.filter(company=company).count(),
+            'draft_contracts': DraftContract.objects.filter(company=company).count(),
             'memberships': UserCompanyMembership.objects.filter(company=company).count(),
         }
         return context
@@ -79,14 +76,8 @@ class CompanyDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateView
             blockers.append('contracts')
         if Clin.objects.filter(company=company).exists():
             blockers.append('CLINs')
-        if QueueContract.objects.filter(company=company).exists():
-            blockers.append('queue contracts')
-        if QueueClin.objects.filter(company=company).exists():
-            blockers.append('queue CLINs')
-        if ProcessContract.objects.filter(company=company).exists():
-            blockers.append('processing contracts')
-        if ProcessClin.objects.filter(company=company).exists():
-            blockers.append('processing CLINs')
+        if DraftContract.objects.filter(company=company).exists():
+            blockers.append('intake drafts')
         if UserCompanyMembership.objects.filter(company=company).exists():
             blockers.append('user memberships')
 

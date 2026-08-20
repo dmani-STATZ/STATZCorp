@@ -119,34 +119,15 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 
 ---
 
-### `processing` — Staging Pipeline
-**Purpose:** Import queue and workflow buffer for contract/CLIN ingestion. PDF award parsing → staging records → finalized canonical contracts/CLINs.
-
-**Owns:** `QueueContract`, `QueueClin`, `ProcessContract`, `ProcessClin`, `ProcessContractSplit`, `SequenceNumber`
-
-**Consumes from other apps:**
-- `contracts` — final write target (`Contract`, `Clin`, `ContractSplit`, `PaymentHistory`)
-- `products.Nsn` — NSN matching during ingestion
-- `suppliers.Supplier` — supplier matching during ingestion
-
-**Other apps consume from it:**
-- `contracts` — reads `SequenceNumber` for PO/TAB defaults
-
-**URL prefix:** `/processing/`
-
-**Critical notes:**
-- IDIQ detection: type-code gate (`position[8] == 'D'` on stripped contract number) OR text gate ("Indefinite Delivery Contract"). Metadata packed into `QueueContract.description` as `IDIQ_META|TERM:12|MAX:350000|MIN:19`.
-- `start_processing` routes IDIQ contracts to `idiq_processing_edit` via `redirect_url` in JSON response.
-- Finalization (`finalize_contract`, `finalize_idiq_contract`) is the **only** write path into `contracts`. Runs inside `transaction.atomic`. Never write `Contract`/`Clin` from processing views outside finalization functions.
-- Orphaned `QueueContract` rows (no contract number) can be reconciled via `match_contract_number` — uses `select_for_update()` to prevent race conditions.
-- `IdiqContract` now has an `alert_note` TextField. When non-blank, both Processing (`ProcessContractUpdateView`) and Intake (DO draft editor) display a Bootstrap modal popup when the IDIQ is matched or when the edit page loads with an IDIQ already linked. The field is writable from the IDIQ processing editor, Intake IDIQ draft editor, and the contracts IDIQ edit page.
+### `processing` — Staging Pipeline (SUNSET / DECOMMISSIONED)
+**Status:** Decommissioned. The app has been removed from `INSTALLED_APPS` and routes. All new contracts, DIBBS award scraping, and PDF ingestion flow exclusively through the `intake` app. `SequenceNumber` has been moved to `intake.models`, and utility functions (`detect_contract_type`, `normalize_nsn`, `normalize_contract_number`) have moved to `contracts/services/contract_number.py`.
 
 ---
 
 ### `intake` — Contract Intake Queue
-**Purpose:** JSON-backed draft workspace for new contracts before finalization into `contracts`. Replaces processing queue over time; independent of processing staging tables.
+**Purpose:** JSON-backed draft workspace for new contracts before finalization into `contracts`. The sole entry point for contract creation, DIBBS award ingestion, and PDF award parsing.
 
-**Owns:** `DraftContract` (with `company` FK and `sharepoint_folder_status`), `AwardLedger` (table `intake_award_ledger` — the sole durable award→draft→live-contract lifecycle record), Pydantic schemas, soft locks, PDF/DIBBS ingestion, finalization into canonical tables
+**Owns:** `DraftContract` (with `company` FK and `sharepoint_folder_status`), `AwardLedger` (table `intake_award_ledger` — the sole durable award→draft→live-contract lifecycle record), `SequenceNumber` (table `intake_sequencenumber`), Pydantic schemas, soft locks, PDF/DIBBS ingestion, finalization into canonical tables
 
 **Consumes from other apps:**
 - `contracts.Company`, `contracts.Contract` — company scoping, dedup badge, finalization target, ledger live-contract link
@@ -402,9 +383,9 @@ File format and validation rules are in `release_notes/README-rn.md`.
 [users] ── auth, active_company, AppPermission ──────────────────────► all apps
     │
     ▼
-[contracts] ◄──── finalization ──── [processing] ◄── PDF award parsing
-    │  Company/Contract/Clin            QueueContract/QueueClin
-    │  SequenceNumber (read)            SequenceNumber (owned)
+[contracts] ◄──── finalization ──── [intake] ◄── PDF award parsing, DIBBS scrape
+    │  Company/Contract/Clin            DraftContract/AwardLedger
+    │                                   SequenceNumber (owned)
     │
     ├──► [transactions]  (signal-tracks Contract/Clin/Supplier saves)
     │
@@ -426,17 +407,17 @@ File format and validation rules are in `release_notes/README-rn.md`.
 | What | Where it lives | Who uses it |
 |---|---|---|
 | Login enforcement | `STATZWeb/middleware.py` `LoginRequiredMiddleware` | All apps |
-| Active company injection | `users/middleware.py` → `request.active_company` | `contracts`, `processing`, `suppliers`, `sales` |
+| Active company injection | `users/middleware.py` → `request.active_company` | `contracts`, `intake`, `suppliers`, `sales` |
 | App access gates | `users.AppRegistry` / `AppPermission` | All feature apps |
 | User settings | `users.UserSettings` | `contracts` (reminder window), `reports` (AI model) |
 | Company membership | `users.UserCompanyMembership` | `contracts.CompanyForm` |
 | Global AI model config | `suppliers.OpenRouterModelSetting` | `suppliers` enrichment, `reports` AI stream |
 | Reminder sidebar context | `contracts/context_processors.py` | All templates extending `contract_base.html` |
-| PO/TAB sequence numbers | `processing.SequenceNumber` | `processing` finalization into `contracts.Contract`; `initialize_sequence_numbers` management command |
+| PO/TAB sequence numbers | `intake.SequenceNumber` | `intake` finalization into `contracts.Contract`; `initialize_sequence_numbers` management command |
 | Field-change audit | `transactions/signals.py` | `contracts.Contract`, `contracts.Clin`, `contracts.ClinShipment` (`pod_date`), `suppliers.Supplier` |
 | Background task registry | `core.ScheduledTask` + `core/management/commands/run_background_tasks.py` | `sales/tasks/`, other app task modules |
 | CSS / design system | `static/css/theme-vars.css`, `app-core.css`, `utilities.css` | All templates |
-| Microsoft Graph API token | `users.UserOAuthToken` | `sales` (RFQ mail) |
+| Microsoft Graph API token | `users.UserOAuthToken` | `sales` (RFQ mail), `intake` (award mail) |
 
 ---
 
@@ -449,13 +430,13 @@ File format and validation rules are in `release_notes/README-rn.md`.
 | `Clin` | `contracts` | `ClinShipment`, `Note`, `PaymentHistory`, `ClinAcknowledgment`; read by `sales` via SQL view |
 | `Supplier` | `suppliers` | `Clin` FK, `Contact`, `SupplierDocument`, `SupplierNSNCapability`; tracked by `transactions` |
 | `Nsn` | `products` | `Clin` FK, `SupplierNSNCapability`, `IdiqContractDetails`; table name `contracts_nsn` |
-| `SequenceNumber` | `processing` | Read by `contracts.views.contract_views` for PO/TAB defaults |
+| `SequenceNumber` | `intake` | Used for PO/TAB assignment during intake finalization |
 | `Transaction` | `transactions` | Generic FK to any audited model; never written to directly from business logic |
 | `AppPermission` | `users` | Checked in every feature view via middleware |
 | `UserSettings` | `users` | `contracts` reminder window, `reports` AI model selection |
-| `QueueContract` | `processing` | Parent of `QueueClin`; finalized into `Contract` |
-| `ContractLevelCharge` | `contracts` | `Contract` FK; copied from `ProcessContractCharge` at finalization |
-| `ProcessContractCharge` | `processing` | `ProcessContract` FK; staging model |
+| `DraftContract` | `intake` | In-flight contract drafts; finalized into `Contract` |
+| `AwardLedger` | `intake` | Durable DIBBS award-to-contract lifecycle tracking |
+| `ContractLevelCharge` | `contracts` | `Contract` FK; copied from intake level charges at finalization |
 | `Solicitation` | `sales` | `SolicitationLine`, `SupplierRFQ`, `GovernmentBid` |
 | `ReportRequest` | `reports` | Nothing downstream |
 | `OpenRouterModelSetting` | `suppliers` | `suppliers` enrichment views, `reports` AI stream endpoint |
@@ -469,7 +450,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
 - **Data Captured:**
   - HTTP Request Traces (100% sample rate via `OpencensusMiddleware`).
   - Unhandled Exceptions.
-  - Django Log Forwarding: Forwarding of all `WARNING` level and higher logs from the major loggers (`django`, `STATZWeb`, `users`, `contracts`, `processing`).
+  - Django Log Forwarding: Forwarding of all `WARNING` level and higher logs from the major loggers (`django`, `STATZWeb`, `users`, `contracts`, `intake`).
 - **Resource Information:** Azure GCC High Application Insights resource located in USGov Virginia, resource group `StatzWeb-App`. The connection string is auto-injected by Azure under the environment variable `APPLICATIONINSIGHTS_CONNECTION_STRING`.
 
 ---

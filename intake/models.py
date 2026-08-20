@@ -334,3 +334,56 @@ class AwardLedger(models.Model):
 
     def __str__(self):
         return f'AwardLedger {self.contract_number} ({self.lifecycle_state or "new"})'
+
+
+class SequenceNumber(models.Model):
+    """Model to store and manage auto-incrementing sequence numbers for PO and Tab assignment."""
+    po_number = models.BigIntegerField(default=10000)
+    tab_number = models.BigIntegerField(default=10000)
+
+    class Meta:
+        db_table = 'intake_sequencenumber'
+        verbose_name = 'Sequence Number'
+        verbose_name_plural = 'Sequence Numbers'
+
+    def __str__(self):
+        return f"SequenceNumber (PO: {self.po_number}, Tab: {self.tab_number})"
+
+    @classmethod
+    def get_po_number(cls):
+        """Get the current PO number without advancing it."""
+        sequence = cls.objects.first()
+        if not sequence:
+            sequence = cls.objects.create()
+        return sequence.po_number
+
+    @classmethod
+    def get_tab_number(cls):
+        """Get the current Tab number without advancing it."""
+        sequence = cls.objects.first()
+        if not sequence:
+            sequence = cls.objects.create()
+        return sequence.tab_number
+
+    @classmethod
+    def advance_po_number(cls):
+        """Get the current PO number and advance it."""
+        sequence = cls.objects.first()
+        if not sequence:
+            sequence = cls.objects.create()
+        current = sequence.po_number
+        sequence.po_number += 1
+        sequence.save()
+        return current
+
+    @classmethod
+    def advance_tab_number(cls):
+        """Get the current Tab number and advance it."""
+        sequence = cls.objects.first()
+        if not sequence:
+            sequence = cls.objects.create()
+        current = sequence.tab_number
+        sequence.tab_number += 1
+        sequence.save()
+        return current
+

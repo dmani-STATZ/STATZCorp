@@ -108,7 +108,6 @@ urlpatterns = [
     path("suppliers/", include("suppliers.urls")),
     path("products/", include("products.urls")),
     path("accesslog/", include("accesslog.urls")),
-    path("processing/", include("processing.urls")),
     path("intake/", include("intake.urls")),
     path("training/", include("training.urls")),
     path("health/", core_views.health_plain, name="health_check"),

@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404
 import json
 
 from STATZWeb.decorators import conditional_login_required
-from processing.services.contract_utils import normalize_nsn
+from contracts.services.contract_number import normalize_nsn
 
 from ..models import (
     Contract, Clin, ClinType, Supplier, Nsn, SpecialPaymentTerms, Buyer, IdiqContract

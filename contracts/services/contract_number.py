@@ -74,3 +74,85 @@ def canonicalize_contract_number(contract_number: Optional[str]) -> Optional[str
         s,
     )
     return s
+
+
+# Alias for backward compatibility with processing.services.contract_utils
+normalize_contract_number = canonicalize_contract_number
+
+
+# Map of position-9 characters (the type indicator after removing dashes) to
+# internal label strings used in Contract/DraftContract contract_type.
+# Source: DLA Aviation position-9 reference + STATZ internal conventions.
+_CONTRACT_TYPE_MAP = {
+    "D": "IDIQ",   # Indefinite-delivery contracts (IDIQ, GWAC, FSS, IQ Purchase Order)
+    "F": "DO",     # Task orders / Delivery Orders against IDIQ, BPA, or BOA
+    "P": "PO",     # Purchase orders below simplified acquisition threshold
+    "V": "PO",     # Purchase order overflow (V substitutes P when P numbering exhausted)
+    "C": "AWD",    # Contracts above simplified acquisition threshold
+    "M": "MOD",    # Reserved for departmental/agency use (legacy DLA)
+    "A": "AMD",    # Amendments
+    "N": "INTERNAL",  # STATZ internal tracking contracts (STATZ1-FY-N-####)
+}
+
+
+def detect_contract_type(contract_number: Optional[str]) -> Optional[str]:
+    """
+    Derive the contract type label from position 9 (1-indexed) of a DLA contract number.
+
+    Works on both dashed ("SPE7M5-26-D-60JK") and normalized forms.
+    Extracts the type character by first normalizing to dashed format, then
+    reading the character after the second hyphen segment.
+
+    Returns a string from _CONTRACT_TYPE_MAP, or None if the contract number
+    is unrecognized or the position-9 character is not in the map.
+
+    Never raises — returns None on any unexpected input.
+    """
+    if not contract_number:
+        return None
+    try:
+        normalized = canonicalize_contract_number(contract_number)
+        if not normalized:
+            return None
+        # Dashed format: "SPE7M5-26-D-60JK" → split on "-" → ["SPE7M5","26","D","60JK"]
+        # Position 9 is the third segment (index 2), single character
+        parts = normalized.split("-")
+        if len(parts) >= 3 and len(parts[2]) == 1:
+            type_char = parts[2].upper()
+            label = _CONTRACT_TYPE_MAP.get(type_char)
+            if label is None:
+                logger.debug(
+                    "detect_contract_type: unknown type character %r in %r",
+                    type_char, contract_number,
+                )
+            return label
+        return None
+    except Exception:
+        logger.exception(
+            "detect_contract_type: unexpected error for input %r", contract_number
+        )
+        return None
+
+
+def normalize_nsn(nsn: Optional[str]) -> Optional[str]:
+    """
+    Normalize an NSN string to the standard hyphenated format: XXXX-XX-XXX-XXXX.
+
+    - S-codes (DLA service codes like S00000053) are passed through unchanged.
+    - 13-digit strings are hyphenated.
+    - Anything else is returned stripped.
+    - Returns None if input is None or empty.
+    """
+    if not nsn:
+        return None
+    s = re.sub(r"\s+", "", str(nsn).strip().upper())
+    if not s:
+        return None
+    # Pass S-codes through unchanged
+    if re.match(r"^S\d+$", s):
+        return s
+    s = s.replace("-", "")
+    if len(s) == 13 and s.isdigit():
+        return f"{s[:4]}-{s[4:6]}-{s[6:9]}-{s[9:]}"
+    return str(nsn).strip()
+

@@ -13,7 +13,6 @@ from mailer.services.graph_mail import send_mail_via_graph
 from sales.models import AwardImportBatch
 from sales.services.awards_file_importer import import_aw_records
 from sales.services.dibbs_awards_scraper import scrape_awards_for_date
-from sales.services.queue_we_won_awards import queue_we_won_awards
 
 logger = logging.getLogger(__name__)
 
@@ -624,20 +623,6 @@ Generated: {timezone.now().strftime('%Y-%m-%d %H:%M UTC')}
             return False, fail_reason or result.get("error") or (
                 "Scrape ended with status FAILED."
             )
-
-        # Piggyback: inject we-won awards into the processing queue.
-        # Runs on SUCCESS and PARTIAL. Never allowed to crash the scrape job.
-        try:
-            inject_result = queue_we_won_awards(batch, activity_log=self._activity)
-            self._activity(
-                f"Award queue injection: "
-                f"queued={inject_result['queued']} "
-                f"skipped={inject_result['skipped']} "
-                f"errors={inject_result['errors']}."
-            )
-        except Exception as exc:
-            self._activity(f"Award queue injection failed unexpectedly: {exc}")
-            self.stderr.write(f"queue_we_won_awards error: {exc}")
 
         # Piggyback: inject we-won awards into the intake queue.
         # Runs on SUCCESS and PARTIAL. Never allowed to crash the scrape job.

@@ -162,18 +162,6 @@ def poll_we_won_today(
         # Step D8 — we-won piggyback (after all cages)                         #
         # ------------------------------------------------------------------ #
         try:
-            from sales.services.queue_we_won_awards import queue_we_won_awards
-
-            ww_result = queue_we_won_awards(batch, activity_log=emit)
-            _emit(
-                f"queue_we_won_awards: queued={ww_result['queued']} "
-                f"skipped={ww_result['skipped']} errors={ww_result['errors']}."
-            )
-        except Exception as exc:
-            _emit(f"queue_we_won_awards failed unexpectedly: {exc}")
-            logger.exception("%s queue_we_won_awards error", _LOG_PREFIX)
-
-        try:
             from intake.services.queue_we_won_drafts import queue_we_won_drafts
 
             draft_result = queue_we_won_drafts(batch, activity_log=emit)
