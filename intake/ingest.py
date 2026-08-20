@@ -297,7 +297,7 @@ def ingest_pdf(pdf_file, *, original_filename: str = '', company=None) -> DraftC
         ) from exc
 
     logger.info(
-        'Ingested PDF %s → DraftContract %s (%s, status=%s)',
+        'Ingested PDF %s -> DraftContract %s (%s, status=%s)',
         original_filename or '<unnamed>',
         draft.contract_number, draft.contract_type, draft.pdf_parse_status,
     )
@@ -473,7 +473,7 @@ def ingest_dibbs_record(record: dict, company=None) -> DraftContract:
         ) from exc
 
     logger.info(
-        'Ingested DIBBS record → DraftContract %s (%s)',
+        'Ingested DIBBS record -> DraftContract %s (%s)',
         draft.contract_number, draft.contract_type,
     )
     return draft

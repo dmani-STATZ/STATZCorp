@@ -386,7 +386,7 @@ def _run_lifecycle_sweep() -> dict:
     )
 
     logger.info(
-        "Lifecycle sweep: %s New→Active, %s Expired→Archived, %s blob(s) purged",
+        "Lifecycle sweep: %s New->Active, %s Expired->Archived, %s blob(s) purged",
         new_to_active_count,
         expired_to_archived_count,
         blob_purged,

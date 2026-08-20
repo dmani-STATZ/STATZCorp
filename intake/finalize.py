@@ -155,7 +155,7 @@ def finalize_draft(draft: DraftContract, user: User) -> CanonicalTarget:
         draft.save(update_fields=['status', 'modified_at'])
 
     logger.info(
-        'Finalized draft %s → %s #%s',
+        'Finalized draft %s -> %s #%s',
         draft.contract_number, type(target).__name__, target.pk,
     )
     draft.delete()
