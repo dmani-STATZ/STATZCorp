@@ -619,9 +619,9 @@ window.onTransactionSaved = function(data) {
                   </td>
                   <td>{{ clin.nsn.nsn_code|default:"N/A" }}</td>
                   <td>{{ clin.order_qty|floatformat:'0'|default:"N/A" }} {{ clin.uom|default:"EA" }}</td>
-                  <td class="{% if clin.due_date_late %}review-late{% endif %}">
+                  <td class="{% if clin.is_late %}review-late{% endif %}">
                     {{ clin.due_date|date:"M d, Y"|default:"N/A" }}
-                    {% if clin.due_date_late %}<span class="ms-1 small">(LATE)</span>{% endif %}
+                    {% if clin.is_late %}<span class="ms-1 small">(LATE)</span>{% endif %}
                   </td>
                   <td class="text-end">${{ clin.quote_value|default:"0.00"|floatformat:2 }}</td>
                   <td>

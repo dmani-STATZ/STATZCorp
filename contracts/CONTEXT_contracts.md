@@ -117,6 +117,30 @@ A multi-company contract-workspace that owns the full lifecycle from contract he
 - A `Reminder` may optionally be attached to a `Note` via `reminder.note` FK (related_name=`note_reminders`). Business rule (enforced in UI, not in DB): one reminder per note. Reminder create/update/delete on a note in `add_note` / `note_update` is allowed when the user can edit the note (`created_by`, `assigned_to`, or `reminder_user` on an attached reminder for that note); `reminder_user` may be any active user (POST `reminder_user`, default `request.user`).
 
 ## 6. Request / User Flow
+
+### Shipment-based late status (2026-08-20)
+
+The stale `Contract.due_date_late` and `Clin.due_date_late`,
+`Clin.supplier_due_date_late`, and `Clin.ship_date_late` database columns were
+removed. Live status now comes from `Contract.is_late`, `Clin.is_late`, and
+`Clin.is_target_ship_late`, with shared semantics in
+`contracts/services/due_status.py`.
+
+A CLIN is complete on the dated shipment that first brings cumulative shipped
+quantity to or above its ordered quantity, ordered by ship date and shipment
+ID. Its completion date is compared with the CLIN due date or supplier target
+ship date. A Contract is late when any production CLIN completed after the
+Contract due date; contracts without production CLINs fall back to all CLINs.
+Incomplete and undated completions are not classified as late. Legacy CLINs
+without child shipment rows use their CLIN-level ship quantity and ship date.
+
+The archived production values are retained in
+`dbo._archive_contract_late_flags_20260820` and
+`dbo._archive_clin_late_flags_20260820`. The lifecycle dashboard's `past_due`
+tile no longer ANDs the live due-date check with a stale flag, fixing the
+historical undercount. Dashboard "Due Late" and supplier performance displays
+use the shipment-completion definition instead.
+
 - **Dynamic contract tracker:** `/contracts/dynamic-tracker/` lists active `TrackerSchema` rows for the active company; create flows to `/contracts/dynamic-tracker/<schema_id>/` for the spreadsheet-style grid (`tracker_detail`). Supporting JSON endpoints live under `/contracts/api/dynamic-tracker/` (schema, add/update/delete column, reorder columns, add/update/delete/close record, contract typeahead search, **column-width** save). See §5 **TrackerSchema & ContractRecord** for width storage and jump-to search behavior.
 - **Dashboard entry (`/contracts/`):** `ContractLifecycleDashboardView` shows metric cards, overdue/open counts, and a recent-contract list; metric detail exports live at `/contracts/dashboard/metric-detail/` (`contracts/views/dashboard_views.py`). The Dashboard section header bar displays a live **Open Contracts** count on the right side, sourced from `context['total_contracts']` (active, non-cancelled Open contracts for the current company).
 - **Contract lifecycle:** `<pk>/close/`, `<pk>/cancel/`, `<pk>/review/`, toggles (`mark-reviewed`, `toggle-contract-field`, `toggle-expedite-status`). **New contracts** are created only through the **Processing** app finalization workflow (queue → process → finalize), not via the contracts app. Management page at `<pk>/` renders header, CLIN tabs, GovActions, notes, and expedite controls (`contracts/views/contract_views.py`). Field-level editing on live contract headers uses the Transactions edit modal.

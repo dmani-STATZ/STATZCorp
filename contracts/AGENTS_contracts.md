@@ -26,6 +26,15 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 
 **Role:** This is the core domain app of the project. Nearly every other app depends on or integrates with it.
 
+### Late-status footguns
+
+- Shipment-based late semantics live only in `contracts/services/due_status.py`. Never re-derive them inline in a view or template.
+- Never reintroduce a stored `*_late` boolean. Those denormalized flags became stale and were removed.
+- `Contract.is_late`, `Clin.is_late`, and `Clin.is_target_ship_late` are Python properties and cannot be used in `.filter()`. Batch consumers must use the service's partition helpers.
+- CLIN status uses the dated shipment that first brings cumulative shipped quantity to the ordered quantity. Contract status uses production CLINs, falling back to all CLINs only when no production CLIN exists.
+- The properties can fetch child rows. Use `late_status_shipment_prefetch()` for CLIN loops and `late_status_clin_prefetch()` for Contract loops.
+- `get_clin_details` intentionally emits legacy JSON keys `due_date_late` and `supplier_due_date_late` as wire-format aliases. Do not rename them without updating the inline JS in `contract_management.html`.
+
 ### Navigation / redirect rules
 
 - **Company switcher on contract pages:** When on `/contracts/<pk>/` (or sub-pages such as `/close/`, `/cancel/`, `/review/`, `/detail/`, `/mark-reviewed/`) or on `/contracts/finance-audit/<pk>/`, switching the active company redirects to `contracts:contracts_dashboard` (main lifecycle dashboard at `/contracts/`), not back to the current URL. This is intentional — contract PKs are company-scoped and cannot be reused cross-company. Do not revert this redirect in `users.views.switch_company` without adding a cross-company existence check first.

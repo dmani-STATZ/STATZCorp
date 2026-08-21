@@ -126,8 +126,52 @@ class SupplierPortalAPITests(TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["contact_email"], "owner@example-supplier.com")
+        self.assertEqual(
+            data["emails"],
+            ["owner@example-supplier.com", "ap@example-supplier.com"],
+        )
         self.assertTrue(data["is_active"])
         self.assertEqual(data["cage_code"], "3WGD1")
+
+    def test_verify_falls_back_to_primary_contact_when_supplier_emails_blank(self):
+        supplier = Supplier.objects.create(
+            name="No Supplier-Level Email LLC",
+            cage_code="NOEML1",
+            archived=False,
+        )
+        Contact.objects.create(
+            supplier=supplier,
+            name="Jane Contact",
+            email="jane@no-supplier-email.com",
+        ).categories.add(self.category)  # non-Primary contact, should be ignored
+
+        primary_contact = Contact.objects.create(
+            supplier=supplier,
+            name="Primary Person",
+            email="primary@no-supplier-email.com",
+        )
+        primary_category, _ = SupplierContactCategory.objects.get_or_create(
+            name="Primary", defaults={"is_active": True, "sort_order": 0}
+        )
+        primary_contact.categories.add(primary_category)
+
+        path = reverse("supplier_portal:verify", kwargs={"cage_code": "NOEML1"})
+        resp = self._get(path)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["contact_email"], "primary@no-supplier-email.com")
+        self.assertEqual(data["emails"], ["primary@no-supplier-email.com"])
+
+    def test_verify_no_emails_returns_null_contact_email(self):
+        supplier = Supplier.objects.create(
+            name="No Email At All LLC", cage_code="NOEML2", archived=False
+        )
+        path = reverse("supplier_portal:verify", kwargs={"cage_code": "NOEML2"})
+        resp = self._get(path)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIsNone(data["contact_email"])
+        self.assertEqual(data["emails"], [])
 
     def test_profile_omits_excluded_fields(self):
         path = reverse("supplier_portal:profile", kwargs={"cage_code": "3WGD1"})

@@ -121,7 +121,6 @@ class Contract(AuditModel):
     contract_type = models.ForeignKey('ContractType', on_delete=models.CASCADE, null=True, blank=True)
     award_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
-    due_date_late = models.BooleanField(null=True, blank=True)
     sales_class = models.ForeignKey('SalesClass', on_delete=models.CASCADE, null=True, blank=True)
     survey_date = models.DateField(null=True, blank=True)
     survey_type = models.CharField(max_length=10, null=True, blank=True)
@@ -172,7 +171,6 @@ class Contract(AuditModel):
             
             # Compound indexes for common query patterns
             models.Index(fields=['status', 'due_date'], name='contract_status_due_idx'),
-            models.Index(fields=['due_date_late'], name='contract_due_late_idx'),
             models.Index(fields=['reviewed'], name='contract_reviewed_idx'),
         ]
 
@@ -187,6 +185,18 @@ class Contract(AuditModel):
     @property
     def cmmc_any(self) -> bool:
         return bool(self.cmmc_l1 or self.cmmc_l2_sa or self.cmmc_l2_c3pao or self.cmmc_l3)
+
+    @property
+    def is_late(self) -> bool:
+        """Evaluate shipment-based late status.
+
+        This property queries CLINs and shipments unless the contract was loaded
+        with ``late_status_clin_prefetch()``. Do not call it in an unprefetched
+        loop over contracts.
+        """
+        from contracts.services.due_status import contract_is_late
+
+        return contract_is_late(self)
 
     @property
     def total_split_value(self):
@@ -750,12 +760,9 @@ class Clin(AuditModel):
     uom = models.CharField(max_length=10, null=True, blank=True)
     ship_qty = models.FloatField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
-    due_date_late = models.BooleanField(null=True, blank=True)
     supplier_due_date = models.DateField(null=True, blank=True)
-    supplier_due_date_late = models.BooleanField(null=True, blank=True)
     ship_date = models.DateField(null=True, blank=True)
     pod_date = models.DateField(null=True, blank=True)
-    ship_date_late = models.BooleanField(null=True, blank=True)
     notes = GenericRelation('Note', related_query_name='clin')
     payment_history = GenericRelation('PaymentHistory', related_query_name='clin')
 
@@ -796,9 +803,6 @@ class Clin(AuditModel):
             # Compound indexes for common query patterns
             models.Index(fields=['contract', 'due_date'], name='clin_contract_due_idx'),
             models.Index(fields=['supplier', 'due_date'], name='clin_supp_due_idx'),
-            models.Index(fields=['due_date_late'], name='clin_due_late_idx'),
-            models.Index(fields=['supplier_due_date_late'], name='clin_supp_due_late_idx'),
-            models.Index(fields=['ship_date_late'], name='clin_ship_late_idx'),
         ]
 
     def __str__(self):
@@ -813,6 +817,38 @@ class Clin(AuditModel):
                 self.company = Company.get_default_company()
         super().save(*args, **kwargs)
     
+    @property
+    def _shipping_completion_date(self):
+        """Return the shipment date that completed the ordered quantity.
+
+        This property queries child shipments unless they were prefetched with
+        ``late_status_shipment_prefetch()``. Do not call it in an unprefetched
+        loop over CLINs.
+        """
+        from contracts.services.due_status import clin_completion_ship_date
+
+        return clin_completion_ship_date(self)
+
+    @property
+    def is_late(self) -> bool:
+        """Return whether the completing shipment was after the CLIN due date."""
+        from contracts.services.due_status import is_late
+
+        return is_late(
+            due_date=self.due_date,
+            completion_date=self._shipping_completion_date,
+        )
+
+    @property
+    def is_target_ship_late(self) -> bool:
+        """Return whether completion was after the supplier target ship date."""
+        from contracts.services.due_status import is_late
+
+        return is_late(
+            due_date=self.supplier_due_date,
+            completion_date=self._shipping_completion_date,
+        )
+
     @property
     def total_shipped(self):
         return self.shipments.aggregate(Sum('ship_qty'))['ship_qty__sum'] or 0

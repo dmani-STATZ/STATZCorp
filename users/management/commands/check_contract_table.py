@@ -67,7 +67,6 @@ class Command(BaseCommand):
             'contract_type_id': 'Type_ID',
             'award_date': '[Award Date]',
             'due_date': 'ContractDueDate',
-            'due_date_late': 'LateShipCDD',
             'sales_class_id': 'SalesClass',
             'survey_date': 'SurveyDate',
             'survey_type': 'SurveyType',

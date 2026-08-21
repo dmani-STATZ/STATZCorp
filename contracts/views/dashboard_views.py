@@ -12,6 +12,11 @@ from django.http import Http404
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Contract, Clin, Reminder, CanceledReason
+from ..services.due_status import (
+    contract_past_due_q,
+    partition_contract_late_status,
+    today,
+)
 from users.user_settings import UserSettings
 import csv
 from django.http import HttpResponse
@@ -138,9 +143,17 @@ def get_dashboard_metric_queryset(request, metric, period):
     if metric == 'contracts_due':
         contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date)).exclude(status__description='Canceled')
     elif metric == 'contracts_due_late':
-        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=True).exclude(status__description='Canceled')
+        due_contracts = contracts_qs.filter(
+            due_date__range=(start_date, end_date)
+        ).exclude(status__description='Canceled')
+        late_ids, _not_late_ids = partition_contract_late_status(due_contracts)
+        contracts_qs = due_contracts.filter(pk__in=late_ids)
     elif metric == 'contracts_due_ontime':
-        contracts_qs = contracts_qs.filter(due_date__range=(start_date, end_date), due_date_late=False).exclude(status__description='Canceled')
+        due_contracts = contracts_qs.filter(
+            due_date__range=(start_date, end_date)
+        ).exclude(status__description='Canceled')
+        _late_ids, not_late_ids = partition_contract_late_status(due_contracts)
+        contracts_qs = due_contracts.filter(pk__in=not_late_ids)
     elif metric in ('new_contracts', 'new_contract_value'):
         contracts_qs = contracts_qs.filter(award_date__range=(start_date, end_date)).exclude(status__description='Canceled')
 
@@ -209,6 +222,7 @@ class ContractLifecycleDashboardView(TemplateView):
         context = super().get_context_data(**kwargs)
         context['cancel_reasons'] = CanceledReason.objects.all()
         now = timezone.now()
+        today_date = today()
 
         # Get user's dashboard view preference
         dashboard_view = UserSettings.get_setting(
@@ -246,11 +260,12 @@ class ContractLifecycleDashboardView(TemplateView):
                 company=self.request.active_company,
                 contract__award_date__range=(start_date, end_date),
             ).exclude(contract__status__description='Canceled')
-            
+
+            late_ids, not_late_ids = partition_contract_late_status(past_contracts)
             return {
-                'contracts_due': past_contracts.distinct().count(),
-                'contracts_due_late': past_contracts.filter(due_date_late=True).distinct().count(),
-                'contracts_due_ontime': past_contracts.filter(due_date_late=False).distinct().count(),
+                'contracts_due': len(late_ids | not_late_ids),
+                'contracts_due_late': len(late_ids),
+                'contracts_due_ontime': len(not_late_ids),
                 'new_contract_value': contracts.aggregate(total=Sum('contract_value'))['total'] or 0,
                 'new_contracts': contracts.distinct().count(),
                 'date_range': mark_safe(f"{start_date.strftime('%Y/%m/%d')} to<br>{end_date.strftime('%Y/%m/%d')}"),
@@ -319,14 +334,11 @@ class ContractLifecycleDashboardView(TemplateView):
         
         # Contracts with upcoming due dates
         context['due_soon'] = active_contracts.filter(
-            due_date__range=[timezone.now(), timezone.now() + timedelta(days=14)]
+            due_date__range=[today_date, today_date + timedelta(days=14)]
         ).count()
         
         # Contracts that are past due
-        context['past_due'] = active_contracts.filter(
-            due_date__lt=timezone.now(),
-            due_date_late=True
-        ).count()
+        context['past_due'] = active_contracts.filter(contract_past_due_q(today_date)).count()
         
         # User's reminders
         context['pending_reminders'] = Reminder.objects.filter(
@@ -348,13 +360,13 @@ class ContractLifecycleDashboardView(TemplateView):
 
         # Find overdue contracts (due_date is in the past)
         overdue_contracts = open_contracts.filter(
-            due_date__lt=timezone.now()  # Due date is less than current time
+            due_date__lt=today_date
         )
         overdue_contracts_count = overdue_contracts.count()
 
         # Find on-time contracts (due_date is in the future or null)
         on_time_contracts = open_contracts.filter(
-            Q(due_date__gte=timezone.now()) | Q(due_date__isnull=True)
+            Q(due_date__gte=today_date) | Q(due_date__isnull=True)
         )
         on_time_contracts_count = on_time_contracts.count()
 
@@ -363,7 +375,7 @@ class ContractLifecycleDashboardView(TemplateView):
 
         # Get upcoming contracts (due within next 14 days)
         upcoming_contracts = open_contracts.filter(
-            due_date__range=[timezone.now(), timezone.now() + timedelta(days=14)]
+            due_date__range=[today_date, today_date + timedelta(days=14)]
         ).order_by('due_date')
         
         upcoming_due_dates = upcoming_contracts.count()

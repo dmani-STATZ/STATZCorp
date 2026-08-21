@@ -22,6 +22,15 @@ window.onTransactionSaved = function(data) {
     var fieldHyphen = data.field_name.replace(/_/g, '-');
     var el = document.getElementById('clin-' + fieldHyphen + '-value');
     if (el) el.textContent = data.display_value || 'N/A';
+    if (data.late_status) {
+      var dueEl = document.getElementById('clin-due-date-value');
+      var targetEl = document.getElementById('clin-supplier-due-date-value');
+      if (dueEl) dueEl.classList.toggle('text-red-600', Boolean(data.late_status.is_late));
+      if (targetEl) targetEl.classList.toggle(
+        'text-red-600',
+        Boolean(data.late_status.is_target_ship_late)
+      );
+    }
 
     // Slice B: handle derived_updates returned by server after
     // order_qty / unit_price / price_per_unit changes
@@ -249,7 +258,7 @@ function refreshClinShipQty() {
                                     CLIN Due Date
                                 </button>
                                 <p class="font-medium text-sm mt-1">
-                                    <span id="clin-due-date-value" class="{% if clin.due_date_late %}text-red-600{% endif %}">{{ clin.due_date|date:"m/d/Y"|default:"N/A" }}</span>
+                                    <span id="clin-due-date-value" class="{% if clin.is_late %}text-red-600{% endif %}">{{ clin.due_date|date:"m/d/Y"|default:"N/A" }}</span>
                                 </p>
                             </div>
                         </div>
@@ -335,7 +344,7 @@ function refreshClinShipQty() {
                                     Target Ship Date
                                 </button>
                                 <p class="font-medium text-sm mt-1">
-                                    <span id="clin-supplier-due-date-value" class="{% if clin.supplier_due_date_late %}text-red-600{% endif %}">{{ clin.supplier_due_date|date:"m/d/Y"|default:"N/A" }}</span>
+                                    <span id="clin-supplier-due-date-value" class="{% if clin.is_target_ship_late %}text-red-600{% endif %}">{{ clin.supplier_due_date|date:"m/d/Y"|default:"N/A" }}</span>
                                 </p>
                             </div>
                         </div>

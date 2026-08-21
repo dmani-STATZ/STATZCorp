@@ -9,8 +9,6 @@ from django.db.models import (
     Q,
     Count,
     Sum,
-    Case,
-    When,
     Value,
     F,
     ExpressionWrapper,
@@ -40,6 +38,7 @@ from contracts.models import (
     ClinShipment,
     PaymentHistory,
 )
+from contracts.services.due_status import late_status_clin_prefetch
 from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
 from suppliers.models import (
     Contact,
@@ -766,18 +765,15 @@ class SupplierDetailView(DetailView):
         contracts_qs = Contract.objects.filter(id__in=clin_contract_ids)
         clins_qs = Clin.objects.filter(supplier=supplier)
 
-        context['contracts'] = (
+        supplier_contracts = list(
             contracts_qs.select_related('status', 'company')
-            .annotate(
-                performance_flag=Case(
-                    When(due_date_late=True, then=Value('Late')),
-                    default=Value(''),
-                    output_field=models.CharField(),
-                )
-            )
+            .prefetch_related(late_status_clin_prefetch())
             .order_by('-award_date', '-created_on')
             .distinct()
         )
+        for contract in supplier_contracts:
+            contract.performance_flag = 'Late' if contract.is_late else ''
+        context['contracts'] = supplier_contracts
 
         context['contract_company_summary'] = (
             clins_qs.filter(contract_id__isnull=False)

@@ -189,7 +189,7 @@ Contract Details: {{ contract.contract_number }}
                 <div class="md:col-span-4">
                     <div class="form-group">
                         <label class="form-label">Due Date</label>
-                        <p class="font-medium {% if contract.due_date_late %}text-red-600{% endif %}">
+                        <p class="font-medium {% if contract.is_late %}text-red-600{% endif %}">
                             {{ contract.due_date|date:"M d, Y"|default:"N/A" }}
                         </p>
                     </div>

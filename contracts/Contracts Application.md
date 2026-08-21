@@ -16,7 +16,7 @@
    - `Clin` (contracts/models.py):
      * Core fields: `item_number`, `item_type`, `item_value`, `unit_price`, `order_qty`, `ship_qty`
      * Date fields: `due_date`, `supplier_due_date`, `ship_date`
-     * Status flags: `due_date_late`, `supplier_due_date_late`, `ship_date_late`
+     * Live status properties: `is_late`, `is_target_ship_late`
      * Foreign keys: `contract`, `supplier`, `nsn`, `special_payment_terms`
      * Generic relations: `notes`, `payment_history`
      * Choices: `ORIGIN_DESTINATION_CHOICES`, `ITEM_TYPE_CHOICES`

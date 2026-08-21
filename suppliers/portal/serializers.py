@@ -116,12 +116,15 @@ def serialize_document(doc):
     }
 
 
-def serialize_verify(supplier):
+def serialize_verify(supplier, emails):
+    """emails: ordered, deduped list of addresses valid for this supplier
+    (see resolve_login_emails) — used for password reset / portal setup."""
     return {
         "cage_code": supplier.cage_code,
         "name": supplier.name,
         "is_active": True,
-        "contact_email": supplier.primary_email or None,
+        "contact_email": emails[0] if emails else None,
+        "emails": emails,
     }
 
 

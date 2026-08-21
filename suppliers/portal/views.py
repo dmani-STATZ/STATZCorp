@@ -14,6 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from contracts.models import Address
 from mailer.services.graph_mail import send_mail_via_graph
+from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
 from suppliers.models import (
     Contact,
     Supplier,
@@ -72,6 +73,31 @@ def get_active_supplier(cage_code):
         )
         .first()
     )
+
+
+def resolve_login_emails(supplier):
+    """Ordered, deduped list of addresses valid for password reset / portal
+    setup: supplier.primary_email, supplier.business_email, then any
+    Primary-category contact emails. primary_email is often blank in
+    practice, so Primary contacts are the real fallback."""
+    emails = []
+    seen = set()
+
+    def add(value):
+        value = (value or "").strip()
+        if value and value.lower() not in seen:
+            seen.add(value.lower())
+            emails.append(value)
+
+    add(supplier.primary_email)
+    add(supplier.business_email)
+    for email in Contact.objects.filter(
+        supplier=supplier,
+        categories__name=PRIMARY_CATEGORY_NAME,
+    ).values_list("email", flat=True):
+        add(email)
+
+    return emails
 
 
 def load_profile_supplier(cage_code):
@@ -261,7 +287,8 @@ class SupplierVerifyView(PortalAPIView):
         supplier = get_active_supplier(cage_code)
         if supplier is None:
             return not_found()
-        return JsonResponse(serialize_verify(supplier))
+        emails = resolve_login_emails(supplier)
+        return JsonResponse(serialize_verify(supplier, emails))
 
 
 class SupplierProfileView(PortalAPIView):

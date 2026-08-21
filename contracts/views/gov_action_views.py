@@ -6,6 +6,7 @@ from django.views.decorators.http import require_http_methods
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, GovAction, Contract
 from ..forms import GovActionForm
+from ..services.due_status import late_status_shipment_prefetch
 from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
 from suppliers.models import Supplier, Contact
 
@@ -18,7 +19,17 @@ def get_clin_details(request, clin_id):
         active_company = getattr(request, 'active_company', None)
         if not active_company:
             return JsonResponse({'success': False, 'error': 'No company selected.'}, status=400)
-        clin = get_object_or_404(Clin.objects.select_related('supplier', 'nsn', 'clin_type', 'special_payment_terms'), id=clin_id, company=active_company)
+        clin = get_object_or_404(
+            Clin.objects.select_related(
+                'contract',
+                'supplier',
+                'nsn',
+                'clin_type',
+                'special_payment_terms',
+            ).prefetch_related(late_status_shipment_prefetch()),
+            id=clin_id,
+            company=active_company,
+        )
         shipment_counts = clin.shipments.aggregate(
             total=Count('id'),
             with_pod=Count('id', filter=Q(pod_date__isnull=False)),
@@ -54,8 +65,9 @@ def get_clin_details(request, clin_id):
             'special_payment_terms': str(clin.special_payment_terms) if clin.special_payment_terms else '—',
             'special_payment_terms_paid': bool(clin.special_payment_terms_paid),
             'supplier_due_date': clin.supplier_due_date.strftime('%m/%d/%Y') if clin.supplier_due_date else 'N/A',
-            'supplier_due_date_late': bool(clin.supplier_due_date_late),
-            'due_date_late': bool(clin.due_date_late),
+            # Legacy wire aliases consumed by contract_management.html inline JS.
+            'supplier_due_date_late': clin.is_target_ship_late,
+            'due_date_late': clin.is_late,
             'order_qty': clin.order_qty if clin.order_qty is not None else '—',
             'uom': clin.uom or 'EA',
             'quoted_due_date': clin.supplier_due_date.strftime('%m/%d/%Y') if clin.supplier_due_date else (clin.due_date.strftime('%m/%d/%Y') if clin.due_date else 'N/A'),

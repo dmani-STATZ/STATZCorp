@@ -37,6 +37,10 @@ from ..models import (
 from .mixins import ActiveCompanyQuerysetMixin
 from contracts.services.sharepoint_paths import build_explorer_uri
 from contracts.services.split_breakdown import build_split_breakdown_context
+from contracts.services.due_status import (
+    late_status_clin_prefetch,
+    late_status_shipment_prefetch,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +52,11 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
     context_object_name = 'contract'
 
     def get_queryset(self):
-        return super().get_queryset().select_related('idiq_contract', 'status', 'company', 'closed_by')
+        return (
+            super().get_queryset()
+            .select_related('idiq_contract', 'status', 'company', 'closed_by')
+            .prefetch_related(late_status_clin_prefetch())
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -58,6 +66,8 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
         contract = self.get_object()
         clins = contract.clin_set.all().select_related(
             'clin_type', 'supplier', 'nsn'
+        ).prefetch_related(
+            late_status_shipment_prefetch()
         ).order_by('item_number')
         context['clins'] = clins
 
@@ -243,7 +253,11 @@ class ContractDetailView(ActiveCompanyQuerysetMixin, DetailView):
     context_object_name = 'contract'
 
     def get_queryset(self):
-        return super().get_queryset().select_related('idiq_contract', 'status', 'company')
+        return (
+            super().get_queryset()
+            .select_related('idiq_contract', 'status', 'company')
+            .prefetch_related(late_status_clin_prefetch())
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -722,6 +736,8 @@ class ContractReviewView(DetailView):
             'clin_type',
             'supplier',
             'nsn'
+        ).prefetch_related(
+            late_status_shipment_prefetch()
         ).order_by('clin_type__description')
 
         context['total_split_value'] = contract.total_split_value

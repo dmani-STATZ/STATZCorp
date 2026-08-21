@@ -227,6 +227,21 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
             or (model_class.__name__ == 'Contract' and field_name == 'po_number')
         ):
             response_data["po_sync_updates"] = po_sync
+        if model_class.__name__ == 'Contract' and field_name == 'due_date':
+            response_data["late_status"] = {
+                "is_late": instance.is_late,
+            }
+        elif model_class.__name__ == 'Clin' and field_name in {
+            'due_date',
+            'supplier_due_date',
+            'order_qty',
+            'ship_qty',
+            'ship_date',
+        }:
+            response_data["late_status"] = {
+                "is_late": instance.is_late,
+                "is_target_ship_late": instance.is_target_ship_late,
+            }
         return JsonResponse(response_data)
 
     old_value_str = get_field_value_display(instance, field_name)
