@@ -4,10 +4,15 @@ import json
 import time
 from unittest.mock import patch
 
+from datetime import date
+from decimal import Decimal
+
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
+from contracts.models import Clin, Contract, ContractStatus
+from products.models import Nsn
 from suppliers.models import (
     Contact,
     Supplier,
@@ -389,4 +394,136 @@ class SupplierPortalAPITests(TestCase):
         self.assertEqual(resp.status_code, 502)
         self.assertEqual(resp.json()["error"]["code"], "bad_gateway")
         mock_send.assert_called_once()
+
+    def _contracts_path(self, cage="3WGD1"):
+        return reverse("supplier_portal:contracts", kwargs={"cage_code": cage})
+
+    def test_contracts_unknown_cage_404(self):
+        resp = self._get(self._contracts_path("NOPE0"))
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json()["error"]["code"], "not_found")
+
+    def test_contracts_archived_supplier_404(self):
+        resp = self._get(self._contracts_path("ARCH01"))
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json()["error"]["code"], "not_found")
+
+    def test_contracts_bad_signature_401(self):
+        path = self._contracts_path()
+        ts = str(int(time.time()))
+        resp = self.client.get(
+            path,
+            HTTP_X_API_KEY=API_KEY,
+            HTTP_X_TIMESTAMP=ts,
+            HTTP_X_SIGNATURE="0" * 64,
+        )
+        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(resp.json()["error"]["code"], "unauthorized")
+
+    def test_contracts_empty_list_200(self):
+        resp = self._get(self._contracts_path())
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"contracts": []})
+
+    def test_contracts_shape_sort_and_allowlist(self):
+        other = Supplier.objects.create(
+            name="Other Vendor",
+            cage_code="OTHER1",
+            archived=False,
+        )
+        nsn_a = Nsn.objects.create(nsn_code="5340-01-234-5678")
+        nsn_b = Nsn.objects.create(nsn_code="5340-01-234-9999")
+
+        open_status = ContractStatus.objects.create(description="Open")
+        older = Contract.objects.create(
+            contract_number="SPE7L1-23-D-0001",
+            award_date=date(2023, 1, 10),
+        )
+        newer = Contract.objects.create(
+            contract_number="SPE7L1-24-D-0042",
+            award_date=date(2024, 3, 15),
+            status=open_status,
+        )
+
+        Clin.objects.create(
+            contract=newer,
+            supplier=self.supplier,
+            item_number="0002",
+            nsn=nsn_b,
+            due_date=None,
+            unit_price=Decimal("99.50"),
+            item_value=Decimal("199.00"),
+        )
+        Clin.objects.create(
+            contract=newer,
+            supplier=self.supplier,
+            item_number="0001",
+            nsn=nsn_a,
+            due_date=date(2024, 9, 1),
+            unit_price=Decimal("12.00"),
+        )
+        Clin.objects.create(
+            contract=newer,
+            supplier=other,
+            item_number="0099",
+            nsn=nsn_a,
+            due_date=date(2024, 1, 1),
+            unit_price=Decimal("500.00"),
+        )
+        Clin.objects.create(
+            contract=older,
+            supplier=self.supplier,
+            item_number="0001",
+            nsn=nsn_a,
+            due_date=date(2023, 6, 1),
+        )
+
+        resp = self._get(self._contracts_path())
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode("utf-8")
+        data = resp.json()
+
+        self.assertEqual(
+            [c["contract_number"] for c in data["contracts"]],
+            ["SPE7L1-24-D-0042", "SPE7L1-23-D-0001"],
+        )
+        self.assertEqual(data["contracts"][0]["award_date"], "2024-03-15")
+        self.assertEqual(data["contracts"][0]["status"], "Open")
+        self.assertIsNone(data["contracts"][1]["status"])
+        self.assertEqual(
+            data["contracts"][0]["clins"],
+            [
+                {
+                    "clin_number": "0001",
+                    "nsn": "5340-01-234-5678",
+                    "due_date": "2024-09-01",
+                },
+                {
+                    "clin_number": "0002",
+                    "nsn": "5340-01-234-9999",
+                    "due_date": None,
+                },
+            ],
+        )
+        self.assertEqual(
+            set(data["contracts"][0].keys()),
+            {"contract_number", "award_date", "status", "clins"},
+        )
+        self.assertEqual(
+            set(data["contracts"][0]["clins"][0].keys()),
+            {"clin_number", "nsn", "due_date"},
+        )
+        self.assertNotIn("0099", body)
+        for banned in (
+            "unit_price",
+            "item_value",
+            "price",
+            "funding",
+            "cost",
+            "amount",
+            "contract_value",
+            "paid_amount",
+            "quote_value",
+        ):
+            self.assertNotIn(banned, body)
 

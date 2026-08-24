@@ -16,6 +16,11 @@ urlpatterns = [
         name="verify",
     ),
     path(
+        "suppliers/<str:cage_code>/contracts/",
+        views.SupplierContractsView.as_view(),
+        name="contracts",
+    ),
+    path(
         "suppliers/<str:cage_code>/",
         views.SupplierProfileView.as_view(),
         name="profile",

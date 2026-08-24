@@ -12,7 +12,9 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
-from contracts.models import Address
+from django.db.models import Prefetch
+
+from contracts.models import Address, Clin, Contract
 from mailer.services.graph_mail import send_mail_via_graph
 from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
 from suppliers.models import (
@@ -47,6 +49,7 @@ from .serializers import (
     serialize_contact,
     serialize_document,
     serialize_profile,
+    serialize_supplier_contracts,
     serialize_verify,
 )
 from .throttling import check_rate_limit
@@ -280,6 +283,39 @@ class SendEmailView(PortalAPIView):
             return bad_gateway()
 
         return JsonResponse({"ok": True})
+
+
+class SupplierContractsView(PortalAPIView):
+    """
+    GET /api/supplier-portal/v1/suppliers/{cage_code}/contracts/
+
+    Read-only list of contracts awarded to this supplier (via Clin.supplier),
+    each with allowlisted fields: contract_number, award_date, status,
+    and CLINs (clin_number, nsn, due_date).
+    Archived or unknown cage codes 404, matching verify/ and profile.
+    Zero contracts is 200 with {"contracts": []}.
+    """
+
+    def get(self, request, cage_code):
+        supplier = get_active_supplier(cage_code)
+        if supplier is None:
+            return not_found()
+
+        contracts = (
+            Contract.objects.filter(clin__supplier=supplier)
+            .select_related("status")
+            .distinct()
+            .prefetch_related(
+                Prefetch(
+                    "clin_set",
+                    queryset=Clin.objects.filter(supplier=supplier).select_related(
+                        "nsn"
+                    ),
+                    to_attr="portal_clins",
+                )
+            )
+        )
+        return JsonResponse(serialize_supplier_contracts(contracts))
 
 
 class SupplierVerifyView(PortalAPIView):

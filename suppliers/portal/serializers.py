@@ -1,5 +1,6 @@
 """Serialize supplier portal payloads (allowlisted fields only)."""
 
+from datetime import date
 from datetime import timezone as datetime_timezone
 
 from django.utils import timezone
@@ -114,6 +115,55 @@ def serialize_document(doc):
         "linked_certification": linked,
         "uploaded_on": _iso_datetime(doc.created_on),
     }
+
+
+def serialize_portal_clin(clin):
+    """Allowlisted CLIN fields for the public supplier portal. No money fields."""
+    nsn_code = None
+    if clin.nsn_id and clin.nsn:
+        nsn_code = clin.nsn.nsn_code or None
+    return {
+        "clin_number": clin.item_number,
+        "nsn": nsn_code,
+        "due_date": _iso_date(clin.due_date),
+    }
+
+
+def serialize_supplier_contracts(contracts):
+    """
+    Allowlisted contract list for GET .../contracts/.
+
+    JSON keys are the portal contract (`contract_number`, `award_date`,
+    `status`, `clins[].clin_number` / `nsn` / `due_date`). Status is
+    `Contract.status.description`. CLIN number is `Clin.item_number`;
+    NSN is `Clin.nsn.nsn_code`.
+    """
+    ordered_contracts = sorted(
+        contracts,
+        key=lambda c: c.award_date or date.min,
+        reverse=True,
+    )
+    payload = []
+    for contract in ordered_contracts:
+        clins = getattr(contract, "portal_clins", None)
+        if clins is None:
+            clins = []
+        ordered_clins = sorted(
+            clins,
+            key=lambda c: (c.due_date is None, c.due_date or date.max),
+        )
+        status_label = None
+        if contract.status_id and contract.status:
+            status_label = contract.status.description or None
+        payload.append(
+            {
+                "contract_number": contract.contract_number,
+                "award_date": _iso_date(contract.award_date),
+                "status": status_label,
+                "clins": [serialize_portal_clin(c) for c in ordered_clins],
+            }
+        )
+    return {"contracts": payload}
 
 
 def serialize_verify(supplier, emails):
