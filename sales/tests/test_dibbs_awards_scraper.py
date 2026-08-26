@@ -7,6 +7,10 @@ from unittest.mock import MagicMock, patch
 from sales.services.dibbs_awards_scraper import (
     DIBBS_MAX_DISPLAY_RECORDS,
     DIBBS_MAX_PAGES,
+    GRID_CONTROL,
+    NAV_TIMEOUT,
+    _dopostback,
+    click_next_ellipsis,
     get_expected_record_count,
     scrape_awards_for_date,
 )
@@ -67,3 +71,69 @@ class TestDibbsAwardsScraperSafeguards(unittest.TestCase):
         self.assertEqual(res["raw_expected_rows"], 10163)
         self.assertEqual(res["expected_rows"], 10000)
         self.assertTrue(any("caps display at 10,000" in log for log in logs))
+
+
+class _ArmedNavigationPage:
+    """Minimal page double that records whether expect_navigation is entered before the action."""
+
+    def __init__(self):
+        self.in_expect_navigation = False
+        self.evaluate_armed = False
+        self.click_armed = False
+        self.wait_until = None
+        self.timeout = None
+
+    def expect_navigation(self, wait_until=None, timeout=None):
+        self.wait_until = wait_until
+        self.timeout = timeout
+        return self
+
+    def __enter__(self):
+        self.in_expect_navigation = True
+        return self
+
+    def __exit__(self, *args):
+        self.in_expect_navigation = False
+        return False
+
+    def evaluate(self, js):
+        self.evaluate_armed = self.in_expect_navigation
+        self.js = js
+
+    def wait_for_load_state(self, *args, **kwargs):
+        return None
+
+    def wait_for_selector(self, *args, **kwargs):
+        return None
+
+    def locator(self, selector):
+        loc = MagicMock()
+        link = MagicMock()
+        link.inner_text.return_value = "..."
+        link.get_attribute.return_value = "__doPostBack('ctl00$cph1$grdAwardSearch','Page$11')"
+
+        def _click(*args, **kwargs):
+            self.click_armed = self.in_expect_navigation
+
+        link.click.side_effect = _click
+        loc.all.return_value = [link]
+        return loc
+
+
+class TestPostbackNavigationArmed(unittest.TestCase):
+    def test_dopostback_arms_expect_navigation_before_evaluate(self):
+        page = _ArmedNavigationPage()
+        _dopostback(page, "2")
+        self.assertTrue(page.evaluate_armed)
+        self.assertEqual(page.wait_until, "domcontentloaded")
+        self.assertEqual(page.timeout, NAV_TIMEOUT)
+        self.assertIn(GRID_CONTROL, page.js)
+        self.assertIn("Page$2", page.js)
+
+    def test_click_next_ellipsis_arms_expect_navigation_before_click(self):
+        page = _ArmedNavigationPage()
+        self.assertTrue(click_next_ellipsis(page))
+        self.assertTrue(page.click_armed)
+        self.assertEqual(page.wait_until, "domcontentloaded")
+        self.assertEqual(page.timeout, NAV_TIMEOUT)
+
