@@ -357,8 +357,11 @@ def get_pagination_state(html: str) -> dict[str, Any]:
 def _dopostback(page, page_target: str) -> None:
     """Execute ASP.NET __doPostBack to navigate to a grid page (no delay — caller sleeps after save)."""
     js = f"__doPostBack('{GRID_CONTROL}', 'Page${page_target}')"
-    page.evaluate(js)
-    page.wait_for_load_state("domcontentloaded", timeout=NAV_TIMEOUT)
+    # expect_navigation must be armed BEFORE evaluate() runs the postback, or
+    # the wait can resolve against the pre-navigation state (leaving the page
+    # still "navigating" when callers later call page.content()).
+    with page.expect_navigation(wait_until="domcontentloaded", timeout=NAV_TIMEOUT):
+        page.evaluate(js)
     try:
         page.wait_for_load_state("networkidle", timeout=15_000)
     except Exception:
@@ -377,11 +380,12 @@ def click_next_ellipsis(page) -> bool:
                 continue
             href = a.get_attribute("href") or ""
             if "Page$" in href:
-                a.click(timeout=15_000)
-                try:
-                    page.wait_for_load_state("domcontentloaded", timeout=NAV_TIMEOUT)
-                except Exception:
-                    pass
+                # Same navigation-race hazard as _dopostback: arm the wait
+                # before the click fires the postback, not after.
+                with page.expect_navigation(
+                    wait_until="domcontentloaded", timeout=NAV_TIMEOUT
+                ):
+                    a.click(timeout=15_000)
                 return True
         except Exception:
             continue
