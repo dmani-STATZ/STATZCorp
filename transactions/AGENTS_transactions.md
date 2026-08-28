@@ -80,6 +80,8 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 3. Confirm `field_types.get_field_info` returns the correct widget type for that field (it introspects the model, so often no change needed unless it's an unusual field type)
 4. Confirm `utils.set_field_value` handles that field's type correctly
 
+`(Contract, "files_url")` is tracked for passive audit logging only. Deliberately do **not** add an `openTransactionsEditModal(..., 'files_url')` caller: folder paths must be changed through the validated Link Contract or Documents-browser Save Path flows so parsing, company scoping, and SharePoint validation cannot be bypassed.
+
 ### Adding a new tracked model
 1. `signals.py` — add import, new `TRACKED` entries, and a new `elif sender is MyModel:` branch inside `store_old_state` with `.values(...)` + `old_state[key]` dict
 2. The caller template — include `{% include "transactions/transaction_modal.html" %}` and call `openTransactionsEditModal(content_type_id, object_id, 'field_name')` from buttons

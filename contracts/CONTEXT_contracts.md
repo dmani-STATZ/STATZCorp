@@ -320,6 +320,7 @@ use the shipment-completion definition instead.
 ## 12. URL Surface / API Surface
 - Dashboard & exports: `/contracts/`, `/contracts/dashboard/metric-detail/`, `/contracts/dashboard/metric-detail/export/`.
 - Contract lifecycle URLs: `<pk>/` (management), `<pk>/detail/`, `<pk>/close/`, `<pk>/cancel/`, `<pk>/review/`, toggles like `mark-reviewed`, `toggle-contract-field`, `toggle-expedite-status`. (Canonical contract **create** is in the `processing` app, not under `/contracts/create/`.)
+- **Link Contract folder:** The Options dropdown on `contract_management.html` opens a paste-only modal for local OneDrive paths. `parse_local_explorer_path()` reverses the Explorer mapping using the global `EXPLORER_LOCAL_MOUNT` and `EXPLORER_SHAREPOINT_STRIP_PREFIX` settings. `POST /contracts/api/link-contract-folder/` (`link_contract_folder_api`) authorizes through `_contract_for_request()`, verifies the reconstructed folder with `sharepoint_service.list_folder_contents()`, and saves `Contract.files_url` through the model instance. A 404 is shown inline and never falls back to another folder. SharePoint web URLs are deliberately rejected.
 - CLIN flows: `/contracts/clin/new/`, `/contracts/contract/<id>/clin/new/`, `<pk>/`, `<pk>/delete/`, plus supporting APIs for `get_clin_notes`, `get_clin_details`, `toggle_clin_acknowledgment`, `save_clin_log_fields`, and shipping/payment/split JSON endpoints (see `split_views`, `payment_history_*`). Legacy `clin/acknowledgment/<pk>/edit/` is unrouted from UI (stub template only).
 - `toggle_clin_acknowledgment` (POST, toggles `ClinAcknowledgment` booleans): when `po_to_supplier_bool` is set true, creates a follow-up note and a "FIRST CHECK IN" reminder (60 days before `supplier_due_date`, else 90 days before `due_date`). JSON includes `reminder_created` (bool), optional `reminder_date`, `reminder_warning` when neither date is set (reminder skipped), and `reminder_error` if creation raises. Contract management JS surfaces success via `window.notify('success', ...)`, warnings via `warning`, and errors via `error`.
 - `toggle_contract_acknowledgment` (POST `/contracts/contract/<id>/toggle-acknowledgment/`): contract-level replacement for the CLIN-level toggle. Reads/writes `ClinAcknowledgment` on the first P CLIN. On `po_to_supplier_bool` set true: creates a "PO ACKNOWLEDGMENT LETTER Followup" note + 10-day reminder on the first P CLIN; creates "FIRST SUPPLIER CHECK IN" notes + reminders (60 days before `supplier_due_date`) for the first P CLIN of each unique `supplier_due_date`, and for every non-Production CLIN. CLINs with no `supplier_due_date` get a note only. Returns `notes_created`, `reminders_created`, and error arrays.
@@ -345,12 +346,13 @@ use the shipment-completion definition instead.
 - Reminders are generated/read during requests via `context_processors.reminders_processor` (no periodic jobs).
 
 ## 15. Testing Coverage
-- `contracts/tests.py` remains the default `TestCase` stub; no automated tests currently cover this app.
-- Regression safety presently depends on manual verification of contract/CLIN workflows, so new features should add smoke/integration tests.
+- Focused tests live under `contracts/tests/`; new features should continue adding smoke/integration coverage.
+- `contracts/tests/test_build_explorer_uri.py` covers forward and reverse Explorer path mapping; `test_link_contract_folder.py` covers linking, Graph 404 handling, company-scoped persistence, and the resulting `files_url` audit transaction.
 
 ## 16. Migrations / Schema Notes
 - 37 migrations exist (`contracts/migrations/0001_initial.py` through `0037_company_sharepoint_urls.py`), documenting the addition of payment history, folder stacks, supplier docs, GovActions, sharepoint URLs, etc.
 - Many migrations adjust indexes (`0011_contract_plan_gross`, `0015_contract_contract_prime_idx`), restructure CLIN/Contract fields (`0030_contact_supplier_alter_supplier_contact`, `0034_contract_supplier_alter_clin_nsn_alter_clin_supplier_and_more`), simplify payment history (`0017_paymenthistory.py`), and add folder-tracking metadata (`0021_folderstack.py`, `0022_foldertracking_stack_id.py`).
+- Migration `0094_alter_contract_files_url` widens `Contract.files_url` from 200 to 400 characters for realistic nested SharePoint paths.
 
 ## 16a. CLIN Fix Tool (Sunset / Legacy Cleanup)
 - **Purpose:** Reclassify legacy `Clin` rows imported from the old Access database where the term "subcontract" was a junk drawer — packaging, trucking/freight, and partial shipments all came across as plain CLINs and need to be routed to their real homes. This is a **temporary** tool, designed to be deleted entirely once cleanup is complete.

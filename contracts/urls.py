@@ -211,6 +211,7 @@ from .views.documents_views import (
     idiq_documents_browser_view,
     intake_draft_details_api,
     intake_draft_documents_browser_view,
+    link_contract_folder_api,
     set_draft_file_path_api,
     set_idiq_file_path_api,
     set_file_path_api,
@@ -371,6 +372,11 @@ urlpatterns = [
     path("api/folder-weburl/", folder_weburl_api, name="folder_weburl_api"),
     path("api/create-folder/", create_folder_api, name="create_folder_api"),
     path("api/set-file-path/", set_file_path_api, name="set_file_path_api"),
+    path(
+        "api/link-contract-folder/",
+        link_contract_folder_api,
+        name="link_contract_folder_api",
+    ),
     path(
         "api/drafts/set-file-path/",
         set_draft_file_path_api,

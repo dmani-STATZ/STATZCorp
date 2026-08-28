@@ -19,6 +19,7 @@ from contracts.services.sharepoint_paths import (
     get_idiq_root_fallback_path,
     get_root_fallback_path,
     get_sharepoint_prefix,
+    parse_local_explorer_path,
     resolve_idiq_folder_path,
     resolve_contract_folder_path,
 )
@@ -91,6 +92,14 @@ def _error_response(error: SharePointError, *, status: Optional[int] = None) -> 
     return JsonResponse(
         {"success": False, "error": error.message, "message": error.message},
         status=status or error.status_code,
+    )
+
+
+def _message_error_response(message: str, *, status: int = 400) -> JsonResponse:
+    """Return the standard document-browser error shape for expected failures."""
+    return JsonResponse(
+        {"success": False, "error": message, "message": message},
+        status=status,
     )
 
 
@@ -496,8 +505,50 @@ def set_file_path_api(request):
     contract = _contract_for_request(request, contract_pk)
     contract.files_url = file_path
     contract.modified_by = request.user
-    contract.save()
+    contract.save(update_fields=["files_url", "modified_by", "modified_on"])
     return JsonResponse({"success": True, "message": "Path saved successfully"})
+
+
+@conditional_login_required
+@require_POST
+def link_contract_folder_api(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return _message_error_response("Invalid JSON body.")
+
+    contract_pk = _parse_contract_id(payload.get("contract_id"))
+    if contract_pk is None:
+        return _message_error_response("contract_id is required.")
+
+    resolved_path = parse_local_explorer_path(payload.get("pasted_path"))
+    if resolved_path is None:
+        return _message_error_response(
+            "Couldn't find the STATZ OneDrive folder in that path. "
+            "Copy the address bar from inside your synced OneDrive - "
+            "statzcorpgcch folder and try again."
+        )
+
+    if len(resolved_path) > Contract._meta.get_field("files_url").max_length:
+        return _message_error_response(
+            "The selected SharePoint path is too long to save."
+        )
+
+    contract = _contract_for_request(request, contract_pk)
+    try:
+        sharepoint_service.list_folder_contents(resolved_path)
+    except SharePointNotFound:
+        return _message_error_response(
+            "That folder doesn't exist in SharePoint yet. Double check "
+            "the path, or create the folder first.",
+            status=404,
+        )
+    except SharePointError as error:
+        return _error_response(error)
+
+    contract.files_url = resolved_path
+    contract.save(update_fields=["files_url"])
+    return JsonResponse({"success": True, "files_url": resolved_path})
 
 
 @conditional_login_required

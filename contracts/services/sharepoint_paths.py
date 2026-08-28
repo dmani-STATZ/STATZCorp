@@ -225,3 +225,45 @@ def build_explorer_uri(drive_relative_path: str) -> str:
     mount = settings.EXPLORER_LOCAL_MOUNT.strip('/').replace('\\', '/')
     local_rel = f'{mount}/{tail}'.rstrip('/')
     return 'statzfile:///' + quote(local_rel, safe='/')
+
+
+def parse_local_explorer_path(pasted_path: str) -> str | None:
+    """Convert a pasted local OneDrive path to a SharePoint-relative path.
+
+    Example:
+        ``C:\\Users\\Dion\\OneDrive - statzcorpgcch\\Statz - V87\\aFed-DOD``
+        becomes ``Statz-Public/data/V87/aFed-DOD/``.
+
+    Returns ``None`` for URLs, empty input, or paths that do not contain the
+    configured local mount as a complete path segment.
+    """
+    if not pasted_path:
+        return None
+
+    path = str(pasted_path).strip().replace('\\', '/').rstrip('/')
+    if not path or path.lower().startswith(('http://', 'https://')):
+        return None
+
+    mount = (
+        getattr(settings, 'EXPLORER_LOCAL_MOUNT', '')
+        .strip()
+        .replace('\\', '/')
+        .strip('/')
+    )
+    if not mount:
+        return None
+
+    path_lower = path.lower()
+    mount_lower = mount.lower()
+    start = path_lower.find(mount_lower)
+    while start >= 0:
+        end = start + len(mount)
+        starts_on_boundary = start == 0 or path[start - 1] == '/'
+        ends_on_boundary = end == len(path) or path[end] == '/'
+        if starts_on_boundary and ends_on_boundary:
+            tail = path[end:].lstrip('/')
+            prefix = getattr(settings, 'EXPLORER_SHAREPOINT_STRIP_PREFIX', '')
+            return join_path(prefix, tail)
+        start = path_lower.find(mount_lower, start + 1)
+
+    return None

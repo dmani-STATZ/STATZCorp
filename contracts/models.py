@@ -136,7 +136,7 @@ class Contract(AuditModel):
     cmmc_l2_sa = models.BooleanField(default=False)
     cmmc_l2_c3pao = models.BooleanField(default=False)
     cmmc_l3 = models.BooleanField(default=False)
-    files_url = models.CharField(max_length=200, null=True, blank=True)
+    files_url = models.CharField(max_length=400, null=True, blank=True)
     reviewed = models.BooleanField(null=True, blank=True)
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_reviewed_by')
     reviewed_on = models.DateTimeField(null=True, blank=True)

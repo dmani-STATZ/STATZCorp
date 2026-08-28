@@ -23,6 +23,7 @@ TRACKED = [
     (Contract, "sales_class"),
     (Contract, "solicitation_type"),
     (Contract, "plan_gross"),
+    (Contract, "files_url"),
     (Clin, "item_type"),
     (Clin, "clin_po_num"),
     (Clin, "supplier"),
@@ -111,7 +112,7 @@ def store_old_state(sender, instance, **kwargs):
             row = Contract.objects.filter(pk=instance.pk).values(
                 "contract_number", "po_number", "tab_num", "buyer_id",
                 "due_date", "award_date", "sales_class_id", "solicitation_type",
-                "plan_gross",
+                "plan_gross", "files_url",
             ).first()
             if row is not None:
                 old_state[key] = {
@@ -124,6 +125,7 @@ def store_old_state(sender, instance, **kwargs):
                     "sales_class": _serialize(row.get("sales_class_id")),
                     "solicitation_type": _serialize(row.get("solicitation_type")),
                     "plan_gross": _serialize(row.get("plan_gross")),
+                    "files_url": _serialize(row.get("files_url")),
                 }
         except Exception:
             pass

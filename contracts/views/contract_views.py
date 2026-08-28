@@ -35,7 +35,10 @@ from ..models import (
     GovAction,
 )
 from .mixins import ActiveCompanyQuerysetMixin
-from contracts.services.sharepoint_paths import build_explorer_uri
+from contracts.services.sharepoint_paths import (
+    build_explorer_uri,
+    resolve_contract_folder_path,
+)
 from contracts.services.split_breakdown import build_split_breakdown_context
 from contracts.services.due_status import (
     late_status_clin_prefetch,
@@ -221,8 +224,9 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
 
         # Explorer URI for the split button — pure computation, no Graph API call.
         # Returns '' for legacy/unmappable paths; template shows disabled button in that case.
+        resolved_folder = resolve_contract_folder_path(contract)["path"]
         context['explorer_uri'] = build_explorer_uri(
-            contract.get_sharepoint_relative_path() or ''
+            resolved_folder or ''
         )
 
         from django.contrib.contenttypes.models import ContentType as DjangoContentType

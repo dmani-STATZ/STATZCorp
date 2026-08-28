@@ -169,6 +169,15 @@
                                     </a>
                                     {% endif %}
 
+                                    <button type="button"
+                                            class="dropdown-item d-flex align-items-center gap-2 px-3 py-2 border-top"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#link-contract-modal"
+                                            onclick="document.getElementById('optionsMenu').classList.add('hidden')">
+                                        <span aria-hidden="true">🔗</span>
+                                        Link Contract
+                                    </button>
+
                                     <a href="{% url 'contracts:finance_audit_detail' contract.id %}"
                                        class="flex items-center w-full px-4 py-2 text-sm text-green-700 hover:bg-green-50">
                                         <svg class="mr-3 h-5 w-5 text-green-700 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -427,6 +436,39 @@
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="link-contract-modal" tabindex="-1"
+         aria-labelledby="link-contract-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="link-contract-form">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="link-contract-modal-label">Link Contract</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-body-secondary small">
+                            Paste the folder path copied from File Explorer's address bar.
+                        </p>
+                        <label for="link-contract-path" class="form-label">Folder path</label>
+                        <input type="text" class="form-control" id="link-contract-path"
+                               autocomplete="off"
+                               placeholder="C:\Users\YourName\OneDrive - statzcorpgcch\Statz - V87\aFed-DOD\Contract SPE3SE-26-V-0530">
+                        <div id="link-contract-error" class="alert alert-danger small mt-3 mb-0 d-none"
+                             role="alert"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary"
+                                data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="link-contract-submit">
+                            Link Folder
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -2763,6 +2805,82 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modalElement = document.getElementById('link-contract-modal');
+    const form = document.getElementById('link-contract-form');
+    const pathInput = document.getElementById('link-contract-path');
+    const errorElement = document.getElementById('link-contract-error');
+    const submitButton = document.getElementById('link-contract-submit');
+
+    if (!modalElement || !form || !pathInput || !errorElement || !submitButton) {
+        return;
+    }
+
+    function showLinkContractError(message) {
+        errorElement.textContent = message;
+        errorElement.classList.remove('d-none');
+    }
+
+    modalElement.addEventListener('show.bs.modal', function() {
+        errorElement.textContent = '';
+        errorElement.classList.add('d-none');
+        submitButton.disabled = false;
+    });
+    modalElement.addEventListener('shown.bs.modal', function() {
+        pathInput.focus();
+    });
+
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        errorElement.textContent = '';
+        errorElement.classList.add('d-none');
+
+        const pastedPath = pathInput.value.trim();
+        if (!pastedPath) {
+            showLinkContractError("Paste a folder path from File Explorer's address bar.");
+            return;
+        }
+
+        submitButton.disabled = true;
+        try {
+            const response = await fetch("{% url 'contracts:link_contract_folder_api' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector(
+                        '#csrf-form [name=csrfmiddlewaretoken]'
+                    ).value,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    contract_id: {{ contract.id }},
+                    pasted_path: pastedPath
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                showLinkContractError(
+                    data.message || data.error || 'Could not link that folder.'
+                );
+                return;
+            }
+
+            bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+            if (window.notify) {
+                window.notify('success', 'Contract folder linked successfully.');
+            }
+            window.setTimeout(function() {
+                window.location.reload();
+            }, 750);
+        } catch (error) {
+            showLinkContractError('Network error. Please try again.');
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+});
 
 function openDocumentsBrowser(contractId) {
     const url = `/contracts/documents/?contract_id=${encodeURIComponent(contractId)}`;

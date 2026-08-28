@@ -67,6 +67,7 @@ python manage.py import_release_notes --verbose   # extra logging
 
 ## Recent release notes
 
+- [2026-08-28-link-contract-folder](2026-08-28-link-contract-folder.md) — Link a contract to an existing synced SharePoint folder from its Options menu.
 - [2026-08-14-nsn-inline-create](2026-08-14-nsn-inline-create.md) — Create NSNs from the Observatory and the New CLIN form; dash-agnostic duplicate check.
 - [2026-08-13-supplier-aka](2026-08-13-supplier-aka.md) — Supplier Also Known As names; dashboard/list/autocomplete search matches aliases.
 - [2026-07-24-competitor-supplier-intel-coverage](2026-07-24-competitor-supplier-intel-coverage.md) — Supplier Intelligence shows true coverage against all competitor awards; larger backfill batches.
