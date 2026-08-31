@@ -287,6 +287,24 @@ def export_contract_log(request):
         'nsn'
     ).prefetch_related(
         'clinacknowledgment_set',
+    ).annotate(
+        ppi_split_paid=Subquery(
+            ClinSplit.objects
+            .filter(clin__contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
+            .order_by()
+            .values('clin__contract_id')
+            .annotate(total=Sum('split_paid'))
+            .values('total')[:1]
+        ),
+        statz_split_paid=Subquery(
+            ClinSplit.objects
+            .filter(clin__contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
+            .order_by()
+            .values('clin__contract_id')
+            .annotate(total=Sum('split_paid'))
+            .values('total')[:1]
+        ),
+        notes_count=Count('notes', distinct=True),
     ).order_by('contract__award_date', 'contract__po_number', 'item_number')
 
     clins = _apply_log_filters(clins, request.GET, request.active_company)
@@ -305,7 +323,8 @@ def export_contract_log(request):
         'Notes'
     ])
 
-    total_rows = clins.count()
+    clins = list(clins)
+    total_rows = len(clins)
     seen_contracts = set()
 
     for clin in clins:
@@ -342,18 +361,8 @@ def export_contract_log(request):
         ppi_split_paid = Decimal('0')
         statz_split_paid = Decimal('0')
         if clin.contract_id and first_for_contract:
-            ppi_split_paid = (
-                ClinSplit.objects.filter(
-                    clin__contract_id=clin.contract_id,
-                    company_name__iexact='PPI',
-                ).aggregate(t=Sum('split_paid'))['t'] or Decimal('0')
-            )
-            statz_split_paid = (
-                ClinSplit.objects.filter(
-                    clin__contract_id=clin.contract_id,
-                    company_name__iexact='STATZ',
-                ).aggregate(t=Sum('split_paid'))['t'] or Decimal('0')
-            )
+            ppi_split_paid = clin.ppi_split_paid or Decimal('0')
+            statz_split_paid = clin.statz_split_paid or Decimal('0')
 
         qty_uom = f"{clin.order_qty:g} {clin.uom or 'ea'}" if clin.order_qty not in (None, '') else ''
 
@@ -391,7 +400,7 @@ def export_contract_log(request):
             f"${clin.contract.plan_gross:,.2f}" if (first_for_contract and clin.contract and clin.contract.plan_gross is not None) else '$0.00',
             f"${ppi_split_paid:,.2f}" if (first_for_contract and ppi_split_paid) else '$0.00',
             f"${statz_split_paid:,.2f}" if (first_for_contract and statz_split_paid) else '$0.00',
-            clin.notes.count()
+            clin.notes_count
         ])
 
     end_time = time.time()
@@ -429,10 +438,29 @@ def export_contract_log_xlsx(request):
         'nsn'
     ).prefetch_related(
         'clinacknowledgment_set',
+    ).annotate(
+        ppi_split_paid=Subquery(
+            ClinSplit.objects
+            .filter(clin__contract_id=OuterRef('contract_id'), company_name__iexact='PPI')
+            .order_by()
+            .values('clin__contract_id')
+            .annotate(total=Sum('split_paid'))
+            .values('total')[:1]
+        ),
+        statz_split_paid=Subquery(
+            ClinSplit.objects
+            .filter(clin__contract_id=OuterRef('contract_id'), company_name__iexact='STATZ')
+            .order_by()
+            .values('clin__contract_id')
+            .annotate(total=Sum('split_paid'))
+            .values('total')[:1]
+        ),
+        notes_count=Count('notes', distinct=True),
     ).order_by('contract__award_date', 'contract__po_number', 'item_number')
 
     clins = _apply_log_filters(clins, request.GET, request.active_company)
     filters_applied = {k: v for k, v in request.GET.items() if k not in ('page', 'per_page') and v}
+    clins = list(clins)
 
     wb = Workbook()
     ws = wb.active
@@ -482,18 +510,8 @@ def export_contract_log_xlsx(request):
         ppi_split_paid = Decimal('0')
         statz_split_paid = Decimal('0')
         if clin.contract_id and first_for_contract:
-            ppi_split_paid = (
-                ClinSplit.objects.filter(
-                    clin__contract_id=clin.contract_id,
-                    company_name__iexact='PPI',
-                ).aggregate(t=Sum('split_paid'))['t'] or Decimal('0')
-            )
-            statz_split_paid = (
-                ClinSplit.objects.filter(
-                    clin__contract_id=clin.contract_id,
-                    company_name__iexact='STATZ',
-                ).aggregate(t=Sum('split_paid'))['t'] or Decimal('0')
-            )
+            ppi_split_paid = clin.ppi_split_paid or Decimal('0')
+            statz_split_paid = clin.statz_split_paid or Decimal('0')
 
         if clin.contract and clin.contract.status and getattr(clin.contract.status, 'description', '') == 'Canceled':
             status_char = 'X'
@@ -554,7 +572,7 @@ def export_contract_log_xlsx(request):
             float(clin.contract.plan_gross) if (first_for_contract and clin.contract and clin.contract.plan_gross is not None) else 0.0,
             float(ppi_split_paid) if (first_for_contract and ppi_split_paid) else 0.0,
             float(statz_split_paid) if (first_for_contract and statz_split_paid) else 0.0,
-            int(clin.notes.count())
+            int(clin.notes_count)
         ]
         ws.append(row)
         r = ws.max_row
@@ -591,7 +609,7 @@ def export_contract_log_xlsx(request):
 
     end_time = time.time()
     ExportTiming.objects.create(
-        row_count=clins.count(),
+        row_count=len(clins),
         export_time=(end_time - start_time),
         filters_applied=filters_applied
     )
