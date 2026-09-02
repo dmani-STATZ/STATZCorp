@@ -1779,6 +1779,33 @@ class ExportTiming(models.Model):
         return max(1, estimated_time)
 
 
+class ContractLogExportJob(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_RUNNING = 'running'
+    STATUS_DONE = 'done'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_RUNNING, 'Running'),
+        (STATUS_DONE, 'Done'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    filters_applied = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    row_count = models.IntegerField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default='')
+    file_path = models.CharField(max_length=500, blank=True, default='')
+
+    class Meta:
+        ordering = ['-requested_at']
+
+
 class TrackerSchema(models.Model):
     SYSTEM_COLUMN_IDS = ['__contract__', '__po__', '__close__']
 

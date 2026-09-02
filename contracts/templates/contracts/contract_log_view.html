@@ -643,6 +643,12 @@ document.addEventListener('DOMContentLoaded', function () {
         return new Date(isoString).toLocaleString();
     }
 
+    function getExportCsrfToken() {
+        return window.STATZ_CSRF_TOKEN || '';
+    }
+
+    const EXPORT_POLL_INTERVAL_MS = 4000;
+
     async function exportContractLog() {
         const startTime = performance.now();
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -652,65 +658,91 @@ document.addEventListener('DOMContentLoaded', function () {
 
         loadingOverlay.classList.remove('hidden');
         exportTime.textContent = '';
+        exportStats.classList.add('hidden');
+        updateExportProgress(5, 'Queuing export...');
 
         try {
             const rowCount = document.querySelector('.text-sm.text-black')?.textContent.match(/of\s+([\d,]+)\s+results/)?.[1]?.replace(/,/g, '') || '0';
             const numRows  = parseInt(rowCount);
 
             const estimateData = await getExportEstimate(numRows);
-            if (estimateData) {
-                const { estimated_seconds, recent_timings } = estimateData;
-
-                recentExports.innerHTML = recent_timings.map(t =>
+            if (estimateData && estimateData.recent_timings && estimateData.recent_timings.length) {
+                recentExports.innerHTML = estimateData.recent_timings.map(t =>
                     `<li>${t.row_count} rows in ${t.export_time.toFixed(1)}s (${formatDateTime(t.timestamp)})</li>`
                 ).join('');
                 exportStats.classList.remove('hidden');
-
-                let progress = 0;
-                const updateInterval = estimated_seconds * 10;
-                const progressIncrement = 100 / (estimated_seconds * 1000 / updateInterval);
-
-                const progressTimer = setInterval(() => {
-                    progress = Math.min(progress + progressIncrement, 95);
-                    updateExportProgress(progress, `Exporting ${numRows} rows...`);
-                }, updateInterval);
-
-                const response = await fetch('{% url "contracts:export_contract_log_xlsx" %}?' + new URLSearchParams(window.location.search));
-                clearInterval(progressTimer);
-
-                if (!response.ok) throw new Error('Export failed');
-
-                const blob = await response.blob();
-                const duration = ((performance.now() - startTime) / 1000).toFixed(1);
-
-                updateExportProgress(100, 'Export completed successfully');
-                exportTime.textContent = `Export completed in ${duration} seconds`;
-
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'contract_log.xlsx';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-
-                setTimeout(() => {
-                    loadingOverlay.classList.add('hidden');
-                    exportStats.classList.add('hidden');
-                }, 2000);
-            } else {
-                throw new Error('Could not get export estimate');
             }
+
+            const requestResponse = await fetch(
+                '{% url "contracts:request_contract_log_export" %}?' + new URLSearchParams(window.location.search),
+                { method: 'POST', headers: { 'X-CSRFToken': getExportCsrfToken() } }
+            );
+            if (!requestResponse.ok) throw new Error('Could not queue export');
+            const { job_id } = await requestResponse.json();
+
+            updateExportProgress(15, 'Queued — waiting for the export job...');
+
+            await pollExportJob(job_id, startTime);
         } catch (error) {
             console.error('Export failed:', error);
             updateExportProgress(100, 'Export failed');
-            document.getElementById('exportTime').textContent = 'An error occurred during export';
+            exportTime.textContent = 'An error occurred while queuing the export';
             setTimeout(() => {
                 loadingOverlay.classList.add('hidden');
-                document.getElementById('exportStats').classList.add('hidden');
-            }, 2000);
+                exportStats.classList.add('hidden');
+            }, 2500);
         }
+    }
+
+    function pollExportJob(jobId, startTime) {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const exportStats    = document.getElementById('exportStats');
+        const exportTime     = document.getElementById('exportTime');
+        const statusUrlBase  = '{% url "contracts:contract_log_export_status" job_id=999999 %}'.replace('999999', jobId);
+
+        return new Promise((resolve, reject) => {
+            async function poll() {
+                try {
+                    const r = await fetch(statusUrlBase);
+                    if (!r.ok) throw new Error('Lost track of the export job');
+                    const data = await r.json();
+
+                    if (data.status === 'pending') {
+                        updateExportProgress(25, 'Queued — waiting for the export job...');
+                        setTimeout(poll, EXPORT_POLL_INTERVAL_MS);
+                    } else if (data.status === 'running') {
+                        updateExportProgress(60, 'Generating your export...');
+                        setTimeout(poll, EXPORT_POLL_INTERVAL_MS);
+                    } else if (data.status === 'done') {
+                        const duration = ((performance.now() - startTime) / 1000).toFixed(1);
+                        updateExportProgress(100, 'Export ready — downloading...');
+                        exportTime.textContent = `${data.row_count} rows, ready in ${duration} seconds`;
+
+                        const downloadUrlBase = '{% url "contracts:download_contract_log_export" job_id=999999 %}'.replace('999999', jobId);
+                        window.location.href = downloadUrlBase;
+
+                        setTimeout(() => {
+                            loadingOverlay.classList.add('hidden');
+                            exportStats.classList.add('hidden');
+                        }, 2000);
+                        resolve();
+                    } else if (data.status === 'failed') {
+                        updateExportProgress(100, 'Export failed');
+                        exportTime.textContent = data.error_message || 'The export job failed. Please try again.';
+                        setTimeout(() => {
+                            loadingOverlay.classList.add('hidden');
+                            exportStats.classList.add('hidden');
+                        }, 3000);
+                        reject(new Error(data.error_message || 'Export failed'));
+                    } else {
+                        setTimeout(poll, EXPORT_POLL_INTERVAL_MS);
+                    }
+                } catch (err) {
+                    reject(err);
+                }
+            }
+            poll();
+        });
     }
 
     exportBtn.addEventListener('click', exportContractLog);

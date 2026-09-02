@@ -115,6 +115,9 @@ from .views import (
     export_contract_log_xlsx,
     open_export_folder,
     get_export_estimate,
+    request_contract_log_export,
+    contract_log_export_status,
+    download_contract_log_export,
     # Folder Tracking views
     folder_tracking,
     add_folder_tracking,
@@ -349,6 +352,9 @@ urlpatterns = [
     path("log/export/", export_contract_log, name="export_contract_log"),
     path("log/export-xlsx/", export_contract_log_xlsx, name="export_contract_log_xlsx"),
     path("log/get-export-estimate/", get_export_estimate, name="get_export_estimate"),
+    path("log/export/request/", request_contract_log_export, name="request_contract_log_export"),
+    path("log/export/status/<int:job_id>/", contract_log_export_status, name="contract_log_export_status"),
+    path("log/export/download/<int:job_id>/", download_contract_log_export, name="download_contract_log_export"),
     path("open-export-folder/", open_export_folder, name="open_export_folder"),
     path("documents/", documents_browser_view, name="documents_browser"),
     path(

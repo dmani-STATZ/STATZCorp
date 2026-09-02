@@ -112,6 +112,9 @@ from .contract_log_views import (
     export_contract_log_xlsx,
     open_export_folder,
     get_export_estimate,
+    request_contract_log_export,
+    contract_log_export_status,
+    download_contract_log_export,
 )
 
 from .folder_tracking_views import (
