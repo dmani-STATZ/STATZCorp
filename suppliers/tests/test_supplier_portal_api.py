@@ -438,11 +438,13 @@ class SupplierPortalAPITests(TestCase):
         older = Contract.objects.create(
             contract_number="SPE7L1-23-D-0001",
             award_date=date(2023, 1, 10),
+            po_number="J00100",
         )
         newer = Contract.objects.create(
             contract_number="SPE7L1-24-D-0042",
             award_date=date(2024, 3, 15),
             status=open_status,
+            po_number="J00121",
         )
 
         Clin.objects.create(
@@ -451,6 +453,7 @@ class SupplierPortalAPITests(TestCase):
             item_number="0002",
             nsn=nsn_b,
             due_date=None,
+            clin_po_num="J00121X",
             unit_price=Decimal("99.50"),
             item_value=Decimal("199.00"),
         )
@@ -460,6 +463,7 @@ class SupplierPortalAPITests(TestCase):
             item_number="0001",
             nsn=nsn_a,
             due_date=date(2024, 9, 1),
+            clin_po_num="J00121",
             unit_price=Decimal("12.00"),
         )
         Clin.objects.create(
@@ -476,6 +480,7 @@ class SupplierPortalAPITests(TestCase):
             item_number="0001",
             nsn=nsn_a,
             due_date=date(2023, 6, 1),
+            clin_po_num="J00100",
         )
 
         resp = self._get(self._contracts_path())
@@ -489,7 +494,9 @@ class SupplierPortalAPITests(TestCase):
         )
         self.assertEqual(data["contracts"][0]["award_date"], "2024-03-15")
         self.assertEqual(data["contracts"][0]["status"], "Open")
+        self.assertEqual(data["contracts"][0]["po_number"], "J00121")
         self.assertIsNone(data["contracts"][1]["status"])
+        self.assertEqual(data["contracts"][1]["po_number"], "J00100")
         self.assertEqual(
             data["contracts"][0]["clins"],
             [
@@ -497,21 +504,34 @@ class SupplierPortalAPITests(TestCase):
                     "clin_number": "0001",
                     "nsn": "5340-01-234-5678",
                     "due_date": "2024-09-01",
+                    "po_number": "J00121",
                 },
                 {
                     "clin_number": "0002",
                     "nsn": "5340-01-234-9999",
                     "due_date": None,
+                    "po_number": "J00121X",
+                },
+            ],
+        )
+        self.assertEqual(
+            data["contracts"][1]["clins"],
+            [
+                {
+                    "clin_number": "0001",
+                    "nsn": "5340-01-234-5678",
+                    "due_date": "2023-06-01",
+                    "po_number": "J00100",
                 },
             ],
         )
         self.assertEqual(
             set(data["contracts"][0].keys()),
-            {"contract_number", "award_date", "status", "clins"},
+            {"contract_number", "award_date", "status", "po_number", "clins"},
         )
         self.assertEqual(
             set(data["contracts"][0]["clins"][0].keys()),
-            {"clin_number", "nsn", "due_date"},
+            {"clin_number", "nsn", "due_date", "po_number"},
         )
         self.assertNotIn("0099", body)
         for banned in (

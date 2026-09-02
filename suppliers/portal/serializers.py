@@ -126,6 +126,8 @@ def serialize_portal_clin(clin):
         "clin_number": clin.item_number,
         "nsn": nsn_code,
         "due_date": _iso_date(clin.due_date),
+        # Live Sub PO # is Clin.clin_po_num (not legacy Clin.po_number).
+        "po_number": clin.clin_po_num or None,
     }
 
 
@@ -134,9 +136,10 @@ def serialize_supplier_contracts(contracts):
     Allowlisted contract list for GET .../contracts/.
 
     JSON keys are the portal contract (`contract_number`, `award_date`,
-    `status`, `clins[].clin_number` / `nsn` / `due_date`). Status is
-    `Contract.status.description`. CLIN number is `Clin.item_number`;
-    NSN is `Clin.nsn.nsn_code`.
+    `status`, `po_number`, `clins[].clin_number` / `nsn` / `due_date` /
+    `po_number`). Status is `Contract.status.description`. CLIN number is
+    `Clin.item_number`; NSN is `Clin.nsn.nsn_code`. Contract PO is
+    `Contract.po_number`; CLIN PO is `Clin.clin_po_num`.
     """
     ordered_contracts = sorted(
         contracts,
@@ -160,6 +163,7 @@ def serialize_supplier_contracts(contracts):
                 "contract_number": contract.contract_number,
                 "award_date": _iso_date(contract.award_date),
                 "status": status_label,
+                "po_number": contract.po_number or None,
                 "clins": [serialize_portal_clin(c) for c in ordered_clins],
             }
         )

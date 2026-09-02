@@ -291,7 +291,7 @@ class SupplierContractsView(PortalAPIView):
 
     Read-only list of contracts awarded to this supplier (via Clin.supplier),
     each with allowlisted fields: contract_number, award_date, status,
-    and CLINs (clin_number, nsn, due_date).
+    po_number, and CLINs (clin_number, nsn, due_date, po_number).
     Archived or unknown cage codes 404, matching verify/ and profile.
     Zero contracts is 200 with {"contracts": []}.
     """
