@@ -19,7 +19,7 @@ BROWSERS_DIR=$(find /tmp /home -name ".local-browsers" -type d 2>/dev/null | hea
 # /home does, so install-deps must run every time — only the browser binary
 # download itself is safe to skip when already cached.
 echo "[scrape_awards] Installing Playwright system dependencies..."
-$PYTHON_EXE -m playwright install-deps chromium 2>/dev/null || true
+$PYTHON_EXE -m playwright install-deps chromium || echo "[scrape_awards] WARNING: install-deps failed (see error above) — continuing, Chromium launch may fail"
 
 if [ -z "$BROWSERS_DIR" ]; then
   echo "[scrape_awards] Playwright browsers missing. Installing chromium..."

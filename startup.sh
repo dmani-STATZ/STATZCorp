@@ -39,8 +39,8 @@ fi
 # window of several minutes — more than enough for install-deps to complete.
 (
   echo "[startup:bg] Installing Playwright system dependencies"
-  $PYTHON_EXE -m playwright install-deps chromium 2>/dev/null || true
-  echo "[startup:bg] Playwright system dependencies ready"
+  $PYTHON_EXE -m playwright install-deps chromium || echo "[startup:bg] WARNING: install-deps failed (see error above) — Chromium launch may fail"
+  echo "[startup:bg] Playwright system dependencies step complete"
 ) &
 
 echo "[startup] Starting Gunicorn"
