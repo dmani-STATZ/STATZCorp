@@ -18,6 +18,11 @@ BROWSERS_DIR=$(find /tmp /home -name ".local-browsers" -type d 2>/dev/null | hea
 # /home does, so install-deps must run every time — only the browser binary
 # download itself is safe to skip when already cached.
 echo "[auto_import_dibbs] Installing Playwright system dependencies..."
+# bullseye-security's InRelease has gone stale upstream (Debian 11 is EOL), so
+# apt-get update aborts on the expiry check before it ever installs anything.
+# Tell apt to skip that freshness check so install-deps can actually run.
+mkdir -p /etc/apt/apt.conf.d 2>/dev/null || true
+echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99-allow-expired-release 2>/dev/null || true
 $PYTHON_EXE -m playwright install-deps chromium || echo "[auto_import_dibbs] WARNING: install-deps failed (see error above) — continuing, Chromium launch may fail"
 
 if [ -z "$BROWSERS_DIR" ]; then

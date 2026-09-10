@@ -39,6 +39,11 @@ fi
 # window of several minutes — more than enough for install-deps to complete.
 (
   echo "[startup:bg] Installing Playwright system dependencies"
+  # bullseye-security's InRelease has gone stale upstream (Debian 11 is EOL), so
+  # apt-get update aborts on the expiry check before it ever installs anything.
+  # Tell apt to skip that freshness check so install-deps can actually run.
+  mkdir -p /etc/apt/apt.conf.d 2>/dev/null || true
+  echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99-allow-expired-release 2>/dev/null || true
   $PYTHON_EXE -m playwright install-deps chromium || echo "[startup:bg] WARNING: install-deps failed (see error above) — Chromium launch may fail"
   echo "[startup:bg] Playwright system dependencies step complete"
 ) &
