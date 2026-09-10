@@ -23,13 +23,13 @@ echo "[auto_import_dibbs] Installing Playwright system dependencies..."
 # Tell apt to skip that freshness check so install-deps can actually run.
 mkdir -p /etc/apt/apt.conf.d 2>/dev/null || true
 echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99-allow-expired-release 2>/dev/null || true
-# The live deb.debian.org bullseye-security mirror has an index/pool mismatch
-# (Packages index references .deb files the pool no longer has — confirmed
-# reproducible, same edge node every time, not a transient flake). Point
-# bullseye-security at archive.debian.org instead: the permanent, frozen
-# Debian archive that never deletes a package once it lands there.
-grep -rl 'deb\.debian\.org/debian-security' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null \
-  | xargs -r sed -i 's|deb\.debian\.org/debian-security|archive.debian.org/debian-security|g'
+# A couple of bullseye-security packages (libglx-mesa0, libnss3) 404 on the
+# live mirror — confirmed reproducible, not transient, and archive.debian.org
+# doesn't carry a debian-security component at all. apt installs atomically,
+# so those 2 permanently-missing packages take out the whole batch, including
+# libglib2.0-0 which downloads fine every time. --fix-missing lets apt install
+# everything it actually can instead of discarding the lot.
+echo 'APT::Get::Fix-Missing "true";' >> /etc/apt/apt.conf.d/99-allow-expired-release 2>/dev/null || true
 $PYTHON_EXE -m playwright install-deps chromium || echo "[auto_import_dibbs] WARNING: install-deps failed (see error above) — continuing, Chromium launch may fail"
 
 if [ -z "$BROWSERS_DIR" ]; then
