@@ -24,7 +24,21 @@ echo "[scrape_awards] Installing Playwright system dependencies..."
 # Tell apt to skip that freshness check so install-deps can actually run.
 mkdir -p /etc/apt/apt.conf.d 2>/dev/null || true
 echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99-allow-expired-release 2>/dev/null || true
-$PYTHON_EXE -m playwright install-deps chromium || echo "[scrape_awards] WARNING: install-deps failed (see error above) — continuing, Chromium launch may fail"
+# The debian-security mirror occasionally 404s on individual packages (stale
+# index on one anycast edge node) — apt aborts the whole atomic install when
+# that happens, so retry a few times rather than limping on without libglib.
+INSTALL_DEPS_OK=0
+for attempt in 1 2 3; do
+  if $PYTHON_EXE -m playwright install-deps chromium; then
+    INSTALL_DEPS_OK=1
+    break
+  fi
+  echo "[scrape_awards] install-deps attempt $attempt failed, retrying in 5s..."
+  sleep 5
+done
+if [ "$INSTALL_DEPS_OK" != "1" ]; then
+  echo "[scrape_awards] WARNING: install-deps failed after 3 attempts — continuing, Chromium launch may fail"
+fi
 
 if [ -z "$BROWSERS_DIR" ]; then
   echo "[scrape_awards] Playwright browsers missing. Installing chromium..."
