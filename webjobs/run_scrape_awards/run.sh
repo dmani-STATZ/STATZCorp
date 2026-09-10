@@ -15,13 +15,18 @@ echo "[scrape_awards] Using Python: $PYTHON_EXE"
 # Install Chromium if missing — WebJobs are ephemeral, binaries may not survive restarts
 BROWSERS_DIR=$(find /tmp /home -name ".local-browsers" -type d 2>/dev/null | head -1)
 
+# Container's OS-level libs (e.g. libglib) don't survive restarts even though
+# /home does, so install-deps must run every time — only the browser binary
+# download itself is safe to skip when already cached.
+echo "[scrape_awards] Installing Playwright system dependencies..."
+$PYTHON_EXE -m playwright install-deps chromium 2>/dev/null || true
+
 if [ -z "$BROWSERS_DIR" ]; then
   echo "[scrape_awards] Playwright browsers missing. Installing chromium..."
-  $PYTHON_EXE -m playwright install-deps chromium 2>/dev/null || true
   $PYTHON_EXE -m playwright install chromium
   echo "[scrape_awards] Chromium install complete."
 else
-  echo "[scrape_awards] Chromium found at $BROWSERS_DIR. Skipping install."
+  echo "[scrape_awards] Chromium found at $BROWSERS_DIR. Skipping browser download."
 fi
 
 echo "[scrape_awards] Starting scrape_awards"
