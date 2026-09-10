@@ -44,21 +44,14 @@ fi
   # Tell apt to skip that freshness check so install-deps can actually run.
   mkdir -p /etc/apt/apt.conf.d 2>/dev/null || true
   echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99-allow-expired-release 2>/dev/null || true
-  # The debian-security mirror occasionally 404s on individual packages (stale
-  # index on one anycast edge node) — apt aborts the whole atomic install when
-  # that happens, so retry a few times rather than limping on without libglib.
-  INSTALL_DEPS_OK=0
-  for attempt in 1 2 3; do
-    if $PYTHON_EXE -m playwright install-deps chromium; then
-      INSTALL_DEPS_OK=1
-      break
-    fi
-    echo "[startup:bg] install-deps attempt $attempt failed, retrying in 5s..."
-    sleep 5
-  done
-  if [ "$INSTALL_DEPS_OK" != "1" ]; then
-    echo "[startup:bg] WARNING: install-deps failed after 3 attempts — Chromium launch may fail"
-  fi
+  # The live deb.debian.org bullseye-security mirror has an index/pool mismatch
+  # (Packages index references .deb files the pool no longer has — confirmed
+  # reproducible, same edge node every time, not a transient flake). Point
+  # bullseye-security at archive.debian.org instead: the permanent, frozen
+  # Debian archive that never deletes a package once it lands there.
+  grep -rl 'deb\.debian\.org/debian-security' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null \
+    | xargs -r sed -i 's|deb\.debian\.org/debian-security|archive.debian.org/debian-security|g'
+  $PYTHON_EXE -m playwright install-deps chromium || echo "[startup:bg] WARNING: install-deps failed (see error above) — Chromium launch may fail"
   echo "[startup:bg] Playwright system dependencies step complete"
 ) &
 
