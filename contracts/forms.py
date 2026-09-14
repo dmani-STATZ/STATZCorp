@@ -704,11 +704,11 @@ class ClinAcknowledgmentForm(BaseModelForm):
 class AcknowledgementLetterForm(BaseModelForm):
     fat_due_date = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+        widget=forms.DateInput(attrs={'type': 'date', 'autocomplete': 'off', 'class': 'form-control form-control-sm'})
     )
     plt_due_date = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'})
+        widget=forms.DateInput(attrs={'type': 'date', 'autocomplete': 'off', 'class': 'form-control form-control-sm'})
     )
 
     class Meta:
