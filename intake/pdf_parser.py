@@ -1799,6 +1799,7 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
     try:
         text, page_one_text = _extract_pdf_texts(pdf_file)
     except Exception as exc:
+        logger.exception("parse_award_pdf: failed to open or read PDF")
         return AwardParseResult(
             contract_number=None,
             contract_type=None,
@@ -1831,6 +1832,10 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
         )
 
     if not text or not text.strip():
+        logger.warning(
+            "parse_award_pdf: no text could be extracted from the PDF "
+            "(pdfplumber and pypdf both returned empty)"
+        )
         return AwardParseResult(
             contract_number=None,
             contract_type=None,
@@ -2013,6 +2018,13 @@ def parse_award_pdf(pdf_file: PdfInput) -> AwardParseResult:
             cmmc_l3=cmmc_flags["cmmc_l3"],
         )
     except Exception as exc:
+        # Text extraction already succeeded by this point, so every field
+        # extracted so far is about to be discarded. str(exc) alone is not
+        # enough to diagnose that — always emit the full traceback.
+        logger.exception(
+            "parse_award_pdf: unexpected error after text extraction; "
+            "discarding all extracted fields and returning an empty result"
+        )
         return AwardParseResult(
             contract_number=None,
             contract_type=None,

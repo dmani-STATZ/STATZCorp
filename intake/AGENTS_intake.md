@@ -306,6 +306,27 @@ NO dependency on `processing.services.pdf_parser`. Do NOT re-introduce
 that import. The intake parser is ported from the original processing
 parser and extended with intake-specific extraction logic.
 
+**Never let a log call sit unguarded between a caught error and a fail-safe
+return.** All three failure exits of `parse_award_pdf()` log before they
+return (`logger.exception` on the two error paths, `logger.warning` on the
+empty-text path) — keep those. Do NOT "fix" the outer
+`except Exception as exc:` by widening it, by catching earlier, or by
+swallowing more: discarding already-extracted fields on an unrelated error
+is the exact bug that block caused on 2026-09-14.
+
+That incident's root cause was **not** in `intake/`. Production used
+`opencensus`'s Application Insights handler, which sets `self.lock = None`.
+Python 3.13+ `logging.Handler.handle()` does an unconditional
+`with self.lock:`, so every WARNING raised
+`TypeError: 'NoneType' object does not support the context manager
+protocol` back into the caller. The Claude guards log their caught
+error, so the TypeError escaped them and killed the parse. Telemetry
+now uses `azure-monitor-opentelemetry` (`configure_azure_monitor` in
+`core.apps.CoreConfig.ready`) — do not re-add `opencensus-*` packages
+or `OpencensusMiddleware`. If you add a new Anthropic call site here,
+keep the local `except Exception` guard pattern; it is correct and was
+never the bug.
+
 `intake/ingest.py::_result_to_data` is the single mapping from
 `AwardParseResult` (intake parser dataclass) to the intake JSON shape. If
 the parser grows new fields, update the mapping there AND add a test under

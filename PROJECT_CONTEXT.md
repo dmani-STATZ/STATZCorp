@@ -445,12 +445,13 @@ File format and validation rules are in `release_notes/README-rn.md`.
 
 ## Azure Telemetry & Infrastructure
 
-- **Application Insights Integration:** Integrated via `opencensus-ext-azure`.
+- **Application Insights Integration:** `azure-monitor-opentelemetry` (`configure_azure_monitor` from `core.apps.CoreConfig.ready`). OpenCensus (`opencensus-ext-*`, `OpencensusMiddleware`) is retired — do not re-add it.
 - **Environment & Activation:** Enabled only in production (`IS_PRODUCTION=True`) when the `APPLICATIONINSIGHTS_CONNECTION_STRING` environment variable is present.
 - **Data Captured:**
-  - HTTP Request Traces (100% sample rate via `OpencensusMiddleware`).
+  - HTTP Request Traces (Django instrumentation, enabled by the distro).
+  - Outbound `requests` traces (Anthropic API calls included).
   - Unhandled Exceptions.
-  - Django Log Forwarding: Forwarding of all `WARNING` level and higher logs from the major loggers (`django`, `STATZWeb`, `users`, `contracts`, `intake`).
+  - Python logging (stdlib `logging`, no custom Azure handler in `settings.LOGGING`).
 - **Resource Information:** Azure GCC High Application Insights resource located in USGov Virginia, resource group `StatzWeb-App`. The connection string is auto-injected by Azure under the environment variable `APPLICATIONINSIGHTS_CONNECTION_STRING`.
 
 ---
@@ -533,7 +534,8 @@ The `tags` array will fail validation if it does not contain exactly two items:
 
 ## Anthropic API Budget Tracker
 - Model: `core.APIBudget` (singleton, pk=1) tracks estimated running balance. `core.APIUsageLog` logs every call with model, tokens, cost, and call site.
-- Central wrapper: `core.anthropic_client.call_anthropic(payload, call_site)` — all Anthropic API calls must route through this.
+- Central wrapper: `core.anthropic_client.call_anthropic(payload, call_site)` — all Anthropic API calls must route through this. It has no budget/rate-limit context manager and no `with` statement; the only retry logic is an HTTP-429 backoff loop. Callers are expected to wrap it in their own `except Exception`.
+- Callers as of 2026-09-14: `intake/pdf_parser.py` (×3, each locally guarded), `reports/views.py::_call_ai_sql_builder` (guarded by all three of its callers), `mailer/tasks/generate_ai.py::process_ai_snippets` (per-campaign `try/except Exception`), `sales/services/competitor_supplier_intel.py::_extract_award_entities_via_claude_api` (guarded). All are adequately guarded.
 - Pricing constants in `core/anthropic_client.py` — update `MODEL_PRICING` when adding new models.
 - Context processor `core.context_processors.api_budget` injects `api_budget` and `api_budget_calls_today` into superuser requests only.
 - Budget card partial: `core/templates/core/partials/api_budget_card.html` — included on Intake Queue, Processing Queue, Reports hub, and Index pages inside `{% if request.user.is_superuser %}`.

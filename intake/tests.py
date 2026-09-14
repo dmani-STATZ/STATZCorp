@@ -1416,6 +1416,88 @@ class CmmcDetectionTests(TestCase):
         )
 
 
+# Minimal but realistically-shaped DD Form 1155 text. Fed to parse_award_pdf by
+# stubbing _extract_pdf_texts, so no binary PDF fixture is needed.
+_DD1155_TEXT = """\
+1. CONTRACT/PURCH ORDER NO. SPE8E9-26-V-2290
+3. DATE OF ORDER
+2026 APR 01
+6. ISSUED BY
+DLA TROOP SUPPORT
+7. ADMINISTERED BY
+DLA TROOP SUPPORT
+9. CONTRACTOR CODE 1ABC2
+ACME MANUFACTURING CO
+1234 INDUSTRIAL PKWY
+25. TOTAL $ 12,345.67
+
+SECTION B
+PR: 7015991525
+CLIN PR PRLI UI QUANTITY UNIT PRICE CURRENCY TOTAL PRICE
+0001 7015991525 0001 EA 369.000 24.99000 USD 9221.31
+NSN/MATERIAL: 4730001256889
+DELIVER FOB: ORIGIN   DELIVER BY: 2027 JAN 04
+INSPECTION POINT: ORIGIN
+ACCEPTANCE POINT: ORIGIN
+52.219-27 NOTICE OF SERVICE-DISABLED VETERAN-OWNED SMALL BUSINESS SET-ASIDE
+
+SECTION C
+END OF DOCUMENT
+"""
+
+_DD1155_PAGE_ONE = """\
+1. CONTRACT/PURCH ORDER NO. SPE8E9-26-V-2290
+2026 APR 01  7015991525  DO-C9
+25. TOTAL $ 12,345.67
+"""
+
+
+class ClaudeGuardFailSafeTests(TestCase):
+    """The three Claude call sites must swallow failures, never propagate."""
+
+    def test_cmmc_detection_returns_all_false_on_api_failure(self):
+        from intake.pdf_parser import _detect_cmmc_via_claude_api
+
+        with patch('intake.pdf_parser.call_anthropic',
+                   side_effect=RuntimeError('api down')):
+            flags = _detect_cmmc_via_claude_api('SECTION B\nRD004 CMMC Level 2')
+        self.assertEqual(
+            flags,
+            {'cmmc_l1': False, 'cmmc_l2_sa': False,
+             'cmmc_l2_c3pao': False, 'cmmc_l3': False},
+        )
+
+    def test_clin_extraction_returns_none_on_api_failure(self):
+        from intake.pdf_parser import _extract_clins_via_claude_api
+
+        with patch('intake.pdf_parser.call_anthropic',
+                   side_effect=RuntimeError('api down')):
+            self.assertIsNone(_extract_clins_via_claude_api('SECTION B\n0001 ...'))
+
+    def test_idiq_supplier_returns_none_on_api_failure(self):
+        from intake.pdf_parser import _extract_idiq_supplier_via_claude_api
+
+        with patch('intake.pdf_parser.call_anthropic',
+                   side_effect=RuntimeError('api down')):
+            self.assertIsNone(
+                _extract_idiq_supplier_via_claude_api('SECTION B\nMFR. CAGE: 75535')
+            )
+
+    def test_parse_award_pdf_populates_contract_number_without_the_api(self):
+        """A well-formed 1155 still parses end-to-end when every LLM call fails."""
+        from intake.pdf_parser import parse_award_pdf
+
+        with patch('intake.pdf_parser._extract_pdf_texts',
+                   return_value=(_DD1155_TEXT, _DD1155_PAGE_ONE)), \
+             patch('intake.pdf_parser.call_anthropic',
+                   side_effect=RuntimeError('api down')):
+            result = parse_award_pdf('ignored.pdf')
+
+        self.assertEqual(result.contract_number, 'SPE8E9-26-V-2290')
+        self.assertEqual(result.contract_type, 'PO')
+        self.assertNotIn('Unexpected parse error', result.pdf_parse_notes or '')
+
+
 class RemovePackagingApiTests(TestCase):
     """Tests for the remove_packaging_api AJAX endpoint."""
 

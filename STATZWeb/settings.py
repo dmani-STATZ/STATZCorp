@@ -62,16 +62,6 @@ APPLICATIONINSIGHTS_CONNECTION_STRING = os.environ.get(
 )
 APPLICATIONINSIGHTS_ENABLED = IS_PRODUCTION and bool(APPLICATIONINSIGHTS_CONNECTION_STRING)
 
-if APPLICATIONINSIGHTS_ENABLED:
-    OPENCENSUS = {
-        "TRACE": {
-            "SAMPLER": "opencensus.trace.samplers.ProbabilitySampler(rate=1.0)",
-            "EXPORTER": f"""opencensus.ext.azure.trace_exporter.AzureExporter(
-                connection_string='{APPLICATIONINSIGHTS_CONNECTION_STRING}'
-            )""",
-        }
-    }
-
 # Azure App Service configuration
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
@@ -123,7 +113,6 @@ INSTALLED_APPS = [
 
 # Middleware - Environment aware
 MIDDLEWARE = [
-    "opencensus.ext.django.middleware.OpencensusMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -604,15 +593,10 @@ else:
         },
     }
 
-if APPLICATIONINSIGHTS_ENABLED:
-    LOGGING["handlers"]["azure"] = {
-        "level": "WARNING",
-        "class": "opencensus.ext.azure.log_exporter.AzureLogHandler",
-        "connection_string": APPLICATIONINSIGHTS_CONNECTION_STRING,
-    }
-    for logger_name in ["django", "STATZWeb", "users", "contracts", "intake", "suppliers"]:
-        if logger_name in LOGGING.get("loggers", {}):
-            LOGGING["loggers"][logger_name]["handlers"].append("azure")
+# Application Insights is started from core.apps.CoreConfig.ready() via
+# azure.monitor.opentelemetry.configure_azure_monitor — after Django's
+# LOGGING dictConfig, so the distro's logging handler is not wiped.
+# Do not add a custom Azure handler here; the distro instruments logging.
 
 # Security settings - Environment aware
 if IS_PRODUCTION:

@@ -485,6 +485,27 @@ the Match button in the editor.
 
 **Block 16 "Reference your" CAGE (2026-06-29):** `_extract_reference_cage(page_one_text)` extracts the supplier CAGE code from the DLA-added text in Block 16 ("Offer/Quote dated YYYY MON DD, {CAGE} {REF}"). Stored as `AwardParseResult.page1_reference_cage`. Used as third-tier fallback in `_clin_to_dict` (per-CLIN cage → contract_supplier_cage → page1_reference_cage) and in IDIQ approved_pairs cage. This is NOT the prime contractor CAGE from Block 9.
 
+**Parse failure logging (2026-09-14):** all three failure exits in
+`parse_award_pdf()` now log before returning — `logger.exception` for the
+"Failed to open or read PDF" and "Unexpected parse error" paths, and
+`logger.warning` for the empty-text path. Previously the flattened
+`str(exc)` in `pdf_parse_notes` was the only record of the failure anywhere,
+which made "Unexpected parse error" effectively undiagnosable. The returned
+`AwardParseResult` shape and the `pdf_parse_notes` text are unchanged.
+
+**Why that mattered (2026-09-14):** production used the retired
+`opencensus` Application Insights handler, which sets `self.lock = None`.
+Since Python 3.13 `logging.Handler.handle()` runs an unconditional
+`with self.lock:`, so on Python 3.13+ every WARNING routed to
+Application Insights raised `TypeError: 'NoneType' object does not support
+the context manager protocol` **in the calling thread**. The Claude guards
+log their caught error with `logger.warning`, so the TypeError escaped
+their `except` block, hit `parse_award_pdf`'s outer handler, and discarded
+a complete parse. Telemetry is now `azure-monitor-opentelemetry` (started
+from `core.apps.CoreConfig.ready`); the OpenCensus handler is gone, so a
+log call can no longer hijack a fail-safe `except`. Regression cover:
+`intake.tests.ClaudeGuardFailSafeTests`.
+
 `ingest_pdf(file, original_filename='...')` returns the new `DraftContract`
 or raises:
 - `IngestionError` — parser couldn't extract a contract_number / type, or

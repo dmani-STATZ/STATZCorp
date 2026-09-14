@@ -11,10 +11,9 @@ pyodbc==5.2.0
 # Authentication / Microsoft Graph (RFQ queue mail)
 msal>=1.28.0
 
-# Azure Application Insights telemetry
-opencensus-ext-azure==1.1.13
-opencensus-ext-django==0.8.0
-opencensus-ext-sqlalchemy==0.1.2
+# Azure Application Insights telemetry (OpenCensus is retired).
+# 1.8.10 supports Python 3.13 and 3.14 (requires-python >=3.8).
+azure-monitor-opentelemetry==1.8.10
 
 
 # Forms and UI
