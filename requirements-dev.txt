@@ -6,8 +6,6 @@
 
 # Development-specific packages (used in settings or daily workflow)
 django-debug-toolbar==4.4.6
-django-extensions==3.2.3
-django-browser-reload==1.15.0
 
 # Code quality and testing
 pytest==9.0.3
@@ -18,7 +16,7 @@ flake8==7.1.1
 isort==5.13.2
 
 # Development utilities
-python-dotenv==1.0.1
+# python-dotenv lives in requirements.txt (currently 1.2.2) — do not re-pin it here.
 ipython==8.29.0
 
 # ---------------------------------------------------------------------------
