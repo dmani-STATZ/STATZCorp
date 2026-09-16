@@ -8,8 +8,8 @@
     <a href="?q={{ query|urlencode }}&category={{ category }}&page={{ page_obj.next_page_number }}">Next →</a>
     {% endif %}
 </nav>
-{% elif total > 10 %}
-<div class="global-result-group__footer">
-    <a href="?q={{ query|urlencode }}&category={{ category }}">View all {{ total }} results</a>
+{% else %}
+<div class="global-result-group__footer js-search-footer{% if total <= 10 %} d-none{% endif %}">
+    <a class="js-search-view-all" href="?q={{ query|urlencode }}&category={{ category }}">View all {{ total }} results</a>
 </div>
 {% endif %}

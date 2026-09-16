@@ -13,4 +13,4 @@ Calendar, Resources, Announcements, and DIBBS Notices each have their own page. 
 
 The nine-dot menu and DIBBS tile show how many DIBBS notices were posted recently.
 
-Searches that took over a minute now return in well under a second. Note that solicitation numbers match from the start of the number rather than anywhere inside it.
+Searches that took over a minute now return indexed matches (contract, IDIQ, NSN, solicitation number) immediately. Related records and item-name matches load in the background afterward. Solicitation numbers match from the start of the number rather than anywhere inside it.

@@ -2617,6 +2617,16 @@ main {
   border-radius: var(--bs-border-radius-lg);
 }
 
+.global-search-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.875rem;
+}
+
 .portal-feature-page {
   max-width: 96rem;
 }

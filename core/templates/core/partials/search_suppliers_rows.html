@@ -1,0 +1,6 @@
+{% for supplier in suppliers %}
+<a href="{% url 'suppliers:supplier_detail' supplier.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between gap-3" data-search-pk="{{ supplier.pk }}">
+    <span>{{ supplier.name|default:"Unnamed supplier" }}</span>
+    <span class="font-monospace text-body-secondary">{{ supplier.cage_code|default:"—" }}</span>
+</a>
+{% endfor %}

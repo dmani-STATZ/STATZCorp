@@ -1,0 +1,6 @@
+{% for solicitation in solicitations %}
+<a href="{% url 'sales:solicitation_detail' solicitation.solicitation_number %}" class="list-group-item list-group-item-action" data-search-pk="{{ solicitation.pk }}">
+    <span class="font-monospace fw-semibold">{{ solicitation.solicitation_number }}</span>
+    {% if solicitation.search_lines.0.nomenclature %}<span class="d-block small text-body-secondary">{{ solicitation.search_lines.0.nomenclature }}</span>{% endif %}
+</a>
+{% endfor %}

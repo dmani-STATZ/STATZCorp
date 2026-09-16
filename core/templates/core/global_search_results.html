@@ -23,104 +23,207 @@
             <div class="form-text mt-2">Contract or IDIQ number, supplier name or CAGE, NSN/NIIN/part number, or solicitation.</div>
         </form>
 
-        {% if contracts %}
-        <section class="global-result-group mb-4" aria-labelledby="contracts-results-heading">
-            <div class="global-result-group__header">
-                <h2 id="contracts-results-heading" class="h5 mb-0">Contracts</h2>
-                <span class="text-body-secondary small">{{ contracts_total|intcomma }} result{{ contracts_total|pluralize }}</span>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for contract in contracts %}
-                <a href="{% url 'contracts:contract_management' contract.pk %}" class="list-group-item list-group-item-action">
-                    <span class="font-monospace fw-semibold">{{ contract.contract_number }}</span>
-                    {% if contract.status %}<span class="badge text-bg-secondary ms-2">{{ contract.status.description }}</span>{% endif %}
-                </a>
-                {% endfor %}
-            </div>
-            {% include "core/partials/search_group_footer.html" with category="contracts" total=contracts_total page_obj=contracts_page %}
-        </section>
-        {% endif %}
+        <div id="search-groups">
+            {% if contracts %}
+            <section class="global-result-group mb-4" data-search-group="contracts" aria-labelledby="contracts-results-heading">
+                <div class="global-result-group__header">
+                    <h2 id="contracts-results-heading" class="h5 mb-0">Contracts</h2>
+                    <span class="text-body-secondary small js-search-count">{{ contracts_total|intcomma }} result{{ contracts_total|pluralize }}</span>
+                </div>
+                <div class="list-group list-group-flush js-search-rows">
+                    {% include "core/partials/search_contracts_rows.html" %}
+                </div>
+                {% include "core/partials/search_group_footer.html" with category="contracts" total=contracts_total page_obj=contracts_page %}
+            </section>
+            {% endif %}
 
-        {% if idiqs %}
-        <section class="global-result-group mb-4" aria-labelledby="idiq-results-heading">
-            <div class="global-result-group__header">
-                <h2 id="idiq-results-heading" class="h5 mb-0">IDIQs</h2>
-                <span class="text-body-secondary small">{{ idiqs_total|intcomma }} result{{ idiqs_total|pluralize }}</span>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for idiq in idiqs %}
-                <a href="{% url 'contracts:idiq_contract_detail' idiq.pk %}" class="list-group-item list-group-item-action">
-                    <span class="font-monospace fw-semibold">{{ idiq.contract_number }}</span>
-                    {% if idiq.closed %}<span class="badge text-bg-secondary ms-2">Closed</span>{% endif %}
-                    {% if idiq.buyer %}<span class="d-block small text-body-secondary">{{ idiq.buyer }}</span>{% endif %}
-                </a>
-                {% endfor %}
-            </div>
-            {% include "core/partials/search_group_footer.html" with category="idiqs" total=idiqs_total page_obj=idiqs_page %}
-        </section>
-        {% endif %}
+            {% if idiqs %}
+            <section class="global-result-group mb-4" data-search-group="idiqs" aria-labelledby="idiq-results-heading">
+                <div class="global-result-group__header">
+                    <h2 id="idiq-results-heading" class="h5 mb-0">IDIQs</h2>
+                    <span class="text-body-secondary small js-search-count">{{ idiqs_total|intcomma }} result{{ idiqs_total|pluralize }}</span>
+                </div>
+                <div class="list-group list-group-flush js-search-rows">
+                    {% include "core/partials/search_idiqs_rows.html" %}
+                </div>
+                {% include "core/partials/search_group_footer.html" with category="idiqs" total=idiqs_total page_obj=idiqs_page %}
+            </section>
+            {% endif %}
 
-        {% if suppliers %}
-        <section class="global-result-group mb-4" aria-labelledby="suppliers-results-heading">
-            <div class="global-result-group__header">
-                <h2 id="suppliers-results-heading" class="h5 mb-0">Suppliers</h2>
-                <span class="text-body-secondary small">{{ suppliers_total|intcomma }} result{{ suppliers_total|pluralize }}</span>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for supplier in suppliers %}
-                <a href="{% url 'suppliers:supplier_detail' supplier.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between gap-3">
-                    <span>{{ supplier.name|default:"Unnamed supplier" }}</span>
-                    <span class="font-monospace text-body-secondary">{{ supplier.cage_code|default:"—" }}</span>
-                </a>
-                {% endfor %}
-            </div>
-            {% include "core/partials/search_group_footer.html" with category="suppliers" total=suppliers_total page_obj=suppliers_page %}
-        </section>
-        {% endif %}
+            {% if suppliers %}
+            <section class="global-result-group mb-4" data-search-group="suppliers" aria-labelledby="suppliers-results-heading">
+                <div class="global-result-group__header">
+                    <h2 id="suppliers-results-heading" class="h5 mb-0">Suppliers</h2>
+                    <span class="text-body-secondary small js-search-count">{{ suppliers_total|intcomma }} result{{ suppliers_total|pluralize }}</span>
+                </div>
+                <div class="list-group list-group-flush js-search-rows">
+                    {% include "core/partials/search_suppliers_rows.html" %}
+                </div>
+                {% include "core/partials/search_group_footer.html" with category="suppliers" total=suppliers_total page_obj=suppliers_page %}
+            </section>
+            {% endif %}
 
-        {% if nsns %}
-        <section class="global-result-group mb-4" aria-labelledby="nsn-results-heading">
-            <div class="global-result-group__header">
-                <h2 id="nsn-results-heading" class="h5 mb-0">NSN</h2>
-                <span class="text-body-secondary small">{{ nsns_total|intcomma }} result{{ nsns_total|pluralize }}</span>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for nsn in nsns %}
-                <a href="{% url 'products:nsn_detail' nsn.pk %}" class="list-group-item list-group-item-action">
-                    <span class="font-monospace fw-semibold">{{ nsn.nsn_normalized|default:nsn.nsn_code|format_nsn }}</span>
-                    {% if nsn.part_number %}<span class="ms-2">{{ nsn.part_number }}</span>{% endif %}
-                    {% if nsn.description %}<span class="d-block small text-body-secondary">{{ nsn.description|truncatechars:120 }}</span>{% endif %}
-                </a>
-                {% endfor %}
-            </div>
-            {% include "core/partials/search_group_footer.html" with category="nsns" total=nsns_total page_obj=nsns_page %}
-        </section>
-        {% endif %}
+            {% if nsns %}
+            <section class="global-result-group mb-4" data-search-group="nsns" aria-labelledby="nsn-results-heading">
+                <div class="global-result-group__header">
+                    <h2 id="nsn-results-heading" class="h5 mb-0">NSN</h2>
+                    <span class="text-body-secondary small js-search-count">{{ nsns_total|intcomma }} result{{ nsns_total|pluralize }}</span>
+                </div>
+                <div class="list-group list-group-flush js-search-rows">
+                    {% include "core/partials/search_nsns_rows.html" %}
+                </div>
+                {% include "core/partials/search_group_footer.html" with category="nsns" total=nsns_total page_obj=nsns_page %}
+            </section>
+            {% endif %}
 
-        {% if solicitations %}
-        <section class="global-result-group mb-4" aria-labelledby="solicitations-results-heading">
-            <div class="global-result-group__header">
-                <h2 id="solicitations-results-heading" class="h5 mb-0">Solicitations</h2>
-                <span class="text-body-secondary small">{{ solicitations_total|intcomma }} result{{ solicitations_total|pluralize }}</span>
-            </div>
-            <div class="list-group list-group-flush">
-                {% for solicitation in solicitations %}
-                <a href="{% url 'sales:solicitation_detail' solicitation.solicitation_number %}" class="list-group-item list-group-item-action">
-                    <span class="font-monospace fw-semibold">{{ solicitation.solicitation_number }}</span>
-                    {% if solicitation.search_lines.0.nomenclature %}<span class="d-block small text-body-secondary">{{ solicitation.search_lines.0.nomenclature }}</span>{% endif %}
-                </a>
-                {% endfor %}
-            </div>
-            {% include "core/partials/search_group_footer.html" with category="solicitations" total=solicitations_total page_obj=solicitations_page %}
-        </section>
-        {% endif %}
-
-        {% if not contracts and not idiqs and not suppliers and not nsns and not solicitations %}
-        <div class="global-search-empty text-center py-5">
-            <h2 class="h5">No matches for “{{ query }}”</h2>
-            <p class="text-body-secondary mb-0">Try a contract or IDIQ number, supplier name or CAGE, NSN, part number, or solicitation number.</p>
+            {% if solicitations %}
+            <section class="global-result-group mb-4" data-search-group="solicitations" aria-labelledby="solicitations-results-heading">
+                <div class="global-result-group__header">
+                    <h2 id="solicitations-results-heading" class="h5 mb-0">Solicitations</h2>
+                    <span class="text-body-secondary small js-search-count">{{ solicitations_total|intcomma }} result{{ solicitations_total|pluralize }}</span>
+                </div>
+                <div class="list-group list-group-flush js-search-rows">
+                    {% include "core/partials/search_solicitations_rows.html" %}
+                </div>
+                {% include "core/partials/search_group_footer.html" with category="solicitations" total=solicitations_total page_obj=solicitations_page %}
+            </section>
+            {% endif %}
         </div>
+
+        <div id="search-empty" class="global-search-empty text-center py-5{% if contracts or idiqs or suppliers or nsns or solicitations %} d-none{% endif %}">
+            <h2 class="h5">{% if load_related %}Looking for “{{ query }}”{% else %}No matches for “{{ query }}”{% endif %}</h2>
+            <p class="text-body-secondary mb-0">{% if load_related %}Indexed matches come back first. Related records load next.{% else %}Try a contract or IDIQ number, supplier name or CAGE, NSN, part number, or solicitation number.{% endif %}</p>
+        </div>
+
+        {% if load_related %}
+        <div id="search-related-status" class="global-search-status" role="status">
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            Looking for related records…
+        </div>
+        <noscript>
+            <p class="small text-body-secondary mt-3">Related records need JavaScript. <a href="{{ complete_url }}">Load everything now</a>.</p>
+        </noscript>
+        <template id="search-group-template">
+            <section class="global-result-group mb-4" data-search-group="">
+                <div class="global-result-group__header">
+                    <h2 class="h5 mb-0 js-search-heading"></h2>
+                    <span class="text-body-secondary small js-search-count"></span>
+                </div>
+                <div class="list-group list-group-flush js-search-rows"></div>
+                <div class="global-result-group__footer js-search-footer d-none">
+                    <a class="js-search-view-all" href="#">View all results</a>
+                </div>
+            </section>
+        </template>
         {% endif %}
     </div>
 </main>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% if load_related %}
+<script>
+(function () {
+    var statusEl = document.getElementById("search-related-status");
+    var groupsEl = document.getElementById("search-groups");
+    var emptyEl = document.getElementById("search-empty");
+    var template = document.getElementById("search-group-template");
+    var relatedUrl = "{{ related_url|escapejs }}";
+    var groupOrder = ["contracts", "idiqs", "suppliers", "nsns", "solicitations"];
+
+    function resultLabel(total) {
+        return total === 1 ? "1 result" : total.toLocaleString() + " results";
+    }
+
+    function existingPks(section) {
+        var pks = {};
+        section.querySelectorAll("[data-search-pk]").forEach(function (row) {
+            pks[row.getAttribute("data-search-pk")] = true;
+        });
+        return pks;
+    }
+
+    function appendUniqueRows(section, html) {
+        var holder = document.createElement("div");
+        holder.innerHTML = html;
+        var rows = section.querySelector(".js-search-rows");
+        var seen = existingPks(section);
+        var added = 0;
+        Array.prototype.slice.call(holder.children).forEach(function (row) {
+            var pk = row.getAttribute("data-search-pk");
+            if (pk && seen[pk]) {
+                return;
+            }
+            if (pk) {
+                seen[pk] = true;
+            }
+            rows.appendChild(row);
+            added += 1;
+        });
+        return added;
+    }
+
+    function groupSection(category, label) {
+        var section = groupsEl.querySelector('[data-search-group="' + category + '"]');
+        if (section) {
+            return section;
+        }
+        section = template.content.firstElementChild.cloneNode(true);
+        section.setAttribute("data-search-group", category);
+        section.querySelector(".js-search-heading").textContent = label;
+        var insertBefore = null;
+        var start = groupOrder.indexOf(category) + 1;
+        for (var i = start; i < groupOrder.length; i += 1) {
+            insertBefore = groupsEl.querySelector('[data-search-group="' + groupOrder[i] + '"]');
+            if (insertBefore) {
+                break;
+            }
+        }
+        groupsEl.insertBefore(section, insertBefore);
+        return section;
+    }
+
+    function applyGroup(group) {
+        var section = groupSection(group.category, group.label);
+        appendUniqueRows(section, group.html);
+        var countEl = section.querySelector(".js-search-count");
+        if (countEl) {
+            countEl.textContent = resultLabel(group.total);
+        }
+        var footer = section.querySelector(".js-search-footer");
+        if (footer && group.view_all_url) {
+            footer.classList.remove("d-none");
+            footer.querySelector(".js-search-view-all").setAttribute("href", group.view_all_url);
+            footer.querySelector(".js-search-view-all").textContent = "View all " + group.total + " results";
+        }
+    }
+
+    fetch(relatedUrl, { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error("related search failed");
+            }
+            return response.json();
+        })
+        .then(function (payload) {
+            (payload.groups || []).forEach(applyGroup);
+            if (statusEl) {
+                statusEl.remove();
+            }
+            if (emptyEl && groupsEl.children.length) {
+                emptyEl.classList.add("d-none");
+            } else if (emptyEl) {
+                emptyEl.querySelector("h2").textContent = "No matches for “{{ query|escapejs }}”";
+                emptyEl.querySelector("p").textContent = "Try a contract or IDIQ number, supplier name or CAGE, NSN, part number, or solicitation number.";
+            }
+        })
+        .catch(function () {
+            if (statusEl) {
+                statusEl.textContent = "Couldn't load related records.";
+            }
+        });
+})();
+</script>
+{% endif %}
 {% endblock %}

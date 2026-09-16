@@ -3,7 +3,8 @@
 Read `PROJECT_CONTEXT.md`, `core/CONTEXT_core.md`, `STATZWeb/settings.py`, and `STATZWeb/urls.py` before changing this app.
 
 ## Global search rules
-- Preserve `@login_required` and GET-only behavior on `global_search`.
+- Preserve `@login_required` and GET-only behavior on `global_search` and `global_search_related`.
+- The first paint is indexed matches only (`mode="fast"`). Do not run related hops or the nomenclature scan on that request. Those belong on `global_search_related` (`mode="deep"`) or `?complete=1` / `?category=` (`mode="full"`).
 - `Contract` and `IdiqContract` results are non-negotiably scoped to `request.active_company`.
 - Do not company-scope `Supplier`, `Nsn`, or `Solicitation`; these models have no company FK.
 - Reuse `normalize_contract_number()`, `nsn_query_variants()`, and `_suppliers_matching_cage()` from their owning apps.

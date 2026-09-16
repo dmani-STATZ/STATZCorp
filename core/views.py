@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -7,6 +8,8 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Case, IntegerField, Prefetch, Q, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from core.health import run_readiness_check
@@ -37,6 +40,14 @@ _MIN_NSN_DIGITS = 7
 # 2,100 parameter limit once several id sets are merged into one `pk__in`.
 _SOURCE_ID_LIMIT = 500
 _CATEGORY_ID_LIMIT = 1000
+_SEARCH_CATEGORIES = ("contracts", "idiqs", "suppliers", "nsns", "solicitations")
+_SEARCH_GROUP_LABELS = {
+    "contracts": "Contracts",
+    "idiqs": "IDIQs",
+    "suppliers": "Suppliers",
+    "nsns": "NSN",
+    "solicitations": "Solicitations",
+}
 
 
 @dataclass(frozen=True)
@@ -154,24 +165,31 @@ def _nsn_column_filter(terms):
     return nsn_filter
 
 
-def _solicitation_line_filter(terms):
-    """Filter for the largest table in the search — one row per DIBBS line.
-
-    Only probe the NSN/NIIN columns with NSN-shaped terms and nomenclature with
-    word-shaped terms; anything else can never match and costs a full scan.
-    """
+def _indexed_line_filter(terms):
+    """NSN/NIIN prefix matches — these can seek `dibbs_solicitation_line.nsn`."""
     line_filter = Q()
-    if terms.is_nsn_shaped:
-        for variant in terms.nsn_variants:
-            line_filter |= _starts_q("nsn", variant)
-            normalized_variant = normalize_nsn(variant)
-            if normalized_variant:
-                line_filter |= _starts_q("nsn", normalized_variant)
-        if len(terms.normalized_nsn) == 9:
-            line_filter |= Q(niin__exact=terms.normalized_nsn)
-    if terms.wants_text_scan:
-        line_filter |= _contains_q("nomenclature", terms.query)
+    if not terms.is_nsn_shaped:
+        return line_filter
+    for variant in terms.nsn_variants:
+        line_filter |= _starts_q("nsn", variant)
+        normalized_variant = normalize_nsn(variant)
+        if normalized_variant:
+            line_filter |= _starts_q("nsn", normalized_variant)
+    if len(terms.normalized_nsn) == 9:
+        line_filter |= Q(niin__exact=terms.normalized_nsn)
     return line_filter
+
+
+def _nomenclature_line_filter(terms):
+    """Item-name contains scan. Unindexed; never run on the first paint."""
+    if not terms.wants_text_scan:
+        return Q()
+    return _contains_q("nomenclature", terms.query)
+
+
+def _solicitation_line_filter(terms):
+    """Indexed NSN/NIIN plus the optional nomenclature scan."""
+    return _indexed_line_filter(terms) | _nomenclature_line_filter(terms)
 
 
 @require_GET
@@ -196,8 +214,8 @@ def health_plain(request):
     return HttpResponse(body, content_type="text/plain", status=code, headers=_NO_STORE)
 
 
-def _direct_matches(terms, company):
-    """Match each model on its own columns only — no joins, no aggregation."""
+def _direct_matches(terms, company, *, include_indexed_lines=True):
+    """Match each model on its own indexed columns — no joins, no aggregation."""
     number_filter = _contract_number_filter(terms)
     suppliers = _ids(
         Supplier.objects.filter(archived=False).filter(
@@ -216,11 +234,12 @@ def _direct_matches(terms, company):
     solicitations = _ids(
         Solicitation.objects.filter(_starts_q("solicitation_number", terms.query))
     )
-    line_filter = _solicitation_line_filter(terms)
-    if line_filter:
-        solicitations |= _ids(
-            SolicitationLine.objects.filter(line_filter), "solicitation_id"
-        )
+    if include_indexed_lines:
+        indexed_lines = _indexed_line_filter(terms)
+        if indexed_lines:
+            solicitations |= _ids(
+                SolicitationLine.objects.filter(indexed_lines), "solicitation_id"
+            )
 
     return _MatchedIds(
         contracts=_ids(
@@ -324,18 +343,84 @@ def _category_ids(direct_ids, related_ids):
     return ordered[:_CATEGORY_ID_LIMIT]
 
 
-def _search_querysets(request, terms):
+def _nomenclature_solicitation_ids(terms):
+    nomenclature_filter = _nomenclature_line_filter(terms)
+    if not nomenclature_filter:
+        return set()
+    return _ids(
+        SolicitationLine.objects.filter(nomenclature_filter), "solicitation_id"
+    )
+
+
+def _related_matches(direct, terms, company):
+    """One-hop ids plus the unindexed nomenclature scan.
+
+    Nomenclature hits are folded into `solicitations` before the supplier hop
+    so a word search still surfaces matched/RFQ suppliers for those lines.
+    """
+    nomenclature = _nomenclature_solicitation_ids(terms)
+    hop_solicitations = direct.solicitations | nomenclature
+    hopped = _MatchedIds(
+        contracts=direct.contracts,
+        idiqs=direct.idiqs,
+        suppliers=direct.suppliers,
+        nsns=direct.nsns,
+        solicitations=hop_solicitations,
+    )
+    return _MatchedIds(
+        contracts=_related_contract_ids(hopped, company),
+        idiqs=_related_idiq_ids(hopped, company),
+        suppliers=_related_supplier_ids(hopped, company),
+        nsns=_related_nsn_ids(hopped, company),
+        solicitations=_related_solicitation_ids(hopped) | nomenclature,
+    )
+
+
+def _category_id_map(direct, related, mode):
+    """Pick the pk set each group queryset should load for this request mode."""
+    id_map = {}
+    for category in _SEARCH_CATEGORIES:
+        direct_ids = getattr(direct, category)
+        related_ids = getattr(related, category)
+        if mode == "fast":
+            id_map[category] = list(direct_ids)[:_CATEGORY_ID_LIMIT]
+        elif mode == "deep":
+            id_map[category] = _category_ids(set(), related_ids - direct_ids)
+        else:
+            id_map[category] = _category_ids(direct_ids, related_ids)
+    return id_map
+
+
+def _search_querysets(request, terms, mode="full"):
     """Build one flat, index-friendly queryset per result group.
+
+    `mode`:
+    - ``fast`` — indexed columns only (first paint)
+    - ``deep`` — related hops + nomenclature, excluding already-shown directs
+    - ``full`` — union used by category pagination and no-JS complete search
 
     Relationships are resolved as primary-key lookups instead of OR'd joins:
     a single `pk__in` filter keeps every group query free of the outer-join
     fan-out and `GROUP BY` that made the previous version unusable.
     """
+    if mode not in {"fast", "deep", "full"}:
+        raise ValueError(f"Unknown search mode {mode!r}")
+
     company = getattr(request, "active_company", None)
     if company is None:
         raise PermissionDenied("No active company set")
 
     direct = _direct_matches(terms, company)
+    related = _MatchedIds(
+        contracts=set(),
+        idiqs=set(),
+        suppliers=set(),
+        nsns=set(),
+        solicitations=set(),
+    )
+    if mode != "fast":
+        related = _related_matches(direct, terms, company)
+
     number_pairs = [
         ("contract_number", candidate) for candidate in terms.contract_candidates
     ]
@@ -343,31 +428,27 @@ def _search_querysets(request, terms):
     if terms.normalized_nsn:
         nsn_pairs.append(("nsn_normalized", terms.normalized_nsn))
     nsn_pairs.append(("part_number", terms.query))
+    id_map = _category_id_map(direct, related, mode)
+
+    def _or_none(model, pks):
+        if not pks:
+            return model.objects.none()
+        return model.objects.filter(pk__in=pks)
 
     contracts = (
-        Contract.objects.filter(
-            pk__in=_category_ids(
-                direct.contracts, _related_contract_ids(direct, company)
-            )
-        )
+        _or_none(Contract, id_map["contracts"])
         .annotate(match_quality=_quality_case(number_pairs))
         .select_related("status")
         .order_by("match_quality", "contract_number", "pk")
     )
     idiqs = (
-        IdiqContract.objects.filter(
-            pk__in=_category_ids(direct.idiqs, _related_idiq_ids(direct, company))
-        )
+        _or_none(IdiqContract, id_map["idiqs"])
         .annotate(match_quality=_quality_case(number_pairs))
         .select_related("buyer")
         .order_by("match_quality", "contract_number", "pk")
     )
     suppliers = (
-        Supplier.objects.filter(
-            pk__in=_category_ids(
-                direct.suppliers, _related_supplier_ids(direct, company)
-            )
-        )
+        _or_none(Supplier, id_map["suppliers"])
         .annotate(
             match_quality=_quality_case(
                 [("name", terms.query), ("cage_code", terms.query)]
@@ -376,18 +457,12 @@ def _search_querysets(request, terms):
         .order_by("match_quality", "name", "pk")
     )
     nsns = (
-        Nsn.objects.filter(
-            pk__in=_category_ids(direct.nsns, _related_nsn_ids(direct, company))
-        )
+        _or_none(Nsn, id_map["nsns"])
         .annotate(match_quality=_quality_case(nsn_pairs))
         .order_by("match_quality", "nsn_code", "pk")
     )
     solicitations = (
-        Solicitation.objects.filter(
-            pk__in=_category_ids(
-                direct.solicitations, _related_solicitation_ids(direct)
-            )
-        )
+        _or_none(Solicitation, id_map["solicitations"])
         .annotate(
             match_quality=_quality_case([("solicitation_number", terms.query)])
         )
@@ -411,6 +486,8 @@ def _search_querysets(request, terms):
 
 
 def _materialize_category(queryset, selected_category, category, page_number):
+    if queryset.query.is_empty():
+        return 0, [], None
     total = queryset.count()
     if selected_category == category:
         paginator = Paginator(queryset, _SEARCH_RESULT_LIMIT)
@@ -420,20 +497,7 @@ def _materialize_category(queryset, selected_category, category, page_number):
     return total, list(queryset[:_SEARCH_RESULT_LIMIT]), None
 
 
-@login_required
-@require_GET
-def global_search(request):
-    query = (request.GET.get("q") or "").strip()[:200]
-    if not query:
-        return redirect("index")
-    terms = _build_search_terms(query)
-    querysets = _search_querysets(request, terms)
-
-    selected_category = (request.GET.get("category") or "").strip().lower()
-    if selected_category not in querysets:
-        selected_category = ""
-    page_number = request.GET.get("page", 1)
-
+def _search_page_context(querysets, query, selected_category, page_number):
     context = {"query": query, "selected_category": selected_category}
     for category, queryset in querysets.items():
         total, results, page = _materialize_category(
@@ -442,8 +506,80 @@ def global_search(request):
         context[category] = results
         context[f"{category}_total"] = total
         context[f"{category}_page"] = page
+    return context
 
+
+@login_required
+@require_GET
+def global_search(request):
+    query = (request.GET.get("q") or "").strip()[:200]
+    if not query:
+        return redirect("index")
+    terms = _build_search_terms(query)
+    selected_category = (request.GET.get("category") or "").strip().lower()
+    if selected_category not in _SEARCH_CATEGORIES:
+        selected_category = ""
+    complete = (request.GET.get("complete") or "") == "1"
+    page_number = request.GET.get("page", 1)
+    load_related = not selected_category and not complete
+    mode = "fast" if load_related else "full"
+    context = _search_page_context(
+        _search_querysets(request, terms, mode=mode),
+        query,
+        selected_category,
+        page_number,
+    )
+    context["load_related"] = load_related
+    context["related_url"] = (
+        f"{reverse('core:global_search_related')}?{urlencode({'q': query})}"
+    )
+    context["complete_url"] = (
+        f"{reverse('core:global_search')}?{urlencode({'q': query, 'complete': '1'})}"
+    )
     return render(request, "core/global_search_results.html", context)
+
+
+@login_required
+@require_GET
+def global_search_related(request):
+    query = (request.GET.get("q") or "").strip()[:200]
+    if not query:
+        return JsonResponse({"groups": []}, headers=_NO_STORE)
+
+    terms = _build_search_terms(query)
+    fast = _search_page_context(
+        _search_querysets(request, terms, mode="fast"), query, "", 1
+    )
+    deep = _search_page_context(
+        _search_querysets(request, terms, mode="deep"), query, "", 1
+    )
+    groups = []
+    for category in _SEARCH_CATEGORIES:
+        rows = deep[category]
+        if not rows:
+            continue
+        total = fast[f"{category}_total"] + deep[f"{category}_total"]
+        html = render_to_string(
+            f"core/partials/search_{category}_rows.html",
+            {category: rows, "query": query},
+        )
+        view_all = ""
+        if total > _SEARCH_RESULT_LIMIT:
+            view_all = (
+                f"{reverse('core:global_search')}?"
+                f"{urlencode({'q': query, 'category': category})}"
+            )
+        groups.append(
+            {
+                "category": category,
+                "label": _SEARCH_GROUP_LABELS[category],
+                "html": html,
+                "total": total,
+                "added": len(rows),
+                "view_all_url": view_all,
+            }
+        )
+    return JsonResponse({"groups": groups}, headers=_NO_STORE)
 
 
 from decimal import Decimal, InvalidOperation

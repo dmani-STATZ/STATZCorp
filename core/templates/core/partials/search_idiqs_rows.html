@@ -1,0 +1,7 @@
+{% for idiq in idiqs %}
+<a href="{% url 'contracts:idiq_contract_detail' idiq.pk %}" class="list-group-item list-group-item-action" data-search-pk="{{ idiq.pk }}">
+    <span class="font-monospace fw-semibold">{{ idiq.contract_number }}</span>
+    {% if idiq.closed %}<span class="badge text-bg-secondary ms-2">Closed</span>{% endif %}
+    {% if idiq.buyer %}<span class="d-block small text-body-secondary">{{ idiq.buyer }}</span>{% endif %}
+</a>
+{% endfor %}

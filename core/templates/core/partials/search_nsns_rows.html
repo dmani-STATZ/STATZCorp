@@ -1,0 +1,8 @@
+{% load nsn_filters %}
+{% for nsn in nsns %}
+<a href="{% url 'products:nsn_detail' nsn.pk %}" class="list-group-item list-group-item-action" data-search-pk="{{ nsn.pk }}">
+    <span class="font-monospace fw-semibold">{{ nsn.nsn_normalized|default:nsn.nsn_code|format_nsn }}</span>
+    {% if nsn.part_number %}<span class="ms-2">{{ nsn.part_number }}</span>{% endif %}
+    {% if nsn.description %}<span class="d-block small text-body-secondary">{{ nsn.description|truncatechars:120 }}</span>{% endif %}
+</a>
+{% endfor %}

@@ -1,4 +1,5 @@
 from unittest.mock import patch
+import json
 
 from types import SimpleNamespace
 
@@ -10,7 +11,12 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from contracts.models import Clin, Company, Contract, IdiqContract, IdiqContractDetails
-from core.views import _build_search_terms, _search_querysets, global_search
+from core.views import (
+    _build_search_terms,
+    _search_querysets,
+    global_search,
+    global_search_related,
+)
 from products.models import Nsn
 from sales.models import Solicitation, SolicitationLine, SupplierMatch
 from suppliers.models import Supplier
@@ -68,8 +74,11 @@ class GlobalSearchTests(TestCase):
         self.company = Company.objects.create(name="Search Company", slug="search-company")
         self.other_company = Company.objects.create(name="Other Company", slug="other-company")
 
-    def _request(self, query=""):
-        request = self.factory.get(reverse("core:global_search"), {"q": query})
+    def _request(self, query="", view_name="core:global_search", extra=None):
+        params = {"q": query}
+        if extra:
+            params.update(extra)
+        request = self.factory.get(reverse(view_name), params)
         request.user = self.user
         request.active_company = self.company
         return request
@@ -136,6 +145,10 @@ class GlobalSearchTests(TestCase):
 
         self.assertEqual(results, [solicitation])
         self.assertEqual(results[0].search_lines[0].nomenclature, "ROLLER BEARING")
+        self.assertEqual(
+            list(_search_querysets(self._request("ROLLER"), _build_search_terms("ROLLER"), mode="fast")["solicitations"]),
+            [],
+        )
 
     def test_solicitation_number_matches_by_prefix(self):
         solicitation = Solicitation.objects.create(solicitation_number="SPE7M126Q0001")
@@ -194,9 +207,23 @@ class GlobalSearchTests(TestCase):
         self.assertEqual(response.status_code, 200)
         context = render.call_args.args[2]
         self.assertEqual(context["suppliers"], [supplier])
-        self.assertEqual(context["contracts"], [contract])
-        self.assertEqual(context["nsns"], [nsn])
-        self.assertEqual(context["solicitations"], [solicitation])
+        self.assertEqual(context["contracts"], [])
+        self.assertEqual(context["nsns"], [])
+        self.assertEqual(context["solicitations"], [])
+        self.assertTrue(context["load_related"])
+
+        related = json.loads(
+            global_search_related(
+                self._request("Acme Bearings", "core:global_search_related")
+            ).content
+        )
+        by_category = {group["category"]: group for group in related["groups"]}
+        self.assertIn("contracts", by_category)
+        self.assertIn("nsns", by_category)
+        self.assertIn("solicitations", by_category)
+        self.assertIn(str(contract.pk), by_category["contracts"]["html"])
+        self.assertIn(str(nsn.pk), by_category["nsns"]["html"])
+        self.assertIn(solicitation.solicitation_number, by_category["solicitations"]["html"])
 
     @patch("core.views.render")
     def test_nsn_expands_relations_without_cross_company_supplier_leak(self, render):
@@ -245,10 +272,21 @@ class GlobalSearchTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         context = render.call_args.args[2]
-        self.assertEqual(context["contracts"], [contract])
-        self.assertEqual(context["suppliers"], [supplier, sales_supplier])
         self.assertEqual(context["nsns"], [nsn])
         self.assertEqual(context["solicitations"], [solicitation])
+        self.assertEqual(context["contracts"], [])
+        self.assertEqual(context["suppliers"], [])
+
+        related = json.loads(
+            global_search_related(
+                self._request("5935-01-129-9512", "core:global_search_related")
+            ).content
+        )
+        by_category = {group["category"]: group for group in related["groups"]}
+        self.assertIn(str(contract.pk), by_category["contracts"]["html"])
+        self.assertIn(str(supplier.pk), by_category["suppliers"]["html"])
+        self.assertIn(str(sales_supplier.pk), by_category["suppliers"]["html"])
+        self.assertNotIn(str(hidden_supplier.pk), by_category["suppliers"]["html"])
 
     @patch("core.views.render")
     def test_idiq_search_expands_delivery_orders_and_details(self, render):
@@ -291,9 +329,21 @@ class GlobalSearchTests(TestCase):
         self.assertEqual(response.status_code, 200)
         context = render.call_args.args[2]
         self.assertEqual(context["idiqs"], [idiq])
-        self.assertEqual(context["contracts"], [delivery])
-        self.assertEqual(context["suppliers"], [supplier])
-        self.assertEqual(context["nsns"], [nsn])
+        self.assertEqual(context["contracts"], [])
+        self.assertEqual(context["suppliers"], [])
+        self.assertEqual(context["nsns"], [])
+
+        related = json.loads(
+            global_search_related(
+                self._request("SPE7M1-26-D-SEARCH", "core:global_search_related")
+            ).content
+        )
+        by_category = {group["category"]: group for group in related["groups"]}
+        self.assertIn(str(delivery.pk), by_category["contracts"]["html"])
+        self.assertIn(str(supplier.pk), by_category["suppliers"]["html"])
+        self.assertIn(str(nsn.pk), by_category["nsns"]["html"])
+        self.assertNotIn(str(hidden_supplier.pk), by_category["suppliers"]["html"])
+        self.assertNotIn(str(hidden_nsn.pk), by_category["nsns"]["html"])
 
     @patch("core.views.render")
     def test_search_materializes_every_category_within_a_query_budget(self, render):
@@ -310,3 +360,34 @@ class GlobalSearchTests(TestCase):
             self.assertIn(f"{category}_total", context)
         # Guard against reintroducing per-category joins or N+1 lookups.
         self.assertLessEqual(len(captured.captured_queries), 25)
+        self.assertFalse(
+            [sql for sql in captured.captured_queries if "nomenclature" in sql["sql"]]
+        )
+        self.assertTrue(render.call_args.args[2]["load_related"])
+
+    @patch("core.views.render")
+    def test_complete_search_includes_related_without_a_second_request(self, render):
+        supplier = Supplier.objects.create(name="Acme Bearings")
+        nsn = Nsn.objects.create(nsn_code="5935-01-129-9512")
+        contract = Contract.objects.create(
+            company=self.company,
+            contract_number="SPE7M1-26-P-3001",
+        )
+        Clin.objects.create(
+            company=self.company,
+            contract=contract,
+            supplier=supplier,
+            nsn=nsn,
+        )
+        render.return_value = SimpleNamespace(status_code=200)
+
+        response = global_search(
+            self._request("Acme Bearings", extra={"complete": "1"})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        context = render.call_args.args[2]
+        self.assertFalse(context["load_related"])
+        self.assertEqual(context["suppliers"], [supplier])
+        self.assertEqual(context["contracts"], [contract])
+        self.assertEqual(context["nsns"], [nsn])
