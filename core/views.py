@@ -4,23 +4,39 @@ from dataclasses import dataclass
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
-from django.db.models import Case, IntegerField, Min, Prefetch, Q, Value, When
+from django.db.models import Case, IntegerField, Prefetch, Q, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET
 
 from core.health import run_readiness_check
-from contracts.models import Contract, IdiqContract
+from contracts.models import (
+    Clin,
+    Contract,
+    IdiqContract,
+    IdiqContractDetails,
+)
 from contracts.services.contract_number import normalize_contract_number
 from products.models import Nsn
 from products.nsn_utils import normalize_nsn, nsn_query_variants
 from products.views import _suppliers_matching_cage
-from sales.models import Solicitation, SolicitationLine
+from sales.models import Solicitation, SolicitationLine, SupplierMatch, SupplierRFQ
 from suppliers.models import Supplier
 
 _NO_STORE = {"Cache-Control": "no-store"}
 _SEARCH_RESULT_LIMIT = 10
 _CAGE_RE = re.compile(r"^[A-Za-z0-9]{5}$")
+_CONTRACT_SHAPE_RE = re.compile(
+    r"^[A-Za-z0-9]{6}[- ]?\d{2}[- ]?[A-Za-z][- ]?[A-Za-z0-9]{2,6}$"
+)
+# Shorter terms are matched exactly; `LIKE '%ab%'` scans are not worth running.
+_MIN_CONTAINS_LEN = 3
+# Smallest digit run worth probing the DIBBS NSN/NIIN columns with.
+_MIN_NSN_DIGITS = 7
+# Per-query cap on collected primary keys, kept well under the SQL Server
+# 2,100 parameter limit once several id sets are merged into one `pk__in`.
+_SOURCE_ID_LIMIT = 500
+_CATEGORY_ID_LIMIT = 1000
 
 
 @dataclass(frozen=True)
@@ -30,12 +46,43 @@ class _SearchTerms:
     nsn_variants: tuple[str, ...]
     normalized_nsn: str
     cage_supplier_ids: tuple[int, ...]
+    wants_text_scan: bool
+    is_nsn_shaped: bool
+
+
+@dataclass(frozen=True)
+class _MatchedIds:
+    """Primary keys matched directly on each model's own columns."""
+
+    contracts: set
+    idiqs: set
+    suppliers: set
+    nsns: set
+    solicitations: set
+
+
+def _wants_text_scan(query):
+    """Only word-shaped terms are worth scanning free-text columns for.
+
+    Contract numbers and NSNs never appear in item nomenclature, and that
+    column is the largest table in the search (one row per solicitation line).
+    """
+    if _CONTRACT_SHAPE_RE.fullmatch(query):
+        return False
+    digits = sum(character.isdigit() for character in query)
+    return digits * 2 < len(query)
+
+
+def _is_nsn_shaped(normalized_nsn):
+    """DIBBS NSN and NIIN columns only ever hold digit codes (9 or 13 long)."""
+    return len(normalized_nsn) >= _MIN_NSN_DIGITS and normalized_nsn.isdigit()
 
 
 def _build_search_terms(query):
     canonical_contract = normalize_contract_number(query) or query
     contract_candidates = tuple(dict.fromkeys((query, canonical_contract)))
     nsn_variants = tuple(nsn_query_variants(query))
+    normalized_nsn = normalize_nsn(query)
     cage_supplier_ids = ()
     if _CAGE_RE.fullmatch(query):
         cage_supplier_ids = tuple(
@@ -45,60 +92,86 @@ def _build_search_terms(query):
         query=query,
         contract_candidates=contract_candidates,
         nsn_variants=nsn_variants,
-        normalized_nsn=normalize_nsn(query),
+        normalized_nsn=normalized_nsn,
         cage_supplier_ids=cage_supplier_ids,
+        wants_text_scan=_wants_text_scan(query),
+        is_nsn_shaped=_is_nsn_shaped(normalized_nsn),
     )
 
 
-def _supplier_match_filter(terms, prefix=""):
-    query = terms.query
-    match_filter = (
-        Q(**{f"{prefix}name__icontains": query})
-        | Q(**{f"{prefix}aliases__name__icontains": query})
-        | Q(**{f"{prefix}cage_code__icontains": query})
-    )
-    if terms.cage_supplier_ids:
-        match_filter |= Q(**{f"{prefix}pk__in": terms.cage_supplier_ids})
-    return match_filter
+# Lookups below are deliberately case-sensitive Django lookups: SQL Server runs
+# a `CI_AS` collation and SQLite's LIKE is ASCII case-insensitive, so both stay
+# case-insensitive without the `UPPER()` wrapper that `icontains` adds — and
+# `UPPER()` makes every indexed column non-sargable.
+def _contains_q(field, value):
+    if len(value) < _MIN_CONTAINS_LEN:
+        return Q(**{f"{field}__exact": value})
+    return Q(**{f"{field}__contains": value})
 
 
-def _nsn_match_filter(terms, prefix=""):
-    match_filter = Q(**{f"{prefix}part_number__icontains": terms.query})
-    for variant in terms.nsn_variants:
-        match_filter |= Q(**{f"{prefix}nsn_code__icontains": variant})
-        normalized_variant = normalize_nsn(variant)
-        if normalized_variant:
-            match_filter |= Q(
-                **{f"{prefix}nsn_normalized__icontains": normalized_variant}
-            )
-    if len(terms.normalized_nsn) == 9 and terms.normalized_nsn.isdigit():
-        match_filter |= Q(
-            **{f"{prefix}nsn_normalized__endswith": terms.normalized_nsn}
-        )
-    return match_filter
+def _starts_q(field, value):
+    """Prefix match on an indexed column so SQL Server can seek it."""
+    if len(value) < _MIN_CONTAINS_LEN:
+        return Q(**{f"{field}__exact": value})
+    return Q(**{f"{field}__startswith": value})
 
 
-def _idiq_number_filter(terms, prefix=""):
-    match_filter = Q()
+def _ids(queryset, field="pk"):
+    return set(queryset.values_list(field, flat=True)[:_SOURCE_ID_LIMIT])
+
+
+def _quality_case(pairs):
+    """Rank rows exact, then starts-with, then contains, then related-only."""
+    whens = [When(**{f"{field}__exact": value}, then=Value(0)) for field, value in pairs]
+    whens += [
+        When(**{f"{field}__startswith": value}, then=Value(1))
+        for field, value in pairs
+    ]
+    whens += [
+        When(**{f"{field}__contains": value}, then=Value(2))
+        for field, value in pairs
+        if len(value) >= _MIN_CONTAINS_LEN
+    ]
+    return Case(*whens, default=Value(3), output_field=IntegerField())
+
+
+def _contract_number_filter(terms):
+    number_filter = Q()
     for candidate in terms.contract_candidates:
-        match_filter |= Q(**{f"{prefix}contract_number__icontains": candidate})
-    return match_filter
+        number_filter |= _contains_q("contract_number", candidate)
+    return number_filter
 
 
-def _solicitation_line_nsn_filter(terms, prefix="lines__"):
-    match_filter = Q()
+def _nsn_column_filter(terms):
+    nsn_filter = _contains_q("part_number", terms.query)
     for variant in terms.nsn_variants:
-        match_filter |= Q(**{f"{prefix}nsn__icontains": variant})
+        nsn_filter |= _contains_q("nsn_code", variant)
         normalized_variant = normalize_nsn(variant)
         if normalized_variant:
-            match_filter |= Q(
-                **{f"{prefix}nsn__icontains": normalized_variant}
-            )
+            nsn_filter |= _contains_q("nsn_normalized", normalized_variant)
     if len(terms.normalized_nsn) == 9 and terms.normalized_nsn.isdigit():
-        match_filter |= Q(
-            **{f"{prefix}niin__iexact": terms.normalized_nsn}
-        )
-    return match_filter
+        nsn_filter |= Q(nsn_normalized__endswith=terms.normalized_nsn)
+    return nsn_filter
+
+
+def _solicitation_line_filter(terms):
+    """Filter for the largest table in the search — one row per DIBBS line.
+
+    Only probe the NSN/NIIN columns with NSN-shaped terms and nomenclature with
+    word-shaped terms; anything else can never match and costs a full scan.
+    """
+    line_filter = Q()
+    if terms.is_nsn_shaped:
+        for variant in terms.nsn_variants:
+            line_filter |= _starts_q("nsn", variant)
+            normalized_variant = normalize_nsn(variant)
+            if normalized_variant:
+                line_filter |= _starts_q("nsn", normalized_variant)
+        if len(terms.normalized_nsn) == 9:
+            line_filter |= Q(niin__exact=terms.normalized_nsn)
+    if terms.wants_text_scan:
+        line_filter |= _contains_q("nomenclature", terms.query)
+    return line_filter
 
 
 @require_GET
@@ -123,159 +196,201 @@ def health_plain(request):
     return HttpResponse(body, content_type="text/plain", status=code, headers=_NO_STORE)
 
 
-def _contract_results(request, terms):
+def _direct_matches(terms, company):
+    """Match each model on its own columns only — no joins, no aggregation."""
+    number_filter = _contract_number_filter(terms)
+    suppliers = _ids(
+        Supplier.objects.filter(archived=False).filter(
+            _contains_q("name", terms.query) | _contains_q("cage_code", terms.query)
+        )
+    )
+    suppliers |= _ids(
+        Supplier.objects.filter(archived=False).filter(
+            _contains_q("aliases__name", terms.query)
+        )
+    )
+    suppliers.update(terms.cage_supplier_ids)
+
+    # Prefix match: `solicitation_number` is unique-indexed on a table with
+    # hundreds of thousands of rows, so a contains scan is not affordable.
+    solicitations = _ids(
+        Solicitation.objects.filter(_starts_q("solicitation_number", terms.query))
+    )
+    line_filter = _solicitation_line_filter(terms)
+    if line_filter:
+        solicitations |= _ids(
+            SolicitationLine.objects.filter(line_filter), "solicitation_id"
+        )
+
+    return _MatchedIds(
+        contracts=_ids(
+            Contract.objects.filter(company=company).filter(number_filter)
+        ),
+        idiqs=_ids(
+            IdiqContract.objects.filter(company=company).filter(number_filter)
+        ),
+        suppliers=suppliers,
+        nsns=_ids(Nsn.objects.filter(_nsn_column_filter(terms))),
+        solicitations=solicitations,
+    )
+
+
+def _clin_ids(company, row_filter, field):
+    return _ids(Clin.objects.filter(company=company).filter(row_filter), field)
+
+
+def _idiq_detail_ids(company, row_filter, field):
+    return _ids(
+        IdiqContractDetails.objects.filter(idiq_contract__company=company).filter(
+            row_filter
+        ),
+        field,
+    )
+
+
+def _related_contract_ids(direct, company):
+    ids = set()
+    clin_filter = Q()
+    if direct.suppliers:
+        clin_filter |= Q(supplier_id__in=direct.suppliers)
+    if direct.nsns:
+        clin_filter |= Q(nsn_id__in=direct.nsns)
+    if clin_filter:
+        ids |= _clin_ids(company, clin_filter, "contract_id")
+    if direct.idiqs:
+        ids |= _ids(
+            Contract.objects.filter(
+                company=company, idiq_contract_id__in=direct.idiqs
+            )
+        )
+    ids.discard(None)
+    return ids
+
+
+def _related_idiq_ids(direct, company):
+    detail_filter = Q()
+    if direct.suppliers:
+        detail_filter |= Q(supplier_id__in=direct.suppliers)
+    if direct.nsns:
+        detail_filter |= Q(nsn_id__in=direct.nsns)
+    if not detail_filter:
+        return set()
+    return _idiq_detail_ids(company, detail_filter, "idiq_contract_id")
+
+
+def _related_supplier_ids(direct, company):
+    ids = set()
+    if direct.nsns:
+        ids |= _clin_ids(company, Q(nsn_id__in=direct.nsns), "supplier_id")
+    if direct.idiqs:
+        ids |= _idiq_detail_ids(
+            company, Q(idiq_contract_id__in=direct.idiqs), "supplier_id"
+        )
+    if direct.solicitations:
+        line_filter = Q(line__solicitation_id__in=direct.solicitations)
+        ids |= _ids(SupplierMatch.objects.filter(line_filter), "supplier_id")
+        ids |= _ids(SupplierRFQ.objects.filter(line_filter), "supplier_id")
+    ids.discard(None)
+    return ids
+
+
+def _related_nsn_ids(direct, company):
+    ids = set()
+    if direct.suppliers:
+        ids |= _clin_ids(company, Q(supplier_id__in=direct.suppliers), "nsn_id")
+    if direct.idiqs:
+        ids |= _idiq_detail_ids(
+            company, Q(idiq_contract_id__in=direct.idiqs), "nsn_id"
+        )
+    ids.discard(None)
+    return ids
+
+
+def _related_solicitation_ids(direct):
+    if not direct.suppliers:
+        return set()
+    supplier_filter = Q(supplier_id__in=direct.suppliers)
+    ids = _ids(
+        SupplierMatch.objects.filter(supplier_filter), "line__solicitation_id"
+    )
+    ids |= _ids(SupplierRFQ.objects.filter(supplier_filter), "line__solicitation_id")
+    ids.discard(None)
+    return ids
+
+
+def _category_ids(direct_ids, related_ids):
+    """Direct matches first so truncation never drops them."""
+    ordered = list(direct_ids) + [pk for pk in related_ids if pk not in direct_ids]
+    return ordered[:_CATEGORY_ID_LIMIT]
+
+
+def _search_querysets(request, terms):
+    """Build one flat, index-friendly queryset per result group.
+
+    Relationships are resolved as primary-key lookups instead of OR'd joins:
+    a single `pk__in` filter keeps every group query free of the outer-join
+    fan-out and `GROUP BY` that made the previous version unusable.
+    """
     company = getattr(request, "active_company", None)
     if company is None:
         raise PermissionDenied("No active company set")
 
-    direct_filter = Q()
-    for candidate in terms.contract_candidates:
-        direct_filter |= Q(contract_number__icontains=candidate)
-    related_filter = (
-        _supplier_match_filter(terms, "clin__supplier__")
-        | _nsn_match_filter(terms, "clin__nsn__")
-        | (
-            _idiq_number_filter(terms, "idiq_contract__")
-            & Q(idiq_contract__company=company)
-        )
-    )
+    direct = _direct_matches(terms, company)
+    number_pairs = [
+        ("contract_number", candidate) for candidate in terms.contract_candidates
+    ]
+    nsn_pairs = [("nsn_code", variant) for variant in terms.nsn_variants]
+    if terms.normalized_nsn:
+        nsn_pairs.append(("nsn_normalized", terms.normalized_nsn))
+    nsn_pairs.append(("part_number", terms.query))
 
-    return (
-        Contract.objects.filter(company=company)
-        .filter(direct_filter | related_filter)
-        .annotate(
-            match_quality=Min(
-                Case(
-                    *[
-                        When(contract_number__iexact=candidate, then=Value(0))
-                        for candidate in terms.contract_candidates
-                    ],
-                    *[
-                        When(contract_number__istartswith=candidate, then=Value(1))
-                        for candidate in terms.contract_candidates
-                    ],
-                    When(direct_filter, then=Value(2)),
-                    default=Value(3),
-                    output_field=IntegerField(),
-                )
+    contracts = (
+        Contract.objects.filter(
+            pk__in=_category_ids(
+                direct.contracts, _related_contract_ids(direct, company)
             )
         )
+        .annotate(match_quality=_quality_case(number_pairs))
         .select_related("status")
         .order_by("match_quality", "contract_number", "pk")
     )
-
-
-def _supplier_results(terms, company):
-    query = terms.query
-    direct_filter = _supplier_match_filter(terms)
-    related_filter = (
-        (_nsn_match_filter(terms, "clin__nsn__") & Q(clin__company=company))
-        | _solicitation_line_nsn_filter(terms, "dibbs_matches__line__")
-        | _solicitation_line_nsn_filter(terms, "dibbs_rfqs__line__")
-        | Q(
-            dibbs_matches__line__solicitation__solicitation_number__icontains=query
+    idiqs = (
+        IdiqContract.objects.filter(
+            pk__in=_category_ids(direct.idiqs, _related_idiq_ids(direct, company))
         )
-        | Q(dibbs_rfqs__line__solicitation__solicitation_number__icontains=query)
-        | (
-            _idiq_number_filter(
-                terms, "idiqcontractdetails__idiq_contract__"
+        .annotate(match_quality=_quality_case(number_pairs))
+        .select_related("buyer")
+        .order_by("match_quality", "contract_number", "pk")
+    )
+    suppliers = (
+        Supplier.objects.filter(
+            pk__in=_category_ids(
+                direct.suppliers, _related_supplier_ids(direct, company)
             )
-            & Q(idiqcontractdetails__idiq_contract__company=company)
         )
-    )
-
-    quality = Case(
-        When(name__iexact=query, then=Value(0)),
-        When(aliases__name__iexact=query, then=Value(0)),
-        When(cage_code__iexact=query, then=Value(0)),
-        When(pk__in=terms.cage_supplier_ids, then=Value(0)),
-        When(name__istartswith=query, then=Value(1)),
-        When(aliases__name__istartswith=query, then=Value(1)),
-        When(cage_code__istartswith=query, then=Value(1)),
-        When(direct_filter, then=Value(2)),
-        default=Value(3),
-        output_field=IntegerField(),
-    )
-    return (
-        Supplier.objects.filter(archived=False)
-        .filter(direct_filter | related_filter)
-        .annotate(match_quality=Min(quality))
+        .annotate(
+            match_quality=_quality_case(
+                [("name", terms.query), ("cage_code", terms.query)]
+            )
+        )
         .order_by("match_quality", "name", "pk")
     )
-
-
-def _nsn_results(terms, company):
-    query = terms.query
-    direct_filter = _nsn_match_filter(terms)
-    related_filter = (
-        _supplier_match_filter(terms, "clin__supplier__")
-        & Q(clin__company=company)
-    ) | (
-        _idiq_number_filter(terms, "idiqcontractdetails__idiq_contract__")
-        & Q(idiqcontractdetails__idiq_contract__company=company)
-    )
-
-    exact_conditions = [
-        When(nsn_code__iexact=variant, then=Value(0))
-        for variant in terms.nsn_variants
-    ]
-    if terms.normalized_nsn:
-        exact_conditions.append(
-            When(nsn_normalized__iexact=terms.normalized_nsn, then=Value(0))
+    nsns = (
+        Nsn.objects.filter(
+            pk__in=_category_ids(direct.nsns, _related_nsn_ids(direct, company))
         )
-    exact_conditions.append(When(part_number__iexact=query, then=Value(0)))
-
-    starts_conditions = [
-        When(nsn_code__istartswith=variant, then=Value(1))
-        for variant in terms.nsn_variants
-    ]
-    if terms.normalized_nsn:
-        starts_conditions.append(
-            When(nsn_normalized__istartswith=terms.normalized_nsn, then=Value(1))
-        )
-    starts_conditions.append(When(part_number__istartswith=query, then=Value(1)))
-
-    return (
-        Nsn.objects.filter(direct_filter | related_filter)
-        .annotate(
-            match_quality=Min(
-                Case(
-                    *exact_conditions,
-                    *starts_conditions,
-                    When(direct_filter, then=Value(2)),
-                    default=Value(3),
-                    output_field=IntegerField(),
-                )
-            )
-        )
+        .annotate(match_quality=_quality_case(nsn_pairs))
         .order_by("match_quality", "nsn_code", "pk")
     )
-
-
-def _solicitation_results(terms):
-    query = terms.query
-    direct_filter = (
-        Q(solicitation_number__icontains=query)
-        | Q(lines__nomenclature__icontains=query)
-        | _solicitation_line_nsn_filter(terms)
-    )
-    related_filter = _supplier_match_filter(
-        terms, "lines__supplier_matches__supplier__"
-    ) | _supplier_match_filter(terms, "lines__rfqs__supplier__")
-    quality = Case(
-        When(solicitation_number__iexact=query, then=Value(0)),
-        When(lines__nomenclature__iexact=query, then=Value(0)),
-        When(lines__nsn__iexact=terms.normalized_nsn, then=Value(0)),
-        When(lines__niin__iexact=terms.normalized_nsn, then=Value(0)),
-        When(solicitation_number__istartswith=query, then=Value(1)),
-        When(lines__nomenclature__istartswith=query, then=Value(1)),
-        When(direct_filter, then=Value(2)),
-        default=Value(3),
-        output_field=IntegerField(),
-    )
-    return (
-        Solicitation.objects.filter(direct_filter | related_filter)
-        .annotate(match_quality=Min(quality))
+    solicitations = (
+        Solicitation.objects.filter(
+            pk__in=_category_ids(
+                direct.solicitations, _related_solicitation_ids(direct)
+            )
+        )
+        .annotate(
+            match_quality=_quality_case([("solicitation_number", terms.query)])
+        )
         .select_related("import_batch")
         .prefetch_related(
             Prefetch(
@@ -286,40 +401,13 @@ def _solicitation_results(terms):
         )
         .order_by("match_quality", "solicitation_number")
     )
-
-
-def _idiq_results(request, terms):
-    company = getattr(request, "active_company", None)
-    if company is None:
-        raise PermissionDenied("No active company set")
-
-    direct_filter = _idiq_number_filter(terms)
-    related_filter = _supplier_match_filter(
-        terms, "idiqcontractdetails__supplier__"
-    ) | _nsn_match_filter(terms, "idiqcontractdetails__nsn__")
-    return (
-        IdiqContract.objects.filter(company=company)
-        .filter(direct_filter | related_filter)
-        .annotate(
-            match_quality=Min(
-                Case(
-                    *[
-                        When(contract_number__iexact=candidate, then=Value(0))
-                        for candidate in terms.contract_candidates
-                    ],
-                    *[
-                        When(contract_number__istartswith=candidate, then=Value(1))
-                        for candidate in terms.contract_candidates
-                    ],
-                    When(direct_filter, then=Value(2)),
-                    default=Value(3),
-                    output_field=IntegerField(),
-                )
-            )
-        )
-        .select_related("buyer")
-        .order_by("match_quality", "contract_number", "pk")
-    )
+    return {
+        "contracts": contracts,
+        "idiqs": idiqs,
+        "suppliers": suppliers,
+        "nsns": nsns,
+        "solicitations": solicitations,
+    }
 
 
 def _materialize_category(queryset, selected_category, category, page_number):
@@ -339,70 +427,23 @@ def global_search(request):
     if not query:
         return redirect("index")
     terms = _build_search_terms(query)
-    company = getattr(request, "active_company", None)
-    if company is None:
-        raise PermissionDenied("No active company set")
+    querysets = _search_querysets(request, terms)
 
-    valid_categories = {"contracts", "idiqs", "suppliers", "nsns", "solicitations"}
     selected_category = (request.GET.get("category") or "").strip().lower()
-    if selected_category not in valid_categories:
+    if selected_category not in querysets:
         selected_category = ""
     page_number = request.GET.get("page", 1)
 
-    contracts_total, contracts, contracts_page = _materialize_category(
-        _contract_results(request, terms),
-        selected_category,
-        "contracts",
-        page_number,
-    )
-    idiqs_total, idiqs, idiqs_page = _materialize_category(
-        _idiq_results(request, terms),
-        selected_category,
-        "idiqs",
-        page_number,
-    )
-    suppliers_total, suppliers, suppliers_page = _materialize_category(
-        _supplier_results(terms, company),
-        selected_category,
-        "suppliers",
-        page_number,
-    )
-    nsns_total, nsns, nsns_page = _materialize_category(
-        _nsn_results(terms, company),
-        selected_category,
-        "nsns",
-        page_number,
-    )
-    solicitations_total, solicitations, solicitations_page = _materialize_category(
-        _solicitation_results(terms),
-        selected_category,
-        "solicitations",
-        page_number,
-    )
+    context = {"query": query, "selected_category": selected_category}
+    for category, queryset in querysets.items():
+        total, results, page = _materialize_category(
+            queryset, selected_category, category, page_number
+        )
+        context[category] = results
+        context[f"{category}_total"] = total
+        context[f"{category}_page"] = page
 
-    return render(
-        request,
-        "core/global_search_results.html",
-        {
-            "query": query,
-            "selected_category": selected_category,
-            "contracts": contracts,
-            "contracts_total": contracts_total,
-            "contracts_page": contracts_page,
-            "idiqs": idiqs,
-            "idiqs_total": idiqs_total,
-            "idiqs_page": idiqs_page,
-            "suppliers": suppliers,
-            "suppliers_total": suppliers_total,
-            "suppliers_page": suppliers_page,
-            "nsns": nsns,
-            "nsns_total": nsns_total,
-            "nsns_page": nsns_page,
-            "solicitations": solicitations,
-            "solicitations_total": solicitations_total,
-            "solicitations_page": solicitations_page,
-        },
-    )
+    return render(request, "core/global_search_results.html", context)
 
 
 from decimal import Decimal, InvalidOperation

@@ -9,6 +9,10 @@ Read `PROJECT_CONTEXT.md`, `core/CONTEXT_core.md`, `STATZWeb/settings.py`, and `
 - Reuse `normalize_contract_number()`, `nsn_query_variants()`, and `_suppliers_matching_cage()` from their owning apps.
 - Never use `SupplierNSNCapability` in global search.
 - Relational expansion uses `Clin` for Contract ↔ Supplier ↔ Nsn, `IdiqContractDetails` for IDIQ ↔ Supplier ↔ Nsn plus `Contract.idiq_contract` for delivery orders, and sales line matches/RFQs for Solicitation ↔ Supplier. Every `Clin` relationship lookup must filter `Clin.company=request.active_company`, even though Supplier and Nsn themselves are global. IDIQ detail hops must filter `IdiqContract.company=request.active_company`.
+- **Do not express relationships as OR'd joins in a group queryset.** Resolve them to primary keys first (`_direct_matches` → `_related_*_ids`) and filter the group with a single `pk__in`. The joined-OR version took over a minute in production; see the query-strategy section in `CONTEXT_core.md`.
+- **Do not use case-insensitive lookups (`icontains`, `istartswith`, `iexact`) in search filters or ordering.** They emit `UPPER()` on SQL Server and disable every index. Use `_contains_q` / `_starts_q` / plain `contains`, `startswith`, `exact`; the collation handles case.
+- Probe `SolicitationLine.nsn`/`niin` only when `terms.is_nsn_shaped` and `nomenclature` only when `terms.wants_text_scan`. It is the biggest table in the search and nomenclature matching is a full scan.
+- Keep the query count per search bounded; `core/tests.py` asserts an upper bound.
 - Keep SQL Server MARS disabled: finish `count()`/`list()` materialization for one queryset before querying another model.
 - Expanded categories use Django `Paginator`; do not add hand-rolled offsets.
 - Keep user input bounded and output encoded by Django templates.

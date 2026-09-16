@@ -17,6 +17,20 @@
 - `SupplierNSNCapability` is not a search source.
 - Querysets are materialized independently before the next model query to remain safe with SQL Server when MARS is disabled.
 
+## Global portal search query strategy
+The search runs in two passes, and the shape is load bearing: an earlier version OR'd every relationship into one filter per group and took over a minute in production.
+
+1. `_direct_matches()` matches each model on its **own columns only** and collects primary keys (capped at `_SOURCE_ID_LIMIT`).
+2. `_related_*_ids()` resolves relationships as `FK id__in <ids>` lookups against `Clin`, `IdiqContractDetails`, `SupplierMatch`, and `SupplierRFQ`.
+3. `_search_querysets()` returns one `pk__in` queryset per group (capped at `_CATEGORY_ID_LIMIT`, direct matches first), ordered by a `Case` over own columns.
+
+Rules that keep it fast:
+- **No joins or aggregates in the group querysets.** OR'd joins produce an outer-join fan-out that needs `GROUP BY`/`Min()` to dedupe, which is what made the page unusable.
+- **Never use `icontains`/`istartswith`/`iexact` here.** SQL Server wraps both sides in `UPPER()`, making every indexed column non-sargable. The database collation is `SQL_Latin1_General_CP1_CI_AS` and SQLite's `LIKE` is ASCII case-insensitive, so plain `contains`/`startswith`/`exact` are already case-insensitive.
+- `Solicitation.solicitation_number` is **prefix matched** (`_starts_q`) — it is a unique-indexed column on a table with hundreds of thousands of rows.
+- `SolicitationLine` is the largest table in the search. Only probe `nsn`/`niin` when `terms.is_nsn_shaped`, and `nomenclature` when `terms.wants_text_scan`. A nomenclature `contains` is an unavoidable full scan, so it must never run for contract-number, IDIQ-number, or NSN-shaped terms.
+- Keep `pk__in` sets under the SQL Server 2,100 parameter limit.
+
 ## DIBBS badge
 The site-wide badge is app-owned by sales: `sales.context_processors.dibbs_notice_count`. It returns zero without querying for anonymous users, calls `sales.services.dibbs_notices.get_recent_notice_count()`, and caches `sales:dibbs_notice_recent_count:v1` for 1,800 seconds.
 
