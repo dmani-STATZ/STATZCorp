@@ -7,9 +7,7 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
-from users.forms import PortalResourceForm, PortalSectionForm, WorkCalendarEventForm, WorkCalendarTaskForm
 from users.models import Announcement
-from users.portal_services import build_portal_context
 from users.sharepoint_services import sync_sharepoint_calendar_two_way
 from .system_test_utils import run_system_tests
 from .version_utils import get_version_info, get_display_version
@@ -21,29 +19,8 @@ def landing(request):
 
 
 def index(request):
-    """Main index page view."""
-    portal_context = build_portal_context(request.user)
-    announcement_qs = Announcement.objects.select_related('posted_by').order_by('-posted_at')[:10]
-    announcement_payload = [
-        {
-            'id': announcement.id,
-            'title': announcement.title,
-            'content': announcement.content,
-            'posted_at': announcement.posted_at.isoformat(),
-            'posted_by': announcement.posted_by.get_full_name() or announcement.posted_by.username,
-        }
-        for announcement in announcement_qs
-    ]
-    context = {
-        'announcements': announcement_qs,
-        'announcement_payload': announcement_payload,
-        'portal_context': portal_context,
-        'portal_section_form': PortalSectionForm(),
-        'portal_resource_form': PortalResourceForm(),
-        'portal_task_form': WorkCalendarTaskForm(),
-        'portal_event_form': WorkCalendarEventForm(),
-    }
-    return render(request, 'index.html', context)
+    """Render the authenticated search-and-favorites portal home."""
+    return render(request, 'index.html')
 
 
 def about(request):
@@ -106,10 +83,9 @@ def system_test_api(request):
 @require_http_methods(["POST"])
 def add_announcement(request):
     """Create a new announcement from portal form submissions."""
-    if not (request.user.is_staff or request.user.is_superuser):
+    if not request.user.has_perm('users.add_announcement'):
         return JsonResponse({'error': 'Permission denied.'}, status=403)
 
-    data = request.POST or request.body
     if request.content_type == 'application/json':
         try:
             import json
@@ -147,7 +123,7 @@ def add_announcement(request):
 @require_http_methods(["POST"])
 def delete_announcement(request, announcement_id):
     """Delete an existing announcement."""
-    if not (request.user.is_staff or request.user.is_superuser):
+    if not request.user.has_perm('users.delete_announcement'):
         return JsonResponse({'error': 'Permission denied.'}, status=403)
 
     announcement = get_object_or_404(Announcement, pk=announcement_id)

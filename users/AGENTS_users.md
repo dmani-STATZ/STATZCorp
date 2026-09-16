@@ -82,7 +82,9 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 **Business logic placement:** Services go in `portal_services.py` (portal domain), `azure_auth.py` (auth domain), or `user_settings.py` (settings domain). Do not add complex logic directly into views.
 
-**Templates:** Authentication templates are thin and use `base_no.html` (no nav). Portal UI is JavaScript-driven (JSON APIs); there are no large portal HTML templates to maintain.
+**Templates:** Authentication templates are thin and use `base_no.html` (no nav). Portal UI remains JSON-driven but now has dedicated `users/templates/users/portal_calendar.html`, `portal_resources.html`, and `portal_announcements.html` pages. The old `templates/index.html` anchor-scroll sections are retired.
+
+**Portal page URLs:** `users:portal_calendar` (`/users/portal/calendar/`), `users:portal_resources` (`/users/portal/resources/`), and `users:portal_announcements` (`/users/portal/announcements/`). Keep these login-required and preserve the existing portal APIs rather than duplicating their business logic in new views.
 
 **Admin:** `AppPermissionAdmin` is non-standard. It shows one row per user and uses a custom form that manages all app permissions at once. Any change to how permissions are stored must also update this admin.
 

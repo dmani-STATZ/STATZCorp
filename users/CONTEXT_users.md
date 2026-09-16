@@ -27,6 +27,12 @@ eady(), ensuring default settings/states are created on user creation.
 - portal_services.py: Serializes portal data for the dashboard (serialize_section, serialize_event, etc.) and selects the visible sections/events/tasks using the same models iews expose.
 - sharepoint_services.py: Client-credentials Graph API token acquisition and SharePoint calendar list sync logic. Uses GRAPH_MAIL_* and SHAREPOINT_* settings. Two SharePoint sites are in use: `SHAREPOINT_SITE_ID` targets the Statz site (contract document library); `SHAREPOINT_CALENDAR_SITE_ID` targets the Communication site (Events calendar list). Entry points: `sync_sharepoint_calendar()` (pull), `push_event_to_sharepoint()` / `delete_event_from_sharepoint()` (single-event push), `push_pending_events_to_sharepoint()` (backlog sweep), and `sync_sharepoint_calendar_two_way()` (pull + push, used by the WebJob and the "Sync SP" button).
 
+### Portal page ownership
+- `/users/portal/calendar/` (`portal_calendar`) renders `users/portal_calendar.html` with event create/edit/delete, recurrence, attachments, SharePoint two-way sync, natural-language scheduling, and micro-break controls.
+- `/users/portal/resources/` (`portal_resources`) renders `users/portal_resources.html` from `get_visible_sections()`. Preserve `PortalSection.is_visible_to()` and editor/staff permissions.
+- `/users/portal/announcements/` (`portal_announcements`) renders `users/portal_announcements.html`; it paginates at 20 rows and preserves `users.add_announcement` / `users.delete_announcement` gates.
+- The former anchor-scroll layout in `templates/index.html` is retired. `/home/` now links to these owned pages.
+
 ### SharePoint calendar sync — push direction (Django → SharePoint)
 - Portal-created events are mirrored into the SharePoint list. `portal_event_create` / `portal_event_update` / `portal_event_delete` call `schedule_event_push()` / `schedule_event_delete()`, which defer the Graph call to `transaction.on_commit` and **never raise into the request** — a Graph outage must not fail the user's save.
 - The link between the two systems is `WorkCalendarEvent.sharepoint_id`. No column is required on the SharePoint side to hold a Django id.
@@ -46,13 +52,13 @@ eady(), ensuring default settings/states are created on user creation.
 - All-day detection runs after timezone correction: corrected `start.time() == 00:00` with `start == end` sets `all_day=True` and applies the existing `timedelta(hours=24)` end workaround for `end_at > start_at` validation; two midnights with `end > start` preserves multi-day all-day spans.
 
 ### Sync Triggers
-- The calendar sync is driven by a scheduled WebJob; in-page auto-sync on index load has been removed.
-- A manual "Sync SP" button remains on the index page but is rendered only for superusers and the backend endpoint requires superuser permission. It hits `STATZWeb.views.sharepoint_sync_view` (URL name `sharepoint_sync`), which runs `sync_sharepoint_calendar_two_way()`.
+- The calendar sync is driven by a scheduled WebJob; in-page auto-sync on calendar load has been removed.
+- A manual "Sync SP" button remains on the dedicated calendar page but is rendered only for superusers and the backend endpoint requires superuser permission. It hits `STATZWeb.views.sharepoint_sync_view` (URL name `sharepoint_sync`), which runs `sync_sharepoint_calendar_two_way()`.
 - Regular users rely on the WebJob for calendar freshness; they cannot trigger a manual sync from the UI.
-- Pushes are **not** batched behind the WebJob: creating, editing, or deleting an event on the index page fires its own Graph call after commit, so SharePoint updates immediately. The WebJob's backlog sweep exists only to retry pushes that failed.
+- Pushes are **not** batched behind the WebJob: creating, editing, or deleting an event on the calendar page fires its own Graph call after commit, so SharePoint updates immediately. The WebJob's backlog sweep exists only to retry pushes that failed.
 
 ### Calendar UI — client-side date handling
-- `templates/index.html` derives every per-day key (event buckets, month-grid cell IDs, today-highlight, day-modal lookup) through `extractLocalDateParts` against `DISPLAY_TZ` (= Django `TIME_ZONE`). Buckets, cell IDs, and the time labels emitted by `formatEventTime` therefore all reference the same timezone regardless of the viewer's browser TZ.
+- `users/templates/users/portal_calendar.html` derives every per-day key (event buckets, month-grid cell IDs, today-highlight, day-modal lookup) through `extractLocalDateParts` against `DISPLAY_TZ` (= Django `TIME_ZONE`). Buckets, cell IDs, and the time labels emitted by `formatEventTime` therefore all reference the same timezone regardless of the viewer's browser TZ.
 - Rationale: when bucketing read calendar-day components via `Date.getFullYear/getMonth/getDate` (browser-local) while labels used `DISPLAY_TZ`, events near midnight dropped into the wrong cell — or silently disappeared — for anyone outside Central. The two sides of the join must derive keys through the same helper.
 - Multi-day iteration uses `addDaysToDateKey(key, n)` — pure integer arithmetic on `YYYY-MM-DD` strings via `Date.UTC` — so day-stepping never introduces a timezone reinterpretation. Do not replace with `setDate()` cursors.
 - Event end times are treated as exclusive in the client-side bucketing loop, per iCalendar convention. The loop subtracts 1 ms from `ev.end` before calling `extractLocalDateParts` to derive `endKey`, so all-day events stored as midnight-to-midnight render only on the intended days and not on the following day.

@@ -1,0 +1,190 @@
+{% extends "base_template.html" %}
+
+{% block title %}Resources — STATZ{% endblock %}
+
+{% block body %}
+<main class="portal-feature-page container-fluid py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <a href="{% url 'index' %}" class="btn btn-outline-brand btn-sm mb-2">← Back to portal home</a>
+            <h1 class="h3 mb-0">Resources</h1>
+        </div>
+        {% if user.is_superuser %}
+        <div class="d-flex gap-2">
+            <button id="adminToggleBtn" type="button" onclick="toggleAdminMode()" class="btn btn-outline-secondary btn-sm">Admin: OFF</button>
+            <button type="button" onclick="toggleNewSection()" class="admin-ui btn btn-primary btn-sm">New Section</button>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if user.is_superuser %}
+    <div id="newSectionForm" class="admin-ui d-none card mb-4">
+        <div class="card-body">
+            <form onsubmit="return addSection(event)">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="section-title">Title</label>
+                        <input id="section-title" name="title" class="form-control" maxlength="150" required>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label" for="section-description">Description</label>
+                        <input id="section-description" name="description" class="form-control">
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-success btn-sm">Create</button>
+                    <button type="button" onclick="toggleNewSection(false)" class="btn btn-secondary btn-sm">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4" id="portalSections">
+        {% for section in sections %}
+        <div class="col-md-6 col-xl-4">
+            <section class="card portal-resource-card h-100">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex align-items-start justify-content-between gap-2">
+                        <div>
+                            <h2 class="h5">{{ section.title }}</h2>
+                            {% if section.description %}<p class="text-body-secondary small">{{ section.description }}</p>{% endif %}
+                        </div>
+                        {% if user.is_superuser %}
+                        <button type="button" title="Delete section" onclick="deleteSection({{ section.id }})" class="admin-ui btn btn-outline-danger btn-sm">Delete</button>
+                        {% endif %}
+                    </div>
+
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for resource in section.resources %}
+                        <li class="list-group-item px-0 d-flex align-items-center justify-content-between gap-2">
+                            <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">{{ resource.title }}</a>
+                            {% if section.can_edit and user.is_superuser %}
+                            <button type="button" onclick="deleteResource({{ resource.id }})" class="admin-ui btn btn-outline-danger btn-sm">Remove</button>
+                            {% endif %}
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item px-0 text-body-secondary small">No resources yet.</li>
+                        {% endfor %}
+                    </ul>
+
+                    {% if section.can_edit and user.is_superuser %}
+                    <details class="admin-ui mt-auto">
+                        <summary class="portal-clickable small fw-semibold">Add link</summary>
+                        <form class="mt-2" onsubmit="return addLink(event, {{ section.id }})">
+                            {% csrf_token %}
+                            <input type="hidden" name="section" value="{{ section.id }}">
+                            <input type="hidden" name="resource_type" value="link">
+                            <div class="mb-2">
+                                <label class="form-label small" for="resource-title-{{ section.id }}">Link title</label>
+                                <input id="resource-title-{{ section.id }}" name="title" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small" for="resource-url-{{ section.id }}">URL</label>
+                                <input id="resource-url-{{ section.id }}" name="external_url" class="form-control form-control-sm" type="text" required>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm">Add Link</button>
+                        </form>
+                    </details>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+        {% empty %}
+        <div class="col-12"><div class="alert alert-secondary mb-0">No resource sections are available.</div></div>
+        {% endfor %}
+    </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    function setAdminMode(on) {
+        const button = document.getElementById('adminToggleBtn');
+        if (button) button.textContent = `Admin: ${on ? 'ON' : 'OFF'}`;
+        document.querySelectorAll('.admin-ui').forEach((element) => {
+            element.classList.toggle('d-none', !on);
+        });
+        localStorage.setItem('adminMode', on ? 'on' : 'off');
+    }
+
+    window.toggleAdminMode = function () {
+        setAdminMode((localStorage.getItem('adminMode') || 'off') !== 'on');
+    };
+
+    window.toggleNewSection = function (forceState) {
+        const form = document.getElementById('newSectionForm');
+        if (!form) return;
+        const show = typeof forceState === 'boolean'
+            ? forceState
+            : form.classList.contains('d-none');
+        form.classList.toggle('d-none', !show);
+    };
+
+    window.addSection = async function (event) {
+        event.preventDefault();
+        const form = event.target;
+        const payload = {
+            title: form.elements.title.value.trim(),
+            description: form.elements.description.value.trim()
+        };
+        if (!payload.title) return false;
+        const response = await fetch("{% url 'users:portal_sections_api' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify(payload)
+        });
+        if (response.ok) window.location.reload();
+        else alert('Could not create the resource section.');
+        return false;
+    };
+
+    window.deleteSection = async function (sectionId) {
+        if (!confirm('Delete this section and all of its resources?')) return;
+        const url = `{% url 'users:portal_section_delete' 0 %}`.replace('/0/', `/${sectionId}/`);
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'}
+        });
+        if (response.ok) window.location.reload();
+        else alert('Could not delete the resource section.');
+    };
+
+    window.addLink = async function (event, sectionId) {
+        event.preventDefault();
+        const data = new FormData(event.target);
+        data.set('section', sectionId);
+        data.set('resource_type', 'link');
+        const rawUrl = data.get('external_url');
+        if (typeof rawUrl === 'string' && rawUrl.startsWith('mailto:')) {
+            data.set('external_url', rawUrl.replace(/\s/g, '%20'));
+        }
+        const response = await fetch("{% url 'users:portal_resource_upsert' %}", {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'},
+            body: data
+        });
+        if (response.ok) window.location.reload();
+        else alert('Could not add the resource link.');
+        return false;
+    };
+
+    window.deleteResource = async function (resourceId) {
+        if (!confirm('Remove this resource?')) return;
+        const url = `{% url 'users:portal_resource_delete' 0 %}`.replace('/0/', `/${resourceId}/`);
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'}
+        });
+        if (response.ok) window.location.reload();
+        else alert('Could not remove the resource.');
+    };
+
+    {% if user.is_superuser %}
+    setAdminMode((localStorage.getItem('adminMode') || 'off') === 'on');
+    {% endif %}
+})();
+</script>
+{% endblock %}

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from urllib.parse import urljoin
 
 import requests
@@ -20,6 +20,12 @@ DIBBS_HOME = "https://www.dibbs.bsm.dla.mil/"
 REQUEST_TIMEOUT = 15
 _NOTICES_HEADING = re.compile(r"DIBBS\s+Notices", re.I)
 _DATE_PATTERN = re.compile(r"^\d{2}-\d{2}-\d{4}$")
+
+
+def get_recent_notice_count(as_of: date | None = None) -> int:
+    """Return the API-compatible count of notices posted in the last 7 days."""
+    cutoff = (as_of or date.today()) - timedelta(days=7)
+    return DibbsNotice.objects.filter(posted_date__gte=cutoff).count()
 
 
 def _find_notices_anchor(soup: BeautifulSoup) -> Tag | None:

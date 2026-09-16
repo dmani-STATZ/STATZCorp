@@ -16,7 +16,11 @@ def get_visible_sections(user):
     """
     Return portal sections visible to the current user with prefetched resources.
     """
-    sections = PortalSection.objects.prefetch_related('resources').filter(is_active=True).order_by('-is_pinned', 'order', 'title')
+    sections = (
+        PortalSection.objects.prefetch_related('resources', 'editors')
+        .filter(is_active=True)
+        .order_by('-is_pinned', 'order', 'title')
+    )
     if not user or not user.is_authenticated:
         return [s for s in sections if s.visibility == 'public']
     visible = []
@@ -44,7 +48,7 @@ def serialize_section(section, user=None):
     can_edit = False
     if user and user.is_authenticated:
         can_edit = (
-            section.editors.filter(pk=user.pk).exists()
+            any(editor.pk == user.pk for editor in section.editors.all())
             or user.is_staff
             or user.is_superuser
         )

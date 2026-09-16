@@ -12,6 +12,7 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 - `STATZWeb/settings.py` + `STATZWeb/urls.py` — global configuration and top-level URL routing
 - `STATZWeb/middleware.py` + `users/middleware.py` — login enforcement, active-company injection
 - `templates/base_template.html` — shared nav, CSS/JS, company selector; treat as a shared contract across all apps
+- `/` (`landing`) remains the public compliance page; `/home/` (`index`) is the authenticated search-and-favorites portal home. Its global search submits to `core:global_search`; calendar, resources, announcements, and DIBBS notices are dedicated pages rather than in-page anchors.
 
 ---
 
@@ -231,7 +232,9 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 
 **URL prefix:** `/sales/`
 
-**URL surface (portal):** `/sales/dibbs-notices/api/` — JSON feed of DIBBS public notices for the portal home page; returns up to 30 notices and a `recent_count` of notices posted within the last 7 days.
+**URL surface (portal):**
+- `/sales/dibbs-notices/` (`sales:dibbs_notices`) — dedicated DIBBS public-notices page.
+- `/sales/dibbs-notices/api/` — JSON feed used by that page; returns up to 30 notices and a `recent_count` of notices posted within the last 7 days.
 
 **Critical notes:**
 - Three match tiers: T1 (`dibbs_supplier_nsn_scored` view — indexed `match_count` column, refreshed nightly), T2 (approved sources from `tbl_ApprovedSource`), T3 (FSC match).
@@ -270,6 +273,13 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 
 **URL prefix:** `/users/`
 
+**Portal pages:**
+- `/users/portal/calendar/` (`users:portal_calendar`) — full calendar, event CRUD, SharePoint sync, NLP scheduling, and micro-breaks.
+- `/users/portal/resources/` (`users:portal_resources`) — visibility-filtered `PortalSection`/`PortalResource` grid and superuser management.
+- `/users/portal/announcements/` (`users:portal_announcements`) — paginated announcement archive and permission-gated add/delete actions.
+
+The former `templates/index.html` anchor-scroll portal is retired; these pages own the relocated features.
+
 #### Release Notes & Acknowledgement
 
 Author-written release notes live in `release_notes/*.md` as YAML-frontmatter +
@@ -296,6 +306,15 @@ File format and validation rules are in `release_notes/README-rn.md`.
 - **Context Processor (`STATZWeb/context_processors.py`):** `version_context` now injects `session_cookie_age` for authenticated users
 - **Template Integration (`base_template.html`):** Injects `window.STATZ_SESSION_MAX_AGE`, `STATZ_KEEPALIVE_URL`, `STATZ_LOGIN_URL`, `STATZ_LOGOUT_URL`, and `STATZ_CSRF_TOKEN` for authenticated users
 - **Message Polling:** The unread message poller in `base_template.html` now checks `window.sessionTimeout.isUserActive()` and pauses automatically after 15 minutes of inactivity
+
+---
+
+### `core` — Cross-Cutting Infrastructure
+**Purpose:** Neutral shared infrastructure, scheduled-task orchestration, API budget tracking, and cross-model portal search.
+
+**Global search:** `/core/search/` (`core:global_search`) searches four independently materialized querysets. `Contract` is always filtered by `request.active_company`; active `Supplier`, canonical `Nsn`, and `Solicitation` are global because those models have no company FK. Contract normalization comes from `contracts.services.contract_number.normalize_contract_number`, NSN variants from `products.nsn_utils.nsn_query_variants`, and CAGE supplier matching from `products.views._suppliers_matching_cage`. `SupplierNSNCapability` is not a search source.
+
+**Global badge:** `sales.context_processors.dibbs_notice_count` exposes `dibbs_notice_recent_count` for authenticated templates. It reuses `sales.services.dibbs_notices.get_recent_notice_count` (the API's query) and caches key `sales:dibbs_notice_recent_count:v1` for 30 minutes.
 
 ---
 

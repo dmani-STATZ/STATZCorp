@@ -1,0 +1,88 @@
+{% extends "base_template.html" %}
+
+{% block title %}DIBBS Notices — STATZ{% endblock %}
+
+{% block body %}
+<main class="portal-feature-page container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <a href="{% url 'index' %}" class="btn btn-outline-brand btn-sm mb-2">← Back to portal home</a>
+            <div class="d-flex align-items-center gap-2">
+                <span aria-hidden="true">🛡️</span>
+                <h1 class="h3 mb-0">DIBBS Notices</h1>
+                {% if dibbs_notice_recent_count %}
+                <span class="badge bg-warning text-dark">{{ dibbs_notice_recent_count }} recent</span>
+                {% endif %}
+            </div>
+            <p class="text-body-secondary mt-2 mb-0">Public DLA cybersecurity, CMMC, and procurement policy notices. Updated daily.</p>
+        </div>
+        <a href="https://www.dibbs.bsm.dla.mil" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">
+            Open DIBBS ↗
+        </a>
+    </div>
+
+    <section class="card">
+        <div id="dibbs-notices-list" class="list-group list-group-flush" aria-live="polite">
+            <p class="text-body-secondary fst-italic p-3 mb-0">Loading notices…</p>
+        </div>
+    </section>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async function () {
+    const container = document.getElementById('dibbs-notices-list');
+    try {
+        const response = await fetch("{% url 'sales:dibbs_notices_api' %}", {
+            headers: {'Accept': 'application/json'}
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        container.replaceChildren();
+
+        if (!Array.isArray(data.notices) || data.notices.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'text-body-secondary p-3 mb-0';
+            empty.textContent = 'No notices found.';
+            container.appendChild(empty);
+            return;
+        }
+
+        const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        data.notices.forEach((notice) => {
+            const row = document.createElement('div');
+            row.className = 'list-group-item d-flex align-items-start gap-3 py-3';
+
+            const isRecent = new Date(`${notice.posted_date}T00:00:00`).getTime() >= cutoff;
+            const badge = document.createElement('span');
+            badge.className = isRecent
+                ? 'badge bg-warning text-dark flex-shrink-0'
+                : 'portal-dibbs-badge-spacer flex-shrink-0';
+            if (isRecent) badge.textContent = 'NEW';
+            row.appendChild(badge);
+
+            const link = document.createElement('a');
+            link.href = notice.external_url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.className = 'text-decoration-none flex-grow-1';
+            link.textContent = notice.title;
+            row.appendChild(link);
+
+            const date = document.createElement('span');
+            date.className = 'small text-body-secondary flex-shrink-0';
+            date.textContent = notice.posted_date;
+            row.appendChild(date);
+            container.appendChild(row);
+        });
+    } catch (error) {
+        const message = document.createElement('p');
+        message.className = 'text-danger p-3 mb-0';
+        message.textContent = 'Could not load DIBBS notices.';
+        container.replaceChildren(message);
+        console.warn('DIBBS notices load failed:', error);
+    }
+});
+</script>
+{% endblock %}

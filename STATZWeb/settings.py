@@ -175,6 +175,7 @@ TEMPLATES = [
                 "STATZWeb.context_processors.cache_version_context",
                 "sales.context_processors.rfq_counts",
                 "sales.context_processors.solicitation_nav_tools",
+                "sales.context_processors.dibbs_notice_count",
                 "users.context_processors.release_notes_context",
                 "core.context_processors.api_budget",
             ],

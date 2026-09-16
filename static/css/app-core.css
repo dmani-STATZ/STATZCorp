@@ -2467,3 +2467,308 @@ main {
 .supplier-section-anchor {
   scroll-margin-top: 72px;
 }
+
+/* ===== Portal home, launcher, and owned portal pages ===== */
+#header .portal-launcher-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bs-white);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+#header .portal-launcher-btn:hover,
+#header .portal-launcher-btn:focus-visible,
+#header .portal-launcher-btn[aria-expanded="true"] {
+  color: var(--bs-white);
+  background: rgba(255, 255, 255, 0.22);
+  border-color: var(--bs-white);
+}
+
+#header .portal-launcher-btn .bi {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+#header .portal-launcher-menu {
+  min-width: 14rem;
+}
+
+#header .portal-launcher-menu .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-block: 0.6rem;
+}
+
+#header .portal-launcher-menu .dropdown-item .bi {
+  display: inline-block;
+  width: 1.25rem;
+  color: var(--company-primary);
+}
+
+.portal-home {
+  min-height: calc(100vh - var(--header-height) - 1rem);
+}
+
+.portal-home-hero {
+  max-width: 48rem;
+  padding-top: clamp(2rem, 10vh, 7rem);
+}
+
+.portal-home-logo {
+  display: block;
+  width: min(22rem, 72vw);
+  max-height: 8rem;
+  margin-inline: auto;
+  object-fit: contain;
+}
+
+.portal-search-box {
+  border-radius: 999px;
+  box-shadow: var(--bs-box-shadow-sm);
+}
+
+.portal-search-box > :first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.portal-search-box > :last-child {
+  border-radius: 0 999px 999px 0;
+}
+
+.portal-favorites {
+  max-width: 44rem;
+  margin-inline: auto;
+}
+
+.portal-favorite-tile {
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 8.5rem;
+  padding: 1.25rem 0.75rem;
+  color: var(--bs-body-color);
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.portal-favorite-tile:hover,
+.portal-favorite-tile:focus-visible {
+  color: var(--company-primary);
+  border-color: var(--company-primary);
+  box-shadow: var(--bs-box-shadow);
+  transform: translateY(-2px);
+}
+
+.portal-favorite-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  font-size: 1.4rem;
+  color: var(--company-primary);
+  background: color-mix(in srgb, var(--company-primary) 10%, var(--bs-body-bg));
+}
+
+.portal-budget-card {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.global-search-shell {
+  max-width: 58rem;
+  margin-inline: auto;
+}
+
+.global-search-form {
+  max-width: 48rem;
+}
+
+.global-result-group {
+  overflow: hidden;
+  border: var(--bs-border-width) solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--bs-body-bg);
+  box-shadow: var(--bs-box-shadow-sm);
+}
+
+.global-result-group__header,
+.global-result-group__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bs-tertiary-bg);
+}
+
+.global-result-group__footer {
+  justify-content: center;
+  border-top: var(--bs-border-width) solid var(--bs-border-color);
+}
+
+.global-search-empty {
+  border: var(--bs-border-width) dashed var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+}
+
+.portal-feature-page {
+  max-width: 96rem;
+}
+
+.portal-resource-card,
+.portal-announcement-card {
+  box-shadow: var(--bs-box-shadow-sm);
+}
+
+.portal-clickable {
+  cursor: pointer;
+}
+
+.portal-dibbs-badge-spacer {
+  width: 2.6rem;
+}
+
+.portal-calendar-card {
+  overflow-x: auto;
+}
+
+.portal-calendar-month {
+  min-width: 10rem;
+}
+
+.portal-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(7.5rem, 1fr));
+  gap: 0.5rem;
+  min-width: 58rem;
+}
+
+.portal-calendar-cell {
+  min-height: 7rem;
+  overflow: hidden;
+}
+
+.portal-calendar-counts,
+.portal-text-xs {
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
+
+.portal-event-chip {
+  display: block;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid transparent;
+}
+
+.portal-event-start {
+  border-radius: var(--bs-border-radius) 0 0 var(--bs-border-radius);
+}
+
+.portal-event-end {
+  border-radius: 0 var(--bs-border-radius) var(--bs-border-radius) 0;
+}
+
+.portal-event-blue {
+  color: var(--bs-primary-text-emphasis);
+  background: var(--bs-primary-bg-subtle);
+}
+
+.portal-event-purple {
+  color: var(--bs-info-text-emphasis);
+  background: var(--bs-info-bg-subtle);
+}
+
+.portal-event-yellow {
+  color: var(--bs-warning-text-emphasis);
+  background: var(--bs-warning-bg-subtle);
+}
+
+.portal-event-lime {
+  color: var(--bs-success-text-emphasis);
+  background: var(--bs-success-bg-subtle);
+}
+
+.portal-event-pink {
+  color: var(--bs-danger-text-emphasis);
+  background: var(--bs-danger-bg-subtle);
+}
+
+.portal-event-gray {
+  color: var(--bs-secondary-text-emphasis);
+  background: var(--bs-secondary-bg-subtle);
+}
+
+.portal-recurrence-interval {
+  width: 5rem;
+}
+
+.portal-attachment-title {
+  max-width: 10rem;
+}
+
+.portal-modal-overlay {
+  position: fixed;
+  inset: var(--header-height) 0 0;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.portal-modal-overlay.d-none {
+  display: none;
+}
+
+.portal-modal-dialog {
+  width: min(100%, 32rem);
+  max-height: calc(100vh - var(--header-height) - 2rem);
+  overflow-y: auto;
+  box-shadow: var(--bs-box-shadow-lg);
+}
+
+.portal-modal-dialog-lg {
+  width: min(100%, 42rem);
+}
+
+.portal-day-events-list {
+  max-height: 24rem;
+}
+
+.portal-calendar-toast {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1080;
+  max-width: 24rem;
+}
+
+@media (max-width: 767.98px) {
+  #header .portal-launcher-menu {
+    min-width: 12rem;
+  }
+
+  .portal-home-hero {
+    padding-top: 2rem;
+  }
+
+  .portal-search-box {
+    border-radius: var(--bs-border-radius-lg);
+  }
+
+  .portal-search-box > :first-child {
+    border-radius: var(--bs-border-radius-lg) 0 0 var(--bs-border-radius-lg);
+  }
+
+  .portal-search-box > :last-child {
+    border-radius: 0 var(--bs-border-radius-lg) var(--bs-border-radius-lg) 0;
+  }
+}

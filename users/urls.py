@@ -53,6 +53,11 @@ urlpatterns = [
     path('session/keep-alive/', views.SessionKeepAliveView.as_view(), name='session-keep-alive'),
     path('release-notes/acknowledge/', views.acknowledge_release_notes, name='release_notes_acknowledge'),
 
+    # Portal pages
+    path('portal/calendar/', views.portal_calendar_page, name='portal_calendar'),
+    path('portal/resources/', views.portal_resources_page, name='portal_resources'),
+    path('portal/announcements/', views.portal_announcements_page, name='portal_announcements'),
+
     # Portal APIs
     path('portal/dashboard/', views.portal_dashboard_data, name='portal_dashboard_data'),
     path('portal/sections/', views.portal_sections_api, name='portal_sections_api'),

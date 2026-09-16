@@ -160,6 +160,37 @@
         </div>
 
         <div class="d-flex align-items-center gap-3 flex-shrink-0">
+            {% if user.is_authenticated %}
+            <div class="dropdown">
+                <button
+                    id="portal-app-launcher"
+                    class="portal-launcher-btn btn btn-sm rounded-circle position-relative"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="Open portal apps"
+                    title="Portal apps"
+                >
+                    <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark {% if not dibbs_notice_recent_count %}d-none{% endif %}">
+                        {{ dibbs_notice_recent_count }}
+                        <span class="visually-hidden">recent DIBBS notices</span>
+                    </span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end portal-launcher-menu" aria-labelledby="portal-app-launcher">
+                    <li><h2 class="dropdown-header">Favorites</h2></li>
+                    <li><a class="dropdown-item" href="{% url 'users:portal_calendar' %}"><i class="bi bi-calendar3" aria-hidden="true"></i><span>Calendar</span></a></li>
+                    <li><a class="dropdown-item" href="{% url 'users:portal_resources' %}"><i class="bi bi-folder2-open" aria-hidden="true"></i><span>Resources</span></a></li>
+                    <li><a class="dropdown-item" href="{% url 'users:portal_announcements' %}"><i class="bi bi-megaphone" aria-hidden="true"></i><span>Announcements</span></a></li>
+                    <li>
+                        <a class="dropdown-item d-flex justify-content-between" href="{% url 'sales:dibbs_notices' %}">
+                            <span><i class="bi bi-shield-check" aria-hidden="true"></i><span>DIBBS Notices</span></span>
+                            {% if dibbs_notice_recent_count %}<span class="badge bg-warning text-dark">{{ dibbs_notice_recent_count }}</span>{% endif %}
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            {% endif %}
             <button id="theme-toggle" class="btn btn-outline-secondary btn-sm p-1 ms-2" title="Toggle dark mode">
                 <svg id="theme-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     {% if user_preferences.theme == 'dark' %}

@@ -1,0 +1,15 @@
+{% if page_obj %}
+<nav class="global-result-group__footer" aria-label="{{ category|title }} result pages">
+    {% if page_obj.has_previous %}
+    <a href="?q={{ query|urlencode }}&category={{ category }}&page={{ page_obj.previous_page_number }}">← Previous</a>
+    {% endif %}
+    <span class="small text-body-secondary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?q={{ query|urlencode }}&category={{ category }}&page={{ page_obj.next_page_number }}">Next →</a>
+    {% endif %}
+</nav>
+{% elif total > 10 %}
+<div class="global-result-group__footer">
+    <a href="?q={{ query|urlencode }}&category={{ category }}">View all {{ total }} results</a>
+</div>
+{% endif %}

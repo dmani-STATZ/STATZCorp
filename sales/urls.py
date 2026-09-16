@@ -116,6 +116,7 @@ from .views import (
     competitor_watchlist_refetch_name,
     competitor_supplier_intel,
     dibbs_notices_api,
+    dibbs_notices_page,
 )
 from .views import awards
 
@@ -308,6 +309,7 @@ urlpatterns = [
         competitor_supplier_intel,
         name="competitor_supplier_intel",
     ),
+    path("dibbs-notices/", dibbs_notices_page, name="dibbs_notices"),
     path("dibbs-notices/api/", dibbs_notices_api, name="dibbs_notices_api"),
     path(
         "contract-mods/<int:pk>/acknowledge/",

@@ -57,6 +57,7 @@ from django.views.generic import ListView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.forms import AuthenticationForm
 from django.conf import settings
+from django.core.paginator import Paginator
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db import transaction
@@ -866,6 +867,42 @@ def oauth_password_set_view(request):
 # ---------------------------------------------------------------------------
 # Portal dashboard APIs
 # ---------------------------------------------------------------------------
+
+
+@login_required
+@require_http_methods(["GET"])
+def portal_calendar_page(request):
+    """Render the full portal calendar workspace."""
+    return render(request, "users/portal_calendar.html")
+
+
+@login_required
+@require_http_methods(["GET"])
+def portal_resources_page(request):
+    """Render portal resources using the established visibility rules."""
+    sections = get_visible_sections(request.user)
+    return render(
+        request,
+        "users/portal_resources.html",
+        {
+            "sections": [
+                serialize_section(section, user=request.user) for section in sections
+            ]
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def portal_announcements_page(request):
+    """Render the complete announcement archive, newest first."""
+    queryset = Announcement.objects.select_related("posted_by").order_by("-posted_at")
+    page_obj = Paginator(queryset, 20).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "users/portal_announcements.html",
+        {"announcements": page_obj.object_list, "page_obj": page_obj},
+    )
 
 
 @login_required
