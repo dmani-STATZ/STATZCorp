@@ -43,7 +43,7 @@ dict(
 
 **`key` is permanent.** It's what the gallery uses to remember who solved what. Change a key and everyone loses that piece from their collection. Change the `name`, the `grid`, even the `tier` freely — never the `key`.
 
-Sizes: **5×5** (easy), **10×10** (medium), **15×15** (hard). Stick to these three.
+Sizes: **10×10** (easy/medium) and **15×15** (hard). **10×10 is the minimum** — no new 5×5 art; a 5×5 grid is too small to read as a picture and solves in under a minute. `easy` vs `medium` at 10×10 is about how simple the silhouette is.
 
 ---
 
@@ -87,7 +87,7 @@ Output looks like:
 ```
 Coffee Mug     10x10   34% fill   line-solvable   4 passes   OK
 Wrench         15x15   25% fill   needs 1 seed               SEEDS
-Checkmark       5x5    28% fill   needs 2 seeds              SEEDS
+Checkmark      10x10   28% fill   needs 2 seeds              SEEDS
 Blobbo         10x10   71% fill   line-solvable   3 passes   WARN: fill > 65%
 Broken          9x10    -         -                          FAIL: rows not uniform length
 ```

@@ -79,60 +79,77 @@ class SelectionTestCase(SimpleTestCase):
 class MoveAndScoreTestCase(SimpleTestCase):
     def setUp(self):
         self.game = NonogramGame()
-        # Use Plus — simple 5x5, no seeds.
+        # Use Plus — simple centred cross, no seeds.
         self.puzzle = self.game.generate(date(2026, 1, 2))
         # Force known art for deterministic cells if needed
         from arcade.puzzles.art_pack import PACK_BY_KEY as P
 
         self.plus = P["plus"]
+        grid = self.plus["grid"]
         self.puzzle = {
             **self.puzzle,
             "art_key": "plus",
-            "grid": self.plus["grid"],
+            "grid": grid,
             "seeds": {},
             "name": "Plus",
-            "nrows": 5,
-            "ncols": 5,
+            "nrows": len(grid),
+            "ncols": len(grid[0]),
         }
+        # Derive cells from the art so redrawing/resizing it cannot break these tests.
+        self.filled_cell = next(
+            (r, c)
+            for r, row in enumerate(grid)
+            for c, ch in enumerate(row)
+            if ch == "#"
+        )
+        self.empty_cell = next(
+            (r, c)
+            for r, row in enumerate(grid)
+            for c, ch in enumerate(row)
+            if ch == "."
+        )
         self.state = self.game.initial_state(self.puzzle)
 
     def test_correct_fill(self):
-        # Plus has center cross — (0,2) is filled
+        row, col = self.filled_cell
         state = self.game.apply_move(
-            self.puzzle, self.state, {"action": "fill", "row": 0, "col": 2}
+            self.puzzle, self.state, {"action": "fill", "row": row, "col": col}
         )
         self.assertEqual(state["last_result"], "correct")
         self.assertEqual(state["mistakes"], 0)
-        self.assertIn([0, 2], state["filled"])
+        self.assertIn([row, col], state["filled"])
 
     def test_wrong_fill_auto_marks(self):
+        row, col = self.empty_cell
         state = self.game.apply_move(
-            self.puzzle, self.state, {"action": "fill", "row": 0, "col": 0}
+            self.puzzle, self.state, {"action": "fill", "row": row, "col": col}
         )
         self.assertEqual(state["last_result"], "mistake")
         self.assertEqual(state["mistakes"], 1)
-        self.assertIn([0, 0], state["marked"])
+        self.assertIn([row, col], state["marked"])
 
     def test_refill_already_filled_no_op(self):
+        row, col = self.filled_cell
         state = self.game.apply_move(
-            self.puzzle, self.state, {"action": "fill", "row": 0, "col": 2}
+            self.puzzle, self.state, {"action": "fill", "row": row, "col": col}
         )
         with self.assertRaises(MoveRejected) as ctx:
             self.game.apply_move(
-                self.puzzle, state, {"action": "fill", "row": 0, "col": 2}
+                self.puzzle, state, {"action": "fill", "row": row, "col": col}
             )
         self.assertEqual(ctx.exception.reason, "already_filled")
         self.assertEqual(state["mistakes"], 0)
         self.assertEqual(len(state["filled"]), 1)
 
     def test_fill_already_marked_no_mistake(self):
+        row, col = self.empty_cell
         state = self.game.apply_move(
-            self.puzzle, self.state, {"action": "mark", "row": 0, "col": 0}
+            self.puzzle, self.state, {"action": "mark", "row": row, "col": col}
         )
         mistakes = state["mistakes"]
         with self.assertRaises(MoveRejected) as ctx:
             self.game.apply_move(
-                self.puzzle, state, {"action": "fill", "row": 0, "col": 0}
+                self.puzzle, state, {"action": "fill", "row": row, "col": col}
             )
         self.assertEqual(ctx.exception.reason, "already_marked")
         self.assertEqual(state["mistakes"], mistakes)
@@ -173,7 +190,7 @@ class MoveAndScoreTestCase(SimpleTestCase):
     def test_payload_redaction(self):
         state = self.state
         # Several moves while in progress
-        for r, c in [(0, 0), (0, 2), (1, 2)]:
+        for r, c in [self.empty_cell, self.filled_cell]:
             try:
                 state = self.game.apply_move(
                     self.puzzle, state, {"action": "fill", "row": r, "col": c}

@@ -3,7 +3,7 @@
 ## 1. Purpose & Scope
 The `arcade` app is a hidden daily-puzzle arcade hosted within STATZWeb. It features a lobby shell, shared per-day deterministic puzzles, server-authoritative grading, leaderboard standings, and player handicap tracking.
 
-Playable games: **Lights Out** (5×5), **Wordle** (5 letters / 6 guesses), **Nonogram** (authored picture logic, 5×5 / 10×10 / 15×15), and **Backyard Marauder** (real-time shooter, not a daily puzzle).
+Playable games: **Lights Out** (5×5), **Wordle** (5 letters / 6 guesses), **Nonogram** (authored picture logic, 10×10 / 15×15), and **Backyard Marauder** (real-time shooter, not a daily puzzle).
 
 ---
 

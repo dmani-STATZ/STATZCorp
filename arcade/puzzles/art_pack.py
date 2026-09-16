@@ -9,6 +9,7 @@ Each entry: key, name, size, tier, passes, seeds, grid.
 AUTHORING RULES (derived empirically - see CONTEXT_arcade.md):
   * Fill ratio 35-55% is the sweet spot. Below ~30% tends to be
     ambiguous (needs seeds); above ~65% renders as an unreadable blob.
+  * Minimum size is 10x10 (enforced at import). 10x10 or 15x15 only.
   * Every piece MUST pass verify_art_pack before merge.
   * Random/procedural grids are NOT viable: at 15x15/45% density only
     ~6% of random grids are line-solvable, vs ~100% of authored art.
@@ -16,101 +17,161 @@ AUTHORING RULES (derived empirically - see CONTEXT_arcade.md):
 from django.core.exceptions import ImproperlyConfigured
 
 ART_PACK = [
-    # Heart - 5x5, 64% fill, 3 passes
-    dict(key='heart', name='Heart', size=5, tier='easy', passes=3, seeds={}, grid=[
-        '.#.#.',
-        '#####',
-        '#####',
-        '.###.',
-        '..#..',
+    # Heart - 10x10, 52% fill, 4 passes
+    dict(key='heart', name='Heart', size=10, tier='easy', passes=4, seeds={}, grid=[
+        '..........',
+        '.##....##.',
+        '####..####',
+        '##########',
+        '##########',
+        '.########.',
+        '..######..',
+        '...####...',
+        '....##....',
+        '..........',
     ]),
-    # Plus - 5x5, 36% fill, 2 passes
-    dict(key='plus', name='Plus', size=5, tier='easy', passes=2, seeds={}, grid=[
-        '..#..',
-        '..#..',
-        '#####',
-        '..#..',
-        '..#..',
+    # Plus - 10x10, 36% fill, 2 passes
+    dict(key='plus', name='Plus', size=10, tier='easy', passes=2, seeds={}, grid=[
+        '....##....',
+        '....##....',
+        '....##....',
+        '....##....',
+        '##########',
+        '##########',
+        '....##....',
+        '....##....',
+        '....##....',
+        '....##....',
     ]),
-    # Diamond - 5x5, 52% fill, 3 passes
-    dict(key='diamond', name='Diamond', size=5, tier='easy', passes=3, seeds={}, grid=[
-        '..#..',
-        '.###.',
-        '#####',
-        '.###.',
-        '..#..',
+    # Diamond - 10x10, 40% fill, 4 passes
+    dict(key='diamond', name='Diamond', size=10, tier='easy', passes=4, seeds={}, grid=[
+        '..........',
+        '....##....',
+        '...####...',
+        '..######..',
+        '.########.',
+        '.########.',
+        '..######..',
+        '...####...',
+        '....##....',
+        '..........',
     ]),
-    # Arrow Up - 5x5, 44% fill, 3 passes
-    dict(key='arrow-up', name='Arrow Up', size=5, tier='easy', passes=3, seeds={}, grid=[
-        '..#..',
-        '.###.',
-        '#####',
-        '..#..',
-        '..#..',
+    # Arrow Up - 10x10, 40% fill, 3 passes
+    dict(key='arrow-up', name='Arrow Up', size=10, tier='easy', passes=3, seeds={}, grid=[
+        '....##....',
+        '...####...',
+        '..######..',
+        '.########.',
+        '##########',
+        '....##....',
+        '....##....',
+        '....##....',
+        '....##....',
+        '....##....',
     ]),
-    # Bowtie - 5x5, 52% fill, 3 passes
-    dict(key='bowtie', name='Bowtie', size=5, tier='easy', passes=3, seeds={}, grid=[
-        '#...#',
-        '##.##',
-        '..#..',
-        '##.##',
-        '#...#',
+    # Bowtie - 10x10, 52% fill, 4 passes
+    dict(key='bowtie', name='Bowtie', size=10, tier='easy', passes=4, seeds={}, grid=[
+        '###....###',
+        '.##....##.',
+        '.###..###.',
+        '..######..',
+        '...####...',
+        '...####...',
+        '..######..',
+        '.###..###.',
+        '.##....##.',
+        '###....###',
     ]),
-    # Checkmark - 5x5, 28% fill, 3 passes
-    dict(key='checkmark', name='Checkmark', size=5, tier='easy', passes=3, seeds={(2, 0): 1, (3, 3): 1}, grid=[
-        '....#',
-        '....#',
-        '#...#',
-        '.#.#.',
-        '..#..',
+    # Checkmark - 10x10, 35% fill, 8 passes
+    dict(key='checkmark', name='Checkmark', size=10, tier='easy', passes=8, seeds={}, grid=[
+        '.......###',
+        '.......###',
+        '......###.',
+        '.....###..',
+        '##...###..',
+        '###.###...',
+        '.######...',
+        '..####....',
+        '...##.....',
+        '..........',
     ]),
-    # House - 5x5, 60% fill, 2 passes
-    dict(key='house', name='House', size=5, tier='easy', passes=2, seeds={}, grid=[
-        '..#..',
-        '.###.',
-        '#####',
-        '#.#.#',
-        '#.#.#',
+    # House - 10x10, 52% fill, 4 passes
+    dict(key='house', name='House', size=10, tier='easy', passes=4, seeds={}, grid=[
+        '....##....',
+        '...####...',
+        '..##..##..',
+        '.##....##.',
+        '##########',
+        '#........#',
+        '#..##.##.#',
+        '#..##.##.#',
+        '#..##....#',
+        '##########',
     ]),
-    # Envelope - 5x5, 76% fill, 2 passes
-    dict(key='envelope', name='Envelope', size=5, tier='easy', passes=2, seeds={}, grid=[
-        '#####',
-        '##.##',
-        '#.#.#',
-        '#...#',
-        '#####',
+    # Envelope - 10x10, 46% fill, 3 passes
+    dict(key='envelope', name='Envelope', size=10, tier='easy', passes=3, seeds={}, grid=[
+        '##########',
+        '#........#',
+        '##......##',
+        '#.##..##.#',
+        '#..####..#',
+        '#........#',
+        '#........#',
+        '#........#',
+        '#........#',
+        '##########',
     ]),
-    # Tree - 5x5, 52% fill, 2 passes
-    dict(key='tree', name='Tree', size=5, tier='easy', passes=2, seeds={}, grid=[
-        '..#..',
-        '.###.',
-        '#####',
-        '..#..',
-        '.###.',
+    # Tree - 10x10, 52% fill, 3 passes
+    dict(key='tree', name='Tree', size=10, tier='easy', passes=3, seeds={}, grid=[
+        '....##....',
+        '...####...',
+        '..######..',
+        '.########.',
+        '..######..',
+        '.########.',
+        '##########',
+        '....##....',
+        '....##....',
+        '...####...',
     ]),
-    # Hourglass - 5x5, 68% fill, 2 passes
-    dict(key='hourglass', name='Hourglass', size=5, tier='easy', passes=2, seeds={}, grid=[
-        '#####',
-        '.###.',
-        '..#..',
-        '.###.',
-        '#####',
+    # Hourglass - 10x10, 48% fill, 3 passes
+    dict(key='hourglass', name='Hourglass', size=10, tier='easy', passes=3, seeds={}, grid=[
+        '##########',
+        '.##....##.',
+        '..##..##..',
+        '...####...',
+        '....##....',
+        '....##....',
+        '...####...',
+        '..##..##..',
+        '.##....##.',
+        '##########',
     ]),
-    # Anchor - 5x5, 44% fill, 3 passes
-    dict(key='anchor', name='Anchor', size=5, tier='easy', passes=3, seeds={}, grid=[
-        '..#..',
-        '.###.',
-        '..#..',
-        '#.#.#',
-        '.###.',
+    # Anchor - 10x10, 40% fill, 4 passes
+    dict(key='anchor', name='Anchor', size=10, tier='easy', passes=4, seeds={}, grid=[
+        '....##....',
+        '...#..#...',
+        '....##....',
+        '..######..',
+        '....##....',
+        '....##....',
+        '#...##...#',
+        '#...##...#',
+        '##.####.##',
+        '.########.',
     ]),
-    # Cup - 5x5, 52% fill, 3 passes
-    dict(key='cup', name='Cup', size=5, tier='easy', passes=3, seeds={}, grid=[
-        '#####',
-        '#...#',
-        '#...#',
-        '.###.',
-        '..#..',
+    # Cup - 10x10, 44% fill, 3 passes
+    dict(key='cup', name='Cup', size=10, tier='easy', passes=3, seeds={}, grid=[
+        '##########',
+        '#........#',
+        '#........#',
+        '#........#',
+        '.########.',
+        '..######..',
+        '...####...',
+        '....##....',
+        '....##....',
+        '..######..',
     ]),
     # Cat - 10x10, 56% fill, 3 passes
     dict(key='cat', name='Cat', size=10, tier='medium', passes=3, seeds={}, grid=[
@@ -319,6 +380,9 @@ ART_PACK = [
 
 # --- Import-time validation (fail at boot, not mid-game) ---
 _ALLOWED_TIERS = frozenset({"easy", "medium", "hard"})
+# 10x10 is the floor. A 5x5 is too coarse to read as a picture and solves in
+# well under a minute; every piece is authored at 10x10 or 15x15.
+_MIN_DIM = 10
 _LOAD_COUNT = 0
 
 
@@ -362,6 +426,11 @@ def _validate_pack(pack: list) -> dict:
         ncols = next(iter(row_lens))
         if nrows == 0 or ncols == 0:
             raise ImproperlyConfigured(f"ART_PACK[{i}] ({key}) grid has zero dimension.")
+        if nrows < _MIN_DIM or ncols < _MIN_DIM:
+            raise ImproperlyConfigured(
+                f"ART_PACK[{i}] ({key}) is {nrows}x{ncols}; minimum is "
+                f"{_MIN_DIM}x{_MIN_DIM}."
+            )
 
         seeds = piece["seeds"] or {}
         if not isinstance(seeds, dict):
