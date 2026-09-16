@@ -20,7 +20,7 @@
                 <input type="search" id="global-results-q" name="q" class="form-control" value="{{ query }}" maxlength="200" required>
                 <button class="btn btn-primary px-4" type="submit">Search</button>
             </div>
-            <div class="form-text mt-2">Contract number, supplier name or CAGE, NSN/NIIN/part number, or solicitation.</div>
+            <div class="form-text mt-2">Contract or IDIQ number, supplier name or CAGE, NSN/NIIN/part number, or solicitation.</div>
         </form>
 
         {% if contracts %}
@@ -38,6 +38,25 @@
                 {% endfor %}
             </div>
             {% include "core/partials/search_group_footer.html" with category="contracts" total=contracts_total page_obj=contracts_page %}
+        </section>
+        {% endif %}
+
+        {% if idiqs %}
+        <section class="global-result-group mb-4" aria-labelledby="idiq-results-heading">
+            <div class="global-result-group__header">
+                <h2 id="idiq-results-heading" class="h5 mb-0">IDIQs</h2>
+                <span class="text-body-secondary small">{{ idiqs_total|intcomma }} result{{ idiqs_total|pluralize }}</span>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for idiq in idiqs %}
+                <a href="{% url 'contracts:idiq_contract_detail' idiq.pk %}" class="list-group-item list-group-item-action">
+                    <span class="font-monospace fw-semibold">{{ idiq.contract_number }}</span>
+                    {% if idiq.closed %}<span class="badge text-bg-secondary ms-2">Closed</span>{% endif %}
+                    {% if idiq.buyer %}<span class="d-block small text-body-secondary">{{ idiq.buyer }}</span>{% endif %}
+                </a>
+                {% endfor %}
+            </div>
+            {% include "core/partials/search_group_footer.html" with category="idiqs" total=idiqs_total page_obj=idiqs_page %}
         </section>
         {% endif %}
 
@@ -96,10 +115,10 @@
         </section>
         {% endif %}
 
-        {% if not contracts and not suppliers and not nsns and not solicitations %}
+        {% if not contracts and not idiqs and not suppliers and not nsns and not solicitations %}
         <div class="global-search-empty text-center py-5">
             <h2 class="h5">No matches for “{{ query }}”</h2>
-            <p class="text-body-secondary mb-0">Try a contract number, supplier name or CAGE, NSN, part number, or solicitation number.</p>
+            <p class="text-body-secondary mb-0">Try a contract or IDIQ number, supplier name or CAGE, NSN, part number, or solicitation number.</p>
         </div>
         {% endif %}
     </div>

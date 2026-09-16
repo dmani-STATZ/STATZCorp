@@ -7,16 +7,18 @@ from django.core.exceptions import PermissionDenied
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
-from contracts.models import Company, Contract
+from contracts.models import Clin, Company, Contract, IdiqContract, IdiqContractDetails
 from core.views import (
+    _build_search_terms,
     _contract_results,
+    _idiq_results,
     _nsn_results,
     _solicitation_results,
     _supplier_results,
     global_search,
 )
 from products.models import Nsn
-from sales.models import Solicitation, SolicitationLine
+from sales.models import Solicitation, SolicitationLine, SupplierMatch
 from suppliers.models import Supplier
 
 
@@ -93,7 +95,8 @@ class GlobalSearchTests(TestCase):
             contract_number="SPE7M1-26-P-HIDDEN",
         )
 
-        results = list(_contract_results(self._request(), "SPE7M1-26-P"))
+        terms = _build_search_terms("SPE7M1-26-P")
+        results = list(_contract_results(self._request(), terms))
 
         self.assertEqual(results, [visible])
 
@@ -102,15 +105,26 @@ class GlobalSearchTests(TestCase):
         request.active_company = None
 
         with self.assertRaises(PermissionDenied):
-            _contract_results(request, "SPE7M1")
+            _contract_results(request, _build_search_terms("SPE7M1"))
+
+    def test_idiq_results_require_an_active_company(self):
+        request = self._request()
+        request.active_company = None
+
+        with self.assertRaises(PermissionDenied):
+            _idiq_results(request, _build_search_terms("SPE7M1"))
 
     def test_supplier_results_match_name_and_cage(self):
         exact = Supplier.objects.create(name="Bearing House", cage_code="1AB23")
         partial = Supplier.objects.create(name="Bearing House Midwest", cage_code="4CD56")
         Supplier.objects.create(name="Archived Bearing House", archived=True)
 
-        name_results = list(_supplier_results("Bearing House"))
-        cage_results = list(_supplier_results("1AB23"))
+        name_results = list(
+            _supplier_results(_build_search_terms("Bearing House"), self.company)
+        )
+        cage_results = list(
+            _supplier_results(_build_search_terms("1AB23"), self.company)
+        )
 
         self.assertEqual(name_results, [exact, partial])
         self.assertEqual(cage_results, [exact])
@@ -122,8 +136,12 @@ class GlobalSearchTests(TestCase):
             part_number="ABC-123",
         )
 
-        nsn_results = list(_nsn_results("5935011299512"))
-        part_results = list(_nsn_results("ABC-123"))
+        nsn_results = list(
+            _nsn_results(_build_search_terms("5935011299512"), self.company)
+        )
+        part_results = list(
+            _nsn_results(_build_search_terms("ABC-123"), self.company)
+        )
 
         self.assertEqual(nsn_results, [nsn])
         self.assertEqual(part_results, [nsn])
@@ -138,19 +156,159 @@ class GlobalSearchTests(TestCase):
             nomenclature="ROLLER BEARING",
         )
 
-        results = list(_solicitation_results("ROLLER"))
+        results = list(_solicitation_results(_build_search_terms("ROLLER")))
 
         self.assertEqual(results, [solicitation])
         self.assertEqual(results[0].search_lines[0].nomenclature, "ROLLER BEARING")
 
     @patch("core.views.render")
+    def test_supplier_name_expands_to_related_contract_nsn_and_solicitation(
+        self, render
+    ):
+        supplier = Supplier.objects.create(name="Acme Bearings", cage_code="1ACME")
+        nsn = Nsn.objects.create(nsn_code="5935-01-129-9512")
+        contract = Contract.objects.create(
+            company=self.company,
+            contract_number="SPE7M1-26-P-1001",
+        )
+        Clin.objects.create(
+            company=self.company,
+            contract=contract,
+            supplier=supplier,
+            nsn=nsn,
+        )
+        solicitation = Solicitation.objects.create(
+            solicitation_number="SPE7M126Q1001"
+        )
+        line = SolicitationLine.objects.create(
+            solicitation=solicitation,
+            nsn="5935011299512",
+            line_number="0001",
+        )
+        SupplierMatch.objects.create(
+            line=line,
+            supplier=supplier,
+            match_tier=1,
+            match_method="DIRECT_NSN",
+        )
+        render.return_value = SimpleNamespace(status_code=200)
+
+        response = global_search(self._request("Acme Bearings"))
+
+        self.assertEqual(response.status_code, 200)
+        context = render.call_args.args[2]
+        self.assertEqual(context["suppliers"], [supplier])
+        self.assertEqual(context["contracts"], [contract])
+        self.assertEqual(context["nsns"], [nsn])
+        self.assertEqual(context["solicitations"], [solicitation])
+
+    @patch("core.views.render")
+    def test_nsn_expands_relations_without_cross_company_supplier_leak(self, render):
+        supplier = Supplier.objects.create(name="Current Company Supplier")
+        hidden_supplier = Supplier.objects.create(name="Other Company Supplier")
+        sales_supplier = Supplier.objects.create(name="Sales Match Supplier")
+        nsn = Nsn.objects.create(nsn_code="5935-01-129-9512")
+        contract = Contract.objects.create(
+            company=self.company,
+            contract_number="SPE7M1-26-P-2001",
+        )
+        other_contract = Contract.objects.create(
+            company=self.other_company,
+            contract_number="SPE7M1-26-P-2002",
+        )
+        Clin.objects.create(
+            company=self.company,
+            contract=contract,
+            supplier=supplier,
+            nsn=nsn,
+        )
+        Clin.objects.create(
+            company=self.other_company,
+            contract=other_contract,
+            supplier=hidden_supplier,
+            nsn=nsn,
+        )
+        solicitation = Solicitation.objects.create(
+            solicitation_number="SPE7M126Q2001"
+        )
+        line = SolicitationLine.objects.create(
+            solicitation=solicitation,
+            nsn="5935011299512",
+            niin="011299512",
+            line_number="0001",
+        )
+        SupplierMatch.objects.create(
+            line=line,
+            supplier=sales_supplier,
+            match_tier=1,
+            match_method="DIRECT_NSN",
+        )
+        render.return_value = SimpleNamespace(status_code=200)
+
+        response = global_search(self._request("5935-01-129-9512"))
+
+        self.assertEqual(response.status_code, 200)
+        context = render.call_args.args[2]
+        self.assertEqual(context["contracts"], [contract])
+        self.assertEqual(context["suppliers"], [supplier, sales_supplier])
+        self.assertEqual(context["nsns"], [nsn])
+        self.assertEqual(context["solicitations"], [solicitation])
+
+    @patch("core.views.render")
+    def test_idiq_search_expands_delivery_orders_and_details(self, render):
+        supplier = Supplier.objects.create(name="IDIQ Supplier")
+        hidden_supplier = Supplier.objects.create(name="Hidden IDIQ Supplier")
+        nsn = Nsn.objects.create(nsn_code="5935-01-555-0001")
+        hidden_nsn = Nsn.objects.create(nsn_code="5935-01-555-0002")
+        idiq = IdiqContract.objects.create(
+            company=self.company,
+            contract_number="SPE7M1-26-D-SEARCH",
+        )
+        other_idiq = IdiqContract.objects.create(
+            company=self.other_company,
+            contract_number="SPE7M1-26-D-SEARCH",
+        )
+        delivery = Contract.objects.create(
+            company=self.company,
+            contract_number="SPE7M1-26-F-0001",
+            idiq_contract=idiq,
+        )
+        Contract.objects.create(
+            company=self.other_company,
+            contract_number="SPE7M1-26-F-0002",
+            idiq_contract=other_idiq,
+        )
+        IdiqContractDetails.objects.create(
+            idiq_contract=idiq,
+            nsn=nsn,
+            supplier=supplier,
+        )
+        IdiqContractDetails.objects.create(
+            idiq_contract=other_idiq,
+            nsn=hidden_nsn,
+            supplier=hidden_supplier,
+        )
+        render.return_value = SimpleNamespace(status_code=200)
+
+        response = global_search(self._request("SPE7M1-26-D-SEARCH"))
+
+        self.assertEqual(response.status_code, 200)
+        context = render.call_args.args[2]
+        self.assertEqual(context["idiqs"], [idiq])
+        self.assertEqual(context["contracts"], [delivery])
+        self.assertEqual(context["suppliers"], [supplier])
+        self.assertEqual(context["nsns"], [nsn])
+
+    @patch("core.views.render")
     @patch("core.views._solicitation_results")
     @patch("core.views._nsn_results")
     @patch("core.views._supplier_results")
+    @patch("core.views._idiq_results")
     @patch("core.views._contract_results")
-    def test_search_materializes_all_four_categories(
+    def test_search_materializes_all_five_categories(
         self,
         contract_results,
+        idiq_results,
         supplier_results,
         nsn_results,
         solicitation_results,
@@ -158,6 +316,7 @@ class GlobalSearchTests(TestCase):
     ):
         querysets = [
             contract_results,
+            idiq_results,
             supplier_results,
             nsn_results,
             solicitation_results,

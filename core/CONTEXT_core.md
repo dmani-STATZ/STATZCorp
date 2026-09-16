@@ -8,10 +8,12 @@
 - Empty `q` redirects to `/home/` (`index`).
 - The initial page materializes at most 10 rows per group. `?category=<category>&page=<n>` expands one group through Django `Paginator`.
 - Match order is exact, starts-with, then contains.
-- Contract searches always filter `Contract.company=request.active_company` and reuse `contracts.services.contract_number.normalize_contract_number`.
+- Contract and IDIQ searches always filter `company=request.active_company` and reuse `contracts.services.contract_number.normalize_contract_number`.
 - Supplier searches are global, exclude `archived=True`, include aliases, and reuse `products.views._suppliers_matching_cage` for CAGE-shaped tokens.
 - NSN searches are global and must use `products.nsn_utils.nsn_query_variants`; NSN, normalized NSN/NIIN, and part number are searched.
 - Solicitation searches are global across `solicitation_number` and `SolicitationLine.nomenclature`.
+- Results expand one relationship hop: supplier and NSN matches find active-company contracts through `Clin`; supplier matches can surface their CLIN NSNs and matched/RFQ solicitations; NSN matches can surface active-company CLIN suppliers plus suppliers associated through solicitation matches/RFQs; solicitation lines match NSN/NIIN directly. IDIQ number matches also return that company's delivery-order `Contract` rows plus `IdiqContractDetails` suppliers and NSNs. Supplier/NSN terms can surface the parent IDIQ through those details.
+- Any relationship traversing `Clin` must include `Clin.company=request.active_company`. IDIQ detail hops must include `IdiqContract.company=request.active_company`. This prevents a global Supplier or Nsn result from exposing another company's contract associations.
 - `SupplierNSNCapability` is not a search source.
 - Querysets are materialized independently before the next model query to remain safe with SQL Server when MARS is disabled.
 

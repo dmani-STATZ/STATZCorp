@@ -4,10 +4,11 @@ Read `PROJECT_CONTEXT.md`, `core/CONTEXT_core.md`, `STATZWeb/settings.py`, and `
 
 ## Global search rules
 - Preserve `@login_required` and GET-only behavior on `global_search`.
-- `Contract` results are non-negotiably scoped to `request.active_company`.
+- `Contract` and `IdiqContract` results are non-negotiably scoped to `request.active_company`.
 - Do not company-scope `Supplier`, `Nsn`, or `Solicitation`; these models have no company FK.
 - Reuse `normalize_contract_number()`, `nsn_query_variants()`, and `_suppliers_matching_cage()` from their owning apps.
 - Never use `SupplierNSNCapability` in global search.
+- Relational expansion uses `Clin` for Contract ↔ Supplier ↔ Nsn, `IdiqContractDetails` for IDIQ ↔ Supplier ↔ Nsn plus `Contract.idiq_contract` for delivery orders, and sales line matches/RFQs for Solicitation ↔ Supplier. Every `Clin` relationship lookup must filter `Clin.company=request.active_company`, even though Supplier and Nsn themselves are global. IDIQ detail hops must filter `IdiqContract.company=request.active_company`.
 - Keep SQL Server MARS disabled: finish `count()`/`list()` materialization for one queryset before querying another model.
 - Expanded categories use Django `Paginator`; do not add hand-rolled offsets.
 - Keep user input bounded and output encoded by Django templates.
