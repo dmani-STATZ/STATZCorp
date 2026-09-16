@@ -1,7 +1,7 @@
 ---
 id: 2026-08-28-link-contract-folder
 title: Link contracts to synced SharePoint folders
-published: false
+published: true
 publish_date: 2026-08-28
 tags: [new, contracts]
 critical: false

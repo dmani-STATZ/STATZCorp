@@ -1,7 +1,7 @@
 ---
 id: 2026-09-16-solicitation-type-length
 title: Fixed — Solicitation Type no longer rejects longer set-aside types
-published: false
+published: true
 publish_date: 2026-09-16
 tags: [fixed, contracts]
 critical: true

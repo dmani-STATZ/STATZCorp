@@ -1,7 +1,7 @@
 ---
 id: 2026-08-20-due-date-late-flags
 title: Due dates now show late status in real time
-published: false
+published: true
 publish_date: 2026-08-20
 tags: [fixed, contracts]
 critical: false

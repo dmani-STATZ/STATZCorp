@@ -1,7 +1,7 @@
 ---
 id: 2026-09-14-pdf-intake-parse-error-swallowing-fix
 title: Fixed award PDFs being rejected with a misleading "could not extract a contract number" error
-published: false
+published: true
 publish_date: 2026-09-14
 tags: [fixed, contracts]
 critical: false

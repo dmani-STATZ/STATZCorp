@@ -1,7 +1,7 @@
 ---
 id: 2026-09-16-finalize-error-messages
 title: Improved — Save & Finalize now shows a real error message on failure
-published: false
+published: true
 publish_date: 2026-09-16
 tags: [improved, contracts]
 critical: false
