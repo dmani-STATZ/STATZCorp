@@ -106,6 +106,18 @@ Read `CONTEXT_intake.md` first for app purpose, model shape, and lock semantics.
   processing import. Never call `SequenceNumber` from processing in intake
   code. Applies to AWD/PO/DO/INTERNAL only (`_stamp_po_number` in
   `finalize.py`).
+- **Fixed-width canonical columns can silently block valid draft data.**
+  `_CommonContractFields` string fields (e.g. `solicitation_type`) carry no
+  length constraint in `schemas.py`, and the matching `draft_edit.html`
+  inputs have no `maxlength` — but the canonical `contracts.Contract`
+  column each field maps to (see the mapping table in `finalize.py`'s
+  module docstring) can be narrower. A value that's perfectly valid in the
+  draft can still fail at `objects.create()` inside `finalize_draft` if it
+  overflows the destination column (e.g. `solicitation_type` was
+  `CharField(max_length=10)`, widened to 50 on 2026-09-16 after
+  "UNRESTRICTED" — 12 chars — broke Save & Finalize). When adding or
+  changing a `_CommonContractFields` string field, check the matching
+  `contracts.Contract` column width, not just the Pydantic schema.
 
 ### Template changes
 - Templates intentionally mirror `processing/` visually so analysts learning

@@ -97,7 +97,7 @@ class Contract(AuditModel):
     contract_number = models.CharField(max_length=25, null=True, blank=True, unique=True)
     pr_number = models.CharField(max_length=50, null=True, blank=True, verbose_name="PR Number")
     status = models.ForeignKey('ContractStatus', on_delete=models.CASCADE, null=True, blank=True)
-    solicitation_type = models.CharField(max_length=10, null=True, blank=True, default='SDVOSB')
+    solicitation_type = models.CharField(max_length=50, null=True, blank=True, default='SDVOSB')
     prime = models.CharField(max_length=25, null=True, blank=True)
     prime_po_number = models.CharField(max_length=10, null=True, blank=True)
     date_closed = models.DateField(null=True, blank=True)

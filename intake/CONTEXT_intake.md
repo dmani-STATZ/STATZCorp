@@ -92,6 +92,15 @@ is rejected. Without enforced schema discipline, the JSON-first architecture
 rots — parsers and templates drift on key names and old records become
 incompatible with new code. Validation is a hard requirement.
 
+**Schema validation does not enforce downstream column width.** Pydantic
+constraining a `data` field to `Optional[str]` (no `max_length`) only means
+the *draft* will accept it — the *canonical* `contracts.Contract` column it
+maps to at finalization can still be narrower and reject the value at the
+database layer. `solicitation_type` hit this on 2026-09-16
+(`CharField(max_length=10)` couldn't hold "UNRESTRICTED"); the column was
+widened to `max_length=50`. See the mapping table in `intake/finalize.py`
+for which `data` keys land on which canonical columns.
+
 ## Lock Model
 - Acquired by `intake.locks.acquire(draft, user)` inside a `select_for_update`
   transaction.
