@@ -1843,7 +1843,23 @@
                     body: formData,
                 })
                 .then(function (resp) {
-                    return resp.json().then(function (data) {
+                    return resp.text().then(function (text) {
+                        let data;
+                        try {
+                            data = text ? JSON.parse(text) : {};
+                        } catch (parseErr) {
+                            // Server returned something that isn't JSON — almost
+                            // always an unhandled server error page (HTML), or a
+                            // gateway/timeout page Django never even saw. Surface
+                            // the HTTP status instead of the raw parser error so
+                            // this doesn't read as "Unexpected token '<'" again.
+                            throw new Error(
+                                'Server returned a non-JSON response (HTTP ' +
+                                resp.status + ' ' + resp.statusText + '). ' +
+                                'This usually means an unhandled server error — ' +
+                                'check server logs or contact IT.'
+                            );
+                        }
                         return { ok: resp.ok, data: data };
                     });
                 })

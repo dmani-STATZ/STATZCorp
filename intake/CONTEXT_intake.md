@@ -479,6 +479,14 @@ transactions: TX1 saves the form data and transitions status to
 fails, data is saved from TX1 and the standard Finalize button is now
 visible. The existing two-step "Mark Ready → Finalize" flow is unchanged.
 
+### Finalize AJAX error contract
+`finalize_direct_view` (`intake:finalize_direct`) always returns
+`JsonResponse({'ok': bool, ...})` to AJAX callers (`X-Requested-With:
+XMLHttpRequest`), including on unexpected/unhandled exceptions — see the
+catch-all `except Exception` in both its transactions (added 2026-09-16).
+Never let an exception propagate uncaught out of this view; the frontend
+depends on always receiving valid JSON.
+
 ## PDF Ingestion (Phase 3c)
 `intake/ingest.py` wraps `intake/pdf_parser.py` (the intake-owned DLA 1155
 parser — no dependency on processing) and converts the resulting

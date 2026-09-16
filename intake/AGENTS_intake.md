@@ -44,6 +44,20 @@ Read `CONTEXT_intake.md` first for app purpose, model shape, and lock semantics.
   receives all draft field values via `request.POST`. Both views branch on
   `is_ajax` and return JSON for AJAX requests, 302 redirects for non-AJAX.
   Do NOT revert either button to `type="submit"`.
+- **`finalize_direct_view` guarantees a JSON response for AJAX callers,
+  even on an unexpected exception (added 2026-09-16).** Both TX1 (save)
+  and TX2 (finalize) now have a catch-all `except Exception` after their
+  specific except clauses, so a raw DB error or any other unhandled bug no
+  longer escapes as Django's default HTML error page — `draft_edit.html`'s
+  `#save-finalize-btn` handler was calling `resp.json()` unconditionally
+  and choking with "Unexpected token '<'" on that HTML. Each catch-all
+  calls `transaction.set_rollback(True)` before returning — catching an
+  exception *inside* `with transaction.atomic():` stops it from reaching
+  the block's own exit handler, so Django will NOT auto-rollback unless
+  told to. **`finalize_draft_view` (the standalone Finalize button,
+  `#finalize-btn`) does NOT have this same catch-all yet** — identical
+  gap, deliberately left out of this pass. Give it the same treatment
+  before relying on its AJAX error responses.
 - **Popup pre-open pattern.** `window.open()` is called SYNCHRONOUSLY
   inside the click handler, before `fetch()` is called. This is required
   to bypass browser popup blockers. Never move `window.open()` into a

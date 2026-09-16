@@ -1168,9 +1168,9 @@ def finalize_direct_view(request, pk: int):
             messages.error(request, str(exc))
             return redirect('intake:queue')
 
-        new_data = parse_post(request.POST)
-        draft.data = new_data
         try:
+            new_data = parse_post(request.POST)
+            draft.data = new_data
             draft.save()
         except DraftDataValidationError as exc:
             first = exc.errors[0] if exc.errors else {'msg': 'invalid data'}
@@ -1187,6 +1187,26 @@ def finalize_direct_view(request, pk: int):
                 request,
                 f'Validation failed at {loc}: {first.get("msg")}',
             )
+            return redirect('intake:edit_draft', pk=pk)
+        except Exception as exc:
+            # Anything else here (a raw DB error, a bug in parse_post, etc.)
+            # was previously left to propagate out of this atomic() block as
+            # Django's default HTML error page, which broke the AJAX JSON
+            # contract client-side. Unlike DraftDataValidationError (which
+            # fires before any write), a generic exception may fire mid-write
+            # — and catching it HERE, inside `with transaction.atomic():`,
+            # stops it from reaching the block's own exit handler. Django
+            # only auto-rolls-back on an exception that exits the `with`
+            # block, so we must mark it explicitly or a partial write could
+            # commit.
+            transaction.set_rollback(True)
+            logger.exception(
+                'Unexpected error saving draft %s in finalize_direct_view (TX1)', pk
+            )
+            message = f'Unexpected error while saving: {exc} — no changes were saved.'
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': message}, status=500)
+            messages.error(request, message)
             return redirect('intake:edit_draft', pk=pk)
 
         # Transition to ready_for_review so finalize_draft's status guard passes.
@@ -1228,6 +1248,27 @@ def finalize_direct_view(request, pk: int):
                 f'Finalization blocked: {exc} — your changes have been saved. '
                 f'Fix the issue above and click "Finalize Draft → Contract".',
             )
+            return redirect('intake:edit_draft', pk=pk)
+        except Exception as exc:
+            # Same rationale as TX1's catch-all above: finalize_draft() may
+            # have already issued objects.create() calls (Contract, Clin,
+            # etc.) before hitting whatever failed. We're catching inside
+            # `with transaction.atomic():`, so mark the transaction for
+            # rollback explicitly before returning — do not rely on Django's
+            # implicit exception-exit rollback, since we're not letting the
+            # exception exit the block.
+            transaction.set_rollback(True)
+            logger.exception(
+                'Unexpected error finalizing draft %s in finalize_direct_view (TX2)', pk
+            )
+            message = (
+                f'Unexpected error while finalizing: {exc} — your changes have '
+                'been saved (from the save step). Fix the issue and use the '
+                'Finalize button, or contact IT with this message if it persists.'
+            )
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': message}, status=500)
+            messages.error(request, message)
             return redirect('intake:edit_draft', pk=pk)
 
     messages.success(
