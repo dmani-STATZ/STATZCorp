@@ -20,6 +20,8 @@ Read `PROJECT_CONTEXT.md`, `core/CONTEXT_core.md`, `STATZWeb/settings.py`, and `
 
 ## Shared-template rules
 - Global launcher/header styling belongs in `static/css/app-core.css` under `#header`.
+- The portal home (`templates/index.html`) uses `active_company.logo_url` with the STATZ static mark as fallback, same rule as the header.
+- The header logo in `templates/base_template.html` links to `/home/` (`index`), not the public landing page. Do not change `msapplication-starturl`.
 - Do not alter the fixed 48px `#header` height when adding controls.
 - DIBBS recent-count logic belongs in `sales.services.dibbs_notices`; both the API and context processor reuse it.
 - The badge context processor is authenticated-only and cached for 30 minutes.

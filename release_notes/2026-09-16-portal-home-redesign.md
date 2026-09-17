@@ -13,4 +13,4 @@ Calendar, Resources, Announcements, and DIBBS Notices each have their own page. 
 
 The nine-dot menu and DIBBS tile show how many DIBBS notices were posted recently.
 
-Searches that took over a minute now return indexed matches (contract, IDIQ, PO, NSN, solicitation number) immediately. Related records and item-name matches load in the background afterward. Solicitation numbers match from the start of the number rather than anywhere inside it.
+The header logo now opens the portal home page. That page uses the selected company's logo, and contract/IDIQ/PO search stays limited to the company in the header switcher.

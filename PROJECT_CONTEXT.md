@@ -12,7 +12,7 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 - `STATZWeb/settings.py` + `STATZWeb/urls.py` — global configuration and top-level URL routing
 - `STATZWeb/middleware.py` + `users/middleware.py` — login enforcement, active-company injection
 - `templates/base_template.html` — shared nav, CSS/JS, company selector; treat as a shared contract across all apps
-- `/` (`landing`) remains the public compliance page; `/home/` (`index`) is the authenticated search-and-favorites portal home. Its global search submits to `core:global_search`; calendar, resources, announcements, and DIBBS notices are dedicated pages rather than in-page anchors.
+- `/` (`landing`) remains the public compliance page; `/home/` (`index`) is the authenticated search-and-favorites portal home. The header logo links to `/home/`. The portal logo uses `active_company.logo_url` with the STATZ mark as fallback. Its global search submits to `core:global_search` and scopes contracts, IDIQs, and POs to `request.active_company`; calendar, resources, announcements, and DIBBS notices are dedicated pages rather than in-page anchors.
 
 ---
 

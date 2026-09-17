@@ -92,7 +92,7 @@
 >
     <header id="header">
         <div class="d-flex align-items-center gap-3 flex-shrink-0">
-        <a href="{% url 'landing' %}">
+        <a href="{% url 'index' %}" aria-label="Portal home">
             {% if active_company and active_company.logo_url %}
                 <img src="{{ active_company.logo_url }}" alt="{{ active_company.name }} Logo" style="height: 30px;">
             {% else %}

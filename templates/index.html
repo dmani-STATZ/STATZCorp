@@ -6,8 +6,12 @@
 {% block body %}
 <main class="portal-home container py-5">
     <section class="portal-home-hero mx-auto text-center">
+        {% if active_company and active_company.logo_url %}
+        <img src="{{ active_company.logo_url }}" class="portal-home-logo" alt="{{ active_company.name }}">
+        {% else %}
         <img src="{% static 'images/StatzCorpColorFINAL.png' %}?v={{ cache_version }}" class="portal-home-logo" alt="STATZ Corporation">
-        <h1 class="visually-hidden">STATZ portal search</h1>
+        {% endif %}
+        <h1 class="visually-hidden">{% if active_company %}{{ active_company.name }} portal search{% else %}STATZ portal search{% endif %}</h1>
 
         <form method="get" action="{% url 'core:global_search' %}" class="mt-4" role="search">
             <label for="portal-global-search" class="visually-hidden">Search contracts, IDIQs, suppliers, NSNs, and solicitations</label>
@@ -18,7 +22,7 @@
                 <input id="portal-global-search" type="search" name="q" class="form-control border-start-0" placeholder="Search STATZ" autocomplete="off" required autofocus>
                 <button type="submit" class="btn btn-primary px-4">Search</button>
             </div>
-            <div class="form-text">Search contract, IDIQ, and PO numbers, suppliers, NSNs, and solicitations.</div>
+            <div class="form-text">{% if active_company %}Searching {{ active_company.name }} contracts, IDIQs, and POs — plus suppliers, NSNs, and solicitations.{% else %}Search contract, IDIQ, and PO numbers, suppliers, NSNs, and solicitations.{% endif %}</div>
         </form>
 
         <div class="portal-favorites row row-cols-2 row-cols-md-4 g-3 mt-4" aria-label="Favorites">
