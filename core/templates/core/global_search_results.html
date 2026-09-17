@@ -20,7 +20,7 @@
                 <input type="search" id="global-results-q" name="q" class="form-control" value="{{ query }}" maxlength="200" required>
                 <button class="btn btn-primary px-4" type="submit">Search</button>
             </div>
-            <div class="form-text mt-2">Contract or IDIQ number, supplier name or CAGE, NSN/NIIN/part number, or solicitation.</div>
+            <div class="form-text mt-2">Contract, IDIQ, or PO number, supplier name or CAGE, NSN/NIIN/part number, or solicitation.</div>
         </form>
 
         <div id="search-groups">
@@ -92,7 +92,7 @@
 
         <div id="search-empty" class="global-search-empty text-center py-5{% if contracts or idiqs or suppliers or nsns or solicitations %} d-none{% endif %}">
             <h2 class="h5">{% if load_related %}Looking for “{{ query }}”{% else %}No matches for “{{ query }}”{% endif %}</h2>
-            <p class="text-body-secondary mb-0">{% if load_related %}Indexed matches come back first. Related records load next.{% else %}Try a contract or IDIQ number, supplier name or CAGE, NSN, part number, or solicitation number.{% endif %}</p>
+            <p class="text-body-secondary mb-0">{% if load_related %}Indexed matches come back first. Related records load next.{% else %}Try a contract, IDIQ, or PO number, supplier name or CAGE, NSN, part number, or solicitation number.{% endif %}</p>
         </div>
 
         {% if load_related %}
@@ -215,7 +215,7 @@
                 emptyEl.classList.add("d-none");
             } else if (emptyEl) {
                 emptyEl.querySelector("h2").textContent = "No matches for “{{ query|escapejs }}”";
-                emptyEl.querySelector("p").textContent = "Try a contract or IDIQ number, supplier name or CAGE, NSN, part number, or solicitation number.";
+                emptyEl.querySelector("p").textContent = "Try a contract, IDIQ, or PO number, supplier name or CAGE, NSN, part number, or solicitation number.";
             }
         })
         .catch(function () {

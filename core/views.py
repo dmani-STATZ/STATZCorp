@@ -18,6 +18,7 @@ from contracts.models import (
     Contract,
     IdiqContract,
     IdiqContractDetails,
+    PurchaseOrder,
 )
 from contracts.services.contract_number import normalize_contract_number
 from products.models import Nsn
@@ -217,6 +218,28 @@ def health_plain(request):
 def _direct_matches(terms, company, *, include_indexed_lines=True):
     """Match each model on its own indexed columns — no joins, no aggregation."""
     number_filter = _contract_number_filter(terms)
+    po_filter = _contains_q("po_number", terms.query) | _contains_q(
+        "prime_po_number", terms.query
+    )
+    contract_ids = _ids(
+        Contract.objects.filter(company=company).filter(number_filter | po_filter)
+    )
+    # Clin.clin_po_num is the UI Sub PO # and stays in sync with Contract.po_number.
+    # Collect ids separately so this stays a pk lookup, not a join on the group query.
+    contract_ids |= _ids(
+        Clin.objects.filter(company=company).filter(
+            _contains_q("clin_po_num", terms.query)
+        ),
+        "contract_id",
+    )
+    contract_ids |= _ids(
+        PurchaseOrder.objects.filter(company=company).filter(
+            _contains_q("po_number", terms.query)
+        ),
+        "contract_id",
+    )
+    contract_ids.discard(None)
+
     suppliers = _ids(
         Supplier.objects.filter(archived=False).filter(
             _contains_q("name", terms.query) | _contains_q("cage_code", terms.query)
@@ -242,9 +265,7 @@ def _direct_matches(terms, company, *, include_indexed_lines=True):
             )
 
     return _MatchedIds(
-        contracts=_ids(
-            Contract.objects.filter(company=company).filter(number_filter)
-        ),
+        contracts=contract_ids,
         idiqs=_ids(
             IdiqContract.objects.filter(company=company).filter(number_filter)
         ),
@@ -424,6 +445,10 @@ def _search_querysets(request, terms, mode="full"):
     number_pairs = [
         ("contract_number", candidate) for candidate in terms.contract_candidates
     ]
+    contract_pairs = number_pairs + [
+        ("po_number", terms.query),
+        ("prime_po_number", terms.query),
+    ]
     nsn_pairs = [("nsn_code", variant) for variant in terms.nsn_variants]
     if terms.normalized_nsn:
         nsn_pairs.append(("nsn_normalized", terms.normalized_nsn))
@@ -437,8 +462,8 @@ def _search_querysets(request, terms, mode="full"):
 
     contracts = (
         _or_none(Contract, id_map["contracts"])
-        .annotate(match_quality=_quality_case(number_pairs))
-        .select_related("status")
+        .annotate(match_quality=_quality_case(contract_pairs))
+        .select_related("status", "purchase_order")
         .order_by("match_quality", "contract_number", "pk")
     )
     idiqs = (

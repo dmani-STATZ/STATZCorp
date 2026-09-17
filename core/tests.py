@@ -10,7 +10,7 @@ from django.test import Client, RequestFactory, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from contracts.models import Clin, Company, Contract, IdiqContract, IdiqContractDetails
+from contracts.models import Clin, Company, Contract, IdiqContract, IdiqContractDetails, PurchaseOrder
 from core.views import (
     _build_search_terms,
     _search_querysets,
@@ -103,6 +103,51 @@ class GlobalSearchTests(TestCase):
         )
 
         self.assertEqual(self._results("SPE7M1-26-P", "contracts"), [visible])
+
+    def test_po_number_matches_header_clin_and_generated_po(self):
+        header = Contract.objects.create(
+            company=self.company,
+            contract_number="SPE7M1-26-P-PO1",
+            po_number="J00121",
+        )
+        clin_only = Contract.objects.create(
+            company=self.company,
+            contract_number="SPE7M1-26-P-PO2",
+        )
+        generated = Contract.objects.create(
+            company=self.company,
+            contract_number="SPE7M1-26-P-PO3",
+        )
+        hidden = Contract.objects.create(
+            company=self.other_company,
+            contract_number="SPE7M1-26-P-PO4",
+            po_number="J00121",
+        )
+        Clin.objects.create(
+            company=self.company,
+            contract=clin_only,
+            clin_po_num="SUB7788",
+        )
+        PurchaseOrder.objects.create(
+            company=self.company,
+            contract=generated,
+            po_number="J00999A",
+        )
+        PurchaseOrder.objects.create(
+            company=self.other_company,
+            contract=hidden,
+            po_number="J00999A",
+        )
+
+        self.assertEqual(self._results("J00121", "contracts"), [header])
+        self.assertEqual(self._results("SUB7788", "contracts"), [clin_only])
+        self.assertEqual(self._results("J00999A", "contracts"), [generated])
+        fast = list(
+            _search_querysets(
+                self._request("J00121"), _build_search_terms("J00121"), mode="fast"
+            )["contracts"]
+        )
+        self.assertEqual(fast, [header])
 
     def test_search_requires_an_active_company(self):
         request = self._request()

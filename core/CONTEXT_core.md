@@ -6,10 +6,10 @@
 ## Global portal search
 - URL: `/core/search/` (`core:global_search`), GET only. Related records load from `/core/search/related/` (`core:global_search_related`).
 - Empty `q` redirects to `/home/` (`index`).
-- The initial page is the **fast path**: indexed columns only (contract/IDIQ number, supplier name/CAGE/alias, NSN/NIIN/part number, solicitation-number prefix, and NSN-shaped solicitation lines). It materializes at most 10 rows per group.
+- The initial page is the **fast path**: indexed columns only (contract/IDIQ/PO number, supplier name/CAGE/alias, NSN/NIIN/part number, solicitation-number prefix, and NSN-shaped solicitation lines). It materializes at most 10 rows per group.
 - JavaScript then fetches `core:global_search_related` and appends one-hop related rows plus nomenclature matches. `?category=` pagination and `?complete=1` run the **full** union in one request (no second fetch).
 - Match order is exact, starts-with, then contains.
-- Contract and IDIQ searches always filter `company=request.active_company` and reuse `contracts.services.contract_number.normalize_contract_number`.
+- Contract and IDIQ searches always filter `company=request.active_company` and reuse `contracts.services.contract_number.normalize_contract_number`. PO matches use `Contract.po_number` / `prime_po_number` (indexed), `Clin.clin_po_num` (the UI Sub PO #; do not search legacy `Clin.po_number`), and `PurchaseOrder.po_number`, all collected as contract primary keys before the group query.
 - Supplier searches are global, exclude `archived=True`, include aliases, and reuse `products.views._suppliers_matching_cage` for CAGE-shaped tokens.
 - NSN searches are global and must use `products.nsn_utils.nsn_query_variants`; NSN, normalized NSN/NIIN, and part number are searched.
 - Solicitation searches are global across `solicitation_number` and `SolicitationLine.nomenclature`.
@@ -23,7 +23,7 @@ The search runs in two passes, and the shape is load bearing: an earlier version
 
 The first HTML response is `mode="fast"` (indexed columns only). Related hops and the nomenclature scan run as `mode="deep"` on `/core/search/related/` so a contract/NSN/IDIQ lookup is not blocked by DIBBS line scans.
 
-1. `_direct_matches()` matches each model on its **own columns only** and collects primary keys (capped at `_SOURCE_ID_LIMIT`). Indexed solicitation-line NSN/NIIN prefix matches are included here; nomenclature is not.
+1. `_direct_matches()` matches each model on its **own columns only** and collects primary keys (capped at `_SOURCE_ID_LIMIT`). Indexed solicitation-line NSN/NIIN prefix matches are included here; nomenclature is not. Contract hits also include PO numbers (`Contract.po_number`, `Clin.clin_po_num`, `PurchaseOrder.po_number`) resolved to contract ids.
 2. `_related_*_ids()` resolves relationships as `FK id__in <ids>` lookups against `Clin`, `IdiqContractDetails`, `SupplierMatch`, and `SupplierRFQ`. `_related_matches()` also runs the nomenclature contains scan.
 3. `_search_querysets(mode=...)` returns one `pk__in` queryset per group (capped at `_CATEGORY_ID_LIMIT`, direct matches first), ordered by a `Case` over own columns. `mode="deep"` excludes ids already returned by the fast path so the JS append is disjoint.
 

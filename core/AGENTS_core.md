@@ -7,7 +7,7 @@ Read `PROJECT_CONTEXT.md`, `core/CONTEXT_core.md`, `STATZWeb/settings.py`, and `
 - The first paint is indexed matches only (`mode="fast"`). Do not run related hops or the nomenclature scan on that request. Those belong on `global_search_related` (`mode="deep"`) or `?complete=1` / `?category=` (`mode="full"`).
 - `Contract` and `IdiqContract` results are non-negotiably scoped to `request.active_company`.
 - Do not company-scope `Supplier`, `Nsn`, or `Solicitation`; these models have no company FK.
-- Reuse `normalize_contract_number()`, `nsn_query_variants()`, and `_suppliers_matching_cage()` from their owning apps.
+- Reuse `normalize_contract_number()`, `nsn_query_variants()`, and `_suppliers_matching_cage()` from their owning apps. PO search uses `Contract.po_number`, `Clin.clin_po_num`, and `PurchaseOrder.po_number` — never legacy `Clin.po_number`.
 - Never use `SupplierNSNCapability` in global search.
 - Relational expansion uses `Clin` for Contract ↔ Supplier ↔ Nsn, `IdiqContractDetails` for IDIQ ↔ Supplier ↔ Nsn plus `Contract.idiq_contract` for delivery orders, and sales line matches/RFQs for Solicitation ↔ Supplier. Every `Clin` relationship lookup must filter `Clin.company=request.active_company`, even though Supplier and Nsn themselves are global. IDIQ detail hops must filter `IdiqContract.company=request.active_company`.
 - **Do not express relationships as OR'd joins in a group queryset.** Resolve them to primary keys first (`_direct_matches` → `_related_*_ids`) and filter the group with a single `pk__in`. The joined-OR version took over a minute in production; see the query-strategy section in `CONTEXT_core.md`.
