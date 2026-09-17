@@ -5,6 +5,12 @@
 
 {% block body %}
 <main class="portal-home container py-5">
+    {% if request.user.is_superuser %}
+    <aside class="portal-budget-card" aria-label="API budget">
+        {% include 'core/partials/api_budget_card.html' %}
+    </aside>
+    {% endif %}
+
     <section class="portal-home-hero mx-auto text-center">
         {% if active_company and active_company.logo_url %}
         <img src="{{ active_company.logo_url }}" class="portal-home-logo" alt="{{ active_company.name }}">
@@ -55,11 +61,5 @@
             </div>
         </div>
     </section>
-
-    {% if request.user.is_superuser %}
-    <aside class="portal-budget-card mt-5" aria-label="API budget">
-        {% include 'core/partials/api_budget_card.html' %}
-    </aside>
-    {% endif %}
 </main>
 {% endblock body %}
