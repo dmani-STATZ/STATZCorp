@@ -170,7 +170,7 @@
                     <div class="text-muted">Status</div>
                     <div>
                         {% if contract.status %}
-                            <span class="badge bg-secondary">{{ contract.status.description|default:"—" }}</span>
+                            <span class="status-pill status-pill--{{ contract.status.description|lower|default:'unknown' }}">{{ contract.status.description|default:"—" }}</span>
                         {% else %}—{% endif %}
                     </div>
                 </div>

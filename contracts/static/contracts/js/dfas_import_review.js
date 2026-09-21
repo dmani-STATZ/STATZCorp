@@ -61,6 +61,13 @@
         });
     }
 
+    function contractStatusPillClass(status) {
+        const normalized = String(status || '').toLowerCase();
+        return ['open', 'closed', 'canceled'].includes(normalized)
+            ? 'status-pill--' + normalized
+            : 'status-pill--unknown';
+    }
+
     function fmtMoney(val) {
         if (val == null || val === '') return '—';
         const n = parseFloat(val);
@@ -543,7 +550,9 @@
                                 '</span>' +
                                 poLine +
                                 '</div>' +
-                                '<span class="badge bg-secondary">' +
+                                '<span class="status-pill ' +
+                                    contractStatusPillClass(contract.status) +
+                                '">' +
                                     escapeHtml(contract.status || '') +
                                 '</span>';
 

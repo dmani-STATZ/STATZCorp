@@ -4,6 +4,7 @@
 {% block body_class %}supplier-detail-page{% endblock %}
 
 {% block extra_head %}
+{{ block.super }}
 <style>
 #hs-needle {
     transition: transform 0.6s ease;
@@ -35,7 +36,6 @@
 .supplier-detail-main section { margin-bottom: 1.5rem; }
 .supplier-status-banner { border-radius: 0.375rem; padding: 0.65rem 1rem; font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; }
 .supplier-status-banner-probation { background: var(--bs-danger); color: #fff; }
-.supplier-status-banner-conditional { background: var(--bs-warning); color: var(--bs-dark); }
 .supplier-status-banner-archived { background: var(--bs-secondary); color: #fff; }
 
 .supplier-header-divider {

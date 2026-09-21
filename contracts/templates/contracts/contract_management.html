@@ -215,15 +215,7 @@
                                 </div>
                             </div>
                         </div>
-                        {% if s == 'Open' %}
-                            <span class="badge rounded-pill bg-success">Open</span>
-                        {% elif s == 'Closed' %}
-                            <span class="badge rounded-pill bg-secondary">Closed</span>
-                        {% elif s == 'Canceled' %}
-                            <span class="badge rounded-pill bg-danger">Canceled</span>
-                        {% else %}
-                            <span class="badge rounded-pill bg-secondary">{{ s|default:"—" }}</span>
-                        {% endif %}
+                        <span class="status-pill status-pill--{{ s|lower|default:'unknown' }}">{{ s|default:"—" }}</span>
                         <a href="{% url 'contracts:contracts_dashboard' %}"
                         class="hover:bg-gray-200 {% if s == 'Canceled' %}text-red{% else %}text-gray-800{% endif %} px-4 py-2 rounded-lg flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">

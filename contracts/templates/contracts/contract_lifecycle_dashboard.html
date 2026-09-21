@@ -288,8 +288,8 @@
                         {% for contract in contracts %}
                         <tr class="contract-table-row {% if contract.status.description == 'Canceled' %}table-danger{% endif %}">
                             <td class="text-nowrap small fw-medium text-body">
-                                <span class="status-badge {% if contract.status.description == 'Canceled' %}cancelled{% elif contract.status.description == 'Open' %}open{% else %}closed{% endif %}">
-                                    {{ contract.status.description }}
+                                <span class="status-pill status-pill--{{ contract.status.description|lower|default:'unknown' }}">
+                                    {{ contract.status.description|default:"Unknown" }}
                                 </span>
                             </td>
                             <td class="text-nowrap small fw-medium text-body">

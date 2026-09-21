@@ -39,13 +39,7 @@
         <div>
           {% if contract.status and contract.status.description %}
             {% with s=contract.status.description %}
-              {% if s == 'Canceled' %}
-                <span class="badge bg-danger">Canceled</span>
-              {% elif s == 'Open' %}
-                <span class="badge bg-success">Open</span>
-              {% else %}
-                <span class="badge bg-secondary">{{ s }}</span>
-              {% endif %}
+              <span class="status-pill status-pill--{{ s|lower|default:'unknown' }}">{{ s|default:"—" }}</span>
             {% endwith %}
           {% else %}
             <span class="fs-6 fw-bold">—</span>

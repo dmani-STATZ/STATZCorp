@@ -3,6 +3,6 @@
     <span class="font-monospace fw-semibold">{{ contract.contract_number }}</span>
     {% if contract.po_number %}<span class="ms-2 small text-body-secondary">PO {{ contract.po_number }}</span>{% endif %}
     {% if contract.purchase_order.po_number and contract.purchase_order.po_number != contract.po_number %}<span class="ms-2 small text-body-secondary">{{ contract.purchase_order.po_number }}</span>{% endif %}
-    {% if contract.status %}<span class="badge text-bg-secondary ms-2">{{ contract.status.description }}</span>{% endif %}
+    {% if contract.status %}<span class="status-pill status-pill--{{ contract.status.description|lower|default:'unknown' }} ms-2">{{ contract.status.description|default:"—" }}</span>{% endif %}
 </a>
 {% endfor %}

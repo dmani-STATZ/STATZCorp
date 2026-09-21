@@ -732,41 +732,24 @@ html {
     white-space: nowrap;
 }
 
-/* Light mode */
 .status-pill--open {
-    background-color: #e8f5e9;
-    color: #1B5E20;
+    background-color: var(--bs-success-bg-subtle);
+    color: var(--bs-success-text-emphasis);
 }
 
 .status-pill--closed {
-    background-color: rgba(111, 66, 193, 0.10);
-    color: #4a235a;
+    background-color: var(--bs-secondary-bg-subtle);
+    color: var(--bs-secondary-text-emphasis);
 }
 
 .status-pill--canceled {
-    background-color: #fce4ec;
-    color: #800000;
+    background-color: var(--bs-danger-bg-subtle);
+    color: var(--bs-danger-text-emphasis);
 }
 
 .status-pill--unknown {
     background-color: var(--bs-secondary-bg);
     color: var(--bs-secondary-color);
-}
-
-/* Dark mode overrides */
-[data-bs-theme="dark"] .status-pill--open {
-    background-color: rgba(105, 240, 174, 0.15);
-    color: #69F0AE;
-}
-
-[data-bs-theme="dark"] .status-pill--closed {
-    background-color: rgba(180, 140, 255, 0.15);
-    color: #ce9eff;
-}
-
-[data-bs-theme="dark"] .status-pill--canceled {
-    background-color: rgba(255, 138, 128, 0.15);
-    color: #FF8A80;
 }
 
 /* DFAS import list / upload / review — full-width content inside contract_base */
@@ -873,12 +856,27 @@ html {
     font-weight: 500;
 }
 
+.supplier-flag-conditional,
+.supplier-status-banner-conditional {
+    background-color: #FFF3E0;
+    color: #B45309;
+}
+
 .supplier-flag-conditional {
-    background-color: #FEF9C3;
-    color: #713F12;
     padding: 0 4px;
     border-radius: 3px;
     font-weight: 500;
+}
+
+[data-bs-theme="dark"] .supplier-flag-probation {
+    background-color: #450A0A;
+    color: #FCA5A5;
+}
+
+[data-bs-theme="dark"] .supplier-flag-conditional,
+[data-bs-theme="dark"] .supplier-status-banner-conditional {
+    background-color: #4A2C0A;
+    color: #FDBA74;
 }
 
 /* ── DFAS Unified Resolve Modal ─────────────────────────────── */

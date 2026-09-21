@@ -1,7 +1,12 @@
 {% extends "base_template.html" %}
-{% load humanize nsn_filters %}
+{% load static humanize nsn_filters %}
 
 {% block title %}Search results — STATZ{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'contracts/css/components.css' %}?v={{ cache_version }}">
+{% endblock extra_head %}
 
 {% block body %}
 <main class="global-search-page container py-4">
