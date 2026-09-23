@@ -10,8 +10,7 @@
             <p class="small text-white-50 mb-1 text-uppercase letter-spacing-wide mb-0">Product updates</p>
             <h1 class="modal-title h4 fw-semibold mb-0" id="releaseNotesModalLabel">What&rsquo;s new</h1>
           </div>
-          <span class="badge rounded-pill bg-white bg-opacity-25 text-white border border-white border-opacity-25">{{
-            unacknowledged_release_notes|length }} update{% if unacknowledged_release_notes|length != 1 %}s
+          <span class="badge rounded-pill bg-white bg-opacity-25 text-white border border-white border-opacity-25">{{ unacknowledged_release_notes|length }} update{% if unacknowledged_release_notes|length != 1 %}s
             {% endif %}</span>
         </div>
         <p class="small text-white-75 mb-0 fw-normal">Take a moment to scan the notes below, then confirm you&rsquo;ve
@@ -26,8 +25,7 @@
             <header class="mb-3">
               <h2 class="h5 fw-semibold mb-2 text-body">{{ note.title }}</h2>
               <div class="d-flex flex-wrap align-items-center gap-2 small">
-                <time class="text-body-secondary" datetime="{{ note.publish_date|date:'c' }}">{{
-                  note.publish_date|date:"M j, Y" }}</time>
+                <time class="text-body-secondary" datetime="{{ note.publish_date|date:'c' }}">{{ note.publish_date|date:"M j, Y" }}</time>
                 {% if note.change_type == 'new' %}
                 <span class="badge text-bg-primary">New</span>
                 {% elif note.change_type == 'improved' %}
