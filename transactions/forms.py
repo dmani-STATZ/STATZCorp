@@ -105,6 +105,13 @@ class EditFieldForm(forms.Form):
     """Single field 'new_value' for editing a model field in the modal. Widget set from field_info."""
 
     new_value = forms.CharField(required=False, label="New value")
+    note = forms.CharField(
+        required=False,
+        max_length=500,
+        strip=True,
+        label="Note (optional)",
+        widget=forms.Textarea(attrs={**_input_attrs(editable=True), "rows": 2}),
+    )
 
     def __init__(self, content_type_id=None, field_name=None, initial_value=None, initial_label=None, *args, **kwargs):
         super().__init__(*args, **kwargs)

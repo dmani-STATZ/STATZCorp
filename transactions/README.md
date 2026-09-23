@@ -31,6 +31,7 @@ Use this README as the reference when adding transaction (edit + history) suppor
 | `field_name`  | Name of the field that changed               |
 | `old_value`   | Serialized value before change (text)        |
 | `new_value`   | Serialized value after change (text)         |
+| `note`        | Optional user explanation (up to 500 chars)  |
 | `created_at`  | When the change occurred                     |
 | `user`        | Who made the change (from request)           |
 
@@ -112,10 +113,11 @@ if sender is Contract:
 
 - **GET** `/transactions/edit/<content_type_id>/<object_id>/<field_name>/`  
   Returns an HTML partial with: table name, field label, current value (read-only), new value input (correct widget), Save/Cancel, and change history table.
-- **POST** same URL with form data (`new_value`, `csrfmiddlewaretoken`):
+- **POST** same URL with form data (`new_value`, optional `note`, `csrfmiddlewaretoken`):
   - Validates with `EditFieldForm`.
   - Uses `utils.set_field_value(instance, field_name, raw_value)` then `instance.save(update_fields=[field_name])`.
-  - The **signal** (post_save) creates the `Transaction` row; the view does not create it.
+  - The view puts the normalized note on `instance._transaction_note` only around the primary save and clears it in `finally` before any derived or synced saves.
+  - The **signal** (post_save) creates the `Transaction` row with that note; the view does not create or update the audit row.
   - Returns JSON: `{ "success": true, "field_name", "content_type_id", "object_id", "display_value" }`.
 
 **utils.py:**
@@ -227,7 +229,7 @@ Use a **button** (or link with `role="button"`) that looks like text and calls t
 ```html
 <button type="button"
   onclick="openTransactionsEditModal({{ content_type_id }}, {{ object_id }}, 'field_name')"
-  class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 dark:text-gray-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none text-left appearance-none">
+  class="btn btn-link btn-sm p-0 text-body-secondary">
   Field Label
 </button>
 ```
@@ -243,7 +245,7 @@ So `onTransactionSaved` can update the DOM:
 - Example for “contract” context: `contract-contract-number-value`, `contract-po-number-value`, `contract-buyer-value` (field_name `contract_number`, `po_number`, `buyer` → underscores become hyphens).
 
 ```html
-<p id="contract-contract-number-value" class="font-medium text-sm">{{ contract.contract_number|default:"N/A" }}</p>
+<p id="contract-contract-number-value" class="fw-semibold small">{{ contract.contract_number|default:"N/A" }}</p>
 ```
 
 ### 5. Implement `onTransactionSaved`
@@ -268,7 +270,7 @@ If part of the page is built in JS (e.g. `fetchClinDetails`), use the same patte
 |--------|-----|--------|
 | GET | `/transactions/list/<content_type_id>/<object_id>/` | HTML partial: table of all transactions for that object. |
 | GET | `/transactions/edit/<content_type_id>/<object_id>/<field_name>/` | HTML partial: edit form (current value, new value input, history table). |
-| POST | `/transactions/edit/<content_type_id>/<object_id>/<field_name>/` | Body: `new_value`, `csrfmiddlewaretoken`. Returns JSON `{ success, field_name, content_type_id, object_id, display_value }`. |
+| POST | `/transactions/edit/<content_type_id>/<object_id>/<field_name>/` | Body: `new_value`, optional `note`, `csrfmiddlewaretoken`. Returns JSON `{ success, field_name, content_type_id, object_id, display_value }`. |
 | GET | `/transactions/<pk>/` | HTML partial: one transaction detail (view-only, typed old/new). |
 | GET | `/transactions/api/field-info/?content_type_id=&field_name=` | JSON: `{ widget_type, choices, label }` for building forms. |
 

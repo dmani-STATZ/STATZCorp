@@ -159,14 +159,24 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
             data=request.POST,
         )
         if not form.is_valid():
+            error = (
+                form.errors.get("new_value")
+                or form.errors.get("note")
+                or ["Invalid value"]
+            )
             return JsonResponse(
-                {"success": False, "error": form.errors.get("new_value", ["Invalid value"])},
+                {"success": False, "error": error},
                 status=400,
             )
         raw_new = form.cleaned_data.get("new_value") or ""
+        note = form.cleaned_data.get("note") or None
         if not set_field_value(instance, field_name, raw_new):
             return JsonResponse({"success": False, "error": "Could not set value"}, status=400)
-        instance.save(update_fields=[field_name])
+        instance._transaction_note = note
+        try:
+            instance.save(update_fields=[field_name])
+        finally:
+            del instance._transaction_note
         if model_class.__name__ == 'ClinShipment' and field_name == 'pod_date':
             from contracts.views.shipment_views import _sync_clin_ship_fields
             _sync_clin_ship_fields(instance.clin, request.user)

@@ -3,17 +3,15 @@
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2/dist/js/tom-select.complete.min.js"></script>
 {# Transactions modal: include this where you need the transactions popup. #}
 {# Data attributes: data-content-type-id, data-object-id for loading list. #}
-<div id="transactionsModal" class="fixed inset-0 modal-backdrop-overlay overflow-y-auto h-full w-full hidden" style="z-index: 9999;" aria-labelledby="transactionsModalTitle" aria-modal="true">
-  <div class="relative top-10 mx-auto p-6 border shadow-lg rounded-lg bg-body w-full max-w-3xl" onclick="event.stopPropagation()">
-    <div class="flex justify-between items-center mb-4">
-      <h2 id="transactionsModalTitle" class="text-xl font-semibold text-gray-800">Field change history</h2>
-      <button type="button" onclick="closeTransactionsModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
+<div id="transactionsModal" class="transaction-modal-overlay d-none" aria-labelledby="transactionsModalTitle" aria-modal="true" role="dialog">
+  <div class="transaction-modal-dialog shadow" onclick="event.stopPropagation()">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 id="transactionsModalTitle" class="h5 mb-0">Field change history</h2>
+      <button type="button" onclick="closeTransactionsModal()" class="btn-close" aria-label="Close"></button>
     </div>
-    <div id="transactionsModalBody" class="min-h-[200px]">
+    <div id="transactionsModalBody" class="transaction-modal-body">
       {# List or detail partial is loaded here via JS #}
-      <p class="text-sm text-gray-500">Loading…</p>
+      <p class="small text-body-secondary">Loading…</p>
     </div>
   </div>
 </div>
@@ -77,21 +75,21 @@
   window.openTransactionsModal = function(contentTypeId, objectId) {
     if (!modal || !body) return;
     if (titleEl) titleEl.textContent = 'Field change history';
-    modal.classList.remove('hidden');
-    body.innerHTML = '<p class="text-sm text-gray-500">Loading…</p>';
+    modal.classList.remove('d-none');
+    body.innerHTML = '<p class="small text-body-secondary">Loading…</p>';
     var url = '/transactions/list/' + contentTypeId + '/' + objectId + '/';
     fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function(r) { return r.text(); })
       .then(function(html) { body.innerHTML = html; })
-      .catch(function() { body.innerHTML = '<p class="text-red-600">Failed to load transactions.</p>'; });
+      .catch(function() { body.innerHTML = '<p class="text-danger">Failed to load transactions.</p>'; });
   };
 
   /** Open modal to edit a specific field (table, field, old value, new value input + history). Save updates DB and triggers onTransactionSaved. */
   window.openTransactionsEditModal = function(contentTypeId, objectId, fieldName) {
     if (!modal || !body) return;
     if (titleEl) titleEl.textContent = 'Edit field';
-    modal.classList.remove('hidden');
-    body.innerHTML = '<p class="text-sm text-gray-500">Loading…</p>';
+    modal.classList.remove('d-none');
+    body.innerHTML = '<p class="small text-body-secondary">Loading…</p>';
     var editUrl = '/transactions/edit/' + contentTypeId + '/' + objectId + '/' + encodeURIComponent(fieldName) + '/';
     fetch(editUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function(r) { return r.text(); })
@@ -124,20 +122,20 @@
         }
         if (cancelBtn) cancelBtn.onclick = closeTransactionsModal;
       })
-      .catch(function() { body.innerHTML = '<p class="text-red-600">Failed to load.</p>'; });
+      .catch(function() { body.innerHTML = '<p class="text-danger">Failed to load.</p>'; });
   };
 
   window.closeTransactionsModal = function() {
-    if (modal) modal.classList.add('hidden');
+    if (modal) modal.classList.add('d-none');
   };
 
   window.showTransactionDetail = function(pk) {
     if (!body) return;
-    body.innerHTML = '<p class="text-sm text-gray-500">Loading…</p>';
+    body.innerHTML = '<p class="small text-body-secondary">Loading…</p>';
     fetch('/transactions/' + pk + '/')
       .then(function(r) { return r.text(); })
       .then(function(html) { body.innerHTML = html; })
-      .catch(function() { body.innerHTML = '<p class="text-red-600">Failed to load transaction.</p>'; });
+      .catch(function() { body.innerHTML = '<p class="text-danger">Failed to load transaction.</p>'; });
   };
 
   window.backToTransactionsList = function(contentTypeId, objectId) {

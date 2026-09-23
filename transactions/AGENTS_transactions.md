@@ -42,7 +42,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 - `transactions/field_types.py` — `FK_AJAX_THRESHOLD` (100), `FK_SEARCH_CONFIG`, and `get_fk_label()` control AJAX autocomplete. When adding a new large FK field (related model >100 records), add the model's lowercase class name and its search fields to `FK_SEARCH_CONFIG`, and add a label-formatting branch in `get_fk_label()`.
 - Tom Select 2.x is loaded from CDN in `transaction_modal.html`. It initializes on `select[data-fk-autocomplete='true']` (AJAX mode) and on preloaded `select.form-control` elements with more than 8 options (local search mode). Initialization is called from `initTomSelectWidgets(body)` inside `openTransactionsEditModal` after HTML injection.
 - `transactions/forms.py` — `TransactionForm._set_value_widgets()` and `EditFieldForm._set_widget()`
-- `transactions/templates/transactions/partials/transaction_edit.html` — the edit partial is injected via `innerHTML`; its form field names and JS submit handler must stay aligned with `EditFieldForm`
+- `transactions/templates/transactions/partials/transaction_edit.html` — the edit partial is injected via `innerHTML`; its form field names must stay aligned with `EditFieldForm`, while `transaction_modal.html` owns the submit handler
 
 ### Before changing views or URLs
 - `transactions/urls.py` — all four URL names: `transaction_list`, `transaction_detail`, `transaction_edit_field`, `field_info`
@@ -56,7 +56,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 - `transactions/signals.py` — `get_current_user()` and `clear_old_state()` are imported from middleware
 
 ### Before changing models or migrations
-- `transactions/migrations/0001_initial.py` — only migration; two named indexes (`tx_content_object_idx`, `tx_field_history_idx`) must remain if referenced
+- `transactions/migrations/0001_initial.py` creates the model and indexes; `0002_transaction_note.py` adds the nullable note. The two named indexes (`tx_content_object_idx`, `tx_field_history_idx`) must remain if referenced.
 - `transactions/admin.py` — `readonly_fields`, list display, and filters reference `Transaction` field names directly
 
 ---
@@ -125,7 +125,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 - All four views are decorated `@login_required`. Do not remove these.
 - `transaction_edit_field` is the only write endpoint. It validates via `EditFieldForm.is_valid()` and `utils.set_field_value` before calling `.save()`. Both gates must pass.
 - The POST body must include `X-CSRFToken` (sent by the modal JS). Do not remove or weaken the CSRF wiring in `transaction_modal.html`.
-- `Transaction` records are historical audit data. `TransactionAdmin` has `readonly_fields` — do not convert those to editable without explicit intent.
+- `Transaction` records, including their notes, are historical audit data. `TransactionAdmin` has `readonly_fields` — do not convert those to editable without explicit intent.
 - `_fk_choices` queries the database for FK option lists capped at 500 rows. Removing the cap risks slow page loads for large tables.
 - The edit endpoint accepts arbitrary `field_name` via URL but validates it against `model._meta.get_field()` and `get_field_info()` before proceeding — this guard must be preserved.
 
@@ -138,7 +138,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 - The two named indexes (`tx_content_object_idx`, `tx_field_history_idx`) support the primary query patterns. Do not drop them without profiling.
 - `object_id` is `PositiveIntegerField` — this breaks if any tracked model uses non-integer PKs.
 - Renaming `field_name`, `old_value`, or `new_value` on `Transaction` requires updating `admin.py`, `forms.py` (`Meta.fields`), both templates (`transaction_detail.html`, `transaction_list.html`, `transaction_edit.html`), and any direct `.filter(field_name=...)` calls in `views.py`.
-- Only one migration exists (`0001_initial`). New migrations are straightforward but must not alter the indexes without checking admin queries.
+- Schema migrations must not alter the existing indexes without checking admin queries.
 
 ---
 
@@ -146,7 +146,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 
 - URL names are in the `transactions` namespace. The modal JavaScript does **not** use Django `{% url %}` — it builds paths from a hardcoded prefix. If the URL prefix changes in root `urls.py`, update the JS fetch paths in `transaction_modal.html` too.
 - The four URL names are: `transactions:transaction_list`, `transactions:transaction_detail`, `transactions:transaction_edit_field`, `transactions:field_info`. Search for these strings if renaming.
-- `transaction_modal.html` is a shared partial included by `supplier_detail.html` and `contract_management.html`. Changes to its API (function signatures, global names, callback contracts) break both callers.
+- `transaction_modal.html` is a shared partial included by `supplier_detail.html`, `contract_management.html`, and `clin_detail.html`. Changes to its API (function signatures, global names, callback contracts) break callers.
 - `window.onTransactionSaved` is the callback hook used by `supplier_detail.html` to refresh displayed values after a successful edit. Do not rename this without updating both caller templates.
 - The partial templates (`transaction_list.html`, `transaction_detail.html`, `transaction_edit.html`) are injected into the modal via `innerHTML`. They must not rely on page-level scripts or styles that aren't available inside a modal overlay.
 - Context variable names matter: `table_name`, `field_name`, `field_label`, `old_value_display`, `content_type_id`, `object_id` are all used in `transaction_edit.html`. Renaming any of these in `views.py` requires updating the template.
@@ -155,7 +155,7 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 
 ## 10. Forms / Serializers / Input Validation Rules
 
-- `EditFieldForm` has a single `new_value = CharField(required=False)`. Widget is set dynamically in `__init__`. The form itself does minimal validation — the real coercion gate is `utils.set_field_value`.
+- `EditFieldForm` has a dynamic `new_value` plus an optional stripped `note` limited to 500 characters. The form itself does minimal value validation — the real coercion gate is `utils.set_field_value`.
 - `utils.set_field_value` returns `False` on coercion failure. The view checks this and returns a `400`. Do not remove this check or call `.save()` if it returns `False`.
 - Empty string handling in `set_field_value`: empty input sets `None` on nullable fields and rejects non-nullable fields. This is by design.
 - `TransactionForm` is read-only (view-only modal). It does not validate on POST and should not be converted to an editable form.
@@ -201,6 +201,7 @@ There are **no automated tests** in this app. After any edit, verify manually:
 - **No tests.** Regressions in signal field serialization, `set_field_value` coercion, or widget selection will not be caught automatically.
 - **`FK_SEARCH_CONFIG` and `get_fk_label()` are NOT automatically updated when new FK fields are added to TRACKED.** If a new FK field's related model has >100 records and its model name is not in `FK_SEARCH_CONFIG`, the `fk_search` endpoint falls back to a generic `name`/`description` field search. If neither attribute exists on the model, the endpoint returns empty results silently.
 - **Tom Select initializes only on elements found by `container.querySelectorAll(...)` inside `#transactionsModalBody` after `innerHTML` injection.** If a template change wraps the `<select>` in a way that removes `data-fk-autocomplete` or the `form-control` class, Tom Select will not enhance it and the raw browser select will be shown instead.
+- **`_transaction_note` must be short-lived.** Set it only around the primary user-requested `instance.save(update_fields=[field_name])` and remove it in a `finally` block before derived-value, shipment-sync, or PO-sync saves run. Otherwise secondary `Transaction` rows can incorrectly inherit the user's note.
 
 ---
 
@@ -283,3 +284,7 @@ This project does not use Tailwind in any form. All styling uses Bootstrap 5 plu
 **When editing templates:** if you encounter Tailwind utility classes, replace them with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind classes in place.
 
 **Button pattern:** `.btn-outline-brand` is the standard outlined brand button. Use `.btn-outline-brand.btn-tinted` for pill-style with `#eff6ff` background tint.
+
+The transaction modal and all three transaction partials were converted from Tailwind-style utilities to Bootstrap 5 plus named `.transaction-*` classes in `app-core.css`. Their colors use Bootstrap `var()` tokens and inherit dark-mode values.
+
+The former `<script>` in `partials/transaction_edit.html` was dead code and was removed. The partial is inserted with `innerHTML`, which does not execute injected scripts; `transaction_modal.html` already binds submit and cancel handlers after insertion.

@@ -1,7 +1,7 @@
 ﻿# Transactions Context
 
 ## 1. Purpose
-Track field-level edits for a handful of auditable models and surface that history in the UI while also letting staff overwrite a single field without leaving the page. The `transactions` app records every change to fields listed in `signals.TRACKED` (Contracts, CLINs, `ClinShipment.pod_date`, and Supplier detail fields) and exposes an AJAX-powered modal plus edit flow that reads from `Transaction` rows, shows typed values, and lets the user submit a new value that reuses the same history recording logic.
+Track field-level edits for a handful of auditable models and surface that history in the UI while also letting staff overwrite a single field without leaving the page. The `transactions` app records every change to fields listed in `signals.TRACKED` (`Contract`, `Clin`, `ClinShipment`, `ClinSplit`, `ContractLevelCharge`, and `Supplier`) and exposes an AJAX-powered modal plus edit flow that reads from `Transaction` rows, shows typed values and optional change notes, and lets the user submit a new value that reuses the same history recording logic.
 
 ## 2. App Identity
 - **Django app name:** `transactions`
@@ -17,7 +17,7 @@ Track field-level edits for a handful of auditable models and surface that histo
 - Surface change history in the admin as read-only rows for auditing (`admin.py`).
 
 ## 4. Key Files and What They Do
-- `models.py`: Declares the single `Transaction` model (fields: `content_type`, `object_id`, `field_name`, `old_value`, `new_value`, `created_at`, `user`) with `Meta.indexes` tuned for per-record and per-field lookups.
+- `models.py`: Declares the single `Transaction` model (fields: `content_type`, `object_id`, `field_name`, `old_value`, `new_value`, `note`, `created_at`, `user`) with `Meta.indexes` tuned for per-record and per-field lookups.
 - `forms.py`: Exposes `TransactionForm` (modal detail view that binds widgets using metadata) and `EditFieldForm` (single `new_value` entry that drives edits); both call `field_types.get_field_info` during `__init__`.
 - `views.py`: Hosts `transaction_list`, `transaction_detail`, `field_info_api`, and `transaction_edit_field` (GET for partials and history, POST to coerce or overwrite a field). Each view is `@login_required` and the edit view returns JSON for the modal.
 - `urls.py`: Namespaced `transactions` routes under `/transactions/...` for list, detail, edit, and field-info endpoints.
@@ -26,11 +26,11 @@ Track field-level edits for a handful of auditable models and surface that histo
 - `signals.py`: Defines `TRACKED` `(model_class, field_name)` tuples for `Contract`, `Clin`, `ClinShipment` (currently `pod_date`), and `Supplier`; stores pre-save state via `contextvars` and creates `Transaction` rows post-save when the serialized old value differs from the new.
 - `middleware.py`: `TransactionUserMiddleware` writes the authenticated user to a contextvar, clears the `old_state` cache each request, and is wired into `MIDDLEWARE` after authentication (`STATZWeb/settings.py:86/98`).
 - `admin.py`: Registers `Transaction` with read-only fields, filters, search, and `date_hierarchy` to support audits.
-- `templates/transactions/transaction_modal.html` plus `templates/transactions/partials/*`: Provide the modal shell, history table, edit form, detail view HTML, and embedded scripts that manage the modal lifecycle.
+- `templates/transactions/transaction_modal.html` plus `templates/transactions/partials/*`: Provide the Bootstrap 5 modal shell, history table, edit form, and detail view HTML. Modal lifecycle and injected-form event binding live in the shell script.
 - `README.md`: Step-by-step instructions for wiring the modal (`openTransactionsModal`, `openTransactionsEditModal`), tracking new fields, and understanding the API.
 
 ## 5. Data Model / Domain Objects
-- **`Transaction`**: Stores one row per field delta, timestamped and optionally tied to a user (`related_name="field_transactions"`). `__str__` formats as `model#pk.field @ timestamp`, and `table_name` returns `content_type.model`.
+- **`Transaction`**: Stores one row per field delta, timestamped and optionally tied to a user (`related_name="field_transactions"`). Its nullable `note` field stores an optional user explanation of up to 500 characters. `__str__` formats as `model#pk.field @ timestamp`, and `table_name` returns `content_type.model`.
 - Uses `ContentType`/`object_id`/`GenericForeignKey`, so the record can belong to any app (contracts, suppliers, etc.).
 - Indexed on `(content_type, object_id)` and `(content_type, object_id, field_name)` for listing history by record or field (`models.py`).
 - No other models exist in this app.
@@ -40,7 +40,7 @@ Track field-level edits for a handful of auditable models and surface that histo
 2. `GET /transactions/list/<content_type_id>/<object_id>/` (`transaction_list`) renders `transactions/partials/transaction_list.html`; rows call `showTransactionDetail(pk)` to load a detail partial.
 3. `GET /transactions/<pk>/` (`transaction_detail`) renders `transaction_detail.html`, using `TransactionForm` so the stored `field_name`, `old_value`, and `new_value` appear with the proper widgets.
 4. `GET /transactions/edit/<content_type_id>/<object_id>/<field_name>/` (`transaction_edit_field`) verifies the model/field exists, reads `get_field_value_display`, prepares `EditFieldForm`, and returns `transaction_edit.html` with the latest 20 transactions for that field.
-5. `POST` to the same edit URL validates `EditFieldForm`, uses `utils.set_field_value` to coerce the raw string, saves the instance with `update_fields=[field_name]`, and returns JSON `{success, field_name, content_type_id, object_id, display_value}` so the caller can update the page without a full refresh. Model-specific post-save cascades (view-layer, not signals): CLIN `item_value`/`quote_value` reverse-derive per-unit prices; CLIN `order_qty`/`unit_price`/`price_per_unit` forward-derive via `clin_compute.recompute_clin_derived_values` (`derived_updates`); CLIN `clin_po_num` or Contract `po_number` sync across the contract via `clin_po_sync.sync_po_number` (`po_sync_updates`).
+5. `POST` to the same edit URL validates `EditFieldForm`, uses `utils.set_field_value` to coerce the raw string, and normalizes the optional note to `None`. Immediately around the primary `instance.save(update_fields=[field_name])`, the view sets `instance._transaction_note` and removes it in `finally`. The post-save signal reads that transient attribute while creating the append-only `Transaction` row. Cleanup occurs before model-specific secondary saves, so derived and synced rows do not inherit the user's note. The response remains `{success, field_name, content_type_id, object_id, display_value}` so the caller can update the page without a full refresh. Model-specific post-save cascades (view-layer, not signals): CLIN `item_value`/`quote_value` reverse-derive per-unit prices; CLIN `order_qty`/`unit_price`/`price_per_unit` forward-derive via `clin_compute.recompute_clin_derived_values` (`derived_updates`); CLIN `clin_po_num` or Contract `po_number` sync across the contract via `clin_po_sync.sync_po_number` (`po_sync_updates`).
 6. `GET /transactions/api/field-info/?content_type_id=...&field_name=...` (`field_info_api`) returns the widget type, choices, and label so page scripts know what input to render before opening the edit modal.
 All views are decorated with `@login_required`, and `transaction_edit_field` uses `JsonResponse` to surface validation errors or unknown fields.
 
@@ -49,25 +49,31 @@ All views are decorated with `@login_required`, and `transaction_edit_field` use
 - Partial templates under `templates/transactions/partials/`:
   - `transaction_list.html`: Tabular history with `humanize` formatting, clickable rows, and truncated old/new values.
   - `transaction_detail.html`: Metadata plus the `TransactionForm` fields (read-only) for a single change.
-  - `transaction_edit.html`: Table and field labels, current value, the `EditFieldForm`, Save/Cancel buttons, a 20-row history table, and an embedded script that submits the form via `fetch` and triggers `window.onTransactionSaved`.
+  - `transaction_edit.html`: Table and field labels, current value, the `EditFieldForm` (including optional note), Save/Cancel buttons, and a 20-row history table. It intentionally contains no script because scripts injected with `innerHTML` do not execute; `transaction_modal.html` owns submission and cancel handlers.
 - UI is server-rendered partials injected via JavaScript; no heavy SPA framework is present, just vanilla `fetch` and DOM updates with Bootstrap-style classes.
 
 ## 8. Admin / Staff Functionality
-`transactions/admin.py` registers `Transaction` with list display columns for the model/field/user/timestamp, filters on `content_type` and `created_at`, readonly fields for historical data, search over field names and values, and `date_hierarchy = "created_at"` so staff can browse the audit trail by time.
+`transactions/admin.py` registers `Transaction` with list display columns for the model/field/note/user/timestamp, filters on `content_type` and `created_at`, readonly fields for all audit data (including `note`), search over field names, values, and notes, and `date_hierarchy = "created_at"` so staff can browse the audit trail by time.
 
 ## 9. Forms, Validation, and Input Handling
 - `TransactionForm` renders the stored `field_name`, `old_value`, and `new_value`. In `__init__`, it calls `get_field_info` to determine the widgets (date input, datetime, select, textarea, etc.) and applies `_input_attrs(editable=False)` for styling (`forms.py`).
-- `EditFieldForm` exposes one `new_value` field. Its `__init__` fetches metadata from `get_field_info` to choose the correct widget and can preload `initial_value` so the modal shows the current value.
+- `EditFieldForm` exposes `new_value` plus an optional stripped `note` limited to 500 characters. Its `__init__` fetches metadata from `get_field_info` to choose the correct value widget and can preload `initial_value` so the modal shows the current value.
 - Both forms expose a `field_info` property so callers can reuse widget metadata.
 - `field_types.get_field_info` inspects the concrete field type, supplies `(value,label)` choices for booleans, ForeignKeys (using `_fk_choices` limited to 500 rows), and fields with `choices`, and returns the verbose name for UI labels.
 
 FK fields on models with more than `FK_AJAX_THRESHOLD` (100) records use `WIDGET_FK_AUTOCOMPLETE` and are rendered as Tom Select AJAX autocomplete widgets. The search endpoint is `GET /transactions/api/fk-search/`. Smaller FK tables use `WIDGET_SELECT` with preloaded choices, also enhanced by Tom Select for local search. The `FK_SEARCH_CONFIG` dict in `field_types.py` defines which fields to search per related model. The `get_fk_label()` function in `field_types.py` controls label formatting for both AJAX results and edit form pre-population.
 
 ## 10. Business Logic and Services
-- `signals.py` contains the core logic: `TRACKED` enumerates the fields audited on `Contract` (including `files_url`), `Clin`, `ClinShipment`, `ClinSplit`, `ContractLevelCharge`, and `Supplier`.
+- `signals.py` contains the core logic. Current `TRACKED` fields are:
+  - `Contract`: `contract_number`, `po_number`, `tab_num`, `buyer`, `due_date`, `award_date`, `sales_class`, `solicitation_type`, `plan_gross`, `files_url`
+  - `Clin`: `item_type`, `clin_po_num`, `supplier`, `nsn`, `ia`, `fob`, `special_payment_terms`, `supplier_due_date`, `due_date`, `order_qty`, `ship_qty`, `ship_date`, `item_value`, `quote_value`, `unit_price`, `price_per_unit`, `uom`
+  - `ClinShipment`: `pod_date`
+  - `ClinSplit`: `split_paid`
+  - `ContractLevelCharge`: `label`, `action_type`, `supplier`, `estimated_amount`, `billed_paid_amount`, `payment_date`, `invoice_number`
+  - `Supplier`: `name`, `cage_code`, `dodaac`, `allows_gsi`, `probation`, `conditional`, `archived`, `iso`, `ppi`, `special_terms`, `supplier_type`, `prime`, `is_packhouse`, `business_phone`, `primary_phone`, `business_email`, `primary_email`, `website_url`
 - `Contract.files_url` is passively audited when validated SharePoint flows save the model instance. It is deliberately not wired to `openTransactionsEditModal`; raw inline editing would bypass local-path parsing and Graph folder validation.
 - `store_old_state` (pre_save) queries the database for tracked values before the change, serializes them via `_serialize` (handling dates, datetimes, and FKs), and caches them in a request-scoped dictionary keyed by `(model_class, pk)`.
-- `record_transactions` (post_save) compares serialized old values to the instance’s new values and creates `Transaction` rows only when the value changed; `get_current_user()` provides the user for attribution.
+- `record_transactions` (post_save) compares serialized old values to the instance’s new values and creates `Transaction` rows only when the value changed; `get_current_user()` provides the user for attribution and `getattr(instance, "_transaction_note", None)` supplies the optional note.
 - `utils.set_field_value` handles coercion: it trims strings, enforces nullability, parses ISO dates/datetimes, resolves ForeignKeys by PK, converts numeric/decimal inputs, and normalizes booleans; it returns `False` when the conversion fails so the edit view can reject the request.
 - A `get_fk_label(obj)` helper in `field_types.py` provides consistent FK display labels used by both the AJAX search endpoint (`fk_search`) and `EditFieldForm`'s initial value pre-population.
 - `utils.get_field_value_display` returns `YYYY-MM-DD` strings for date pickers; `get_display_value` formats values for the page (using `get_<field>_display` when available or falling back to `strftime`).
@@ -96,7 +102,7 @@ All endpoints require authentication (`@login_required`).
 - Views are decorated with `@login_required`, and the modal partials should only be included on pages shown to authorized staff.
 - Edit requests run through `TransactionUserMiddleware`, which sets the authenticated user into a contextvar and calls `signals.clear_old_state()` after each request so state does not leak.
 - `transaction_edit_field` returns JSON errors (`400` for invalid value, `404` for unknown model/field) and refuses to save unless `utils.set_field_value` and `form.is_valid()` succeed.
-- Admin exposure is read-only—`TransactionAdmin.readonly_fields` prevents manual edits of historical data.
+- Admin exposure is read-only—`TransactionAdmin.readonly_fields` prevents manual edits of historical values and notes.
 - The modal POST includes `X-CSRFToken`, `X-Requested-With`, and submits with `credentials: 'same-origin'` for security.
 
 ## 14. Background Processing / Scheduled Work
@@ -107,10 +113,10 @@ All endpoints require authentication (`@login_required`).
 No `tests.py`, `tests/`, or other automated tests exist inside `transactions/`, so there is currently no coverage for the edit/history flow.
 
 ## 16. Migrations / Schema Notes
-Only `migrations/0001_initial.py` exists (Django 4.2.24, Feb 12 2026). It creates the `Transaction` table with a `BigAutoField` primary key and the two indexes referenced in `models.py`. No later migrations are present.
+`migrations/0001_initial.py` creates the `Transaction` table with a `BigAutoField` primary key and the two indexes referenced in `models.py`. `0002_transaction_note.py` adds the nullable note column without changing either index.
 
 ## 17. Known Gaps / Ambiguities
-- Despite the README showing how to call `openTransactionsEditModal`/`openTransactionsModal`, no other templates or JS currently import or call those helpers, so the modal is not wired to any real field.
+- The modal is actively included/called by `templates/suppliers/supplier_detail.html`, `contracts/templates/contracts/contract_management.html`, and `contracts/templates/contracts/clin_detail.html` (with shipment POD controls rendered through its included partial).
 - There are no automated tests for the signals, forms, or views, so regressions in `TRACKED` or `set_field_value` would go unnoticed.
 - `transaction_edit_field` limits history to 20 rows per field, and extending `TRACKED` requires updating both the tuple list and `store_old_state` branches for that model.
 

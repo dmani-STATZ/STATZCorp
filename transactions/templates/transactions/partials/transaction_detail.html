@@ -1,39 +1,43 @@
 {% load humanize %}
-<div class="space-y-4">
-  <div class="flex justify-between items-center">
+<div class="vstack gap-3">
+  <div class="d-flex justify-content-between align-items-center">
     <button
       type="button"
       onclick="backToTransactionsList({{ transaction.content_type_id }}, {{ transaction.object_id }})"
-      class="text-sm text-blue-600 hover:text-blue-800"
+      class="btn btn-link btn-sm p-0"
     >
       ← Back to list
     </button>
   </div>
 
-  <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-    <div>
-      <dt class="text-gray-500">Date / time</dt>
-      <dd class="font-medium text-gray-900">{{ transaction.created_at|date:"M j, Y g:i A" }}</dd>
+  <dl class="row g-2 small mb-0">
+    <div class="col-12 col-sm-6">
+      <dt class="text-body-secondary">Date / time</dt>
+      <dd class="fw-semibold mb-0">{{ transaction.created_at|date:"M j, Y g:i A" }}</dd>
     </div>
-    <div>
-      <dt class="text-gray-500">User</dt>
-      <dd class="font-medium text-gray-900">{{ transaction.user.get_full_name|default:transaction.user.username|default:"—" }}</dd>
+    <div class="col-12 col-sm-6">
+      <dt class="text-body-secondary">User</dt>
+      <dd class="fw-semibold mb-0">{{ transaction.user.get_full_name|default:transaction.user.username|default:"—" }}</dd>
     </div>
   </dl>
 
-  <form class="space-y-4" method="get" action="#">
+  <form class="vstack gap-3" method="get" action="#">
     {% csrf_token %}
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Field</label>
+      <label class="form-label small fw-semibold mb-1">Field</label>
       {{ form.field_name }}
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Old value</label>
+      <label class="form-label small fw-semibold mb-1">Old value</label>
       {{ form.old_value }}
     </div>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">New value</label>
+      <label class="form-label small fw-semibold mb-1">New value</label>
       {{ form.new_value }}
     </div>
   </form>
+  <div>
+    <div class="small fw-semibold mb-1">Note</div>
+    <div class="form-control bg-body-secondary transaction-note-text" role="textbox" aria-readonly="true">{{ transaction.note|default:"—" }}</div>
+  </div>
 </div>

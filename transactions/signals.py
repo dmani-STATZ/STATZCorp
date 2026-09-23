@@ -256,4 +256,5 @@ def record_transactions(sender, instance, **kwargs):
             old_value=old_val,
             new_value=new_val,
             user=user,
+            note=getattr(instance, "_transaction_note", None),
         )
