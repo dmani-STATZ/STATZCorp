@@ -1,7 +1,7 @@
 ---
 id: 2026-09-23-release-notes-modal-fix
 title: Fixed — What's New modal now shows the correct update count and dates
-published: false
+published: true
 publish_date: 2026-09-23
 tags: [fixed, system]
 critical: false
