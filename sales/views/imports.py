@@ -35,6 +35,7 @@ from sales.forms import ImportUploadForm
 from sales.models import AwardImportBatch, ImportBatch, ImportJob
 from sales.services.dibbs_fetch import DibbsFetchError, fetch_dibbs_archive_files
 from sales.services.importer import (
+    DIBBS_FILE_ENCODING,
     _import_date_from_filename,
     _run_lifecycle_sweep,
     create_import_batch,
@@ -308,9 +309,9 @@ def _open_files(job):
         )
 
     return (
-        open(job.in_file_path, "r", encoding="utf-8", errors="replace"),
-        open(job.bq_file_path, "r", encoding="utf-8", errors="replace"),
-        open(job.as_file_path, "r", encoding="utf-8", errors="replace"),
+        open(job.in_file_path, "r", encoding=DIBBS_FILE_ENCODING),
+        open(job.bq_file_path, "r", encoding=DIBBS_FILE_ENCODING),
+        open(job.as_file_path, "r", encoding=DIBBS_FILE_ENCODING),
     )
 
 

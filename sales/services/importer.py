@@ -58,6 +58,14 @@ def _import_date_from_filename(filename: str) -> date | None:
         return None
 
 
+# DIBBS publishes the IN/BQ/AS files as ISO-8859-1, and the BQ file must be
+# written back in the same encoding. Reading them as UTF-8 turned every byte
+# >= 0x80 into U+FFFD inside SolicitationLine.bq_raw_columns, corrupting the
+# export template. latin-1 round-trips all 256 byte values, so no errors= is
+# needed -- the decode cannot fail.
+DIBBS_FILE_ENCODING = "iso-8859-1"
+
+
 def _chunked(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
@@ -68,7 +76,7 @@ def _as_text(f):
     """Wrap a binary upload file as a text stream for parsing."""
     if isinstance(f.read(0), bytes):
         f.seek(0)
-        return io.TextIOWrapper(f, encoding="utf-8", errors="replace")
+        return io.TextIOWrapper(f, encoding=DIBBS_FILE_ENCODING)
     f.seek(0)
     return f
 
@@ -311,6 +319,11 @@ def upsert_lines_and_sources(parsed: dict, batch: ImportBatch) -> dict:
             "quantity", "nomenclature", "unit_of_issue",
             "purchase_request_number", "fsc", "niin",
             "line_number", "delivery_days",
+            # bq_raw_columns is assigned above when a BQ row matched. Without it
+            # here, bulk_update silently drops the 121-column template on every
+            # re-import, leaving pre-existing lines NULL forever and hard-failing
+            # bq_export.generate_bq_file().
+            "bq_raw_columns",
         ]
         for chunk in _chunked(lines_to_create, LINE_CHUNK):
             SolicitationLine.objects.bulk_create(chunk, ignore_conflicts=False)
