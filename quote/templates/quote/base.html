@@ -1,0 +1,31 @@
+{% extends "base_template.html" %}
+{% comment %}
+  Quotes app shell.
+
+  base_template.html exposes only {% block body %} and {% block extra_js %} --
+  there is no {% block content %} there. This shell defines body and re-exposes
+  content, the same contract sales/base.html provides. All quote pages extend
+  THIS file, never base_template.html directly.
+
+  jQuery, jQuery UI and the Bootstrap 5.3.3 bundle are already loaded
+  synchronously in base_template.html's <head>, so inline scripts here may use
+  bootstrap.Modal / bootstrap.Offcanvas with no DOMContentLoaded guard and with
+  no extra CDN tags.
+{% endcomment %}
+
+{% block body %}
+<div class="quote-shell">
+
+  <nav class="quote-subnav" aria-label="Quotes sections">
+    <div class="quote-subnav-inner">
+      <a href="{% url 'quote:dashboard' %}"
+         class="quote-subnav-link {% if section == 'dashboard' %}active{% endif %}">
+        Dashboard
+      </a>
+    </div>
+  </nav>
+
+  {% block content %}{% endblock content %}
+
+</div>
+{% endblock body %}

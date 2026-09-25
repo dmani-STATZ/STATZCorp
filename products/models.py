@@ -64,6 +64,17 @@ class Nsn(AuditModel):
         blank=True, default="",
         help_text="Hazmat, crating, ORM-D, or other special handling notes."
     )
+    dimension_source_notes = models.TextField(
+        blank=True, default="",
+        help_text="Where the weight/dimension figures came from, e.g. 'vendor "
+                  "spec sheet' or 'estimated from prior drawing'. Written by the "
+                  "quote app's freight sub-modal."
+    )
+    dimensions_last_verified = models.DateField(
+        null=True, blank=True,
+        help_text="Date the weight/dimensions were last confirmed against a "
+                  "real source. Stale dims produce bad freight adders."
+    )
     directory_url = models.CharField(max_length=200, null=True, blank=True)
     suppliers = models.ManyToManyField(
         Supplier,

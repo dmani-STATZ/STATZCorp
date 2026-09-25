@@ -105,6 +105,7 @@ urlpatterns = [
     path("inventory/", include("inventory.urls")),
     path("contracts/", include("contracts.urls")),
     path("sales/", include("sales.urls")),
+    path("quote/", include("quote.urls")),
     path("suppliers/", include("suppliers.urls")),
     path("products/", include("products.urls")),
     path("accesslog/", include("accesslog.urls")),

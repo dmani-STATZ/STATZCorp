@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STATZ Quotes — Phase 4: Our Bids & Post-Award Intelligence</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-border: #334155;
+      --surface-hover: #273549;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --green: #10b981;
+      --green-bg: #064e3b;
+      --red: #f43f5e;
+      --red-bg: #4c0519;
+      --amber: #f59e0b;
+      --amber-bg: #451a03;
+      --blue: #38bdf8;
+      --blue-bg: #0c4a6e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Top Global Header */
+    header {
+      background: #111827;
+      border-bottom: 1px solid var(--surface-border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+      flex-shrink: 0;
+    }
+    .brand { font-size: 1.15rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    .brand span { color: var(--text-muted); font-size: 0.85rem; font-weight: 400; }
+    .time-selector {
+      display: flex;
+      align-items: center;
+      background: #0f172a;
+      border: 1px solid var(--surface-border);
+      border-radius: 9999px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .time-pill {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 5px 14px;
+      font-size: 0.8rem;
+      border-radius: 9999px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+    .time-pill.active { background: var(--accent); color: #fff; }
+
+    /* Main Container */
+    .dashboard-container { flex: 1; display: flex; flex-direction: column; padding: 20px 24px; overflow: hidden; position: relative; }
+
+    /* Executive KPI Cards */
+    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; flex-shrink: 0; }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      position: relative;
+    }
+    .kpi-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; }
+    .kpi-value { font-size: 1.75rem; font-weight: 800; margin: 4px 0; display: flex; align-items: baseline; gap: 8px; }
+    .kpi-sub { font-size: 0.8rem; color: var(--text-muted); }
+    .val-won { color: #34d399; }
+    .val-lost { color: #fb7185; }
+    .val-rate { color: #38bdf8; }
+    .val-alert { color: #fbbf24; }
+
+    /* Filter & Search Bar */
+    .filter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .filter-group { display: flex; align-items: center; gap: 8px; }
+    .search-box {
+      width: 320px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .filter-pill {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .filter-pill.active { background: #334155; color: #fff; border-color: #64748b; }
+
+    /* Master Data Grid */
+    .grid-container {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      overflow-y: auto;
+    }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+    thead { position: sticky; top: 0; background: #162032; border-bottom: 2px solid var(--surface-border); z-index: 10; }
+    th { padding: 12px 16px; font-weight: 700; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 12px 16px; border-bottom: 1px solid var(--surface-border); vertical-align: middle; }
+    tr:hover { background: var(--surface-hover); }
+
+    /* Badges */
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; }
+    .badge-won { background: var(--green-bg); color: #34d399; border: 1px solid var(--green); }
+    .badge-lost { background: var(--red-bg); color: #fb7185; border: 1px solid var(--red); }
+    .badge-pending { background: var(--blue-bg); color: #7dd3fc; border: 1px solid var(--blue); }
+    .badge-tight { background: var(--amber-bg); color: #fcd34d; font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+
+    /* Button */
+    .btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid var(--surface-border);
+      background: transparent;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: #334155; color: #fff; }
+
+    /* Slide-Out Forensic Drawer */
+    .forensic-drawer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 480px;
+      background: #111827;
+      border-left: 2px solid var(--accent);
+      box-shadow: -12px 0 30px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      transform: translateX(100%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .forensic-drawer.open { transform: translateX(0); }
+    .drawer-top {
+      padding: 18px 22px;
+      background: #162032;
+      border-bottom: 1px solid var(--surface-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .drawer-title { font-weight: 700; font-size: 1.05rem; }
+    .drawer-body { padding: 22px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; font-size: 0.88rem; }
+    .detail-card {
+      background: #0f172a;
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .card-label { font-size: 0.72rem; text-transform: uppercase; font-weight: 700; color: #38bdf8; margin-bottom: 10px; letter-spacing: 0.5px; }
+    .detail-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem; }
+    .detail-row span { color: var(--text-muted); }
+    .detail-row strong { color: var(--text); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Global Header with Timeframe Selectors -->
+  <header>
+    <div class="brand">
+      STATZ QUOTES <span>| Phase 4: Our Bids & Post-Award Intelligence</span>
+    </div>
+    <div class="time-selector">
+      <button class="time-pill" onclick="setTimeframe('week', this)">Week</button>
+      <button class="time-pill active" onclick="setTimeframe('month', this)">Month</button>
+      <button class="time-pill" onclick="setTimeframe('quarter', this)">Quarter</button>
+      <button class="time-pill" onclick="setTimeframe('all', this)">All Time</button>
+    </div>
+  </header>
+
+  <!-- Main Dashboard -->
+  <main class="dashboard-container">
+
+    <!-- Executive Summary KPI Cards -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Bids Won</div>
+        <div class="kpi-value val-won" id="kpiWon">14 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$86,450 Total</span></div>
+        <div class="kpi-sub">Avg Margin: <strong>4.8%</strong></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Bids Lost</div>
+        <div class="kpi-value val-lost" id="kpiLost">48 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$210,800 Total</span></div>
+        <div class="kpi-sub">Market Clearing Delta: <strong>+8.4%</strong></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Win Rate</div>
+        <div class="kpi-value val-rate" id="kpiRate">22.5%</div>
+        <div class="kpi-sub">62 Bids Finalized</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">"Within 5%" Opportunities</div>
+        <div class="kpi-value val-alert" id="kpiTight">9 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$32,150 Value</span></div>
+        <div class="kpi-sub">Lost by &lt; 5% price delta</div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <input type="text" class="search-box" placeholder="Search by SOL #, NSN, Nomenclature, Winner..." oninput="filterGrid(this.value)" />
+        <button class="filter-pill active" onclick="setStatusFilter('ALL', this)">All (6)</button>
+        <button class="filter-pill" onclick="setStatusFilter('WON', this)">Won (2)</button>
+        <button class="filter-pill" onclick="setStatusFilter('LOST', this)">Lost (3)</button>
+        <button class="filter-pill" onclick="setStatusFilter('PENDING', this)">Pending (1)</button>
+      </div>
+      <div style="font-size:0.8rem; color:var(--text-muted);">
+        Showing bids from <strong id="timeframeLabel" style="color:#fff;">Last 30 Days</strong>
+      </div>
+    </div>
+
+    <!-- Master Grid Table -->
+    <div class="grid-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Solicitation</th>
+            <th>NSN / Nomenclature</th>
+            <th>Bid Date</th>
+            <th>Our Unit Bid</th>
+            <th>Award Price</th>
+            <th>Dollar Delta</th>
+            <th>% Spread</th>
+            <th>Winning Entity</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="gridBody">
+          <!-- Rows injected by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Slide-Out Bid Forensic Detail Drawer -->
+    <aside class="forensic-drawer" id="forensicDrawer">
+      <div class="drawer-top">
+        <div class="drawer-title" id="drawerTitle">Bid Forensics</div>
+        <button class="btn" onclick="closeDrawer()" style="padding:2px 8px;">✕</button>
+      </div>
+      <div class="drawer-body">
+        
+        <!-- Outcome Summary Card -->
+        <div class="detail-card">
+          <div class="card-label">🏆 Contract Award Outcome (DIBBS Scrape)</div>
+          <div class="detail-row"><span>Status:</span> <strong id="dOutcome">—</strong></div>
+          <div class="detail-row"><span>Contract / PIID:</span> <strong id="dPiid">—</strong></div>
+          <div class="detail-row"><span>Award Date:</span> <strong id="dAwardDate">—</strong></div>
+          <div class="detail-row"><span>Awarded Winner:</span> <strong id="dWinner">—</strong></div>
+          <div class="detail-row"><span>Winning CAGE:</span> <strong id="dCage">—</strong></div>
+          <div class="detail-row"><span>Winning Unit Price:</span> <strong id="dWinPrice">—</strong></div>
+          <div class="detail-row"><span>Difference / Delta:</span> <strong id="dDelta">—</strong></div>
+        </div>
+
+        <!-- STATZ Bid Snapshot Card -->
+        <div class="detail-card">
+          <div class="card-label">📊 STATZ Frozen Bid Snapshot</div>
+          <div class="detail-row"><span>Base Part Supplier:</span> <strong id="dSupplier">—</strong></div>
+          <div class="detail-row"><span>Supplier Unit Cost:</span> <strong id="dBaseCost">—</strong></div>
+          <div class="detail-row"><span>Packhouse Handler:</span> <strong id="dPackhouse">—</strong></div>
+          <div class="detail-row"><span>Pack Adder / Unit:</span> <strong id="dPackCost">—</strong></div>
+          <div class="detail-row"><span>Freight Adder / Unit:</span> <strong id="dFreightCost">—</strong></div>
+          <div class="detail-row"><span>Physical Specs:</span> <strong id="dDims">—</strong></div>
+          <div class="detail-row"><span>Applied STATZ Margin:</span> <strong id="dMargin">—</strong></div>
+          <div class="detail-row"><span>Final Unit Submitted:</span> <strong id="dFinalPrice" style="color:#38bdf8;">—</strong></div>
+          <div class="detail-row"><span>Quote Submitter:</span> <strong id="dRep">—</strong></div>
+          <div class="detail-row"><span>Source Email:</span> <strong id="dEmail">—</strong></div>
+        </div>
+
+        <!-- Competitive Pattern Card -->
+        <div class="detail-card">
+          <div class="card-label">💡 Competitive Trend Analysis</div>
+          <div id="dTrends" style="line-height:1.5; color:#cbd5e1; font-size:0.8rem;"></div>
+        </div>
+
+      </div>
+    </aside>
+
+  </main>
+
+  <script>
+    // Real mock records representing recent solicitations from daily files
+    const mockBids = [
+      {
+        sol: "SPE1C126Q0528",
+        nsn: "8465-01-613-1241",
+        nom: "CARABINER, PULLEY",
+        bidDate: "09/25/2026",
+        status: "WON",
+        ourPrice: 34.45,
+        awardPrice: 34.45,
+        piid: "SPE1C1-26-P-8104",
+        awardDate: "09/27/2026",
+        winner: "STATZ CORPORATION",
+        cage: "1PN61",
+        supplier: "Vortex Tactical",
+        baseCost: 32.50,
+        packhouse: "Supplier Included ($0.00)",
+        packUnit: 0.00,
+        freightUnit: 0.50,
+        dims: "0.4 lbs | 4\" x 2\" x 1\"",
+        margin: "2.0% ($0.68)",
+        rep: "Dion",
+        email: "EML-2026-0925-01",
+        trends: "STATZ has won 3 of 4 bids for this NSN. Vortex Tactical remains the most reliable pricing partner for this FSC."
+      },
+      {
+        sol: "SPE4A626T36QG",
+        nsn: "5305-12-309-7497",
+        nom: "SCREW, CAP, HEXAGON HEAD",
+        bidDate: "09/24/2026",
+        status: "LOST",
+        ourPrice: 16.12,
+        awardPrice: 15.50,
+        piid: "SPE4A6-26-T-8812",
+        awardDate: "09/27/2026",
+        winner: "AERO FASTENERS LLC",
+        cage: "D2689",
+        supplier: "Precision Aero",
+        baseCost: 14.20,
+        packhouse: "PackCo Mil-Spec",
+        packUnit: 0.60,
+        freightUnit: 0.40,
+        dims: "0.1 lbs | 2\" x 0.5\" x 0.5\"",
+        margin: "6.0% ($0.92)",
+        rep: "Dion",
+        email: "EML-2026-0924-14",
+        trends: "Lost by $0.62 (4.0%). Winner D2689 is the approved manufacturing CAGE. If our margin was 2%, our bid would have been $15.51."
+      },
+      {
+        sol: "SPE4A526T476A",
+        nsn: "5330-01-173-8300",
+        nom: "GASKET",
+        bidDate: "09/22/2026",
+        status: "LOST",
+        ourPrice: 64.50,
+        awardPrice: 41.20,
+        piid: "SPE4A5-26-P-4401",
+        awardDate: "09/26/2026",
+        winner: "SEAL CORP OF AMERICA",
+        cage: "72914",
+        supplier: "Apex Fasteners",
+        baseCost: 58.00,
+        packhouse: "Supplier Included ($0.00)",
+        packUnit: 0.00,
+        freightUnit: 1.50,
+        dims: "0.2 lbs | 6\" x 6\" x 0.1\"",
+        margin: "8.4% ($5.00)",
+        rep: "Sales Rep 2",
+        email: "EML-2026-0922-09",
+        trends: "Lost by +56.5%. Supplier Apex Fasteners is not competitive against prime manufacturer 72914 on this gasket."
+      },
+      {
+        sol: "SPE2DH26T7056",
+        nsn: "6530-01-131-0051",
+        nom: "STAND, INTRAVENOUS-IRR",
+        bidDate: "09/25/2026",
+        status: "LOST",
+        ourPrice: 112.00,
+        awardPrice: 108.50,
+        piid: "SPE2DH-26-T-9901",
+        awardDate: "09/27/2026",
+        winner: "GLOBAL MED SUPPLY",
+        cage: "4M773",
+        supplier: "MedTech Logistics",
+        baseCost: 98.00,
+        packhouse: "In-House ($0.00)",
+        packUnit: 0.00,
+        freightUnit: 6.50,
+        dims: "12 lbs | 48\" x 6\" x 6\"",
+        margin: "7.2% ($7.50)",
+        rep: "Dion",
+        email: "EML-2026-0925-88",
+        trends: "Lost by $3.50 (3.2%). High freight expense on heavy intravenous stands accounts for the margin deficit."
+      },
+      {
+        sol: "SPE7L126T16E8",
+        nsn: "5331-00-303-0091",
+        nom: "O-RING",
+        bidDate: "09/25/2026",
+        status: "PENDING",
+        ourPrice: 1.85,
+        awardPrice: null,
+        piid: "—",
+        awardDate: "Pending DLA Evaluation",
+        winner: "—",
+        cage: "—",
+        supplier: "All-Seals Inc",
+        baseCost: 1.50,
+        packhouse: "In-House ($0.00)",
+        packUnit: 0.15,
+        freightUnit: 0.05,
+        dims: "0.01 lbs | 1\" x 1\" x 0.1\"",
+        margin: "8.8% ($0.15)",
+        rep: "Dion",
+        email: "EML-2026-0925-99",
+        trends: "Pending evaluation. DLA usually awards FSC 5331 items within 5 business days."
+      },
+      {
+        sol: "SPE3SE26Q0504",
+        nsn: "7310-GM-502-2323",
+        nom: "EQUIPMENT IST - FTRD",
+        bidDate: "09/20/2026",
+        status: "WON",
+        ourPrice: 420.00,
+        awardPrice: 420.00,
+        piid: "SPE3SE-26-P-1120",
+        awardDate: "09/24/2026",
+        winner: "STATZ CORPORATION",
+        cage: "1PN61",
+        supplier: "Commercial Kitchen Direct",
+        baseCost: 380.00,
+        packhouse: "Supplier Included ($0.00)",
+        packUnit: 0.00,
+        freightUnit: 20.00,
+        dims: "45 lbs | 30\" x 24\" x 20\"",
+        margin: "5.0% ($20.00)",
+        rep: "Dion",
+        email: "EML-2026-0920-04",
+        trends: "Clean win. Margin held at exactly 5% markup."
+      }
+    ];
+
+    let currentStatusFilter = 'ALL';
+    let searchQuery = '';
+
+    function renderGrid() {
+      const tbody = document.getElementById('gridBody');
+      tbody.innerHTML = '';
+
+      const filtered = mockBids.filter(b => {
+        const matchesStatus = (currentStatusFilter === 'ALL' || b.status === currentStatusFilter);
+        const text = `${b.sol} ${b.nsn} ${b.nom} ${b.winner}`.toLowerCase();
+        const matchesSearch = text.includes(searchQuery.toLowerCase());
+        return matchesStatus && matchesSearch;
+      });
+
+      filtered.forEach((b, idx) => {
+        const tr = document.createElement('tr');
+        
+        let badgeHtml = '';
+        if (b.status === 'WON') badgeHtml = `<span class="badge badge-won">WON</span>`;
+        else if (b.status === 'LOST') badgeHtml = `<span class="badge badge-lost">LOST</span>`;
+        else badgeHtml = `<span class="badge badge-pending">PENDING</span>`;
+
+        let diffHtml = '—';
+        let pctHtml = '—';
+
+        if (b.awardPrice) {
+          const delta = b.ourPrice - b.awardPrice;
+          const pct = ((delta / b.awardPrice) * 100);
+          
+          if (b.status === 'WON') {
+            diffHtml = `$0.00`;
+            pctHtml = `0.0%`;
+          } else {
+            diffHtml = `+${delta.toFixed(2)}`;
+            const isTight = pct <= 5.0 && pct > 0;
+            pctHtml = `+${pct.toFixed(1)}% ${isTight ? '<span class="badge badge-tight">Within 5%</span>' : ''}`;
+          }
+        }
+
+        tr.innerHTML = `
+          <td>${badgeHtml}</td>
+          <td><strong style="color:#38bdf8;">${b.sol}</strong></td>
+          <td>
+            <div><strong>${b.nsn}</strong></div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">${b.nom}</div>
+          </td>
+          <td>${b.bidDate}</td>
+          <td>$${b.ourPrice.toFixed(2)}</td>
+          <td>${b.awardPrice ? '$' + b.awardPrice.toFixed(2) : '—'}</td>
+          <td style="${b.status === 'LOST' ? 'color:#fb7185;' : ''}">${diffHtml}</td>
+          <td>${pctHtml}</td>
+          <td>${b.winner}</td>
+          <td style="text-align:right;">
+            <button class="btn" onclick="openDrawer(${idx})">Details ➔</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function setTimeframe(tf, btn) {
+      document.querySelectorAll('.time-pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+
+      const labelMap = {
+        week: 'Past 7 Days',
+        month: 'Last 30 Days',
+        quarter: 'Current Quarter',
+        all: 'All Time Records'
+      };
+      document.getElementById('timeframeLabel').innerText = labelMap[tf];
+
+      // Simulated KPI shifts by timeframe
+      if (tf === 'week') {
+        document.getElementById('kpiWon').innerHTML = '3 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$18,400 Total</span>';
+        document.getElementById('kpiLost').innerHTML = '9 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$42,100 Total</span>';
+        document.getElementById('kpiRate').innerText = '25.0%';
+        document.getElementById('kpiTight').innerHTML = '2 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$7,800 Value</span>';
+      } else if (tf === 'month') {
+        document.getElementById('kpiWon').innerHTML = '14 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$86,450 Total</span>';
+        document.getElementById('kpiLost').innerHTML = '48 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$210,800 Total</span>';
+        document.getElementById('kpiRate').innerText = '22.5%';
+        document.getElementById('kpiTight').innerHTML = '9 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$32,150 Value</span>';
+      } else if (tf === 'quarter') {
+        document.getElementById('kpiWon').innerHTML = '42 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$248,000 Total</span>';
+        document.getElementById('kpiLost').innerHTML = '144 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$680,000 Total</span>';
+        document.getElementById('kpiRate').innerText = '22.6%';
+        document.getElementById('kpiTight').innerHTML = '28 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$94,000 Value</span>';
+      } else {
+        document.getElementById('kpiWon').innerHTML = '184 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$1,120,000 Total</span>';
+        document.getElementById('kpiLost').innerHTML = '612 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$3,180,000 Total</span>';
+        document.getElementById('kpiRate').innerText = '23.1%';
+        document.getElementById('kpiTight').innerHTML = '112 <span style="font-size:0.9rem; font-weight:400; color:var(--text-muted);">$380,000 Value</span>';
+      }
+    }
+
+    function setStatusFilter(status, btn) {
+      currentStatusFilter = status;
+      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      renderGrid();
+    }
+
+    function filterGrid(val) {
+      searchQuery = val;
+      renderGrid();
+    }
+
+    function openDrawer(idx) {
+      const b = mockBids[idx];
+      document.getElementById('drawerTitle').innerText = `Forensic: ${b.sol}`;
+      document.getElementById('dOutcome').innerHTML = b.status === 'WON' 
+        ? '<span style="color:#34d399; font-weight:700;">WON AWARD</span>' 
+        : (b.status === 'LOST' ? '<span style="color:#fb7185; font-weight:700;">LOST TO COMPETITOR</span>' : '<span style="color:#38bdf8;">PENDING DLA EVALUATION</span>');
+      
+      document.getElementById('dPiid').innerText = b.piid;
+      document.getElementById('dAwardDate').innerText = b.awardDate;
+      document.getElementById('dWinner').innerText = b.winner;
+      document.getElementById('dCage').innerText = b.cage;
+      document.getElementById('dWinPrice').innerText = b.awardPrice ? `$${b.awardPrice.toFixed(2)} / EA` : '—';
+      
+      if (b.awardPrice) {
+        const delta = b.ourPrice - b.awardPrice;
+        const pct = ((delta / b.awardPrice) * 100).toFixed(1);
+        document.getElementById('dDelta').innerHTML = b.status === 'WON' 
+          ? '$0.00 (Awarded at our bid price)' 
+          : `<span style="color:#fb7185;">+$${delta.toFixed(2)} (+${pct}% over winner)</span>`;
+      } else {
+        document.getElementById('dDelta').innerText = '—';
+      }
+
+      // Snapshot details
+      document.getElementById('dSupplier').innerText = b.supplier;
+      document.getElementById('dBaseCost').innerText = `$${b.baseCost.toFixed(2)}`;
+      document.getElementById('dPackhouse').innerText = b.packhouse;
+      document.getElementById('dPackCost').innerText = `+$${b.packUnit.toFixed(2)}`;
+      document.getElementById('dFreightCost').innerText = `+$${b.freightUnit.toFixed(2)}`;
+      document.getElementById('dDims').innerText = b.dims;
+      document.getElementById('dMargin').innerText = b.margin;
+      document.getElementById('dFinalPrice').innerText = `$${b.ourPrice.toFixed(2)} / EA`;
+      document.getElementById('dRep').innerText = b.rep;
+      document.getElementById('dEmail').innerText = b.email;
+
+      // Trends
+      document.getElementById('dTrends').innerText = b.trends;
+
+      document.getElementById('forensicDrawer').classList.add('open');
+    }
+
+    function closeDrawer() {
+      document.getElementById('forensicDrawer').classList.remove('open');
+    }
+
+    // Initialize
+    renderGrid();
+  </script>
+</body>
+</html>

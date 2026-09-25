@@ -109,6 +109,7 @@ INSTALLED_APPS = [
     "transactions.apps.TransactionsConfig",
     "arcade.apps.ArcadeConfig",
     "core.apps.CoreConfig",
+    "quote.apps.QuoteConfig",
 ]
 
 # Middleware - Environment aware

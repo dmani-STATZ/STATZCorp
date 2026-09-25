@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quotes App — Phase 2 Interactive Prototype</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-border: #334155;
+      --surface-hover: #293548;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --badge-green: #065f46;
+      --badge-green-txt: #34d399;
+      --badge-blue: #1e3a8a;
+      --badge-blue-txt: #93c5fd;
+      --badge-amber: #78350f;
+      --badge-amber-txt: #fcd34d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Top Global Header */
+    header {
+      background: #111827;
+      border-bottom: 1px solid var(--surface-border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+    }
+    .brand { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.5px; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    .brand span { color: var(--text-muted); font-size: 0.85rem; font-weight: 400; }
+    .mode-switcher {
+      display: flex;
+      align-items: center;
+      background: #0f172a;
+      border: 1px solid var(--surface-border);
+      border-radius: 9999px;
+      padding: 4px;
+      gap: 4px;
+    }
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      border-radius: 9999px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+    .mode-btn.active { background: var(--accent); color: #fff; }
+
+    /* Main Container */
+    .app-body { flex: 1; display: flex; overflow: hidden; }
+
+    /* Left Sidebar: Inbox */
+    .inbox-pane {
+      width: 380px;
+      background: var(--surface);
+      border-right: 1px solid var(--surface-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .inbox-header { padding: 12px 16px; border-bottom: 1px solid var(--surface-border); }
+    .search-input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .search-input:focus { outline: 1px solid var(--accent); }
+    .inbox-list { flex: 1; overflow-y: auto; }
+    .email-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--surface-border);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .email-item:hover { background: var(--surface-hover); }
+    .email-item.active { background: #1e3a5f; border-left: 4px solid var(--accent); }
+    .email-vendor { font-weight: 600; font-size: 0.9rem; display: flex; justify-content: space-between; }
+    .email-time { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+    .email-subject { font-size: 0.82rem; margin: 4px 0; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .email-preview { font-size: 0.77rem; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .pill-group { margin-top: 6px; display: flex; gap: 6px; }
+    .pill { font-size: 0.68rem; padding: 2px 7px; border-radius: 9999px; font-weight: 600; }
+    .pill-match { background: var(--badge-green); color: var(--badge-green-txt); }
+    .pill-orphan { background: var(--badge-amber); color: var(--badge-amber-txt); }
+
+    /* Right Main Panel */
+    .viewport { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+    .msg-header {
+      padding: 16px 24px;
+      background: #162032;
+      border-bottom: 1px solid var(--surface-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .msg-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .msg-meta { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+    .msg-content { flex: 1; padding: 24px; overflow-y: auto; line-height: 1.6; font-size: 0.92rem; white-space: pre-wrap; font-family: ui-monospace, Menlo, Monaco, monospace; }
+
+    /* OPTION A: Persistent Bottom Dock */
+    .option-a-dock {
+      background: #111827;
+      border-top: 2px solid #3b82f6;
+      max-height: 380px;
+      display: flex;
+      flex-direction: column;
+    }
+    .dock-bar {
+      padding: 10px 20px;
+      background: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    .dock-cards { display: flex; gap: 14px; padding: 14px 20px; overflow-x: auto; }
+    .sol-card {
+      background: #0f172a;
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      width: 320px;
+      padding: 14px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .sol-card-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .sol-id { font-weight: 700; color: #38bdf8; font-size: 0.95rem; }
+    .sol-line-item { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px; }
+    .sol-line-item strong { color: var(--text); }
+    .sol-card-actions { margin-top: 12px; display: flex; gap: 8px; }
+
+    /* OPTION B: Slide-out Flyout Drawer */
+    .drawer-overlay {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 440px;
+      background: #111827;
+      border-left: 2px solid var(--accent);
+      box-shadow: -10px 0 25px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      transform: translateX(100%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .drawer-overlay.open { transform: translateX(0); }
+    .drawer-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--surface-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .drawer-body { padding: 20px; flex: 1; overflow-y: auto; }
+
+    /* Shared Form & Modal Components */
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+    .form-control {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tip-pills { display: flex; gap: 6px; margin-top: 6px; }
+    .tip-pill {
+      flex: 1;
+      padding: 6px 0;
+      background: #1e293b;
+      border: 1px solid var(--surface-border);
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+    }
+    .tip-pill:hover, .tip-pill.active { background: var(--accent); border-color: var(--accent); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: #334155; color: #fff; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-outline { background: transparent; border: 1px solid var(--surface-border); color: #cbd5e1; }
+    .btn-outline:hover { background: #1e293b; }
+
+    /* Common modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-box {
+      width: 500px;
+      background: #111827;
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .modal-header { padding: 14px 20px; background: #1e293b; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+    .modal-body { padding: 20px; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Global Header -->
+  <header>
+    <div class="brand">
+      STATZ QUOTES <span>| Phase 2 Mailbox Workflow</span>
+    </div>
+    <div class="mode-switcher">
+      <button class="mode-btn active" id="btnModeA" onclick="setMode('A')">Option A: Split Pane + Dock</button>
+      <button class="mode-btn" id="btnModeB" onclick="setMode('B')">Option B: Slide-out Flyout</button>
+    </div>
+  </header>
+
+  <!-- App Workspace -->
+  <div class="app-body">
+
+    <!-- Left Column: Shared Mailbox Inbox -->
+    <aside class="inbox-pane">
+      <div class="inbox-header">
+        <input type="text" class="search-input" placeholder="Search email, SOL #, NSN, Part #..." />
+      </div>
+      <div class="inbox-list">
+        <!-- Inbound Email 1 -->
+        <div class="email-item active" onclick="loadEmail(0)">
+          <div class="email-vendor">
+            <span>Vortex Aerospace</span>
+            <span class="email-time">9:42 AM</span>
+          </div>
+          <div class="email-subject">RE: RFQ SPE1C126Q0528 (Carabiners)</div>
+          <div class="email-preview">Hi Dion, we can supply the carabiner pulleys under P/N ZPCARA101XX at $32.50 each...</div>
+          <div class="pill-group">
+            <span class="pill pill-match">Auto-SOL: SPE1C126Q0528</span>
+          </div>
+        </div>
+
+        <!-- Inbound Email 2 -->
+        <div class="email-item" onclick="loadEmail(1)">
+          <div class="email-vendor">
+            <span>Apex Fasteners</span>
+            <span class="email-time">8:30 AM</span>
+          </div>
+          <div class="email-subject">Pricing for NSN 5305-12-309-7497 & 5330-01-173-8300</div>
+          <div class="email-preview">See attached pricing for the two hardware lines you requested yesterday...</div>
+          <div class="pill-group">
+            <span class="pill pill-match">2 Items Matched</span>
+          </div>
+        </div>
+
+        <!-- Inbound Email 3 -->
+        <div class="email-item" onclick="loadEmail(2)">
+          <div class="email-vendor">
+            <span>Titan Defense Systems</span>
+            <span class="email-time">Yesterday</span>
+          </div>
+          <div class="email-subject">Quote Ref #TD-8841</div>
+          <div class="email-preview">Good afternoon, our price for P/N 359042-15 is $84.00 ea. Lead time is 45 ARO...</div>
+          <div class="pill-group">
+            <span class="pill pill-orphan">No SOL in Subject</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center/Right Column: Live Mailbox Body + Quoting Target Area -->
+    <main class="viewport">
+      <div class="msg-header">
+        <div>
+          <div class="msg-title" id="msgSubject">RE: RFQ SPE1C126Q0528 (Carabiners)</div>
+          <div class="msg-meta" id="msgMeta">
+            <strong>From:</strong> sales@vortextactical.com &lt;sales@vortextactical.com&gt;<br />
+            <strong>Date:</strong> Sep 25, 2026, 9:42 AM | <strong>To:</strong> quotes@statzcorp.com
+          </div>
+        </div>
+        <div id="optionBAction" style="display:none;">
+          <button class="btn btn-primary" onclick="openFlyout()">⚡ Log Supplier Quote</button>
+        </div>
+      </div>
+
+      <div class="msg-content" id="msgContent"></div>
+
+      <!-- OPTION A DOCK CONTAINER (Visible only in Mode A) -->
+      <section class="option-a-dock" id="dockA">
+        <div class="dock-bar">
+          <span>Linked Solicitations Detected in this Email (<span id="solCount">1</span>)</span>
+          <button class="btn btn-outline" style="font-size:0.75rem; padding:4px 8px;" onclick="openLinkModal()">+ Link Another SOL</button>
+        </div>
+        <div class="dock-cards" id="solCards">
+          <!-- Dynamically populated SOL Cards -->
+        </div>
+      </section>
+
+      <!-- OPTION B SLIDE-OUT FLYOUT (Visible only in Mode B) -->
+      <aside class="drawer-overlay" id="flyoutB">
+        <div class="drawer-header">
+          <strong>Log Quote Data</strong>
+          <button class="btn btn-outline" onclick="closeFlyout()" style="padding:2px 8px;">✕</button>
+        </div>
+        <div class="drawer-body">
+          <div class="form-group">
+            <label class="form-label">Target Solicitation</label>
+            <select class="form-control" id="flyoutSolSelect" onchange="syncFlyoutSol()">
+              <!-- Options populated by JS -->
+            </select>
+          </div>
+
+          <div style="background:#0f172a; padding:10px; border-radius:6px; margin-bottom:14px; font-size:0.8rem; border:1px solid var(--surface-border);">
+            <div><strong>NSN:</strong> <span id="flyoutNsnText">-</span></div>
+            <div><strong>Nomenclature:</strong> <span id="flyoutNomText">-</span></div>
+            <div><strong>Req Quantity:</strong> <span id="flyoutQtyText">-</span></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Approved Part Number / CAGE</label>
+            <input type="text" class="form-control" id="flyoutPartNo" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Unit Cost ($)</label>
+              <input type="number" step="0.01" class="form-control" id="flyoutCost" value="0.00" oninput="calcFlyout()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Delivery Days ARO</label>
+              <input type="number" class="form-control" id="flyoutLead" value="30" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Packaging Adder ($)</label>
+              <input type="number" step="0.01" class="form-control" id="flyoutPack" value="0.00" oninput="calcFlyout()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Freight Adder ($ Total)</label>
+              <input type="number" step="0.01" class="form-control" id="flyoutFreight" value="0.00" oninput="calcFlyout()" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Margin Preset (Tip-Screen)</label>
+            <div class="tip-pills">
+              <div class="tip-pill active" onclick="setTip(this, 2)">2%</div>
+              <div class="tip-pill" onclick="setTip(this, 4)">4%</div>
+              <div class="tip-pill" onclick="setTip(this, 6)">6%</div>
+              <div class="tip-pill" onclick="setTip(this, 0)">Custom</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Final Gov Bid Unit Price ($)</label>
+            <input type="number" step="0.01" class="form-control" id="flyoutFinalPrice" style="color:#38bdf8; font-weight:700; font-size:1.05rem;" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Payment Terms</label>
+            <input type="text" class="form-control" value="Net 30" />
+          </div>
+
+          <button class="btn btn-primary" style="width:100%; margin-top:10px;" onclick="saveQuote()">Save Quote to SOL</button>
+        </div>
+      </aside>
+
+    </main>
+  </div>
+
+  <!-- Modal for Option A: Enter Quote Dialog -->
+  <div class="modal-backdrop" id="quoteModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span id="modalTitle">Enter Quote Details</span>
+        <button class="btn btn-outline" onclick="closeQuoteModal()" style="padding:2px 8px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:12px; font-size:0.85rem; color:#93c5fd;" id="modalSolDetails"></div>
+        <div class="form-group">
+          <label class="form-label">Approved Part No. & CAGE</label>
+          <input type="text" class="form-control" id="modalPartNo" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Supplier Unit Cost ($)</label>
+            <input type="number" step="0.01" class="form-control" id="modalCost" oninput="calcModal()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Delivery Days ARO</label>
+            <input type="number" class="form-control" id="modalLead" value="30" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Flat Freight Total ($)</label>
+            <input type="number" step="0.01" class="form-control" id="modalFreight" value="0.00" oninput="calcModal()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unit Packaging Adder ($)</label>
+            <input type="number" step="0.01" class="form-control" id="modalPack" value="0.00" oninput="calcModal()" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Margin Selection</label>
+          <div class="tip-pills">
+            <div class="tip-pill active" onclick="setModalTip(this, 2)">2%</div>
+            <div class="tip-pill" onclick="setModalTip(this, 4)">4%</div>
+            <div class="tip-pill" onclick="setModalTip(this, 6)">6%</div>
+            <div class="tip-pill" onclick="setModalTip(this, 0)">Custom</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Calculated Gov Unit Price</label>
+          <input type="number" step="0.01" class="form-control" id="modalFinalPrice" style="font-weight:700; color:#38bdf8;" />
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onclick="closeQuoteModal()">Save Quote Record</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Link SOL Modal (For Orphan Emails) -->
+  <div class="modal-backdrop" id="linkModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>Find & Link Solicitation to this Email</span>
+        <button class="btn btn-outline" onclick="closeLinkModal()" style="padding:2px 8px;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Search active solicitations</label>
+          <input type="text" class="form-control" placeholder="Search by SOL #, Part #, or NSN..." oninput="filterLinkResults(this.value)" />
+        </div>
+        <div style="max-height:180px; overflow-y:auto; border:1px solid var(--surface-border); border-radius:6px; margin-bottom:14px;" id="linkResults">
+          <div style="padding:8px; border-bottom:1px solid var(--surface-border); cursor:pointer;" onclick="attachSol('SPE4A126T2948', '4810-01-144-4178', 'GUIDE, DISK, VALVE', 5, '3851515-101')">
+            <strong>SPE4A126T2948</strong> — NSN: 4810-01-144-4178 (P/N 3851515-101)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentMode = 'A'; // 'A' or 'B'
+    let currentEmailIdx = 0;
+    let selectedMarginPct = 2;
+    let activeModalSol = null;
+
+    // Real test data sampled from in260924.txt and as260924.txt
+    const mockEmails = [
+      {
+        from: "sales@vortextactical.com",
+        vendor: "Vortex Aerospace",
+        subject: "RE: RFQ SPE1C126Q0528 (Carabiners)",
+        date: "Sep 25, 2026, 9:42 AM",
+        body: "Good morning Dion,\n\nWe can supply the requested hardware for solicitation SPE1C126Q0528:\n\n- NSN: 8465-01-613-1241 (CARABINER, PULLEY)\n- Our Part #: ZPCARA101XX (CAGE 0SKY9)\n- Price: $32.50 per EA\n- Delivery: 45 Days ARO\n- Packaging: Standard mil packaging included\n- Freight: FOB Destination\n- Payment Terms: Net 30\n\nLet me know if you need our official PDF quote.\n\nBest,\nSarah Jenkins\nVortex Aerospace Sales",
+        sols: [
+          { sol: "SPE1C126Q0528", nsn: "8465-01-613-1241", nom: "CARABINER, PULLEY", qty: 2, uom: "EA", defaultPart: "ZPCARA101XX (CAGE 0SKY9)", defaultCost: 32.50, due: "10/26/26" }
+        ]
+      },
+      {
+        from: "quotes@apexfasteners.com",
+        vendor: "Apex Fasteners Inc",
+        subject: "Pricing for NSN 5305-12-309-7497 & 5330-01-173-8300",
+        date: "Sep 25, 2026, 8:30 AM",
+        body: "Dion,\n\nHere are line item quotes for your recent requirements:\n\nLine 1: NSN 5305-12-309-7497 (SCREW, CAP, HEXAGON HEAD)\nPart No: 01104897ES8920-14 (CAGE D2689)\nQty Available: 8 EA\nUnit Cost: $14.20 ea\nLead time: 30 days\n\nLine 2: NSN 5330-01-173-8300 (GASKET)\nPart No: 31-4978-1 (CAGE 72914)\nQty: 2 EA\nUnit Cost: $58.00 ea\nLead time: 20 days\n\nNote: Shipping is $45.00 flat ground for the whole order.",
+        sols: [
+          { sol: "SPE4A626T36QG", nsn: "5305-12-309-7497", nom: "SCREW, CAP, HEXAGON HEAD", qty: 8, uom: "EA", defaultPart: "01104897ES8920-14 (CAGE D2689)", defaultCost: 14.20, due: "10/02/26" },
+          { sol: "SPE4A526T476A", nsn: "5330-01-173-8300", nom: "GASKET", qty: 2, uom: "EA", defaultPart: "31-4978-1 (CAGE 72914)", defaultCost: 58.00, due: "10/02/26" }
+        ]
+      },
+      {
+        from: "bids@titandefense.com",
+        vendor: "Titan Defense Systems",
+        subject: "Quote Ref #TD-8841",
+        date: "Sep 24, 2026, 4:18 PM",
+        body: "STATZ Procurement,\n\nRegarding your inquiry for P/N 359042-15:\n\nUnit Price: $84.00 each\nQuantity quoted: 5 pieces\nLead time: 60 days ARO\nTerms: Net 30\nFreight: Pre-pay and add $25.00\n\nPlease reference quote #TD-8841 when submitting purchase orders.",
+        sols: [] // Orphan: no SOL recognized in subject or body
+      }
+    ];
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('btnModeA').classList.toggle('active', mode === 'A');
+      document.getElementById('btnModeB').classList.toggle('active', mode === 'B');
+
+      if (mode === 'A') {
+        document.getElementById('dockA').style.display = 'flex';
+        document.getElementById('optionBAction').style.display = 'none';
+        closeFlyout();
+      } else {
+        document.getElementById('dockA').style.display = 'none';
+        document.getElementById('optionBAction').style.display = 'block';
+      }
+    }
+
+    function loadEmail(idx) {
+      currentEmailIdx = idx;
+      const email = mockEmails[idx];
+
+      // Update active list state
+      const items = document.querySelectorAll('.email-item');
+      items.forEach((item, i) => item.classList.toggle('active', i === idx));
+
+      // Populate Email Headers & Body
+      document.getElementById('msgSubject').innerText = email.subject;
+      document.getElementById('msgMeta').innerHTML = `
+        <strong>From:</strong> ${email.vendor} &lt;${email.from}&gt;<br />
+        <strong>Date:</strong> ${email.date} | <strong>To:</strong> quotes@statzcorp.com
+      `;
+      document.getElementById('msgContent').innerText = email.body;
+
+      // Populate Option A Dock Cards
+      renderOptionADock(email);
+
+      // Populate Option B Flyout Dropdown
+      renderOptionBFlyoutSelect(email);
+    }
+
+    function renderOptionADock(email) {
+      const container = document.getElementById('solCards');
+      container.innerHTML = '';
+      document.getElementById('solCount').innerText = email.sols.length;
+
+      if (email.sols.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; padding:10px;">No solicitation detected automatically. Click "+ Link Another SOL" above to attach one.</div>`;
+        return;
+      }
+
+      email.sols.forEach(sol => {
+        const card = document.createElement('div');
+        card.className = 'sol-card';
+        card.innerHTML = `
+          <div class="sol-card-header">
+            <span class="sol-id">${sol.sol}</span>
+            <span class="pill pill-match">Due: ${sol.due}</span>
+          </div>
+          <div class="sol-line-item"><strong>NSN:</strong> ${sol.nsn}</div>
+          <div class="sol-line-item"><strong>Item:</strong> ${sol.nom}</div>
+          <div class="sol-line-item"><strong>Qty:</strong> ${sol.qty} ${sol.uom}</div>
+          <div class="sol-card-actions">
+            <button class="btn btn-primary" style="flex:1;" onclick='openQuoteModal(${JSON.stringify(sol)})'>⚡ Enter Quote</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderOptionBFlyoutSelect(email) {
+      const select = document.getElementById('flyoutSolSelect');
+      select.innerHTML = '';
+
+      if (email.sols.length === 0) {
+        select.innerHTML = '<option value="">(No solicitation linked)</option>';
+        syncFlyoutSol();
+        return;
+      }
+
+      email.sols.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.sol;
+        opt.innerText = `${s.sol} — ${s.nom} (Qty: ${s.qty})`;
+        select.appendChild(opt);
+      });
+      syncFlyoutSol();
+    }
+
+    function syncFlyoutSol() {
+      const email = mockEmails[currentEmailIdx];
+      const solId = document.getElementById('flyoutSolSelect').value;
+      const sol = email.sols.find(s => s.sol === solId);
+
+      if (sol) {
+        document.getElementById('flyoutNsnText').innerText = sol.nsn;
+        document.getElementById('flyoutNomText').innerText = sol.nom;
+        document.getElementById('flyoutQtyText').innerText = `${sol.qty} ${sol.uom}`;
+        document.getElementById('flyoutPartNo').value = sol.defaultPart;
+        document.getElementById('flyoutCost').value = sol.defaultCost.toFixed(2);
+      } else {
+        document.getElementById('flyoutNsnText').innerText = '—';
+        document.getElementById('flyoutNomText').innerText = '—';
+        document.getElementById('flyoutQtyText').innerText = '—';
+        document.getElementById('flyoutPartNo').value = '';
+        document.getElementById('flyoutCost').value = '0.00';
+      }
+      calcFlyout();
+    }
+
+    function openFlyout() {
+      document.getElementById('flyoutB').classList.add('open');
+    }
+    function closeFlyout() {
+      document.getElementById('flyoutB').classList.remove('open');
+    }
+
+    function setTip(el, pct) {
+      document.querySelectorAll('#flyoutB .tip-pill').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      selectedMarginPct = pct;
+      calcFlyout();
+    }
+
+    function calcFlyout() {
+      const cost = parseFloat(document.getElementById('flyoutCost').value) || 0;
+      const pack = parseFloat(document.getElementById('flyoutPack').value) || 0;
+      const freightTotal = parseFloat(document.getElementById('flyoutFreight').value) || 0;
+      const qty = 2; // sample fallback qty
+      const freightPerUnit = freightTotal / qty;
+
+      const baseUnitCost = cost + pack + freightPerUnit;
+      const finalPrice = baseUnitCost * (1 + selectedMarginPct / 100);
+      document.getElementById('flyoutFinalPrice').value = finalPrice.toFixed(2);
+    }
+
+    // Modal Option A Handlers
+    function openQuoteModal(sol) {
+      activeModalSol = sol;
+      document.getElementById('modalTitle').innerText = `Log Quote for ${sol.sol}`;
+      document.getElementById('modalSolDetails').innerHTML = `<strong>NSN:</strong> ${sol.nsn} &bull; <strong>${sol.nom}</strong> (Qty: ${sol.qty} ${sol.uom})`;
+      document.getElementById('modalPartNo').value = sol.defaultPart;
+      document.getElementById('modalCost').value = sol.defaultCost.toFixed(2);
+      calcModal();
+      document.getElementById('quoteModal').style.display = 'flex';
+    }
+    function closeQuoteModal() {
+      document.getElementById('quoteModal').style.display = 'none';
+    }
+    function setModalTip(el, pct) {
+      document.querySelectorAll('#quoteModal .tip-pill').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      selectedMarginPct = pct;
+      calcModal();
+    }
+    function calcModal() {
+      if (!activeModalSol) return;
+      const cost = parseFloat(document.getElementById('modalCost').value) || 0;
+      const pack = parseFloat(document.getElementById('modalPack').value) || 0;
+      const freightTotal = parseFloat(document.getElementById('modalFreight').value) || 0;
+      const freightPerUnit = freightTotal / activeModalSol.qty;
+
+      const baseUnitCost = cost + pack + freightPerUnit;
+      const finalPrice = baseUnitCost * (1 + selectedMarginPct / 100);
+      document.getElementById('modalFinalPrice').value = finalPrice.toFixed(2);
+    }
+
+    // Link Sol Modal Handlers
+    function openLinkModal() {
+      document.getElementById('linkModal').style.display = 'flex';
+    }
+    function closeLinkModal() {
+      document.getElementById('linkModal').style.display = 'none';
+    }
+    function attachSol(sol, nsn, nom, qty, part) {
+      mockEmails[currentEmailIdx].sols.push({
+        sol: sol, nsn: nsn, nom: nom, qty: qty, uom: "EA", defaultPart: part, defaultCost: 84.00, due: "10/02/26"
+      });
+      loadEmail(currentEmailIdx);
+      closeLinkModal();
+    }
+
+    function saveQuote() {
+      alert("Quote Record Stored!\n• Supplier Quote created in DB\n• Linked to SOL and Email ID\n• Ready for BQ Export staging.");
+      closeFlyout();
+    }
+
+    // Initialize
+    loadEmail(0);
+  </script>
+</body>
+</html>
