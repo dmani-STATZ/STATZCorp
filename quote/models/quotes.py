@@ -2,9 +2,8 @@
 QuoteSupplierQuote — a supplier's price for one solicitation line, with the full
 landed-cost buildup.
 
-This is Quote.md's `Supplier_Quotes` table. sales.SupplierQuote stores only
-unit_price / lead_time / part_number and is left untouched; every adder, markup
-and derived field below has no home anywhere else in the repo.
+This is Quote.md's `Supplier_Quotes` table: every adder, markup and derived
+field needed to reproduce the government unit price.
 
 Table: quote_supplier_quote.
 """
@@ -43,9 +42,9 @@ class QuoteSupplierQuote(AuditModel):
         blank=True,
         help_text='Null for a quote logged against a line with no outbound RFQ.',
     )
-    # Read-only references into the sales DIBBS tables.
+    # Read-only references into the dibbs tables.
     line = models.ForeignKey(
-        'sales.SolicitationLine',
+        'dibbs.SolicitationLine',
         on_delete=models.CASCADE,
         related_name='quote_supplier_quotes',
     )
@@ -132,6 +131,16 @@ class QuoteSupplierQuote(AuditModel):
         default=False,
         help_text='True when the system auto-picked this as lowest landed cost, '
                   'so the UI can show the "Auto: Lowest" badge.',
+    )
+
+    source_email = models.ForeignKey(
+        'quote.QuoteEmail',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supplier_quotes',
+        help_text='The supplier reply these numbers were transcribed from, so '
+                  'the quote screen can link straight back to it.',
     )
 
     notes = models.TextField(blank=True, default='')

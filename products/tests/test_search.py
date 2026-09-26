@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from products.models import Nsn
 from products.nsn_utils import normalize_nsn
-from sales.models.sam_cache import SAMEntityCache
+from dibbs.models.sam_cache import SAMEntityCache
 from suppliers.models import Supplier
 
 User = get_user_model()

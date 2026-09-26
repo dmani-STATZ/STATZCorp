@@ -24,7 +24,8 @@ from contracts.services.contract_number import normalize_contract_number
 from products.models import Nsn
 from products.nsn_utils import normalize_nsn, nsn_query_variants
 from products.views import _suppliers_matching_cage
-from sales.models import Solicitation, SolicitationLine, SupplierMatch, SupplierRFQ
+from dibbs.models import Solicitation, SolicitationLine
+from quote.models import QuoteRFQ, QuoteSolicitationMatch
 from suppliers.models import Supplier
 
 _NO_STORE = {"Cache-Control": "no-store"}
@@ -327,9 +328,16 @@ def _related_supplier_ids(direct, company):
             company, Q(idiq_contract_id__in=direct.idiqs), "supplier_id"
         )
     if direct.solicitations:
-        line_filter = Q(line__solicitation_id__in=direct.solicitations)
-        ids |= _ids(SupplierMatch.objects.filter(line_filter), "supplier_id")
-        ids |= _ids(SupplierRFQ.objects.filter(line_filter), "supplier_id")
+        ids |= _ids(
+            QuoteSolicitationMatch.objects.filter(
+                solicitation_id__in=direct.solicitations
+            ),
+            "supplier_id",
+        )
+        ids |= _ids(
+            QuoteRFQ.objects.filter(line__solicitation_id__in=direct.solicitations),
+            "supplier_id",
+        )
     ids.discard(None)
     return ids
 
@@ -351,9 +359,9 @@ def _related_solicitation_ids(direct):
         return set()
     supplier_filter = Q(supplier_id__in=direct.suppliers)
     ids = _ids(
-        SupplierMatch.objects.filter(supplier_filter), "line__solicitation_id"
+        QuoteSolicitationMatch.objects.filter(supplier_filter), "solicitation_id"
     )
-    ids |= _ids(SupplierRFQ.objects.filter(supplier_filter), "line__solicitation_id")
+    ids |= _ids(QuoteRFQ.objects.filter(supplier_filter), "line__solicitation_id")
     ids.discard(None)
     return ids
 

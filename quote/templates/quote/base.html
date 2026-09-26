@@ -14,12 +14,12 @@
 {% endcomment %}
 
 {% block body %}
-<div class="quote-shell">
+<div class="app-shell">
 
-  <nav class="quote-subnav" aria-label="Quotes sections">
-    <div class="quote-subnav-inner">
+  <nav class="app-subnav" aria-label="Quotes sections">
+    <div class="app-subnav-inner">
       <a href="{% url 'quote:dashboard' %}"
-         class="quote-subnav-link {% if section == 'dashboard' %}active{% endif %}">
+         class="app-subnav-link {% if section == 'dashboard' %}active{% endif %}">
         Dashboard
       </a>
     </div>

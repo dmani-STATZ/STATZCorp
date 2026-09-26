@@ -8,7 +8,7 @@ Playable games: **Lights Out** (5×5), **Wordle** (5 letters / 6 guesses), **Non
 ---
 
 ## 2. Total Isolation Constraint
-The `arcade` app is totally isolated from all other domain apps (`contracts`, `intake`, `processing`, `sales`, `suppliers`, `products`, `core`, `reports`, `training`, `transactions`).
+The `arcade` app is totally isolated from all other domain apps (`contracts`, `intake`, `processing`, `dibbs`, `quote`, `suppliers`, `products`, `core`, `reports`, `training`, `transactions`).
 
 - **Allowed external imports:** Django (`django.*`), `settings.AUTH_USER_MODEL`, `settings.ARCADE_SEED_SALT`, `settings.ARCADE_WORDLE_EPOCH`, `settings.ARCADE_NONOGRAM_EPOCH`.
 - **Only coupling point:** A 20-line vendored JS script (`static/js/arcade_trigger.js`) included in `templates/base_template.html` that triggers navigation to `/arcade/` on 7 clicks of the header logo within a 3.0-second rolling window.

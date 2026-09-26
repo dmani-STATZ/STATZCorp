@@ -238,7 +238,7 @@ use the shipment-completion definition instead.
 
 ## 7. Templates and UI Surface Area
 - On **contract management** (`contract_management.html`), the CLIN details card includes a **Shipments** button that opens a read-only Bootstrap modal (`#shipmentsModal`). The modal body is loaded via AJAX (`fetch`) from `GET /contracts/api/shipments/<clin_id>/?mode=detail`, which returns JSON (`success`, `html`) from `get_clin_shipments` in `shipment_views.py`. The modal footer **View Full Detail →** link targets `/contracts/clin/<clin_id>/#shipping-information`. On **CLIN detail** (`clin_detail.html`), the wrapper around `clin_shipments.html` has `id="shipping-information"` so that anchor scrolls to the shipping section.
-- Server-rendered templates under `contracts/templates/contracts/`: `contract_management.html` (primary hub; includes **Modifications** card at page bottom — DIBBS mods via `sales.services.contract_mods.mods_for_contract`, acknowledge via `sales:acknowledge_contract_mod`), `contract_detail.html`, `clin_detail.html`, `clin_form.html`, `contract_lifecycle_dashboard.html`, `contract_log_view.html`, `folder_tracking.html`, `finance_audit.html`, and modals such as `admin_tools.html`.
+- Server-rendered templates under `contracts/templates/contracts/`: `contract_management.html` (primary hub; includes **Modifications** card at page bottom — DIBBS mods via `dibbs.services.contract_mods.mods_for_contract`, acknowledge via `sales:acknowledge_contract_mod`), `contract_detail.html`, `clin_detail.html`, `clin_form.html`, `contract_lifecycle_dashboard.html`, `contract_log_view.html`, `folder_tracking.html`, `finance_audit.html`, and modals such as `admin_tools.html`.
 - Shared partials for reusable UI: `contract_menu_items.html`, `folderstack_modal.html`, `checkbox_field.html`, `payment_history_popup.html`, `notes_list.html`, `note_modal.html`, `clin_shipments.html`, `acknowledgment_letter_form.html` (and the stub `contract_splits.html` for historical context).
 - Static assets: JS under `contracts/static/contracts/js/` (CLIN shipments, contract splits, note modal interactions) plus `contracts/static/js/supplier_modal.js`; CSS/JS align with Bootstrap-style classes applied in `BaseFormMixin`.
 - Templates rely on HTMX-like endpoints (note modal, payment history) and modals for splits/shipments; dashboards offer CSV exports, charts, and contract search modals.
@@ -270,7 +270,7 @@ use the shipment-completion definition instead.
 - `suppliers.models.*` (Supplier, Contact, SupplierType, Certification/Classification, SupplierDocument) are the source of supplier CRUD, certification/classification edits, and supplier detail dashboards.
 - `processing.models.SequenceNumber` provides PO/TAB defaults when contracts are finalized from the Processing app; `initialize_sequence_numbers` seeds counters from existing data.
 - `users` assets: `UserCompanyMembership` powers `CompanyForm`, `UserSettings` drives reminder sidebar preferences, and `STATZWeb.decorators.conditional_login_required` plus `request.active_company` tie the app to the shared authentication layer.
-- `STATZWeb` and `sales` indirectly depend on contract data (e.g., docs mention `award_date` used in the DIBBS spec), so any schema change ripple affects those reports/integrations.
+- `STATZWeb` and `dibbs` indirectly depend on contract data (e.g., docs mention `award_date` used in the DIBBS spec), so any schema change ripple affects those reports/integrations.
 
 ## PO Snippet Library
 

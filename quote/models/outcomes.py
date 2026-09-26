@@ -1,7 +1,7 @@
 """
 BidOutcome — post-award reconciliation, one row per submitted QuoteBid.
 
-Joins a bid to the sales.DibbsAward for the same solicitation + NSN and freezes
+Joins a bid to the dibbs.DibbsAward for the same solicitation + NSN and freezes
 the bid's cost basis at submit time, so later edits to supplier pricing, NSN
 dimensions or markup defaults never rewrite history (Quote.md Phase 4 §2,
 "STATZ Frozen Bid Snapshot").
@@ -32,10 +32,10 @@ class BidOutcome(AuditModel):
         on_delete=models.CASCADE,
         related_name='outcome',
     )
-    # Read-only reference into the sales DIBBS tables. Null until the award
+    # Read-only reference into the dibbs tables. Null until the award
     # lands in dibbs_award.
     award = models.ForeignKey(
-        'sales.DibbsAward',
+        'dibbs.DibbsAward',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

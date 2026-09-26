@@ -119,7 +119,7 @@ def _batched_suppliers_by_cage(cage_codes):
 
 
 def _batched_sam_names_by_cage(cage_codes):
-    from sales.models.sam_cache import SAMEntityCache
+    from dibbs.models import SAMEntityCache
 
     cage_set = {c for c in cage_codes if c}
     if not cage_set:
@@ -158,18 +158,6 @@ def _suppliers_matching_cage(cage):
             if len(exact) >= 50:
                 break
     return exact
-
-
-def _active_no_quote_cages(cage_codes):
-    from sales.models.no_quote import NoQuoteCAGE
-
-    cage_set = {c for c in cage_codes if c}
-    if not cage_set:
-        return set()
-    return set(
-        NoQuoteCAGE.objects.filter(cage_code__in=cage_set, is_active=True)
-        .values_list('cage_code', flat=True)
-    )
 
 
 def _nsn_pk_for_code(nsn_code):
@@ -217,8 +205,8 @@ class ObservatoryView(LoginRequiredMixin, TemplateView):
             return cached
 
         from contracts.models import Contract
-        from sales.models.solicitations import NsnProcurementHistory
-        from sales.models.approved_sources import ApprovedSource
+        from dibbs.models import NsnProcurementHistory
+        from dibbs.models import ApprovedSource
 
         total_nsns = Nsn.objects.count()
         catalog_normalized = set()
@@ -254,7 +242,7 @@ class ObservatoryView(LoginRequiredMixin, TemplateView):
         return stats
 
     def _get_recent_awards(self):
-        from sales.models.awards import DibbsAward
+        from dibbs.models import DibbsAward
 
         # Bounded prefetch + in-memory dedup — full-table Window() on MSSQL scanned
         # ~465K partition winners (~30s). Candidates are already date-ordered.
@@ -329,7 +317,7 @@ def _search_nsn_full(request, normalized, raw_stripped):
 
 
 def _search_niin(request, niin):
-    from sales.models.solicitations import SolicitationLine
+    from dibbs.models import SolicitationLine
 
     nsn_hits = _nsns_matching_niin(niin)
     line_nsns = list(
@@ -355,7 +343,7 @@ def _search_niin(request, niin):
 
 
 def _search_cage(request, cage, raw_query=''):
-    from sales.models.sam_cache import SAMEntityCache
+    from dibbs.models import SAMEntityCache
 
     cage = (cage or '').strip().upper()
     suppliers = _suppliers_matching_cage(cage)
@@ -383,8 +371,8 @@ def _search_cage(request, cage, raw_query=''):
 
 
 def _search_text(request, query):
-    from sales.models.approved_sources import ApprovedSource
-    from sales.models.quotes import SupplierQuote
+    from dibbs.models import ApprovedSource
+    from quote.models import QuoteSupplierQuote
 
     part_hits = []
     seen_pks = set()
@@ -408,8 +396,8 @@ def _search_text(request, query):
                 break
 
     if len(part_hits) < 50:
-        for row in SupplierQuote.objects.filter(part_number_offered__icontains=query)[:50]:
-            _add_nsn_from_code(row.nsn, row.part_number_offered, 'Supplier Quote')
+        for row in QuoteSupplierQuote.objects.filter(offered_part_number__icontains=query)[:50]:
+            _add_nsn_from_code(row.nsn, row.offered_part_number, 'Supplier Quote')
             if len(part_hits) >= 50:
                 break
 
@@ -471,10 +459,10 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
         if not variants:
             return {}
 
-        from sales.models.solicitations import NsnProcurementHistory
-        from sales.models.quotes import SupplierQuote
-        from sales.models.bids import GovernmentBid
-        from sales.models.awards import DibbsAward
+        from dibbs.models import NsnProcurementHistory
+        from quote.models import QuoteSupplierQuote
+        from quote.models import QuoteBid
+        from dibbs.models import DibbsAward
 
         series = {}
 
@@ -492,7 +480,7 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
             ]
 
         quote_rows = (
-            SupplierQuote.objects.filter(nsn__in=variants)
+            QuoteSupplierQuote.objects.filter(nsn__in=variants)
             .select_related('supplier')
             .order_by('quote_date')
         )
@@ -500,16 +488,16 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
             series['supplier_quoted'] = [
                 {
                     'x': row.quote_date.date().isoformat(),
-                    'y': float(row.unit_price),
+                    'y': float(row.supplier_unit_cost),
                     'supplier': row.supplier.name if row.supplier_id else '',
                 }
                 for row in quote_rows
             ]
 
         bid_rows = (
-            GovernmentBid.objects.filter(
+            QuoteBid.objects.filter(
                 line__nsn__in=variants,
-                bid_status__in=['SUBMITTED', 'ACCEPTED'],
+                bid_status=QuoteBid.STATUS_SUBMITTED,
             )
             .select_related('line')
             .order_by('submitted_at')
@@ -542,7 +530,7 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
         return series
 
     def _get_procurement_history(self, variants):
-        from sales.models.solicitations import NsnProcurementHistory
+        from dibbs.models import NsnProcurementHistory
 
         if not variants:
             return []
@@ -576,7 +564,7 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
         return result
 
     def _get_approved_sources_data(self, variants):
-        from sales.models.approved_sources import ApprovedSource
+        from dibbs.models import ApprovedSource
 
         empty = {'rows': [], 'total_count': 0, 'resolved_count': 0, 'orphaned_count': 0}
         if not variants:
@@ -605,7 +593,6 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
         cage_set = {r['approved_cage'] for r in deduped if r.get('approved_cage')}
         suppliers_by_cage = _batched_suppliers_by_cage(cage_set)
         sam_names = _batched_sam_names_by_cage(cage_set)
-        no_quote = _active_no_quote_cages(cage_set)
 
         rows = []
         for r in deduped:
@@ -627,7 +614,6 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
                 'supplier': supplier,
                 'supplier_pk': supplier.pk if supplier else None,
                 'is_resolved': is_resolved,
-                'no_quote': cage in no_quote,
             })
 
         rows.sort(key=lambda r: (not r['is_resolved'], (r['company_name'] or '').lower()))
@@ -640,11 +626,11 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
         }
 
     def _get_our_activity(self, variants):
-        from sales.models.quotes import SupplierQuote
-        from sales.models.awards import DibbsAward, DibbsAwardMod
+        from quote.models import QuoteSupplierQuote
+        from dibbs.models import DibbsAward, DibbsAwardMod
 
         quotes = list(
-            SupplierQuote.objects.filter(nsn__in=variants)
+            QuoteSupplierQuote.objects.filter(nsn__in=variants)
             .select_related('supplier')
             .order_by('-quote_date')[:50]
         ) if variants else []
@@ -700,7 +686,7 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
 
         mod_contracts = []
         if variants:
-            from sales.models.awards import DibbsAwardMod
+            from dibbs.models import DibbsAwardMod
             seen_contract_pks = set()
             for mod in (
                 DibbsAwardMod.objects.filter(nsn__in=variants)
@@ -719,7 +705,7 @@ class NsnDetailView(LoginRequiredMixin, DetailView):
         }
 
     def _get_demand_history(self, variants):
-        from sales.models.solicitations import SolicitationLine
+        from dibbs.models import SolicitationLine
 
         if not variants:
             return []
@@ -762,17 +748,11 @@ class SupplierNsnView(LoginRequiredMixin, DetailView):
         supplier = self.object
         cage = (supplier.cage_code or '').strip()
 
-        from sales.models.approved_sources import ApprovedSource
-        from sales.models.quotes import SupplierQuote
-        from sales.models.awards import DibbsAward
-        from sales.models.suppliers import SupplierNSN
-        from sales.models.no_quote import NoQuoteCAGE
+        from dibbs.models import ApprovedSource
+        from quote.models import QuoteSupplierQuote
+        from dibbs.models import DibbsAward
+        from quote.models import QuoteSupplierNSN
 
-        no_quote = False
-        if cage:
-            no_quote = NoQuoteCAGE.objects.filter(cage_code=cage, is_active=True).exists()
-
-        context['no_quote'] = no_quote
         context['has_cage'] = bool(cage)
 
         approved_rows = []
@@ -796,7 +776,7 @@ class SupplierNsnView(LoginRequiredMixin, DetailView):
                 })
             context['approved_page'] = self._paginate(approved_rows, 'approved_page')
 
-        quote_qs = SupplierQuote.objects.filter(supplier=supplier).order_by('-quote_date')
+        quote_qs = QuoteSupplierQuote.objects.filter(supplier=supplier).order_by('-quote_date')
         context['quotes_page'] = self._paginate_queryset(quote_qs, 'quotes_page')
 
         won_rows = []
@@ -809,7 +789,7 @@ class SupplierNsnView(LoginRequiredMixin, DetailView):
         else:
             context['won_page'] = None
 
-        manual_qs = SupplierNSN.objects.filter(supplier=supplier).order_by('-added_at')
+        manual_qs = QuoteSupplierNSN.objects.filter(supplier=supplier).order_by('-added_at')
         context['manual_page'] = self._paginate_queryset(manual_qs, 'manual_page')
 
         return context

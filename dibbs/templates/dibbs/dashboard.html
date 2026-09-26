@@ -1,0 +1,80 @@
+{% extends "dibbs/base.html" %}
+
+{% block title %}DIBBS Data{% endblock %}
+
+{% block content %}
+<div class="card card-padded mb-3">
+  <h1 class="h4 mb-1">DIBBS Data</h1>
+  <p class="text-body-secondary mb-0">
+    Daily solicitation imports, award records and notices pulled from DIBBS.
+    <strong>{{ open_solicitations }}</strong> solicitation{{ open_solicitations|pluralize }} still open.
+  </p>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card card-padded h-100">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h6 mb-0">Solicitation imports</h2>
+        <a class="small" href="{% url 'dibbs:import_history' %}">History</a>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Import date</th><th class="text-end">Solicitations</th><th>By</th></tr></thead>
+        <tbody>
+        {% for batch in recent_imports %}
+          <tr>
+            <td>{{ batch.import_date|date:"M j, Y" }}</td>
+            <td class="text-end">{{ batch.solicitation_count }}</td>
+            <td>{{ batch.imported_by|default:"—" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="text-body-secondary">No imports yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card card-padded h-100">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h6 mb-0">Award batches</h2>
+        <a class="small" href="{% url 'dibbs:awards_list' %}">Awards</a>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Award date</th><th>Status</th><th class="text-end">Awards</th></tr></thead>
+        <tbody>
+        {% for batch in recent_award_batches %}
+          <tr>
+            <td>{{ batch.award_date|date:"M j, Y" }}</td>
+            <td>{{ batch.get_scrape_status_display|default:"—" }}</td>
+            <td class="text-end">{{ batch.awards_created }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="text-body-secondary">No award batches yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card card-padded">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h6 mb-0">Latest DIBBS notices</h2>
+        <a class="small" href="{% url 'dibbs:dibbs_notices' %}">All notices</a>
+      </div>
+      <ul class="list-unstyled mb-0 small">
+      {% for notice in recent_notices %}
+        <li class="mb-1">
+          <span class="text-body-secondary">{{ notice.posted_date|date:"M j, Y" }}</span> &middot;
+          <a href="{{ notice.external_url }}" target="_blank" rel="noopener noreferrer">{{ notice.title }}</a>
+        </li>
+      {% empty %}
+        <li class="text-body-secondary">No notices.</li>
+      {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock content %}

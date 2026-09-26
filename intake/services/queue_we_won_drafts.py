@@ -9,7 +9,7 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from sales.models import AwardImportBatch, DibbsAward, WeWonAward
+from dibbs.models import AwardImportBatch, DibbsAward, WeWonAward
 
 if TYPE_CHECKING:
     from contracts.models import Company
@@ -35,10 +35,10 @@ def _resolve_company_for_award(award) -> 'Company | None':
     """
     Look up the Company for a DibbsAward via the dibbs_company_cage join table.
 
-    CompanyCAGE lives in the sales app (table dibbs_company_cage).
+    CompanyCAGE lives in the dibbs app (table dibbs_company_cage).
     Returns None if no match found — callers must handle gracefully.
     """
-    from sales.models import CompanyCAGE
+    from dibbs.models import CompanyCAGE
 
     cage = (getattr(award, 'awardee_cage', None) or '').strip()
     if not cage:

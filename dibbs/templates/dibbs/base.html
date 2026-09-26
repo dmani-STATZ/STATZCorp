@@ -1,0 +1,40 @@
+{% extends "base_template.html" %}
+{% comment %}
+  DIBBS data app shell.
+
+  base_template.html exposes only {% block body %} and {% block extra_js %} --
+  there is no {% block content %} there. This shell defines body and re-exposes
+  content. Every full-page dibbs template extends THIS file.
+
+  Bootstrap 5.3.3 (Spacelab CSS + bundle JS) is already loaded by
+  base_template.html -- do not add CDN tags here.
+{% endcomment %}
+
+{% block body %}
+{% with url_name=request.resolver_match.url_name %}
+<div class="app-shell">
+
+  <nav class="app-subnav" aria-label="DIBBS sections">
+    <div class="app-subnav-inner">
+      <a href="{% url 'dibbs:dashboard' %}"
+         class="app-subnav-link {% if url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="{% url 'dibbs:import_upload' %}"
+         class="app-subnav-link {% if section == 'imports' %}active{% endif %}">Imports</a>
+      <a href="{% url 'dibbs:awards_list' %}"
+         class="app-subnav-link {% if url_name == 'awards_list' or url_name == 'awards_import_upload' or url_name == 'awards_import_result' %}active{% endif %}">Awards</a>
+      <a href="{% url 'dibbs:awards_wins' %}"
+         class="app-subnav-link {% if url_name == 'awards_wins' %}active{% endif %}">Wins</a>
+      <a href="{% url 'dibbs:competitor_watchlist' %}"
+         class="app-subnav-link {% if url_name == 'competitor_watchlist' or url_name == 'competitor_supplier_intel' %}active{% endif %}">Competitors</a>
+      <a href="{% url 'dibbs:dibbs_notices' %}"
+         class="app-subnav-link {% if url_name == 'dibbs_notices' %}active{% endif %}">Notices</a>
+      <a href="{% url 'dibbs:settings_cages' %}"
+         class="app-subnav-link {% if section == 'settings' %}active{% endif %}">CAGE Settings</a>
+    </div>
+  </nav>
+
+  {% block content %}{% endblock content %}
+
+</div>
+{% endwith %}
+{% endblock body %}

@@ -101,7 +101,7 @@ All templates are production-quality Bootstrap 5 (Spacelab theme) UIs. No placeh
 ## 11. Integrations and Cross-App Dependencies
 - Depends on `users` auth model for ownership and sharing FKs.
 - Depends on `contracts.utils.contracts_schema.generate_db_schema_snapshot` for AI schema context.
-- Optionally depends on `sales.services.graph_mail.send_mail_via_graph` for outbound email
+- Optionally depends on `mailer.services.graph_mail.send_mail_via_graph` for outbound email
   notifications (fail-soft; silently skipped when `GRAPH_MAIL_ENABLED=False`).
   Notification logic lives in `reports/services/notifications.py`. Report notifications
   call `send_mail_via_graph` with an explicit `sender=settings.GRAPH_MAIL_SENDER_CONTRACT`

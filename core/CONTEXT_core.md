@@ -35,7 +35,7 @@ Rules that keep it fast:
 - Keep `pk__in` sets under the SQL Server 2,100 parameter limit.
 
 ## DIBBS badge
-The site-wide badge is app-owned by sales: `sales.context_processors.dibbs_notice_count`. It returns zero without querying for anonymous users, calls `sales.services.dibbs_notices.get_recent_notice_count()`, and caches `sales:dibbs_notice_recent_count:v1` for 1,800 seconds.
+The site-wide badge is app-owned by dibbs: `dibbs.context_processors.dibbs_notice_count`. It returns zero without querying for anonymous users, calls `dibbs.services.dibbs_notices.get_recent_notice_count()`, and caches `sales:dibbs_notice_recent_count:v1` for 1,800 seconds.
 
 ## Key files
 - `core/views.py` — health endpoints, global search, API budget update.

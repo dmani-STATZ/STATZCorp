@@ -14,7 +14,7 @@ Use this reading order before editing:
 - Target app `AGENTS_<app>.md`.
 - Coupled app docs when changing shared concepts:
 - `contracts` + `processing` + `transactions` for `Contract`/`Clin` changes.
-- `suppliers` + `contracts` + `sales` + `transactions` for supplier changes.
+- `suppliers` + `contracts` + `quote` + `transactions` for supplier changes.
 - `products` + `contracts` + `processing` for `Nsn` changes.
 - `users` + `STATZWeb/middleware.py` for auth/permissions/company-scoping changes.
 - Shared global files as needed:
@@ -29,11 +29,11 @@ This repository is a multi-app Django monolith with app-based ownership but stro
 - Staging-to-canonical pipeline: `processing` writes into `contracts`.
 - Audit side effects: `transactions` signals on `Contract`, `Clin`, `ClinShipment` (`pod_date` only), and `Supplier` saves.
 - Supplier/NSN split ownership: `suppliers` and `products` models, but important UI/views in `contracts`.
-- Reporting/export-heavy runtime: `contracts`, `sales`, `reports`, `training`, `tools`, `accesslog`, `users` all stream files.
-- Cross-cutting infrastructure: **`core`** — lightweight app for shared wiring (e.g. **`core/management/commands/run_background_tasks.py`**, the Azure WebJob orchestrator that invokes task modules such as **`sales/tasks/send_queued_rfqs.py`**). Background tasks are driven by the **`ScheduledTask`** model (`core.ScheduledTask`): per-task `interval_minutes`, stale-lock detection with `freeze_count` diagnostics, and a **1-minute** WebJob heartbeat (`webjobs/background_tasks/settings.job`). New tasks must be registered in both the **`TASK_FUNCTIONS`** dict in `run_background_tasks.py` and a **`ScheduledTask`** table row. `core` also owns `APIBudget` + `APIUsageLog` models and `core/anthropic_client.py` — the central wrapper for all Anthropic API calls. All new Anthropic API calls must use `call_anthropic()` from this module. Per-call token usage is automatically recorded and debited from the running balance. Application Insights uses **`azure-monitor-opentelemetry`** (`configure_azure_monitor` in `core.apps.CoreConfig.ready`). Do not add `opencensus-*` packages or `OpencensusMiddleware` — the retired OpenCensus Azure handler sets `self.lock = None`, and Python 3.13+ `logging.Handler.handle()` then raises `TypeError: 'NoneType' object does not support the context manager protocol` into the caller's thread (this is what broke intake PDF parsing on 2026-09-14).
+- Reporting/export-heavy runtime: `contracts`, `quote` (BQ export, planned), `reports`, `training`, `tools`, `accesslog`, `users` all stream files.
+- Cross-cutting infrastructure: **`core`** — lightweight app for shared wiring (e.g. **`core/management/commands/run_background_tasks.py`**, the Azure WebJob orchestrator that invokes task modules such as **`dibbs/tasks/poll_we_won_today.py`**). Background tasks are driven by the **`ScheduledTask`** model (`core.ScheduledTask`): per-task `interval_minutes`, stale-lock detection with `freeze_count` diagnostics, and a **1-minute** WebJob heartbeat (`webjobs/background_tasks/settings.job`). New tasks must be registered in both the **`TASK_FUNCTIONS`** dict in `run_background_tasks.py` and a **`ScheduledTask`** table row. `core` also owns `APIBudget` + `APIUsageLog` models and `core/anthropic_client.py` — the central wrapper for all Anthropic API calls. All new Anthropic API calls must use `call_anthropic()` from this module. Per-call token usage is automatically recorded and debited from the running balance. Application Insights uses **`azure-monitor-opentelemetry`** (`configure_azure_monitor` in `core.apps.CoreConfig.ready`). Do not add `opencensus-*` packages or `OpencensusMiddleware` — the retired OpenCensus Azure handler sets `self.lock = None`, and Python 3.13+ `logging.Handler.handle()` then raises `TypeError: 'NoneType' object does not support the context manager protocol` into the caller's thread (this is what broke intake PDF parsing on 2026-09-14).
 - Hidden arcade app: `arcade` — daily puzzle arcade (Lights Out, Wordle-style, Nonogram) plus Backyard Marauder (real-time shooter, not a PuzzleGame), completely isolated from domain models with zero cross-app imports.
 - UI pattern mix: server-rendered templates with significant inline JS in several apps.
-- Background pattern: no Celery/task queue files; most heavy work is synchronous request-time logic. The **`core`** app houses cross-cutting infrastructure; **`core/management/commands/run_background_tasks.py`** is the WebJob entry (1-minute heartbeat) that reads **`ScheduledTask`** rows and runs due tasks (Azure **`webjobs/background_tasks/`**). Individual task modules live under app-owned packages such as **`sales/tasks/`** (e.g. **`send_queued_rfqs`**) and are imported by that command. **Pattern:** add a new callable in the owning app’s **`tasks/`** package, register it in **`TASK_FUNCTIONS`** in **`run_background_tasks.py`**, and seed a **`ScheduledTask`** row (migration or admin).
+- Background pattern: no Celery/task queue files; most heavy work is synchronous request-time logic. The **`core`** app houses cross-cutting infrastructure; **`core/management/commands/run_background_tasks.py`** is the WebJob entry (1-minute heartbeat) that reads **`ScheduledTask`** rows and runs due tasks (Azure **`webjobs/background_tasks/`**). Individual task modules live under app-owned packages such as **`dibbs/tasks/`** (e.g. **`poll_we_won_today`**) and are imported by that command. **Pattern:** add a new callable in the owning app’s **`tasks/`** package, register it in **`TASK_FUNCTIONS`** in **`run_background_tasks.py`**, and seed a **`ScheduledTask`** row (migration or admin).
 
 ### Adding a New Background Task
 
@@ -41,7 +41,7 @@ To register a new background task, three things must be done. All three are requ
 
 **1. Create the task function**
 
-The function must live in an app-owned `tasks/` package (e.g. `sales/tasks/`, `mailer/tasks/`, `users/tasks/`). The function must accept no arguments and handle its own exceptions internally if partial failure is acceptable. The management command wraps each call in a top-level try/except, but internal error handling is still encouraged.
+The function must live in an app-owned `tasks/` package (e.g. `dibbs/tasks/`, `mailer/tasks/`, `users/tasks/`). The function must accept no arguments and handle its own exceptions internally if partial failure is acceptable. The management command wraps each call in a top-level try/except, but internal error handling is still encouraged.
 
 Example:
 
@@ -86,9 +86,9 @@ last_run_at     — None (null — task will run on first heartbeat)
 **No WebJob redeployment is required** when adding a new task. The 1-minute heartbeat picks up new ScheduledTask rows automatically on the next tick.
 
 ## 4. Global Safe-Edit Rules
-- **MSSQL / pyodbc data migrations (no MARS):** SQL Server via `mssql-django` cannot hold an open server-side read cursor while another command runs on the same connection. In `RunPython` migrations, never use `.iterator()` or iterate a lazy queryset while calling `.get()`, `.save()`, `.create()`, or `bulk_create`/`bulk_update` on the same connection. Materialize reads first with `list(queryset.values(...))` or `list(queryset.only(...))`, build in-memory lookup dicts, then batch writes (≤500 per batch inside `transaction.atomic()`). See `contracts/migrations/0061_backfill_contract_status_history.py` and `sales/migrations/0052_backfill_dibbs_award_mod_matched_contract.py`.
+- **MSSQL / pyodbc data migrations (no MARS):** SQL Server via `mssql-django` cannot hold an open server-side read cursor while another command runs on the same connection. In `RunPython` migrations, never use `.iterator()` or iterate a lazy queryset while calling `.get()`, `.save()`, `.create()`, or `bulk_create`/`bulk_update` on the same connection. Materialize reads first with `list(queryset.values(...))` or `list(queryset.only(...))`, build in-memory lookup dicts, then batch writes (≤500 per batch inside `transaction.atomic()`). See `contracts/migrations/0061_backfill_contract_status_history.py` and the historical `sales/migrations/0052_backfill_dibbs_award_mod_matched_contract.py` (git history; replaced by `dibbs/0001`).
 - **CI vendor guard — varchar `Cast` annotations:** Any `Cast(...)` annotation on a `CharField` that may contain non-numeric data must use the `TRY_CAST` vendor-guard pattern (`connection.vendor == 'microsoft'` → `TryCastInteger`, else `Cast`) and filter `__isnull=False` before numeric comparisons. SQLite's permissive `CAST` will not catch conversion failures in CI. Canonical example: `numeric_item_annotation()` in `contracts/views/dashboard_views.py`.
-- **CI vendor guard — `dibbs_we_won_awards` / SQLite `_remake_table`:** Any future migration that adds, alters, or removes a field on `DibbsAward` (`sales` app, `dibbs_award` table) must sandwich the schema operation between `_drop_we_won_awards_view` / `_recreate_we_won_awards_view` (SQLite-only helpers; no-op on MSSQL). Without the drop, SQLite CI fails during `migrate` with `error in view dibbs_we_won_awards: no such table: main.dibbs_award` when Django rebuilds the table. Precedent: `sales/migrations/0026_…`, `0039_…`, and `0061_dibbs_award_pdf_url.py`.
+- **CI vendor guard — `dibbs_we_won_awards` / SQLite `_remake_table`:** Any future migration that adds, alters, or removes a field on `DibbsAward` (`dibbs` app, `dibbs_award` table) must sandwich the schema operation between `dibbs.db_objects.drop_we_won_awards_view` / `recreate_we_won_awards_view` (SQLite-only helpers; no-op on MSSQL). Without the drop, SQLite CI fails during `migrate` with `error in view dibbs_we_won_awards: no such table: main.dibbs_award` when Django rebuilds the table. Helpers live in `dibbs/db_objects.py`; the historical `sales` precedents are in git history.
 - Keep changes scoped to the requested behavior. Do not do opportunistic cleanup in unrelated files.
 - Edit in the owning app first, then update downstream consumers in the same change.
 - Before renaming shared fields, URL names, templates, or JSON keys, run repo-wide search and update all call sites.
@@ -107,10 +107,10 @@ Run repo-wide search before any of these changes:
 - Renaming fields on `contracts.Contract`, `contracts.Clin`, `suppliers.Supplier`, `products.Nsn`.
 - Renaming URL names in any app namespace used outside that app (`contracts:`, `suppliers:`, `users:`, `reports:`, `inventory:`, `training:`, `tools:`).
 - Renaming template paths used by includes/extends or cross-app render calls.
-- Changing status/choice values used as raw strings in views/templates (`sales`, `processing`, `reports`, `training`).
+- Changing status/choice values used as raw strings in views/templates (`processing`, `reports`, `training`, `quote` statuses).
 - Changing JSON payload keys used by JS (`processing/static/processing/js`, `reports/templates/reports/admin_dashboard.html`, `templates/suppliers/supplier_enrich.html`).
 - Changing permission/setting keys (`AppRegistry`, `AppPermission`, `UserSettings` names like `reports_ai_model`, `current_company_id`).
-- Changing export/report columns or field mappings (`sales/services/bq_export.py`, `contracts` export views, `reports` SQL outputs).
+- Changing export/report columns or field mappings (the quote BQ writer, `contracts` export views, `reports` SQL outputs).
 - Changing signal or middleware behavior (`transactions/signals.py`, `users/signals.py`, `STATZWeb/middleware.py`, `users/middleware.py`).
 
 **Return-to-origin navigation pattern:** when a page can be reached from multiple entry points and needs to send the user back afterward, use a validated `next` query param (`url_has_allowed_host_and_scheme`) carried through hidden form fields across POST-redirect-GET cycles — do not hardcode a single return destination. Established first in `note_views.py` (`referring_url`), extended to `ContractCloseView` on 2026-07-02.
@@ -118,9 +118,9 @@ Run repo-wide search before any of these changes:
 ## 6. Common Coupled Change Patterns
 - `Contract`/`Clin` schema changes:
 - `contracts/models.py` + migration + `contracts/forms.py` + relevant `contracts/views/*` + templates.
-- Plus downstream: `processing/models.py` and finalization mapping, `transactions/signals.py`, and `sales/services/matching.py` when CLIN supplier/NSN fields are touched.
+- Plus downstream: `processing/models.py` and finalization mapping, `transactions/signals.py`.
 - `Supplier` schema changes:
-- `suppliers/models.py` + migration + `contracts/forms.py` (`SupplierForm`) + `contracts/views/supplier_views.py` + `templates/suppliers/*` + `transactions/signals.py` + `sales/services/email.py`/matching flows.
+- `suppliers/models.py` + migration + `contracts/forms.py` (`SupplierForm`) + `contracts/views/supplier_views.py` + `templates/suppliers/*` + `transactions/signals.py`.
 - `Nsn` schema changes:
 - `products/models.py` + migration + `contracts/forms.py` (`NsnForm`) + `contracts/views/nsn_views.py`/`idiq_views.py` + `processing` matching views + raw SQL references (`SQL/migrate_data.sql`) when table/column names change.
 - Permission-registry changes:
@@ -168,7 +168,8 @@ Run repo-wide search before any of these changes:
 - `transactions` is downstream audit infrastructure. Do not move business logic there; keep it as observer/edit modal support.
 - `suppliers` owns supplier models and enrichment logic, but supplier CRUD form/view flow is largely in `contracts`.
 - `products` owns NSN models, but NSN editing/search views are wired from `contracts`.
-- `sales` owns DIBBS-specific entities/workflows and consumes supplier/contracts data.
+- `dibbs` owns DIBBS-sourced data (imports, awards, notices, CAGE reference) and never imports from `quote`.
+- `quote` owns all quoting workflow data and consumes `dibbs`, supplier and NSN data; it reacts to `dibbs.signals.import_completed`.
 - `reports` owns `ReportRequest` workflow and read-only SQL tooling; it should not become a write path to core domain tables.
 - `users` owns auth, app permissions, settings, active-company state, and portal APIs.
 - Prefer extending existing owner workflows over duplicating business rules in another app.
@@ -184,17 +185,17 @@ Run repo-wide search before any of these changes:
 - Document browser (`contracts/views/documents_views.py`) uses service principal credentials (client credentials flow) for SharePoint access. All folder listing and uploads are done on behalf of the service principal, not the logged-in user. User permissions are enforced at the Django level through `request.active_company` contract scoping.
 - Treat uploads/downloads as sensitive:
 - PDF/file handlers in `tools`, `training`, `processing`, `contracts` should keep size/type/permission checks.
-- `parse_procurement_history()` in `sales/services/dibbs_pdf.py` uses `pypdf.PdfReader` to extract text from raw PDF bytes. DIBBS serves `.PDF` files directly — not ZIPs. The old ZIP-based approach was incorrect and has been replaced. The `pypdf` package is a declared dependency in `requirements.txt`.
+- `parse_procurement_history()` in `dibbs/services/dibbs_pdf.py` uses `pypdf.PdfReader` to extract text from raw PDF bytes. DIBBS serves `.PDF` files directly — not ZIPs. The old ZIP-based approach was incorrect and has been replaced. The `pypdf` package is a declared dependency in `requirements.txt`.
 - **`NsnProcurementHistory`** rows are keyed on `(nsn, contract_number)`. `save_procurement_history()` inserts new rows with `first_seen_sol` / `last_seen_sol`; for existing keys it updates **`last_seen_sol`** and **`extracted_at`** only — it does not overwrite price, quantity, or other historical fields.
 - Exports should remain authenticated and scoped.
 
 ## 9. Reporting / Export / Background Processing Rules
 - Keep `reports` execution read-only via `run_select`; do not execute raw SQL directly in views.
 - `reports/views.py` `CORE_TABLES` is a hardcoded schema prompt list. Update it when core table names change.
-- `sales/services/bq_export.py` `COMPANY_FILLED_COLUMNS` is a strict column mapping contract. Field renames must update mapping.
+- The BQ export column map (documented in `quote/CONTEXT_quote.md` §8–10) is a strict contract. Field renames must update the writer.
 - Validate export changes end-to-end in:
 - `contracts` (CSV/XLSX and folder tracking exports),
-- `sales` (BQ export),
+- `quote` (BQ export, once built),
 - `reports` (CSV export),
 - `training` and `accesslog` (PDF exports),
 - `tools` (PDF/ZIP outputs),
@@ -204,7 +205,7 @@ Run repo-wide search before any of these changes:
 - `fetch_pending_pdfs` — **Deprecated** as the default 5‑minute WebJob; nightly Loop B+C cover set-aside harvest + parse. Command remains for manual/RFQ-queue catch-up: batch-of-10 sessions, then `parse_pdf_data_backlog`. Max five fetch attempts per sol.
 - `poll_we_won_today` — Daytime we-won award detection task (`ScheduledTask` interval 15 minutes; run_order 2). Its execution is guarded by the `WE_WON_POLL_ENABLED` environment variable; if not set to `"true"`, the task executes as a no-op.
 - `check_dibbs_notices` (1440 min / daily, run_order 7): Scrapes `www.dibbs.bsm.dla.mil` homepage for public DIBBS Notices using `make_www_session()` (requests only — no Playwright). Upserts new rows into `DibbsNotice` using `get_or_create` keyed on `(title, posted_date)`. Never overwrites existing rows.
-- The scraper may re-attempt a date that was partially imported. `_process_records()` in `sales/services/awards_file_importer.py` must filter out `notice_id` values that already exist before calling `executemany` to prevent `IntegrityError` on duplicate key (and filter `dibbs_award_mod` inserts against existing rows for the same unique constraint). All `IN` clause queries against large record sets must be chunked using `_chunked(list, AW_CHUNK)` to stay under SQL Server's 2,100 parameter limit. This applies to `existing_keys` and `existing_mod_awards` lookups in `_process_records()`.
+- The scraper may re-attempt a date that was partially imported. `_process_records()` in `dibbs/services/awards_file_importer.py` must filter out `notice_id` values that already exist before calling `executemany` to prevent `IntegrityError` on duplicate key (and filter `dibbs_award_mod` inserts against existing rows for the same unique constraint). All `IN` clause queries against large record sets must be chunked using `_chunked(list, AW_CHUNK)` to stay under SQL Server's 2,100 parameter limit. This applies to `existing_keys` and `existing_mod_awards` lookups in `_process_records()`.
 - Signal-based automation exists in `transactions` and `users`; changing save paths or middleware can silently remove side effects.
 
 ## 10. Testing and Verification Expectations
@@ -284,7 +285,7 @@ Slow down and inspect deeply before editing when changes involve:
 - Target app `CONTEXT_<app>.md` and `AGENTS_<app>.md`.
 - Most coupled areas:
 - `contracts` <-> `processing` <-> `transactions`.
-- `contracts` <-> `suppliers` <-> `sales`.
+- `contracts` <-> `suppliers` <-> `quote`; `dibbs` -> `intake` / `contracts` / `products` / `quote`.
 - `products` <-> `contracts` <-> `processing`.
 - `users` permissions/company state <-> `STATZWeb/middleware.py`.
 - Riskiest edit types:

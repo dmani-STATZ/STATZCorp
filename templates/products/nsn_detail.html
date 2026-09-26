@@ -124,9 +124,7 @@
                             </span>
                             <span class="nsn-portal-part-number">{{ row.part_number|default:"—" }}</span>
                             <span>
-                                {% if row.no_quote %}
-                                <span class="badge text-bg-danger">No Quote</span>
-                                {% elif row.is_resolved %}
+                                {% if row.is_resolved %}
                                 <span class="nsn-detail-source-chip nsn-detail-source-chip--resolved">In system</span>
                                 {% else %}
                                 <span class="nsn-detail-source-chip nsn-detail-source-chip--unresolved">Not in DB</span>
@@ -276,9 +274,9 @@
                             <tr>
                                 <td>{{ q.quote_date|date:"M j, Y" }}</td>
                                 <td>{{ q.supplier.name }}</td>
-                                <td class="text-end font-monospace">${{ q.unit_price|floatformat:2 }}</td>
+                                <td class="text-end font-monospace">${{ q.supplier_unit_cost|floatformat:2 }}</td>
                                 <td>{{ q.lead_time_days }}d</td>
-                                <td class="nsn-portal-part-number">{{ q.part_number_offered|default:"—" }}</td>
+                                <td class="nsn-portal-part-number">{{ q.offered_part_number|default:"—" }}</td>
                                 <td>{% if q.is_selected_for_bid %}<span class="badge text-bg-primary">Selected</span>{% else %}—{% endif %}</td>
                             </tr>
                             {% endfor %}

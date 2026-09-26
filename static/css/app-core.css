@@ -2811,16 +2811,16 @@ main {
   }
 }
 /* ==========================================================================
-   Quotes app (quote/) — DIBBS quoting workspace
+   App shell + sub-nav — shared by feature-app shells (quote/, dibbs/)
    Theme-aware: light values on the bare selector, dark overrides scoped to
    [data-bs-theme="dark"]. Never use a .dark class.
    ========================================================================== */
 
-.quote-shell {
+.app-shell {
   padding: 0 2rem 2rem;
 }
 
-.quote-subnav {
+.app-subnav {
   display: flex;
   align-items: stretch;
   width: 100%;
@@ -2830,14 +2830,14 @@ main {
   border-bottom: 1px solid var(--bs-border-color);
 }
 
-.quote-subnav-inner {
+.app-subnav-inner {
   display: flex;
   align-items: stretch;
   gap: 0;
   padding: 0 1rem;
 }
 
-.quote-subnav-link {
+.app-subnav-link {
   display: flex;
   align-items: center;
   padding: 0 1rem;
@@ -2848,17 +2848,17 @@ main {
   border-bottom: 2px solid transparent;
 }
 
-.quote-subnav-link:hover {
+.app-subnav-link:hover {
   color: var(--bs-body-color);
   background-color: var(--bs-secondary-bg);
 }
 
-.quote-subnav-link.active {
+.app-subnav-link.active {
   color: var(--company-primary);
   border-bottom-color: var(--company-primary);
 }
 
-[data-bs-theme="dark"] .quote-subnav-link.active {
+[data-bs-theme="dark"] .app-subnav-link.active {
   color: var(--bs-link-color);
   border-bottom-color: var(--bs-link-color);
 }

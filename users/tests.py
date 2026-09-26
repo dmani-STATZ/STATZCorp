@@ -25,6 +25,6 @@ class PortalPageTests(TestCase):
         self.assertContains(response, "Announcements")
 
     def test_dibbs_notices_page_renders(self):
-        response = self.client.get(reverse("sales:dibbs_notices"))
+        response = self.client.get(reverse("dibbs:dibbs_notices"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "DIBBS Notices")

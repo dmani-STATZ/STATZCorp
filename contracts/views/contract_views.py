@@ -243,7 +243,7 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
                 break
         context['main_supplier'] = main_supplier
 
-        from sales.services.contract_mods import mods_for_contract
+        from dibbs.services.contract_mods import mods_for_contract
 
         context['contract_mods'] = mods_for_contract(contract)
 

@@ -435,7 +435,7 @@ canonical `Contract.contract_number`.
   (JSON). It is **not** a model column.
 - `sharepoint_folder_status` is a real model column
   (`pending` / `exists` / `not_found` / `created` / `error`).
-- Company lookup at DIBBS injection uses `sales.CompanyCAGE` (`dibbs_company_cage`)
+- Company lookup at DIBBS injection uses `dibbs.CompanyCAGE` (`dibbs_company_cage`)
   CAGE code join. If no company found, `draft.company=None` and SP probe is
   skipped.
 - At finalization, copy `draft.data.get('sharepoint_folder_path')` →
@@ -478,7 +478,7 @@ canonical `Contract.contract_number`.
   `Last_Mod_Posting_Date` are classified as MODs in `usp_process_award_staging`
   and land in `dibbs_award_mod` only — they never become `DibbsAward` rows,
   never appear in `WeWonAward`, and never receive `DraftContract` skeletons.
-  The hot-poll parser (`sales/services/awdrecs_parser.py`) must extract mod
+  The hot-poll parser (`dibbs/services/awdrecs_parser.py`) must extract mod
   posting date so daytime polls follow the same gate as nightly AW imports.
 
 ### DIBBS PDF Fetch (On-Demand)
@@ -492,7 +492,7 @@ month + 2-digit year (e.g., 28MAY26).
 draft.data['award_pdf_url'] is stored at DIBBS injection time for all new
 skeletons. Old skeletons fall back to DibbsAward ORM lookup in _resolve_pdf_url.
 draft.data['award_basic_number'] is stored at injection time for DO/IDIQ drafts.
-Download uses make_dibbs2_session() from sales.services.dibbs_session  this
+Download uses make_dibbs2_session() from dibbs.services.dibbs_session  this
 handles the DOD Computer Use Notice cookie for dibbs2.bsm.dla.mil. DO NOT use
 make_www_session() (wrong domain). DO NOT import from processing.*.
 After fetch: merge_parsed_pdf_into_draft(draft, parse_result) in intake/ingest.py
@@ -517,7 +517,7 @@ PDF upload, and manual creation).
 
 **Sweep service — `intake/services/award_ledger.py`.** Mirrors the
 `queue_we_won_drafts` conventions: module logger + `_LOG_PREFIX`, lazy
-cross-app imports inside functions (intake → sales, intake → contracts; no
+cross-app imports inside functions (intake → dibbs, intake → contracts; no
 `processing.*`), never raises to callers (every entry point is wrapped +
 logged), MSSQL no-MARS safety (all source reads are materialized with
 `list(qs.values(...))`/`list(qs)` before any secondary DB call; `__in` lookups
@@ -559,7 +559,7 @@ exists AND (status is non-`queued` OR `locked_by` is set OR
 `modified_at > created_at`). Treat it as a best-effort observation, not an
 authoritative audit event.
 
-**Injection points (same pattern as `queue_we_won_drafts`).** The `sales`
+**Injection points (same pattern as `queue_we_won_drafts`).** The `dibbs`
 scrape (`scrape_awards._scrape_single_date_from_batch`) and hot poll
 (`poll_we_won_today` service) call `upsert_ledger_for_batch(batch, ...)` in a
 guarded piggyback block AFTER the `queue_we_won_drafts` block. Both are
@@ -575,7 +575,7 @@ wrapped so a ledger failure can never crash the scrape/poll. Backfill:
   CAGE list MUST be materialized first with `list(CompanyCAGE.objects.filter(
   company__in=<user companies>, is_active=True).values_list('cage_code',
   flat=True))` before filtering the ledger — MSSQL has no MARS, so never iterate
-  one queryset while filtering another on the same connection. `sales.CompanyCAGE`
+  one queryset while filtering another on the same connection. `dibbs.CompanyCAGE`
   is the only scoping bridge; do not invent a company FK on the ledger.
 - **Sort whitelist + deterministic MSSQL order.** Only `first_seen_at`
   (default), `award_date`, `total_contract_price`, `contract_number`, and

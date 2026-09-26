@@ -377,7 +377,7 @@ def _dibbs_to_data(record: dict) -> dict:
         'contractor_cage': (record.get('Awardee_CAGE_Code') or '').strip() or None,
         'parser': {
             'source': 'dibbs',
-            'parser_version': 'sales.dibbs_awards_scraper',
+            'parser_version': 'dibbs.dibbs_awards_scraper',
             'raw_extraction': None,
         },
     }

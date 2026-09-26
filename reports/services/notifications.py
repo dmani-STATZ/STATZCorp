@@ -2,7 +2,7 @@
 reports/services/notifications.py
 
 Outbound email notifications for the reports request lifecycle.
-Uses the shared Graph mail service (sales.services.graph_mail).
+Uses the shared Graph mail service (mailer.services.graph_mail).
 All functions are fail-soft  log errors, never raise.
 """
 import logging
@@ -13,7 +13,7 @@ logger = logging.getLogger("reports.notifications")
 
 
 def _get_graph_mail():
-    """Lazy import to avoid hard dependency if sales app is ever not installed."""
+    """Lazy import to avoid a hard dependency on the mailer app."""
     try:
         from mailer.services.graph_mail import send_mail_via_graph
         return send_mail_via_graph

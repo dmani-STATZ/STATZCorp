@@ -1,9 +1,9 @@
 """
 Inbound supplier email persistence for the quotes@ shared mailbox.
 
-sales.InboxMessage persists only emails a rep has already linked to an RFQ, and
-stores no raw payload, no headers and no attachments. The quote app's mailbox
-workspace needs all three, so it owns its own records.
+Every message in the mailbox is persisted -- linked or not -- with its raw
+Graph payload, headers and attachments, because the mailbox workspace needs all
+three.
 
 Tables: quote_email, quote_email_attachment, quote_email_sol_link.
 """
@@ -16,8 +16,9 @@ from django.utils import timezone
 from .base import AuditModel
 
 #: How long a rep holds an email before another rep can take it. Matches the
-#: 20-minute convention used by sales.InboxMessage and Solicitation review
-#: claims. Changing this means updating CONTEXT_quote.md and AGENTS_quote.md too.
+#: 20-minute convention used by every claim in this app (see
+#: QuoteSolicitation.claim_for). Changing this means updating CONTEXT_quote.md
+#: and AGENTS_quote.md too.
 CLAIM_DURATION = timedelta(minutes=20)
 
 
@@ -137,9 +138,9 @@ class QuoteEmailSolLink(models.Model):
         on_delete=models.CASCADE,
         related_name='sol_links',
     )
-    # Read-only reference into the sales DIBBS tables.
+    # Read-only reference into the dibbs tables.
     line = models.ForeignKey(
-        'sales.SolicitationLine',
+        'dibbs.SolicitationLine',
         on_delete=models.CASCADE,
         related_name='quote_email_links',
     )

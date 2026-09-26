@@ -2507,7 +2507,7 @@ class FetchDibbsPdfTests(TestCase):
         self.assertEqual(resp.status_code, 409)
         self.assertIn('currently locked by bob', resp.json()['error'])
 
-    @patch('sales.services.dibbs_session.make_dibbs2_session')
+    @patch('dibbs.services.dibbs_session.make_dibbs2_session')
     @patch('intake.pdf_parser.parse_award_pdf')
     @patch('intake.services.sharepoint_intake.upload_pdf_to_draft_folder')
     def test_fetch_dibbs_pdf_success(self, mock_upload, mock_parse, mock_session):
@@ -2668,7 +2668,7 @@ class AwardLedgerSweepTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from sales.models import AwardImportBatch, CompanyCAGE
+        from dibbs.models import AwardImportBatch, CompanyCAGE
 
         cls.cage = '1ABC5'
         CompanyCAGE.objects.create(
@@ -2685,7 +2685,7 @@ class AwardLedgerSweepTests(TestCase):
         )
 
     def _make_award(self, basic='SPE7L126P7653', **kw):
-        from sales.models import DibbsAward
+        from dibbs.models import DibbsAward
 
         defaults = dict(
             sol_number='SPE7L126Q0001',
@@ -2704,7 +2704,7 @@ class AwardLedgerSweepTests(TestCase):
 
         ww = MagicMock()
         ww.objects.values.return_value = list(ids)
-        return patch('sales.models.WeWonAward', ww)
+        return patch('dibbs.models.WeWonAward', ww)
 
     def test_upsert_creates_row_and_is_idempotent(self):
         from intake.models import AwardLedger
@@ -2733,7 +2733,7 @@ class AwardLedgerSweepTests(TestCase):
     def test_upsert_counts_mods_and_latches_mod_timestamp(self):
         from intake.models import AwardLedger
         from intake.services.award_ledger import upsert_ledger_for_batch
-        from sales.models import DibbsAwardMod
+        from dibbs.models import DibbsAwardMod
 
         award = self._make_award(basic='SPE7L126P8000',
                                  notice_id='n-8000')
@@ -2871,7 +2871,7 @@ class AwardLedgerListViewTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         from contracts.models import Company
-        from sales.models import CompanyCAGE
+        from dibbs.models import CompanyCAGE
         from users.models import UserCompanyMembership
 
         cls.url = reverse('intake:award_ledger')
@@ -2950,7 +2950,7 @@ class AwardLedgerListViewTests(TestCase):
             user=loner, company=self.other_company, is_default=True,
         )
         # Deactivate the other company's CAGE so scope is empty.
-        from sales.models import CompanyCAGE
+        from dibbs.models import CompanyCAGE
         CompanyCAGE.objects.filter(cage_code=self.cage_out).update(is_active=False)
 
         self.client.force_login(loner)
@@ -3093,7 +3093,7 @@ class AwardLedgerProvenanceTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         from contracts.models import Company, Buyer
-        from sales.models import CompanyCAGE
+        from dibbs.models import CompanyCAGE
         from users.models import UserCompanyMembership
         from products.models import Nsn
         from suppliers.models import Supplier
@@ -3163,7 +3163,7 @@ class AwardLedgerProvenanceTests(TestCase):
     def test_cage_resolution_resolves_correctly(self):
         from intake.models import AwardLedger, DraftContract
         from intake.services.award_ledger import log_draft_ingestion
-        from sales.models import CompanyCAGE
+        from dibbs.models import CompanyCAGE
 
         # 1. prime contractor CAGE block
         draft_with_parse = DraftContract.objects.create(

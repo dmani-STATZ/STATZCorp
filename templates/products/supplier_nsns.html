@@ -20,9 +20,6 @@
                 {% endif %}
             </p>
             <div class="d-flex flex-wrap gap-2 mt-2">
-                {% if no_quote %}
-                <span class="badge text-bg-danger">No Quote</span>
-                {% endif %}
                 {% if supplier.probation %}
                 <span class="badge text-bg-warning">Probation</span>
                 {% endif %}
@@ -101,7 +98,7 @@
                             <a href="{% url 'products:nsn_detail' q.dossier_pk %}">{{ q.nsn|format_nsn }}</a>
                             {% else %}{{ q.nsn|format_nsn }}{% endif %}
                         </td>
-                        <td class="text-end font-monospace">${{ q.unit_price|floatformat:2 }}</td>
+                        <td class="text-end font-monospace">${{ q.supplier_unit_cost|floatformat:2 }}</td>
                         <td>{{ q.lead_time_days }}d</td>
                     </tr>
                     {% endfor %}

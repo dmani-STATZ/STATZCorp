@@ -16,7 +16,8 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.views.generic import RedirectView
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse
@@ -104,7 +105,10 @@ urlpatterns = [
     # path('check-auth-method/', views.check_auth_method, name='check_auth_method'),
     path("inventory/", include("inventory.urls")),
     path("contracts/", include("contracts.urls")),
-    path("sales/", include("sales.urls")),
+    path("dibbs/", include("dibbs.urls")),
+    # The retired sales app's DIBBS pages (imports, awards, notices, competitors,
+    # CAGE settings) kept their sub-paths under /dibbs/ -- forward old bookmarks.
+    re_path(r"^sales/(?P<rest>.*)$", RedirectView.as_view(url="/dibbs/%(rest)s", permanent=False)),
     path("quote/", include("quote.urls")),
     path("suppliers/", include("suppliers.urls")),
     path("products/", include("products.urls")),

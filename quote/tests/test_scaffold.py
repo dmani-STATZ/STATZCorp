@@ -3,7 +3,7 @@ Scaffold-level guarantees for the quote app.
 
 These lock in the wiring contracts that fail silently rather than loudly:
 the URL namespace (permission middleware resolves it), the read-only rule
-toward sales, and the auto-award remarks gate.
+toward dibbs, and the auto-award remarks gate.
 """
 from decimal import Decimal
 
@@ -38,11 +38,11 @@ class QuoteWiringTests(SimpleTestCase):
             )
 
 
-class ReadOnlyTowardSalesTests(SimpleTestCase):
+class ReadOnlyTowardDibbsTests(SimpleTestCase):
     """
-    The quote app references sales/suppliers/products but must never own or
-    alter their schema. Catching a stray FK back onto a sales model with a
-    cascade that would delete sales rows is the point here.
+    The quote app references dibbs/suppliers/products but must never own or
+    alter their schema. Catching a stray FK onto an app it should not know
+    about is the point here.
     """
 
     def test_foreign_keys_into_other_apps_do_not_own_the_target(self):
@@ -57,7 +57,7 @@ class ReadOnlyTowardSalesTests(SimpleTestCase):
                     continue
                 self.assertIn(
                     target_label,
-                    {'sales', 'suppliers', 'products', 'auth', 'contracts'},
+                    {'dibbs', 'suppliers', 'products', 'auth', 'contracts'},
                     f'{model.__name__}.{field.name} points at unexpected app {target_label}',
                 )
 
@@ -92,12 +92,11 @@ class AutoAwardGateTests(TestCase):
     """
 
     def _bid_for(self, sol_number):
-        from sales.models import Solicitation, SolicitationLine
+        from dibbs.models import Solicitation, SolicitationLine
 
         sol = Solicitation.objects.create(solicitation_number=sol_number)
         line = SolicitationLine.objects.create(solicitation=sol, nsn='8465016131241')
         return QuoteBid(
-            solicitation=sol,
             line=line,
             quoter_cage='1PN61',
             quote_for_cage='1PN61',
@@ -165,7 +164,7 @@ class EmailClaimTests(TestCase):
 class QuoteRFQConstraintTests(TestCase):
     def test_one_rfq_per_line_and_supplier(self):
         from django.db import IntegrityError, transaction
-        from sales.models import Solicitation, SolicitationLine
+        from dibbs.models import Solicitation, SolicitationLine
         from suppliers.models import Supplier
 
         sol = Solicitation.objects.create(solicitation_number='SPE1C126Q0528')
@@ -222,7 +221,7 @@ class DashboardRenderTests(TestCase):
         self.client.force_login(self.user)
         html = self.client.get(reverse('quote:dashboard')).content.decode()
 
-        self.assertIn('quote-shell', html)
+        self.assertIn('app-shell', html)
         self.assertIn('DIBBS quoting workspace', html)
 
     def test_quote_templates_add_no_cdn_tags(self):

@@ -183,7 +183,7 @@
                     <li><a class="dropdown-item" href="{% url 'users:portal_resources' %}"><i class="bi bi-folder2-open" aria-hidden="true"></i><span>Resources</span></a></li>
                     <li><a class="dropdown-item" href="{% url 'users:portal_announcements' %}"><i class="bi bi-megaphone" aria-hidden="true"></i><span>Announcements</span></a></li>
                     <li>
-                        <a class="dropdown-item d-flex justify-content-between" href="{% url 'sales:dibbs_notices' %}">
+                        <a class="dropdown-item d-flex justify-content-between" href="{% url 'dibbs:dibbs_notices' %}">
                             <span><i class="bi bi-shield-check" aria-hidden="true"></i><span>DIBBS Notices</span></span>
                             {% if dibbs_notice_recent_count %}<span class="badge bg-warning text-dark">{{ dibbs_notice_recent_count }}</span>{% endif %}
                         </a>
@@ -332,12 +332,12 @@
                                 <a href="{% url 'contracts:dfas_import_list' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">DFAS Payment Import</a>
                             </li>
                             <li>
-                                <a href="{% url 'sales:competitor_watchlist' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Competitors Numbers</a>
+                                <a href="{% url 'dibbs:competitor_watchlist' %}" class="px-3 py-1 rounded-md text-sm hover:text-green-700 block">Competitors Numbers</a>
                             </li>
                         </ul>
                     </li>
                     <li class="py-1 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
-                        <a href="{% url 'sales:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">STATZ Sales</a>
+                        <a href="{% url 'dibbs:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">DIBBS Data</a>
                     </li>
                     <li class="py-1 ps-1 hover:text-green-700 cursor-pointer overflow-hidden">
                         <a href="{% url 'quote:dashboard' %}" class="px-3 py-2 rounded-md text-sm font-medium menu-label">STATZ Quotes</a>

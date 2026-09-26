@@ -39,7 +39,7 @@ Every final prompt must follow this specific structural hierarchy:
 
 ### Precision Standards
 * **Zero Assumption:** The prompt must be so detailed that the coding agent does not have to "guess" or "invent" logic. Specify variable names, logic gates, and error handling.
-* **Documentation Loop:** Every prompt **must** include a specific instruction for the agent to update `CONTEXT_contracts.md` (project state) and `AGENTS_contracts.md` (active goals/tasks) within the sales app to ensure the project history remains accurate.
+* **Documentation Loop:** Every prompt **must** include a specific instruction for the agent to update `CONTEXT_contracts.md` (project state) and `AGENTS_contracts.md` (active goals/tasks) within the contracts app to ensure the project history remains accurate.
 
 ## 4. Technical Environment
 * **Framework:** Django (Python).

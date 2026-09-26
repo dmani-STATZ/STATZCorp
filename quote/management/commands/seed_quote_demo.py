@@ -15,11 +15,12 @@ The dev database is a production-like copy (hundreds of thousands of real
 solicitations and awards), so every row this command creates is tagged, and
 --clear only ever deletes tagged rows:
 
-  * sales.Solicitation   -> linked to an ImportBatch whose imported_by is
+  * dibbs.Solicitation   -> linked to an ImportBatch whose imported_by is
                             DEMO_IMPORTED_BY. Deleting that batch's
-                            solicitations cascades to lines, RFQs, quotes,
-                            bids, outcomes and email links.
-  * sales.DibbsAward     -> notice_id starts with DEMO_NOTICE_PREFIX.
+                            solicitations cascades to lines, workflow state,
+                            matches, RFQs, quotes, bids, outcomes and email
+                            links.
+  * dibbs.DibbsAward     -> notice_id starts with DEMO_NOTICE_PREFIX.
   * suppliers.Supplier   -> notes contains DEMO_MARKER.
   * quote.QuoteEmail     -> graph_message_id starts with DEMO_GRAPH_PREFIX.
 
@@ -35,14 +36,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from products.models import Nsn
-from sales.models import (
+from dibbs.models import (
     ApprovedSource,
     DibbsAward,
     ImportBatch,
     Solicitation,
     SolicitationLine,
-    SupplierFSC,
-    SupplierNSN,
 )
 from suppliers.models import Supplier, SupplierType
 
@@ -53,6 +52,10 @@ from quote.models import (
     QuoteEmailAttachment,
     QuoteEmailSolLink,
     QuoteRFQ,
+    QuoteSolicitation,
+    QuoteSolicitationMatch,
+    QuoteSupplierFSC,
+    QuoteSupplierNSN,
     QuoteSupplierQuote,
 )
 
@@ -200,8 +203,8 @@ class Command(BaseCommand):
             ('solicitation lines', SolicitationLine.objects.filter(solicitation__in=sols).count()),
             ('RFQs', QuoteRFQ.objects.filter(line__solicitation__in=sols).count()),
             ('supplier quotes', QuoteSupplierQuote.objects.filter(line__solicitation__in=sols).count()),
-            ('bids', QuoteBid.objects.filter(solicitation__in=sols).count()),
-            ('bid outcomes', BidOutcome.objects.filter(bid__solicitation__in=sols).count()),
+            ('bids', QuoteBid.objects.filter(line__solicitation__in=sols).count()),
+            ('bid outcomes', BidOutcome.objects.filter(bid__line__solicitation__in=sols).count()),
             ('emails', QuoteEmail.objects.filter(graph_message_id__startswith=DEMO_GRAPH_PREFIX).count()),
             ('awards', DibbsAward.objects.filter(notice_id__startswith=DEMO_NOTICE_PREFIX).count()),
             ('NSN spec rows', Nsn.objects.filter(
@@ -212,9 +215,10 @@ class Command(BaseCommand):
 
         if sols.exists():
             self.stdout.write('\nStages represented:')
-            for sol in sols.order_by('solicitation_number'):
+            for sol in sols.select_related('quote_state').order_by('solicitation_number'):
+                state = getattr(sol, 'quote_state', None)
                 self.stdout.write(
-                    f'  {sol.solicitation_number}  {sol.status:14} '
+                    f'  {sol.solicitation_number}  {(state.status if state else "-"):14} '
                     f'{(sol.lines.first().nomenclature or ""):22}'
                 )
 
@@ -409,7 +413,6 @@ class Command(BaseCommand):
             return_by_date=spec['due'],
             import_date=batch.import_date,
             import_batch=batch,
-            status=self._status_for(spec['stage']),
             pdf_file_name=f'{spec["sol"]}.PDF',
             buyer_code='DEMO1',
         )
@@ -443,14 +446,22 @@ class Command(BaseCommand):
             )
 
         for cage in spec.get('match_suppliers', []):
-            SupplierNSN.objects.get_or_create(
+            QuoteSupplierNSN.objects.get_or_create(
                 supplier=suppliers[cage], nsn=nsn_plain,
                 defaults={'notes': f'{DEMO_MARKER} demo capability'},
             )
-            SupplierFSC.objects.get_or_create(
-                supplier=suppliers[cage], fsc_code=nsn_plain[:4],
+            QuoteSupplierFSC.objects.get_or_create(
+                supplier=suppliers[cage], fsc=nsn_plain[:4],
                 defaults={'notes': f'{DEMO_MARKER} demo capability'},
             )
+            QuoteSolicitationMatch.objects.get_or_create(
+                solicitation=sol, supplier=suppliers[cage],
+                source=QuoteSolicitationMatch.SOURCE_NSN,
+            )
+
+        QuoteSolicitation.objects.create(
+            solicitation=sol, status=self._status_for(spec['stage']),
+        )
 
         rfq_by_cage = {}
         for cage, status in spec.get('rfqs', []):
@@ -552,7 +563,6 @@ class Command(BaseCommand):
         submitted = spec['submitted']
 
         bid = QuoteBid.objects.create(
-            solicitation=sol,
             line=line,
             selected_quote=selected,
             quoter_cage=STATZ_CAGE,
@@ -732,14 +742,14 @@ class Command(BaseCommand):
     @staticmethod
     def _status_for(stage):
         return {
-            'unmatched': 'New',
-            'matched': 'Active',
-            'rfq_queued': 'RFQ_PENDING',
-            'rfq_sent': 'RFQ_SENT',
-            'won': 'BID_SUBMITTED',
-            'lost_tight': 'BID_SUBMITTED',
-            'lost_wide': 'BID_SUBMITTED',
-            'pending': 'BID_SUBMITTED',
+            'unmatched': QuoteSolicitation.STATUS_UNMATCHED,
+            'matched': QuoteSolicitation.STATUS_MATCHED,
+            'rfq_queued': QuoteSolicitation.STATUS_MATCHED,
+            'rfq_sent': QuoteSolicitation.STATUS_RFQ_SENT,
+            'won': QuoteSolicitation.STATUS_BID_SUBMITTED,
+            'lost_tight': QuoteSolicitation.STATUS_BID_SUBMITTED,
+            'lost_wide': QuoteSolicitation.STATUS_BID_SUBMITTED,
+            'pending': QuoteSolicitation.STATUS_BID_SUBMITTED,
         }[stage]
 
     @staticmethod

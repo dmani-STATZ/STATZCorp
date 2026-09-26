@@ -1,7 +1,7 @@
 """
 QuoteBid — the staged DIBBS submission for one solicitation line.
 
-Quote-owned equivalent of sales.GovernmentBid. Carries every column the BQ
+The staged DIBBS bid for one line. Carries every column the BQ
 overlay writes, plus clin_group so a combined-CLIN entry can drive sibling
 lines from one form (Quote.md Phase 2 "Default Mode (Combined / Linked)").
 
@@ -37,14 +37,10 @@ class QuoteBid(AuditModel):
         (BID_NO_QUOTE, 'No bid'),
     ]
 
-    # Read-only references into the sales DIBBS tables.
-    solicitation = models.ForeignKey(
-        'sales.Solicitation',
-        on_delete=models.CASCADE,
-        related_name='quote_bids',
-    )
+    # Read-only reference into the dibbs tables. The solicitation is reached
+    # through the line -- no separate FK, so the two can never disagree.
     line = models.OneToOneField(
-        'sales.SolicitationLine',
+        'dibbs.SolicitationLine',
         on_delete=models.CASCADE,
         related_name='quote_bid',
     )
@@ -133,5 +129,5 @@ class QuoteBid(AuditModel):
         solicitation number being T or U. On those, BQ col 121 (Quote Remarks)
         must stay empty or the solicitation loses auto-award status.
         """
-        sol_number = (self.solicitation.solicitation_number or '')
+        sol_number = (self.line.solicitation.solicitation_number or '')
         return len(sol_number) >= 9 and sol_number[8].upper() in ('T', 'U')

@@ -15,7 +15,7 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 
 from products.models import Nsn
-from sales.models import (
+from dibbs.models import (
     ApprovedSource,
     DibbsAward,
     ImportBatch,
@@ -31,6 +31,10 @@ from quote.models import (
     QuoteEmailAttachment,
     QuoteEmailSolLink,
     QuoteRFQ,
+    QuoteSolicitation,
+    QuoteSolicitationMatch,
+    QuoteSupplierFSC,
+    QuoteSupplierNSN,
     QuoteSupplierQuote,
 )
 
@@ -80,14 +84,21 @@ class SeedContentTests(TestCase):
 
     def test_covers_every_pipeline_stage(self):
         statuses = set(
-            Solicitation.objects.values_list('status', flat=True)
+            QuoteSolicitation.objects.values_list('status', flat=True)
         )
-        # Unworked, matched, queued, sent, and bid-submitted must all appear or
-        # the demo does not actually show the workflow.
+        # Unworked, matched, sent, and bid-submitted must all appear or the
+        # demo does not actually show the workflow.
         self.assertEqual(
             statuses,
-            {'New', 'Active', 'RFQ_PENDING', 'RFQ_SENT', 'BID_SUBMITTED'},
+            {
+                QuoteSolicitation.STATUS_UNMATCHED,
+                QuoteSolicitation.STATUS_MATCHED,
+                QuoteSolicitation.STATUS_RFQ_SENT,
+                QuoteSolicitation.STATUS_BID_SUBMITTED,
+            },
         )
+        # Every demo solicitation carries workflow state.
+        self.assertEqual(QuoteSolicitation.objects.count(), Solicitation.objects.count())
 
     def test_covers_every_outcome_including_a_near_miss(self):
         outcomes = dict(
@@ -206,7 +217,9 @@ class ClearIsolationTests(TestCase):
         _seed(clear=True)
 
         for model in (QuoteRFQ, QuoteSupplierQuote, QuoteBid, BidOutcome,
-                      QuoteEmail, QuoteEmailAttachment, QuoteEmailSolLink):
+                      QuoteEmail, QuoteEmailAttachment, QuoteEmailSolLink,
+                      QuoteSolicitation, QuoteSolicitationMatch,
+                      QuoteSupplierNSN, QuoteSupplierFSC):
             self.assertEqual(
                 model.objects.count(), 0,
                 f'{model.__name__} still has rows after --clear',

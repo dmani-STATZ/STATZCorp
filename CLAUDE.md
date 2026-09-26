@@ -16,7 +16,7 @@ This repo already has its own established system for how AI agents should safely
 4. The target app's own `AGENTS_<app>.md`
 5. `PROJECT_AGENTS.md` (repo root) for the full safe-edit rules
 
-Every app in this Django project (`contracts`, `users`, `sales`, `products`, etc.) has its own `CONTEXT_<app>.md` and `AGENTS_<app>.md`. Always check the specific app folder you're working in for these before making changes there.
+Every app in this Django project (`contracts`, `users`, `dibbs`, `quote`, `products`, etc.) has its own `CONTEXT_<app>.md` and `AGENTS_<app>.md`. Always check the specific app folder you're working in for these before making changes there.
 
 ## Subfolders and when to load them
 

@@ -49,12 +49,12 @@ all contracts entering the intake queue (regardless of source).
 | Column | Purpose |
 |---|---|
 | `contract_number` | Canonical (dashed) identity; unique upsert key (matches `DraftContract`/`Contract`) |
-| `award_basic_number`, `delivery_order_number`, `delivery_order_counter`, `awardee_cage`, `nsn`, `nomenclature`, `purchase_request`, `solicitation` | DIBBS mirror strings (types copied from `sales.DibbsAward`) |
+| `award_basic_number`, `delivery_order_number`, `delivery_order_counter`, `awardee_cage`, `nsn`, `nomenclature`, `purchase_request`, `solicitation` | DIBBS mirror strings (types copied from `dibbs.DibbsAward`) |
 | `total_contract_price`, `award_date`, `posted_date`, `aw_file_date`, `last_mod_posting_date` | DIBBS mirror decimal/date fields |
 | `mod_count` | Number of mods observed (monotonic; never inflated on re-run) |
 | `is_we_won` | Award appears in the `WeWonAward` view (our active CAGE) |
 | `has_award` | A `DibbsAward` row exists for this identity |
-| `dibbs_award` | FK → `sales.DibbsAward` (`SET_NULL`) |
+| `dibbs_award` | FK → `dibbs.DibbsAward` (`SET_NULL`) |
 | `contract` | FK → `contracts.Contract` (`SET_NULL`); set when the live contract is detected |
 | `first_seen_at` | **Latched** — when the identity first entered the ledger |
 | `draft_created_at` | **Latched** — a `DraftContract` was created |
@@ -146,7 +146,7 @@ Read-only `ListView` at `/intake/ledger/`. No POST, no model writes.
   materialized first via `list(CompanyCAGE.objects.filter(company__in=<user
   companies>, is_active=True).values_list('cage_code', flat=True))` (no-MARS on
   MSSQL), then `AwardLedger.objects.filter(awardee_cage__in=cages)`. No matching
-  CAGEs → empty result. `sales.CompanyCAGE` is the scoping bridge.
+  CAGEs → empty result. `dibbs.CompanyCAGE` is the scoping bridge.
 - **`select_related('dibbs_award', 'contract')`** to avoid N+1.
 - **GET filters (re-rendered into the form):** `state` (a `lifecycle_state`
   enum value or blank), `we_won` (`''` / `yes` / `no`), `cage` (exact
@@ -584,7 +584,7 @@ trigger a per-row SP rescan. The Docs button is now icon-only.
 **Company scoping** — `DraftContract.company` FK added. Queue view filters to all
 companies the user has membership in (superusers see all, including unscoped
 drafts with `company=None`). DIBBS injection resolves company via
-`dibbs_company_cage` CAGE lookup (`sales.CompanyCAGE`).
+`dibbs_company_cage` CAGE lookup (`dibbs.CompanyCAGE`).
 
 **SharePoint folder status** — `DraftContract.sharepoint_folder_status` column
   (`pending` / `exists` / `not_found` / `created` / `error` — folder probe/create state).
@@ -613,7 +613,7 @@ PDF upload creates folder — `upload_pdfs` calls `create_draft_sharepoint_folde
 ## Coupling
 - Reads `contracts.models.Contract` for the "Already in DB" queue badge and
   for the `final_contract` FK target.
-- Reads `sales.CompanyCAGE` (`dibbs_company_cage`) for company resolution at
+- Reads `dibbs.CompanyCAGE` (`dibbs_company_cage`) for company resolution at
   DIBBS injection time.
 - Calls `contracts.services.sharepoint_service` and
   `contracts.services.sharepoint_paths` for SharePoint operations via

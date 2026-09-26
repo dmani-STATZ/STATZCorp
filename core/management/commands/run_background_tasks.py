@@ -6,19 +6,17 @@ from django.db.models import F
 from django.utils import timezone
 
 from core.models import ScheduledTask
-from sales.tasks.send_queued_rfqs import send_queued_rfqs
-from sales.tasks.poll_we_won_today import poll_we_won_today_task
+from dibbs.tasks.poll_we_won_today import poll_we_won_today_task
 from users.tasks.sync_calendar import run as sync_sharepoint_calendar_task
 from mailer.tasks.dispatch_campaigns import dispatch_campaigns
 from mailer.tasks.generate_ai import process_ai_snippets
 from mailer.tasks.dispatch_followups import dispatch_followups
-from sales.tasks.check_dibbs_notices import run as check_dibbs_notices_task
+from dibbs.tasks.check_dibbs_notices import run as check_dibbs_notices_task
 from intake.tasks.reconcile_award_ledger import reconcile_award_ledger_task
 
 logger = logging.getLogger("core.background_tasks")
 
 TASK_FUNCTIONS = {
-    "send_queued_rfqs": send_queued_rfqs,
     "poll_we_won_today": poll_we_won_today_task,
     "sync_sharepoint_calendar": sync_sharepoint_calendar_task,
     "dispatch_campaigns": dispatch_campaigns,

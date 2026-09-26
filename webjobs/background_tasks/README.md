@@ -21,8 +21,7 @@ Tasks run in `run_order` when multiple are due on the same heartbeat. A failure 
 
 | # | Name | Interval | Module | Description |
 |---|------|----------|--------|-------------|
-| 1 | `send_queued_rfqs` | 5 min | `sales/tasks/send_queued_rfqs.py` | Sends grouped RFQ emails via Microsoft Graph for all `SupplierRFQ` rows in `READY_TO_SEND` state. |
-| 2 | `poll_we_won_today` | 15 min | `sales/tasks/poll_we_won_today.py` | Queries DIBBS AwdRecs.aspx per active CompanyCAGE (plain requests, no Playwright) for today's awards and feeds results into the same import + we-won pipeline used by the nightly scraper. Guarded by `WE_WON_POLL_ENABLED`. |
+| 2 | `poll_we_won_today` | 15 min | `dibbs/tasks/poll_we_won_today.py` | Queries DIBBS AwdRecs.aspx per active CompanyCAGE (plain requests, no Playwright) for today's awards and feeds results into the same import + we-won pipeline used by the nightly scraper. Guarded by `WE_WON_POLL_ENABLED`. |
 | 3 | `sync_sharepoint_calendar` | 60 min | `users/tasks/sync_calendar.py` | Two-way calendar sync: imports the SharePoint Events list into `WorkCalendarEvent`, then retries any portal events SharePoint is still missing. The push half is gated by `SHAREPOINT_CALENDAR_PUSH_ENABLED` + `SHAREPOINT_CALENDAR_BACKFILL_ENABLED`. |
 | 4 | `dispatch_campaigns` | 10 min | `mailer/tasks/dispatch_campaigns.py` | Dispatches outbound mailer campaigns. |
 | 5 | `process_ai_snippets` | 5 min | `mailer/tasks/generate_ai.py` | Generates AI snippets for pending mailer content. |
@@ -38,8 +37,8 @@ Tasks run in `run_order` when multiple are due on the same heartbeat. A failure 
 
 | Variable | Description |
 |----------|-------------|
-| `GRAPH_MAIL_ENABLED` | Set to `"true"` to enable Graph email dispatch for `send_queued_rfqs`. |
-| `GRAPH_MAIL_SENDER_RFQ` | Sender address used by `send_queued_rfqs` (e.g. `quotes@statzcorp.com`). |
+| `GRAPH_MAIL_ENABLED` | Set to `"true"` to enable Graph email dispatch (award alerts, mailer). |
+| `GRAPH_MAIL_SENDER_RFQ` | The `quotes@` shared mailbox read by `quote.services.graph_inbox` (e.g. `quotes@statzcorp.com`). |
 | `WE_WON_POLL_ENABLED` | Set to `"true"` to enable the daytime we-won CAGE poll. Omit or set to any other value to disable without a deploy. |
 | `SHAREPOINT_CALENDAR_PUSH_ENABLED` | Master switch for writing portal calendar events back to SharePoint. Defaults to `"true"`. Set to `"false"` to make the calendar pull-only. |
 | `SHAREPOINT_CALENDAR_BACKFILL_ENABLED` | Set to `"true"` to let the sync retry events that have no SharePoint item yet. Defaults to `"false"` — enabling it writes existing portal events onto the shared company calendar. |

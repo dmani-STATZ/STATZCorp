@@ -1,0 +1,142 @@
+{% extends "dibbs/base.html" %}
+
+{% block title %}{{ solicitation.solicitation_number }}{% endblock %}
+
+{% block content %}
+<div class="card card-padded mb-3">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <h1 class="h4 mb-1">{{ solicitation.solicitation_number }}</h1>
+      <div class="text-body-secondary small">
+        Return by {{ solicitation.return_by_date|date:"M j, Y"|default:"—" }}
+        &middot; Set-aside {{ solicitation.small_business_set_aside|default:"—" }}
+        &middot; Type {{ solicitation.solicitation_type|default:"—" }}
+        &middot; Buyer {{ solicitation.buyer_code|default:"—" }}
+        &middot; Imported {{ solicitation.import_date|date:"M j, Y"|default:"—" }}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"
+         href="{% url 'dibbs:solicitation_pdf' solicitation.solicitation_number %}">Stored PDF</a>
+      {% if solicitation.dibbs_pdf_url %}
+      <a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener noreferrer"
+         href="{{ solicitation.dibbs_pdf_url }}">PDF on DIBBS</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card card-padded mb-3">
+  <h2 class="h6 mb-2">Lines</h2>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr>
+        <th>Line</th><th>NSN</th><th>Nomenclature</th><th class="text-end">Qty</th>
+        <th>UI</th><th class="text-end">Delivery days</th><th>PR #</th>
+      </tr></thead>
+      <tbody>
+      {% for line in lines %}
+        <tr>
+          <td>{{ line.line_number|default:"—" }}</td>
+          <td class="font-monospace">{{ line.nsn }}</td>
+          <td>{{ line.nomenclature|default:"—" }}</td>
+          <td class="text-end">{{ line.quantity|default:"—" }}</td>
+          <td>{{ line.unit_of_issue|default:"—" }}</td>
+          <td class="text-end">{{ line.delivery_days|default:"—" }}</td>
+          <td class="font-monospace">{{ line.purchase_request_number|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="text-body-secondary">No lines imported.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card card-padded mb-3">
+  <h2 class="h6 mb-2">Approved sources</h2>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>NSN</th><th>CAGE</th><th>Part number</th><th>Company</th></tr></thead>
+      <tbody>
+      {% for src in approved_sources %}
+        <tr>
+          <td class="font-monospace">{{ src.nsn }}</td>
+          <td class="font-monospace">
+            <a href="{% url 'dibbs:entity_cage_lookup' src.approved_cage %}">{{ src.approved_cage }}</a>
+          </td>
+          <td class="font-monospace">{{ src.part_number|default:"—" }}</td>
+          <td>{{ src.company_name|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="text-body-secondary">No approved sources on file.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card card-padded mb-3">
+  <h2 class="h6 mb-2">Awards</h2>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr>
+        <th>Award date</th><th>Contract</th><th>Awardee CAGE</th><th class="text-end">Total</th>
+      </tr></thead>
+      <tbody>
+      {% for award in awards %}
+        <tr>
+          <td>{{ award.award_date|date:"M j, Y" }}</td>
+          <td class="font-monospace">{{ award.award_basic_number|default:"—" }}{% if award.delivery_order_number %} / {{ award.delivery_order_number }}{% endif %}</td>
+          <td class="font-monospace">
+            {% if award.awardee_cage %}<a href="{% url 'dibbs:entity_cage_lookup' award.awardee_cage %}">{{ award.awardee_cage }}</a>{% else %}—{% endif %}
+          </td>
+          <td class="text-end">{% if award.total_contract_price is not None %}${{ award.total_contract_price|floatformat:2 }}{% else %}—{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="text-body-secondary">No award recorded yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card card-padded mb-3">
+  <h2 class="h6 mb-2">Procurement history</h2>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr>
+        <th>Award date</th><th>NSN</th><th>CAGE</th><th>Contract</th>
+        <th class="text-end">Qty</th><th class="text-end">Unit cost</th>
+      </tr></thead>
+      <tbody>
+      {% for ph in procurement_history %}
+        <tr>
+          <td>{{ ph.award_date|date:"M j, Y" }}</td>
+          <td class="font-monospace">{{ ph.nsn }}</td>
+          <td class="font-monospace">{{ ph.cage_code }}</td>
+          <td class="font-monospace">{{ ph.contract_number }}</td>
+          <td class="text-end">{{ ph.quantity|floatformat:"-3" }}</td>
+          <td class="text-end">${{ ph.unit_cost|floatformat:2 }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="text-body-secondary">No procurement history extracted.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if packaging %}
+<div class="card card-padded mb-3">
+  <h2 class="h6 mb-2">Packaging (Section D)</h2>
+  <div class="small"><strong>Standard:</strong> {{ packaging.packaging_standard|default:"—" }}</div>
+  {% if packaging.preservation_requirements %}
+  <div class="small mt-1"><strong>Preservation:</strong> {{ packaging.preservation_requirements|linebreaksbr }}</div>
+  {% endif %}
+  {% if packaging.marking_requirements %}
+  <div class="small mt-1"><strong>Marking:</strong> {{ packaging.marking_requirements|linebreaksbr }}</div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock content %}

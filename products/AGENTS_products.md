@@ -32,7 +32,7 @@ Defines how to safely modify the `products` app for AI coding agents and develop
 - NSN search view logic — lives in `contracts/views/idiq_views.py` (`NsnSearchView`)
 - NSN form definition — lives in `contracts/forms.py` (`NsnForm`); portal logistics edits use `products/forms.py` (`NsnLogisticsForm`) — keep both in sync when packout fields change
 - NSN API endpoint for select widgets — lives in `contracts/views/api_views.py`
-- `sales.ApprovedSource` data — `products` reads this model from the NSN detail view (`get_approved_sources_data`) but does not own its schema, import logic, or admin. Any schema change to `ApprovedSource` (especially renaming `nsn`, `approved_cage`, `part_number`, `company_name`, or `import_batch`) is the sales app's responsibility, but it silently breaks the NSN detail page if the read site here is not updated in the same change.
+- `dibbs.ApprovedSource` data — `products` reads this model from the NSN detail view (`get_approved_sources_data`) but does not own its schema, import logic, or admin. Any schema change to `ApprovedSource` (especially renaming `nsn`, `approved_cage`, `part_number`, `company_name`, or `import_batch`) is the sales app's responsibility, but it silently breaks the NSN detail page if the read site here is not updated in the same change.
 - No services, signals, or tasks beyond `backfill_nsn_normalized` / `list_unnormalized_nsns` management commands
 
 This app started as **glue/domain infrastructure** but now also owns a real read-focused detail page and a small JSON packout endpoint. Treat `models.py`, `views.py`, `urls.py`, and `migrations/` as the blast radius for most change types.
@@ -90,7 +90,7 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 | Add/rename a packout/logistics field on `Nsn` | `products/models.py`, `products/migrations/`, `products/forms.py` (`NsnLogisticsForm`), `products/views.py` (`nsn_logistics_update`), `contracts/forms.py` (`NsnForm`), `templates/products/nsn_detail.html` (modal + readout), `templates/products/nsn_edit.html`, `SQL/migrate_data.sql` |
 | Add a new NSN URL | `products/urls.py` + the view file in `products/views.py` (or `contracts/views/`) it points to |
 | Add/change NSN Create | `contracts/views/nsn_views.py` (`NsnCreateView`), `products/urls.py` (`nsn_create`), `templates/products/nsn_edit.html` (shared with Update; branch `{% if object %}`), `templates/products/observatory.html`, `templates/products/search_results.html`, `contracts/forms.py` (`NsnForm` dedup), `products/tests/test_nsn_form.py` |
-| Change to `ApprovedSource` fields used in detail page | `sales/models/approved_sources.py`, `products/views.py` (`get_approved_sources_data`), `templates/products/nsn_detail.html` (the approved-sources panel block) |
+| Change to `ApprovedSource` fields used in detail page | `dibbs/models/approved_sources.py`, `products/views.py` (`get_approved_sources_data`), `templates/products/nsn_detail.html` (the approved-sources panel block) |
 
 ---
 
@@ -98,7 +98,7 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 
 ### This app depends on:
 - `suppliers.models.Supplier` — FK target for `SupplierNSNCapability` and the M2M on `Nsn`. Supplier deletions cascade to `SupplierNSNCapability` rows via `CASCADE`. Also read by `NsnDetailView.get_approved_sources_data` via a single batched `Supplier.objects.filter(cage_code__in=...)` query to resolve approved-source CAGEs.
-- `sales.models.ApprovedSource` — read by `NsnDetailView.get_approved_sources_data` via a lazy import. Joined to `Nsn` by string match on `nsn` ↔ `nsn_code` and to `Supplier` by string match on `approved_cage` ↔ `cage_code`. **No FKs in either direction.** Field name changes on `ApprovedSource` (especially `nsn`, `approved_cage`, `part_number`, `company_name`, `import_batch`) will silently break the NSN detail page.
+- `dibbs.models.ApprovedSource` — read by `NsnDetailView.get_approved_sources_data` via a lazy import. Joined to `Nsn` by string match on `nsn` ↔ `nsn_code` and to `Supplier` by string match on `approved_cage` ↔ `cage_code`. **No FKs in either direction.** Field name changes on `ApprovedSource` (especially `nsn`, `approved_cage`, `part_number`, `company_name`, `import_batch`) will silently break the NSN detail page.
 - `django.contrib.auth.models.User` — FK target for `AuditModel` audit fields (SET_NULL on delete).
 
 ### Apps that depend on this app:
@@ -170,11 +170,11 @@ This app started as **glue/domain infrastructure** but now also owns a real read
 
 ### Cross-app import rule (mandatory)
 
-Never import `sales` or `contracts` models at **module top-level** in `products`. Lazy-import inside view methods only (established pattern in `NsnDetailView`).
+Never import `dibbs`, `quote` or `contracts` models at **module top-level** in `products`. Lazy-import inside view methods only (established pattern in `NsnDetailView`).
 
 ### NSN join pattern (mandatory)
 
-All filters against sales-app NSN **string** columns (`ApprovedSource.nsn`, `SupplierQuote.nsn`, `SolicitationLine.nsn`, `DibbsAward.nsn`, `NsnProcurementHistory.nsn`, etc.) must use:
+All filters against dibbs/quote NSN **string** columns (`ApprovedSource.nsn`, `QuoteSupplierQuote.nsn`, `SolicitationLine.nsn`, `DibbsAward.nsn`, `NsnProcurementHistory.nsn`, etc.) must use:
 
 ```python
 from products.nsn_utils import nsn_query_variants
@@ -301,7 +301,7 @@ After editing, verify manually:
 
 - **CAGE-to-Supplier resolution in `NsnDetailView.get_approved_sources_data` uses a single batched query** (`Supplier.objects.filter(cage_code__in=cage_set)`) producing a `{cage: supplier}` dict. Do NOT refactor this into per-row queries — at scale (an NSN with 50 approved sources) that becomes a 50-query page load that bypasses the existing `select_related` optimisations elsewhere on the page.
 
-- **`SupplierNSNCapability` is forbidden in portal code.** Do not read, write, or surface it in templates. The approved-sources panel uses `sales.ApprovedSource` only.
+- **`SupplierNSNCapability` is forbidden in portal code.** Do not read, write, or surface it in templates. The approved-sources panel uses `dibbs.ApprovedSource` only.
 
 ---
 

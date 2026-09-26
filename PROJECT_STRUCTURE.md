@@ -30,6 +30,10 @@ Each app is a package with `models`, `views`, `urls`, `admin`, etc.:
 - `products` — Products
 - `tools` — Tools
 - `transactions` — Transactions
+- `dibbs` — DIBBS data: solicitation imports, awards, notices, CAGE reference (replaced the retired `sales` app)
+- `quote` — DIBBS quoting workflow (owns all quoting data)
+- `intake` — Contract intake queue and award ledger
+- `core` — Cross-cutting infrastructure (background tasks, global search)
 
 ## Shared assets
 

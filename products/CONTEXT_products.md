@@ -1,7 +1,7 @@
 ﻿# Products Context
 
 ## 1. Purpose
-The `products` app owns the canonical National Stock Number (NSN) catalog (`contracts_nsn`) and the **NSN Portal** — a read-focused research surface that aggregates DIBBS/sales intelligence, supplier data, and contract linkages around each NSN. Contracts/IDIQ flows still use `Nsn` as the FK spine; the portal adds cross-app joins via `nsn_normalized` and `nsn_query_variants()`.
+The `products` app owns the canonical National Stock Number (NSN) catalog (`contracts_nsn`) and the **NSN Portal** — a read-focused research surface that aggregates DIBBS / quoting intelligence, supplier data, and contract linkages around each NSN. Contracts/IDIQ flows still use `Nsn` as the FK spine; the portal adds cross-app joins via `nsn_normalized` and `nsn_query_variants()`.
 
 ## 2. App Identity
 - **Django app name:** `products` (urls are namespaced under `products`).
@@ -15,14 +15,14 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
   1. **Observatory** — `/products/` — omnibox search, cached portfolio stats, recent awards/NSN activity.
   2. **NSN Dossier** — `/products/nsn/<pk>/` — full intelligence panels + bounded logistics edit.
   3. **Supplier NSN View** — `/products/supplier/<pk>/nsns/` — approved/quoted/won/manual NSNs per supplier.
-- Cross-app reads use lazy imports inside view methods; sales NSN string columns are filtered with `nsn_query_variants()` (never DB-side string transforms on indexed columns).
+- Cross-app reads use lazy imports inside view methods; dibbs/quote NSN string columns are filtered with `nsn_query_variants()` (never DB-side string transforms on indexed columns).
 - **Single write path:** logistics fields via `NsnLogisticsForm` POST to `products:nsn_logistics_update` (modal on dossier). **Create NSN** is `products:nsn_create` → `contracts.NsnCreateView` (dedupes on `nsn_normalized`). Full NSN identity edits remain at `products:nsn_edit` → `contracts.NsnUpdateView`.
 - Admin, migrations, `backfill_nsn_normalized` management command, and `products/nsn_utils.py`.
 
 ## 4. Key Files and What They Do
 - `apps.py` – Defines `ProductsConfig` so Django can load the app, and the `name = 'products'` label that other apps import.
 - `models.py` – Contains `AuditModel`, `Nsn`, and `SupplierNSNCapability`. `AuditModel` adds `created_by`, `created_on`, `modified_by`, `modified_on` and a `save()` override. `Nsn` defines the descriptive fields, the `suppliers` ManyToMany via `SupplierNSNCapability`, and forces the existing `contracts_nsn` table name. `SupplierNSNCapability` stores lead times/prices between a supplier and an NSN.
-- `nsn_utils.py` – `normalize_nsn`, `format_nsn`, `nsn_query_variants`, `fsc_of`, `niin_of`; mandatory join helper for sales string NSN columns.
+- `nsn_utils.py` – `normalize_nsn`, `format_nsn`, `nsn_query_variants`, `fsc_of`, `niin_of`; mandatory join helper for dibbs/quote string NSN columns.
 - `templatetags/nsn_filters.py` – `|format_nsn` display filter and `|is_plausible_nsn` (display-only; used to decide Create-NSN prefill, never querysets).
 - `forms.py` – `NsnLogisticsForm` (portal sole write path for weight/dims/packaging notes).
 - `views.py` – `ObservatoryView`, `portal_search`, `NsnDetailView`, `nsn_logistics_update`, `SupplierNsnView`.
@@ -39,7 +39,7 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
 - **`Nsn`:** Core model (`contracts_nsn`). Includes `nsn_normalized` (CharField max 13, `blank=True`, `default=""`, `db_index=True`, populated in `save()` via `normalize_nsn(nsn_code)`). When `normalize_nsn(nsn_code)` exceeds 13 characters (NSN typos with extra digits, or non-NSN identifiers mis-stored in `nsn_code`), `nsn_normalized` is intentionally left blank — never truncated, never widened. Audit with `python manage.py list_unnormalized_nsns`. **No uniqueness constraint on `nsn_code`** — duplicates possible; dossier shows a data-quality badge linking to admin when `duplicate_count > 1`. Packout/logistics fields: `unit_weight`, `unit_length`, `unit_width`, `unit_height`, `packaging_notes`. M2M `suppliers` through `SupplierNSNCapability` exists in schema only — portal must not read it.
 - **`SupplierNSNCapability`:** The `supplier_nsn_capability` table that connects an `Nsn` to a `Supplier` and stores `lead_time_days`/`price_reference`. There are no extra methods, so the table is purely data with the M2M relationship on `Nsn`.
 
-  **Deprecated in practice (as of 2026-04-26):** `SupplierNSNCapability` is not surfaced anywhere in the v1 NSN detail UI. The active source of truth for "which suppliers can supply this NSN" is `sales.ApprovedSource` — a daily DLA-published feed keyed by NSN code (string) and CAGE code (string), surfaced on the NSN detail page via `NsnDetailView.get_approved_sources_data`. `SupplierNSNCapability` is retained in the schema for backward compatibility, still registered in admin, and still wired through `Nsn.suppliers` (M2M `through=`), but it has no documented creation flow and no production data. Do not write new code that reads from it; do not delete it without a migration plan.
+  **Deprecated in practice (as of 2026-04-26):** `SupplierNSNCapability` is not surfaced anywhere in the v1 NSN detail UI. The active source of truth for "which suppliers can supply this NSN" is `dibbs.ApprovedSource` — a daily DLA-published feed keyed by NSN code (string) and CAGE code (string), surfaced on the NSN detail page via `NsnDetailView.get_approved_sources_data`. `SupplierNSNCapability` is retained in the schema for backward compatibility, still registered in admin, and still wired through `Nsn.suppliers` (M2M `through=`), but it has no documented creation flow and no production data. Do not write new code that reads from it; do not delete it without a migration plan.
 
 ## 6. Request / User Flow (NSN Portal)
 
@@ -52,7 +52,7 @@ The `products` app owns the canonical National Stock Number (NSN) catalog (`cont
 - Recent activity: up to 10 `DibbsAward` rows with NSN. Ordering uses `-aw_file_date`, `-posted_date`, `-id` (not `award_date`). Dedup on `(award_basic_number, delivery_order_number)` keeps the first row seen in a bounded candidate window (400 most-recent rows by file/posted date) — avoids full-table `Window()` on MSSQL (~30s scan). Plus up to 10 latest modified `Nsn` rows after display-only filtering (see §20).
 
 ### NSN Dossier (`/products/nsn/<pk>/`, `products:nsn_detail`)
-Panels (lazy-loaded sales/contracts data via `nsn_query_variants`):
+Panels (lazy-loaded dibbs/quote/contracts data via `nsn_query_variants`):
 1. Identity header — formatted NSN, FSC/NIIN, part/rev, duplicate badge.
 2. Logistics — read-only + **Edit logistics** modal → POST `products:nsn_logistics_update`.
 3. Approved sources — `ApprovedSource` deduped on `(approved_cage, part_number)`; one batched `Supplier` query; `NoQuoteCAGE` badges; orphan count footer.
@@ -93,7 +93,7 @@ Business logic within `products` is limited to:
 All other logic (search throttles, redirect decisions, JSON responses) lives in `contracts.views`. There are no services, selectors, or background jobs defined in this app.
 
 ## 11. Integrations and Cross-App Dependencies
-- `sales.models.approved_sources.ApprovedSource` is the active source of truth for NSN ↔ supplier relationships in the UI. `products.views.NsnDetailView.get_approved_sources_data` reads it via a lazy import (the `products → sales` direction is the only one that exists; `sales` does not import `products`). `ApprovedSource` joins to `Nsn` by string equality on `nsn` ↔ `nsn_code`, and to `Supplier` by string equality on `approved_cage` ↔ `cage_code`. There are no FKs in either direction.
+- `dibbs.models.ApprovedSource` is the active source of truth for NSN ↔ supplier relationships in the UI. `products.views.NsnDetailView.get_approved_sources_data` reads it via a lazy import (the `products → sales` direction is the only one that exists; `sales` does not import `products`). `ApprovedSource` joins to `Nsn` by string equality on `nsn` ↔ `nsn_code`, and to `Supplier` by string equality on `approved_cage` ↔ `cage_code`. There are no FKs in either direction.
 - `contracts.models.Clin` and `contracts.models.IdiqContractDetails` both FK to `products.Nsn`, so changing the `Nsn` schema will ripple through the contracts schema and migrations such as `0034`.
 - `contracts.views.nsn_views.NsnUpdateView`, `contracts.views.idiq_views.NsnSearchView`, `IdiqContractDetailsCreateView`, `IdiqContractDetailsDeleteView`, and `contracts.views.api_views` all import `Nsn`. The edit/search endpoints exposed here are actually defined in `contracts/views`, so this app must stay in sync with the contracts forms/templates.
 - `suppliers.Supplier` is referenced via the `suppliers` ManyToMany and the `SupplierNSNCapability` through table, so supplier deletions or migrations can affect capability rows.
@@ -148,12 +148,12 @@ The migration uses `SeparateDatabaseAndState` to avoid touching the existing dat
 
 ## 19. Quick Reference
 - **Portal surfaces:** Observatory, NSN Dossier, Supplier NSN View.
-- **Join spine:** `Nsn.nsn_normalized` + `nsn_query_variants()` for all sales string NSN columns.
+- **Join spine:** `Nsn.nsn_normalized` + `nsn_query_variants()` for all dibbs/quote string NSN columns.
 - **Forbidden read:** `SupplierNSNCapability` / `Nsn.suppliers` M2M.
 - **Primary models:** `Nsn`, `AuditModel` (`SupplierNSNCapability` schema-only).
 - **Main URLs:** `/products/`, `/products/search/`, `/products/nsn/create/`, `/products/nsn/<pk>/`, `/products/supplier/<pk>/nsns/`.
 - **Key templates:** `observatory.html`, `nsn_detail.html`, `supplier_nsns.html`, `search_results.html`, `nsn_edit.html`.
-- **Key dependencies:** lazy imports of `sales.*`, `contracts.models.Clin`/`IdiqContractDetails`, `suppliers.Supplier`.
+- **Key dependencies:** lazy imports of `dibbs.*` / `quote.*`, `contracts.models.Clin`/`IdiqContractDetails`, `suppliers.Supplier`.
 
 ## 20. Portal defect fixes (2026-07-07)
 

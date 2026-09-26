@@ -50,7 +50,7 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 - The dashboard search input must not be inside a `<form>` tag — doing so will cause the browser to intercept Enter key presses and bypass the JS-driven autocomplete.
 
 ### Before changing URLs
-- Grep the full repo for `'suppliers:supplier_detail'`, `'suppliers:supplier_edit'`, `'suppliers:supplier_enrich_page'`, `'suppliers:supplier_dashboard'` — these names are referenced in: `contracts` templates, `reports` templates, `sales` templates, `base_template.html`, and Python view reverse calls in `contracts/views/`.
+- Grep the full repo for `'suppliers:supplier_detail'`, `'suppliers:supplier_edit'`, `'suppliers:supplier_enrich_page'`, `'suppliers:supplier_dashboard'` — these names are referenced in: `contracts` templates, `reports` templates, `base_template.html`, and Python view reverse calls in `contracts/views/`.
 
 ### Before changing enrichment logic
 - Read `suppliers/views.py` (enrichment helpers: `call_openrouter_for_supplier`, `fetch_website_html`, `_normalize_*`), `suppliers/openrouter_config.py`, `templates/suppliers/supplier_enrich.html` (inline JS ~lines 760–860), and `static/suppliers/js/supplier_enrich.js`.
@@ -86,7 +86,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 `suppliers/views.py` (enrichment helpers) ↔ `suppliers/openrouter_config.py` ↔ `templates/suppliers/supplier_enrich.html` (inline JS) ↔ `static/suppliers/js/supplier_enrich.js`
 
 ### URL rename
-`suppliers/urls.py` → all `{% url 'suppliers:<name>' %}` in `templates/suppliers/`, `contracts/templates/contracts/`, `reports/templates/`, `sales/templates/`, `templates/base_template.html` → Python `reverse('suppliers:<name>')` calls in `contracts/views/supplier_views.py` and `contracts/views/contacts_views.py`
+`suppliers/urls.py` → all `{% url 'suppliers:<name>' %}` in `templates/suppliers/`, `contracts/templates/contracts/`, `reports/templates/`, `templates/base_template.html` → Python `reverse('suppliers:<name>')` calls in `contracts/views/supplier_views.py` and `contracts/views/contacts_views.py`
 
 ### Adding a new enrichment-appliable field
 `SupplierApplyEnrichmentView` allowed fields list in `views.py` → `templates/suppliers/supplier_enrich.html` UI + JS → `static/suppliers/js/supplier_enrich.js` if it handles the new field client-side
@@ -140,7 +140,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 | `contracts` | `Supplier`, `SupplierType`, `SupplierCertification`, `SupplierClassification`, `Contact`, `SupplierContactCategory`, `CertificationType`, `ClassificationType` |
 | `products` | `Supplier` (FK on product model) |
 | `processing` | `Supplier` (matching and processing views) |
-| `sales` | `Supplier` (RFQ, solicitation, supplier service views) |
+| `quote` | `Supplier` (capabilities, matches, RFQs, supplier quotes, packhouse) |
 | `transactions` | `Supplier` (signal handlers) |
 
 **Any rename of `Supplier` or its fields requires updating all of the above.**
@@ -148,7 +148,6 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 ### URL namespace `suppliers:` used in
 - `contracts/templates/contracts/` (multiple templates)
 - `reports/templates/reports/admin_dashboard.html`
-- `sales/templates/sales/rfq/pending.html`, `sent.html`, `solicitations/detail.html`
 - `templates/base_template.html`
 - `contracts/views/supplier_views.py`, `contracts/views/contacts_views.py` (Python reverse)
 
@@ -273,8 +272,8 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 
 **Main cross-app dependencies:**
 - `contracts` (models, forms, views — bidirectional)
-- `products`, `processing`, `sales`, `transactions` (import `Supplier`)
-- `reports`, `sales` templates (reverse `suppliers:` URLs)
+- `products`, `processing`, `quote`, `transactions` (import `Supplier`)
+- `reports` templates (reverse `suppliers:` URLs)
 
 **Security-sensitive areas:**
 - `GlobalAIModelConfigView.post` — superuser check

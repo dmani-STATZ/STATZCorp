@@ -1,6 +1,6 @@
 """Backfill the Award Intake Ledger from recent award import batches.
 
-Iterates recent ``sales.AwardImportBatch`` rows (default: last 45 days, to
+Iterates recent ``dibbs.AwardImportBatch`` rows (default: last 45 days, to
 match DIBBS's ~45-day award retention window), calling
 ``upsert_ledger_for_batch`` for each, then runs one full
 ``reconcile_open_ledger_rows`` at the end.
@@ -15,7 +15,7 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from sales.models import AwardImportBatch
+from dibbs.models import AwardImportBatch
 from intake.services.award_ledger import (
     reconcile_open_ledger_rows,
     upsert_ledger_for_batch,

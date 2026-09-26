@@ -1435,7 +1435,7 @@ class AwardLedgerListView(ListView):
         companies = Company.objects.filter(
             user_memberships__user=self.request.user,
         )
-        from sales.models import CompanyCAGE  # lazy cross-app import
+        from dibbs.models import CompanyCAGE  # lazy cross-app import
 
         return list(
             CompanyCAGE.objects.filter(

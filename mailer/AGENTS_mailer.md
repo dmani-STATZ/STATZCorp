@@ -27,7 +27,7 @@ Safe-edit guidance for the `mailer` backend (campaign management, CSV import, AI
 
 ## 4. Cross-App Dependency Warnings
 - Depends on `core.anthropic_client.call_anthropic` for AI generation.
-- `services/graph_mail.py` is widely imported by other apps (e.g., `reports`, `sales`). Do not change its signature (`send_mail_via_graph`) or default `contentType` behavior without exhaustive codebase search and regression testing. (An `is_html=False` parameter was added to support mailer HTML auto-linking while preserving backward compatibility).
+- `services/graph_mail.py` is widely imported by other apps (e.g., `reports`, `dibbs`). Do not change its signature (`send_mail_via_graph`) or default `contentType` behavior without exhaustive codebase search and regression testing. (An `is_html=False` parameter was added to support mailer HTML auto-linking while preserving backward compatibility).
 - Background tasks (`dispatch_campaigns`, `process_ai_snippets`, `dispatch_followups`) must be registered in `core/management/commands/run_background_tasks.py` and require a corresponding row in `core.ScheduledTask`.
 
 ## 5. Security / Permissions Rules

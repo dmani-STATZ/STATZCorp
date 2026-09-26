@@ -8,22 +8,26 @@ How to change the `quote` app safely. Read `CONTEXT_quote.md` first for what the
 this file is not a repeat of it.
 
 ## 2. App Scope
-- **Owns:** the quoting workflow tables — `QuoteRFQ`, `QuoteSupplierQuote`, `QuoteBid`,
+- **Owns:** all quoting workflow data — `QuoteSolicitation`, `QuoteSupplierNSN`,
+  `QuoteSupplierFSC`, `QuoteSolicitationMatch`, `QuoteRFQ`, `QuoteSupplierQuote`, `QuoteBid`,
   `QuoteEmail`, `QuoteEmailAttachment`, `QuoteEmailSolLink`, `BidOutcome`. All `quote_*` tables.
-- **Owns operationally:** RFQ dispatch, supplier quote entry and cost buildup, bid staging,
-  BQ file generation, post-award reconciliation and the "Our Bids" analytics.
-- **Does not own:** DIBBS file ingestion, solicitation records, supplier capability matching,
-  approved sources, award ingestion (all `sales`); the supplier directory (`suppliers`);
-  part records (`products`).
-- **App type:** feature app, read-only consumer of the `sales` DIBBS tables.
+- **Owns operationally:** solicitation pipeline state, supplier matching, RFQ dispatch,
+  supplier quote entry and cost buildup, bid staging, BQ file generation, post-award
+  reconciliation and the "Our Bids" analytics.
+- **Does not own:** DIBBS file ingestion, solicitation records, approved sources, award
+  ingestion, `CompanyCAGE` (all `dibbs`); the supplier directory (`suppliers`); part
+  records (`products`).
+- **App type:** feature app; read-only consumer of the `dibbs` tables, subscriber to
+  `dibbs.signals.import_completed`.
 
 ## 3. Read This Before Editing
 
 ### The one rule that defines this app
-**`quote` never writes a `sales` table.** Not `Solicitation.status`, not `SupplierRFQ`,
-not `GovernmentBid`, not `DibbsAward`. Every workflow state the quote app needs lives on a
-`quote_*` table. If you find yourself wanting to flip a solicitation's status, add a field to a
-quote-owned model instead.
+**`quote` owns all of its data and never writes a `dibbs` table.** Not `Solicitation.status`
+(legacy, frozen), not `DibbsAward`, not `CompanyCAGE`. Every workflow state lives on a
+`quote_*` table keyed to the solicitation or line. If you want to flag a solicitation, add a
+field to `QuoteSolicitation` (or a new quote model) instead. And `dibbs` must never import
+from `quote` — the only link that direction is the `import_completed` signal.
 
 The single sanctioned cross-app write is `products.Nsn`'s dimension fields
 (`unit_weight`, `unit_length`, `unit_width`, `unit_height`, `dimension_source_notes`,
@@ -58,10 +62,17 @@ permission gating silently stops applying.
 
 ## 4. Local Architecture / Change Patterns
 - **Business logic location:** `quote/services/`.
-- **Cost buildup:** one Decimal-only service, single source of truth. `sales` duplicates its markup
-  formula in five places (`views/rfq.py:510,721`, `views/bids.py:61,111,159`) and mixes `float` into
-  the `Decimal` path. Do not copy that shape.
-- **Status transitions:** on quote-owned models only.
+- **Cost buildup:** one Decimal-only service, single source of truth. The retired `sales`
+  prototype duplicated its markup formula in five views and mixed `float` into the `Decimal`
+  path. Do not repeat that.
+- **Status transitions:** on `QuoteSolicitation` via `set_status()` (stamps `status_changed_at`).
+  Matching may only move `UNMATCHED → MATCHED`; it must never rewind a worked solicitation.
+- **Reacting to new DIBBS data:** the `import_completed` receiver in `quote/signals.py`. It runs
+  synchronously inside the import; keep it set-based and fast. A receiver exception is logged
+  and swallowed by `dibbs`, so the import still succeeds — check logs if state looks stale.
+- **Auto-created rows:** a model whose rows are created for every solicitation automatically
+  must set `dibbs_disposable = True`, or dibbs' import-batch delete will refuse to remove any
+  solicitation. Rep-created rows (RFQs, quotes, bids, email links) must NOT set it.
 - **Concurrency:** claim fields plus a self-scheduling `setTimeout` poll. There are no websockets in
   this repo; do not add Channels without an explicit architecture decision.
 
@@ -81,17 +92,20 @@ the relevant form/service/template + `CONTEXT_quote.md` §5.
 a `core.ScheduledTask` data migration. **All three, or it silently never runs.**
 
 ### Adding a CSS class
-`static/css/app-core.css` only, under the "Quotes app" banner. Never a new CSS file.
+`static/css/app-core.css` only. Shell/sub-nav classes are shared (`.app-shell`, `.app-subnav*`).
+Never a new CSS file.
 
 ## 6. Cross-App Dependency Warnings
 
-**This app depends on:** `sales` (solicitations, lines, `bq_raw_columns`, approved sources,
-capability tiers, awards, `CompanyCAGE`, `SAMEntityCache`, `graph_inbox`, `matching`,
-`competitor_stats`, `bq_export` column map), `suppliers` (`Supplier`, `Contact`, packhouse flags),
-`products` (`Nsn` dimensions), `mailer` (`graph_mail.send_mail_via_graph`),
-`core` (`ScheduledTask` scheduling), `users` (`AppRegistry` / `AppPermission`).
+**This app depends on:** `dibbs` (solicitations, lines, `bq_raw_columns`, approved sources,
+awards, `CompanyCAGE`, `SAMEntityCache`, `competitor_stats`, `import_completed` signal),
+`suppliers` (`Supplier`, `Contact`, packhouse flags), `products` (`Nsn` dimensions),
+`mailer` (`graph_mail.send_mail_via_graph`), `core` (`ScheduledTask`), `users`
+(`AppRegistry` / `AppPermission`).
 
-**Other apps that depend on this app:** none yet.
+**Other apps that depend on this app:** `core` global search (`QuoteSolicitationMatch`,
+`QuoteRFQ`), `products` NSN/supplier pages (`QuoteSupplierQuote`, `QuoteBid`,
+`QuoteSupplierNSN`). Renaming those fields breaks them.
 
 **URL namespace:** `quote:` — referenced from `templates/base_template.html` (one sidebar `<li>`).
 That file is a shared contract; changing `quote:dashboard` breaks it.
@@ -100,7 +114,7 @@ That file is a shared contract; changing `quote:dashboard` breaks it.
 - `@login_required` everywhere.
 - `QuoteEmail.body_html` and attachment bytes are supplier-supplied. Render HTML only in a sandboxed
   no-scripts iframe. Never trust an attachment's `content_type`.
-- No `company` FK on quote data by design — scope by CAGE via `sales.CompanyCAGE`.
+- No `company` FK on quote data by design — scope by CAGE via `dibbs.CompanyCAGE`.
 - Export/download endpoints are sensitive: keep access controls and expected columns intact.
 
 ## 8. Model and Schema Change Rules
@@ -109,11 +123,12 @@ That file is a shared contract; changing `quote:dashboard` breaks it.
 - **No MARS in data migrations.** Never `.iterator()` or iterate a lazy queryset while writing on the
   same connection. Materialize with `list(qs.values(...))`, batch writes at 500 or fewer inside
   `transaction.atomic()`.
-- **No `bulk_create` on high-volume insert paths** — `mssql-django` adds `OUTPUT INSERTED.id` and
-  SQL Server raises error 8115. Prefer raw `executemany`.
+- **Bulk inserts:** chunk `bulk_create` at 200 rows (the size the dibbs importer uses in
+  production). For whole-table backfills use one set-based `INSERT … SELECT` (see `0004`).
+  Never `bulk_create` a model with an `auto_now_add` NOT NULL column on SQL Server (8115).
 - Chunk every `__in` lookup under SQL Server's 2,100-parameter limit.
-- Any migration touching a `sales.DibbsAward` field must sandwich the operation between
-  `_drop_we_won_awards_view` / `_recreate_we_won_awards_view`, or SQLite CI fails during `migrate`.
+- Quote migrations never alter `dibbs` tables. (If you ever must touch `dibbs_award`, use
+  `dibbs.db_objects.drop_we_won_awards_view` / `recreate_we_won_awards_view` around it.)
 - `Cast(...)` on a CharField needs the `TRY_CAST` vendor guard.
 
 ## 9. View / URL / Template Change Rules
@@ -148,18 +163,16 @@ That file is a shared contract; changing `quote:dashboard` breaks it.
 | Permissions | Log in as a non-superuser with and without an `AppPermission` row |
 | Templates | Both light and dark theme; confirm the sub-nav highlight |
 
-Baseline: `python manage.py check`, `python manage.py test quote sales products`.
+Baseline: `python manage.py check`, `python manage.py test quote dibbs products core`.
 
 ## 13. Known Footguns
-1. **`AppRegistry` is a live decision, not a detail.** No row for `quote` means the middleware
-   **fails open** — every authenticated user reaches the app. Creating a row flips it to deny-by-
-   default, and every non-superuser then needs an explicit `AppPermission(has_access=True)` or they
-   hit `permission_denied` immediately. There is no signal backfilling permissions for new users
-   (`users/signals.py` has it commented out). Decide deliberately and seed via data migration.
+1. **`quote` is deny-by-default.** `0002` created its `AppRegistry` row, so every non-superuser
+   needs an explicit `AppPermission(has_access=True)` or they hit `permission_denied`. There is
+   no signal backfilling permissions for new users (`users/signals.py` has it commented out).
 2. **`app_name` drift silently disables permission checks.** See §3.
 3. **`base_template.html` has no `content` block.** Extending it directly renders a blank page.
-4. **`sales.SolicitationLine` has no unique constraint on `(solicitation, nsn)`** even though the
-   `sales` importer keys its diff on that tuple. Do not assume that pair is unique.
+4. **`dibbs.SolicitationLine` has no unique constraint on `(solicitation, nsn)`** even though the
+   dibbs importer keys its diff on that tuple. Do not assume that pair is unique.
 5. **`bq_raw_columns` can legitimately be `NULL`** on a line imported before a BQ file existed for
    it. The BQ writer must produce a clear error, not a traceback.
 6. **Historical `bq_raw_columns` rows may contain `U+FFFD`.** They were written while the importer
@@ -170,9 +183,10 @@ Baseline: `python manage.py check`, `python manage.py test quote sales products`
    multi-line awards. Never present it as a published DIBBS figure.
 8. **`QuoteBid.line` is OneToOne.** Combined-CLIN pricing writes several bids sharing a
    `clin_group`; it does not write one bid spanning lines.
-9. **Two RFQ pipelines exist during the transition.** `sales.SupplierRFQ` and `quote.QuoteRFQ` can
-   both dispatch to the same supplier for the same line. Guard against double-sending until the
-   sales DIBBS screens retire.
+9. **`QuoteSolicitation` rows are seeded, not guaranteed.** Every imported solicitation gets one
+   via the import signal (and `0004` backfilled history), but a failed receiver is only logged.
+   Code that reads `solicitation.quote_state` must handle `RelatedObjectDoesNotExist`, or call
+   `services.matching.seed_solicitation_states([...])` first.
 10. **`send_mail_via_graph` returns `False` on failure, it does not raise.** Check the return value.
 11. **GCC High endpoints only** — `graph.microsoft.us`, not `graph.microsoft.com`.
 12. **`is_packhouse` is a hint, not a filter.** Use the documented `Q(...) | Q(...)` OR pattern so a
@@ -186,7 +200,7 @@ Baseline: `python manage.py check`, `python manage.py test quote sales products`
 
 ## 14. Safe Change Workflow
 1. Read `CONTEXT_quote.md`, then this file.
-2. For anything crossing into `sales` / `suppliers` / `products`, read that app's `CONTEXT_` and
+2. For anything crossing into `dibbs` / `suppliers` / `products`, read that app's `CONTEXT_` and
    `AGENTS_` pair too.
 3. Make the change in `quote` first; update downstream consumers in the same change.
 4. `python manage.py check` and `python manage.py makemigrations --check`.
@@ -196,10 +210,10 @@ Baseline: `python manage.py check`, `python manage.py test quote sales products`
 
 ## 15. Quick Reference
 - **Primary files:** `models/`, `services/`, `views/`, `urls.py`, `templates/quote/base.html`
-- **Coupled areas:** `sales` DIBBS tables (read-only), `suppliers.Supplier`, `products.Nsn`
+- **Coupled areas:** `dibbs` tables (read-only) + `import_completed` signal, `suppliers.Supplier`, `products.Nsn`
   dimensions, `mailer.services.graph_mail`, `core` task registry, `users.AppRegistry`
 - **Security-sensitive:** inbound email HTML and attachments, BQ export download, permission gating
-- **Riskiest edits:** anything that writes a `sales` table; the BQ writer; migrations on
+- **Riskiest edits:** anything that writes a `dibbs` table; the import signal receiver; the BQ writer; migrations on
   `contracts_nsn`
 
 ## 16. Release Notes (Changelog) Rules

@@ -44,7 +44,6 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 
 **Other apps consume from it:**
 - `processing` — writes finalized records into `Contract`/`Clin`
-- `sales` — reads `Clin` data via SQL views for Tier 1 NSN scoring
 - `reports` — reads schema for AI-assisted query generation
 - `transactions` — signal-tracks `Contract`, `Clin`, `ClinShipment` saves
 - `products`, `suppliers` — URL routing forwards to `contracts` views
@@ -132,11 +131,11 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 
 **Consumes from other apps:**
 - `contracts.Company`, `contracts.Contract` — company scoping, dedup badge, finalization target, ledger live-contract link
-- `sales.CompanyCAGE` (`dibbs_company_cage`) — CAGE → company resolution at DIBBS injection; ledger our-CAGE scoping
-- `sales.DibbsAward` / `DibbsAwardMod` / `WeWonAward` — ledger mirror source (read-only)
+- `dibbs.CompanyCAGE` (`dibbs_company_cage`) — CAGE → company resolution at DIBBS injection; ledger our-CAGE scoping
+- `dibbs.DibbsAward` / `DibbsAwardMod` / `WeWonAward` — ledger mirror source (read-only)
 - `contracts.services.sharepoint_service` / `sharepoint_paths` via `intake/services/sharepoint_intake.py` — folder path build, probe, create (no `processing.*` imports)
 
-**Other apps consume from it:** The `sales` nightly scrape (`scrape_awards`) and daytime hot poll (`poll_we_won_today`) call `intake.services.award_ledger.upsert_ledger_for_batch(batch, ...)` in a guarded piggyback block — the same injection pattern as `queue_we_won_drafts`.
+**Other apps consume from it:** The `dibbs` nightly scrape (`scrape_awards`) and daytime hot poll (`poll_we_won_today`) call `intake.services.award_ledger.upsert_ledger_for_batch(batch, ...)` in a guarded piggyback block — the same injection pattern as `queue_we_won_drafts`.
 
 **URL prefix:** `/intake/` (queue at `/intake/`; read-only Award Ledger page at `/intake/ledger/` → `intake:award_ledger`)
 
@@ -154,7 +153,7 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 - SharePoint folder path carried to `Contract.files_url` at finalization
 - DIBBS PDF fetch: fetch_and_apply_dibbs_pdf in intake/services/dibbs_pdf_fetcher.py. URL pattern confirmed: Award/IDIQ/PO  dibbs2.bsm.dla.mil/Downloads/Awards/{DDMONYY}/{contract_number}.PDF; DO  {idiq}{do}.PDF. Requires make_dibbs2_session() (DOD cookie). Stored in data['award_pdf_url'] at injection time.
 - **Award Intake Ledger (`AwardLedger`):** the only durable record of the award→draft→live-contract journey (drafts + their `final_contract` link are deleted on finalize). Maintained by `intake/services/award_ledger.py`; latched write-once `*_at` timestamps + advance-only `lifecycle_state`. Updated from the scrape/poll piggyback (`upsert_ledger_for_batch`), the finalize hook (`stamp_live_contract` in `intake/finalize.py`), and the nightly `reconcile_award_ledger` background task. Backfill: `python manage.py backfill_award_ledger [--days N]`.
-- **Award Ledger page (`intake:award_ledger`, `/intake/ledger/`):** read-only `AwardLedgerListView` — GET filters/sort/pagination + scoped CSV export (`?export=csv`). No company FK on the model, so scoping is by CAGE via `sales.CompanyCAGE` (superusers see all). Sort is whitelisted with a deterministic MSSQL tiebreak; `lifecycle_state` orders by `LIFECYCLE_RANK`. Nav link lives in the `draft_queue.html` header.
+- **Award Ledger page (`intake:award_ledger`, `/intake/ledger/`):** read-only `AwardLedgerListView` — GET filters/sort/pagination + scoped CSV export (`?export=csv`). No company FK on the model, so scoping is by CAGE via `dibbs.CompanyCAGE` (superusers see all). Sort is whitelisted with a deterministic MSSQL tiebreak; `lifecycle_state` orders by `LIFECYCLE_RANK`. Nav link lives in the `draft_queue.html` header.
 
 ---
 
@@ -169,7 +168,7 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 
 **Other apps consume from it:**
 - `contracts` — supplier CRUD form and views **live in contracts**, not here; this app owns models only
-- `sales` — RFQ targets, quote records, Tier 1–3 supplier matching
+- `quote` — RFQ targets, supplier quotes, NSN/FSC capability matching (`quote_*` tables)
 - `processing` — supplier matching during contract ingestion
 - `reports` — `OpenRouterModelSetting` endpoint for global AI model config
 
@@ -190,7 +189,7 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 **Other apps consume from it:**
 - `contracts` — `Clin` FK to `Nsn`
 - `processing` — NSN matching
-- `sales` — Tier 1 NSN scoring, approved-source lookup
+- `quote` — freight sub-modal writes NSN dimension fields
 
 **URL prefix:** `/products/nsn/` — routes to `contracts.views.NsnUpdateView`/`NsnSearchView`; no standalone views
 
@@ -217,46 +216,53 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 
 ---
 
-### `sales` — DIBBS Procurement Workflow
-**Purpose:** Solicitation triage → RFQ dispatch → quote capture → BQ export; DIBBS award file imports; Tier 1–3 supplier matching; saved filter presets.
+### `dibbs` — DIBBS Data (imports & awards)
+**Purpose:** Owns DIBBS-sourced data only: daily IN/BQ/AS solicitation import, award ingestion (AW file, nightly scrape, daytime hot poll), procurement history / packaging from solicitation PDFs, DIBBS notices, SAM.gov CAGE cache, competitor award intel, and the STATZ `CompanyCAGE` reference table. **No quoting workflow** — that is `quote`. Took over these models (tables and data untouched) from the retired, never-used `sales` prototype in 2026-09; `dibbs/0001_initial` `replaces` all 63 `sales` migrations.
 
-**Owns:** `Solicitation`, `SolicitationLine`, `SupplierRFQ`, `GovernmentBid`, `DibbsAward`, `DibbsAwardMod`, `DibbsNotice`, `NsnProcurementHistory`, `SavedFilter`, `MassPassLog`, `SolPackaging`, `SAMEntityCache`
+**Owns:** `ImportBatch`, `ImportJob`, `Solicitation`, `SolicitationLine`, `ApprovedSource`, `NsnProcurementHistory`, `SolPackaging`, `SolAnalysis`, `AwardImportBatch`, `DibbsAward`, `DibbsAwardMod`, `WeWonAward` (view), `DibbsAwardStaging(+Error)`, `CompanyCAGE`, `SAMEntityCache`, `DibbsNotice`, `CompetitorWatchlist`, `CompetitorAwardParseStatus`, `CompetitorAwardEntity`
 
 **Consumes from other apps:**
-- `suppliers.Supplier` — RFQ targets, quotes
-- `contracts.Clin` — Tier 1 NSN scoring via SQL view `dibbs_supplier_nsn_scored`
-- `products.Nsn` — NSN matching, approved-source lookup
+- `contracts.Company` (`CompanyCAGE.company`), `contracts.Contract` (mod matching via `normalize_contract_number`)
+- `intake` — `_extract_pdf_texts` (competitor intel), `award_ledger.upsert_ledger_for_batch` piggyback after award imports
+- `core.ScheduledTask`, Anthropic client
 
 **Other apps consume from it:**
-- `contracts` — reads matched `DibbsAwardMod` rows via `sales/services/contract_mods.py` (`mods_for_contract`) for the Modifications section on the contract management page; acknowledgement via `POST /sales/contract-mods/<pk>/acknowledge/`
+- `quote` — reads solicitations/lines/approved sources/awards/`CompanyCAGE`; subscribes to `dibbs.signals.import_completed`
+- `intake` — `DibbsAward`, `AwardImportBatch`, `WeWonAward`, `CompanyCAGE`, `dibbs_session`
+- `contracts` — `dibbs.services.contract_mods.mods_for_contract` for the contract Modifications section; acknowledgement via `POST /dibbs/contract-mods/<pk>/acknowledge/`; Competitors menu links
+- `products` — NSN/supplier pages read solicitations, approved sources, procurement history, awards, SAM cache
+- `core` — global search (`Solicitation`, `SolicitationLine`), task registry
 
-**URL prefix:** `/sales/`
-
-**URL surface (portal):**
-- `/sales/dibbs-notices/` (`sales:dibbs_notices`) — dedicated DIBBS public-notices page.
-- `/sales/dibbs-notices/api/` — JSON feed used by that page; returns up to 30 notices and a `recent_count` of notices posted within the last 7 days.
+**URL prefix:** `/dibbs/` (`/sales/<path>` redirects here). Portal: `/dibbs/dibbs-notices/` (`dibbs:dibbs_notices`) + `/dibbs/dibbs-notices/api/`.
 
 **Critical notes:**
-- Three match tiers: T1 (`dibbs_supplier_nsn_scored` view — indexed `match_count` column, refreshed nightly), T2 (approved sources from `tbl_ApprovedSource`), T3 (FSC match).
-- DIBBS PDFs fetched via Playwright in batches of 10 sessions.
+- `dibbs` never imports from `quote`. The only outbound hook is the `import_completed` signal (sent robustly — receiver errors are logged, never fail an import).
+- `Solicitation.status` is legacy/frozen; kept only because `usp_process_award_staging` filters `status <> 'NO_BID'`. Workflow state lives in `quote.QuoteSolicitation`.
+- DIBBS PDFs fetched via Playwright in batches of 10 sessions. No ORM inside `sync_playwright()`.
 - `NsnProcurementHistory` keyed on `(nsn, contract_number)` — `save_procurement_history` updates `last_seen_sol`/`extracted_at` only for existing keys; never overwrites price/quantity.
-- **Manual SQL deploy boundary:** `sales/sql/usp_process_award_staging.sql` and the production `dibbs_we_won_awards` view are not managed by Django migrations. Every SQL-file change must be redeployed manually via SSMS to every environment; an application deploy alone can leave production on stale SQL. Bump the in-body `PROC_VERSION` and `sales/services/proc_versions.py` together. `python manage.py verify_stored_procs` compares live vs expected `PROC_VERSION` and INSERT column coverage; it exits non-zero on drift for CI/on-demand use. Startup runs it non-blocking (CRITICAL log, continue). It does not replace manual deployment.
-- **`scrape_awards` resilience:** Per-date failures are isolated (batch → `FAILED`, loop continues). `MAX_CONSECUTIVE_FAILURES = 3` aborts the remaining queue on systemic faults. Import failures delete that `stage_id`'s staging rows before re-raising. Post-import WARNING when imported awards have empty `award_basic_number_url` (`possible stored proc drift`).
-- **Stale award staging cleanup:** `python manage.py purge_stale_award_staging --older-than-hours=24 --dry-run` reports orphaned rows belonging only to stale `IN_PROGRESS` / `FAILED` scrape batches; omit `--dry-run` to delete those rows and their matching staging errors. Primary orphan cleanup is on the import failure path where `stage_id` is known. Never blanket-truncate staging tables.
-- Background tasks registered via `core/management/commands/run_background_tasks.py` and scheduled per-task in `core.ScheduledTask` (`interval_minutes`, `run_order`). The WebJob heartbeat fires every 1 minute (`0 * 11-22 * * *`, 6 AM–5 PM CT window).
-  1. `send_queued_rfqs` (5 min): Sends queued RFQs.
-  2. `poll_we_won_today` (15 min): Daytime we-won award detection.
-     - Service: `sales/services/poll_we_won_today.py` (wrapped in `sales/tasks/poll_we_won_today.py`).
-     - Activation: Controlled by `WE_WON_POLL_ENABLED=true` environment variable (feature is off by default).
-     - Session: Uses `make_www_session()` from `sales/services/dibbs_session.py` (requests-only, no Playwright).
-     - Storage & Reconciliation: Inserts batches into `AwardImportBatch` with source `SOURCE_HOT_POLL` (`"hot_poll"`). This batch source is never touched by the nightly `scrape_awards` reconciliation.
-     - Schedule: Every 15 minutes during the WebJob business-hours window (6 AM–5 PM CT).
-     - Backstop: The nightly `scrape_awards` continues unchanged as the full-day backstop for all contractors, and naturally dedupes hot-poll captured awards by award number.
-  - **Mod leak gate (hot poll):** `parse_awdrecs_html` must populate `Last_Mod_Posting_Date` (and related AW columns) so `import_aw_records` → `usp_process_award_staging` classifies MOD rows into `dibbs_award_mod` instead of `dibbs_award`. Rows with a populated mod posting date must not enter `WeWonAward` / Intake draft injection.
-  - **`DibbsAwardMod` contract link:** `matched_contract` (FK → `contracts.Contract`, exact `contract_number` match via `contracts/services/contract_number.normalize_contract_number`), `acknowledged_at`, `acknowledged_by`. Matching runs after each `import_aw_records` / `import_aw_file` when `awardee_cage` is in active `CompanyCAGE` **or** `sales/constants.py::PARTNER_CAGES` (currently ETP / `64W95`). Backfill (`0052`) iterates `contracts.Contract` — not CAGE-filtered — so partner-managed contracts are included when the contract number exists in DB. Contract-page display: `sales/services/contract_mods.py` (`mods_for_contract`, `build_award_record_url`).
-  3. `check_dibbs_notices` (1440 min / daily): Scrapes `www.dibbs.bsm.dla.mil` homepage for public DIBBS Notices using `make_www_session()` (requests only — no Playwright). Upserts new rows into `DibbsNotice` via `get_or_create` on `(title, posted_date)`; never overwrites existing rows.
-  8. `reconcile_award_ledger` (1440 min / daily, run_order 8): `intake/tasks/reconcile_award_ledger.py`. Full backstop for the Award Intake Ledger — runs `intake.services.award_ledger.reconcile_open_ledger_rows()` across all open rows (draft-worked proxy + live-contract backstop + advance-only `lifecycle_state`). Catches finalize-hook misses and stragglers. Seeded by `core/migrations/0004_seed_reconcile_award_ledger_task.py`.
-- `DibbsNotice` rows are keyed on `(title, posted_date)`. Use `get_or_create` only. `external_url` is resolved to absolute URL at scrape time and stored; never re-updated. Do not use Playwright for notice scraping — `make_www_session()` is sufficient.
+- **Manual SQL deploy boundary:** `dibbs/sql/usp_process_award_staging.sql` and the production `dibbs_we_won_awards` view are not managed by Django migrations. Every SQL-file change must be redeployed manually via SSMS to every environment. Bump the in-body `PROC_VERSION` and `dibbs/services/proc_versions.py` together. `python manage.py verify_stored_procs` compares live vs expected; startup runs it non-blocking.
+- **`scrape_awards` resilience:** Per-date failures are isolated (batch → `FAILED`, loop continues). `MAX_CONSECUTIVE_FAILURES = 3` aborts the remaining queue on systemic faults. Import failures delete that `stage_id`'s staging rows before re-raising. Post-import WARNING when imported awards have empty `award_basic_number_url`.
+- **Stale award staging cleanup:** `python manage.py purge_stale_award_staging --older-than-hours=24 --dry-run`. Never blanket-truncate staging tables.
+- Background tasks (via `core/management/commands/run_background_tasks.py` + `core.ScheduledTask`; WebJob heartbeat every minute, 6 AM–5 PM CT):
+  - `poll_we_won_today` (15 min): `dibbs/services/poll_we_won_today.py` (wrapped in `dibbs/tasks/poll_we_won_today.py`). Enabled by `WE_WON_POLL_ENABLED=true`. `make_www_session()` (requests only). Inserts `AwardImportBatch` with source `hot_poll`, never touched by nightly reconciliation; nightly `scrape_awards` is the backstop.
+  - **Mod leak gate (hot poll):** `parse_awdrecs_html` must populate `Last_Mod_Posting_Date` so MOD rows route to `dibbs_award_mod`, never `WeWonAward` / Intake drafts.
+  - **`DibbsAwardMod` contract link:** `matched_contract` (exact normalized contract-number match), `acknowledged_at`, `acknowledged_by`. Matching runs after each award import when `awardee_cage` is an active `CompanyCAGE` **or** in `dibbs/constants.py::PARTNER_CAGES` (ETP / `64W95`).
+  - `check_dibbs_notices` (daily): scrapes the DIBBS homepage with `make_www_session()`; `get_or_create` on `(title, posted_date)`, never overwrites.
+  - `reconcile_award_ledger` (daily, run_order 8): owned by `intake` (see above).
+- `DibbsNotice` rows are keyed on `(title, posted_date)`. Use `get_or_create` only.
+
+---
+
+### `quote` — DIBBS Quoting Workflow
+**Purpose:** Owns the whole quoting workflow and all its data: solicitation pipeline state, supplier NSN/FSC capabilities + additive matching, RFQ dispatch, `quotes@` mailbox, supplier quotes with landed-cost buildup, bid staging, BQ export, post-award "Our Bids" analytics. Phase 1–4 screens are not built yet (placeholder dashboard).
+
+**Owns:** `QuoteSolicitation`, `QuoteSupplierNSN`, `QuoteSupplierFSC`, `QuoteSolicitationMatch`, `QuoteRFQ`, `QuoteSupplierQuote`, `QuoteBid`, `QuoteEmail`, `QuoteEmailAttachment`, `QuoteEmailSolLink`, `BidOutcome` (all `quote_*` tables)
+
+**Consumes from other apps:** `dibbs` (read-only + `import_completed` receiver that seeds `QuoteSolicitation` and runs matching), `suppliers.Supplier`, `products.Nsn` (one sanctioned write: dimension fields), `mailer` Graph mail.
+
+**Other apps consume from it:** `core` global search (supplier ↔ solicitation hops via `QuoteSolicitationMatch` / `QuoteRFQ`); `products` NSN/supplier pages (`QuoteSupplierQuote`, `QuoteBid`, `QuoteSupplierNSN`).
+
+**URL prefix:** `/quote/` — deny-by-default `AppRegistry` row (non-superusers need `AppPermission`).
 
 ---
 
@@ -314,7 +320,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
 
 **Global search:** `/core/search/` (`core:global_search`) returns indexed matches immediately (contract/IDIQ/PO number, supplier, NSN, solicitation-number prefix). Related hops and nomenclature scans load afterward from `/core/search/related/` (`core:global_search_related`). Supplier/NSN terms surface related contracts through `Clin`; supplier terms also surface CLIN NSNs and matched/RFQ solicitations; NSN/NIIN terms match solicitation lines. IDIQ number matches return the company-scoped `IdiqContract`, its delivery-order `Contract` rows, and the suppliers/NSNs on `IdiqContractDetails`. `Contract`, `IdiqContract`, and every relationship traversing `Clin` or IDIQ details are always filtered by `request.active_company`; active `Supplier`, canonical `Nsn`, and `Solicitation` remain global because those models have no company FK. Contract/IDIQ normalization comes from `contracts.services.contract_number.normalize_contract_number`, NSN variants from `products.nsn_utils.nsn_query_variants`, and CAGE supplier matching from `products.views._suppliers_matching_cage`. `SupplierNSNCapability` is not a search source. Relationships are resolved to primary keys first and each group is then fetched with a single join-free `pk__in` queryset; search filters must avoid `icontains`-style lookups because SQL Server's `UPPER()` wrapper makes indexed columns non-sargable. See the query-strategy section in `core/CONTEXT_core.md` before changing search filters.
 
-**Global badge:** `sales.context_processors.dibbs_notice_count` exposes `dibbs_notice_recent_count` for authenticated templates. It reuses `sales.services.dibbs_notices.get_recent_notice_count` (the API's query) and caches key `sales:dibbs_notice_recent_count:v1` for 30 minutes.
+**Global badge:** `dibbs.context_processors.dibbs_notice_count` exposes `dibbs_notice_recent_count` for authenticated templates. It reuses `dibbs.services.dibbs_notices.get_recent_notice_count` (the API's query) and caches key `dibbs:dibbs_notice_recent_count:v1` for 30 minutes.
 
 ---
 
@@ -412,8 +418,11 @@ File format and validation rules are in `release_notes/README-rn.md`.
     │                                                       │
     └──► [suppliers]  Supplier ────────────────────────────┤
                                                            │
-                                                    [sales] (reads Clin/Supplier/Nsn)
-                                                    Solicitation/RFQ/Award → terminal
+                                                    [quote] (reads Supplier/Nsn, dibbs data)
+                                                    workflow state/RFQ/quote/bid → terminal
+                                                       ▲
+[dibbs] ── DIBBS IN/BQ/AS + awards + notices ──────────┘ (import_completed signal)
+    └──► [intake] (awards → ledger/drafts), [contracts] (mods), [products] (NSN pages)
 
 [reports] ── read-only SQL across contracts/suppliers schema
 [training], [accesslog], [inventory], [tools] ── fully isolated
@@ -426,7 +435,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
 | What | Where it lives | Who uses it |
 |---|---|---|
 | Login enforcement | `STATZWeb/middleware.py` `LoginRequiredMiddleware` | All apps |
-| Active company injection | `users/middleware.py` → `request.active_company` | `contracts`, `intake`, `suppliers`, `sales` |
+| Active company injection | `users/middleware.py` → `request.active_company` | `contracts`, `intake`, `suppliers` |
 | App access gates | `users.AppRegistry` / `AppPermission` | All feature apps |
 | User settings | `users.UserSettings` | `contracts` (reminder window), `reports` (AI model) |
 | Company membership | `users.UserCompanyMembership` | `contracts.CompanyForm` |
@@ -434,9 +443,9 @@ File format and validation rules are in `release_notes/README-rn.md`.
 | Reminder sidebar context | `contracts/context_processors.py` | All templates extending `contract_base.html` |
 | PO/TAB sequence numbers | `intake.SequenceNumber` | `intake` finalization into `contracts.Contract`; `initialize_sequence_numbers` management command |
 | Field-change audit | `transactions/signals.py` | `contracts.Contract`, `contracts.Clin`, `contracts.ClinShipment` (`pod_date`), `suppliers.Supplier` |
-| Background task registry | `core.ScheduledTask` + `core/management/commands/run_background_tasks.py` | `sales/tasks/`, other app task modules |
+| Background task registry | `core.ScheduledTask` + `core/management/commands/run_background_tasks.py` | `dibbs/tasks/`, other app task modules |
 | CSS / design system | `static/css/theme-vars.css`, `app-core.css`, `utilities.css` | All templates |
-| Microsoft Graph API token | `users.UserOAuthToken` | `sales` (RFQ mail), `intake` (award mail) |
+| Microsoft Graph API token | `users.UserOAuthToken` | `quote` (RFQ mail, planned), `intake` (award mail) |
 
 ---
 
@@ -446,7 +455,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
 |---|---|---|
 | `Company` | `contracts` | `Contract`, `Clin`, `UserCompanyMembership`, all company-scoped models |
 | `Contract` | `contracts` | `Clin`, `ContractSplit`, `Note`, `PaymentHistory`, `FolderTracking` |
-| `Clin` | `contracts` | `ClinShipment`, `Note`, `PaymentHistory`, `ClinAcknowledgment`; read by `sales` via SQL view |
+| `Clin` | `contracts` | `ClinShipment`, `Note`, `PaymentHistory`, `ClinAcknowledgment` |
 | `Supplier` | `suppliers` | `Clin` FK, `Contact`, `SupplierDocument`, `SupplierNSNCapability`; tracked by `transactions` |
 | `Nsn` | `products` | `Clin` FK, `SupplierNSNCapability`, `IdiqContractDetails`; table name `contracts_nsn` |
 | `SequenceNumber` | `intake` | Used for PO/TAB assignment during intake finalization |
@@ -456,7 +465,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
 | `DraftContract` | `intake` | In-flight contract drafts; finalized into `Contract` |
 | `AwardLedger` | `intake` | Durable DIBBS award-to-contract lifecycle tracking |
 | `ContractLevelCharge` | `contracts` | `Contract` FK; copied from intake level charges at finalization |
-| `Solicitation` | `sales` | `SolicitationLine`, `SupplierRFQ`, `GovernmentBid` |
+| `Solicitation` | `dibbs` | `SolicitationLine`, `DibbsAward`; `quote.QuoteSolicitation` (workflow state), `QuoteRFQ`/`QuoteBid` via lines |
 | `ReportRequest` | `reports` | Nothing downstream |
 | `OpenRouterModelSetting` | `suppliers` | `suppliers` enrichment views, `reports` AI stream endpoint |
 
@@ -479,10 +488,10 @@ File format and validation rules are in `release_notes/README-rn.md`.
 
 ### When changing `Contract` or `Clin` fields
 Required updates: `contracts/models.py` + migration + `contracts/forms.py` + affected `contracts/views/*` + templates + `contracts/CONTRACTS_APP_CURRENT_STATE.md`.
-Downstream: `processing/models.py` finalization mapping, `transactions/signals.py` tracked fields, `sales/services/matching.py` if CLIN supplier/NSN fields touched.
+Downstream: `processing/models.py` finalization mapping, `transactions/signals.py` tracked fields.
 
 ### When changing `Supplier` fields
-Required: `suppliers/models.py` + migration + `contracts/forms.py` (`SupplierForm`) + `contracts/views/supplier_views.py` + `templates/suppliers/*` + `transactions/signals.py` + `sales/services/email.py` / matching flows.
+Required: `suppliers/models.py` + migration + `contracts/forms.py` (`SupplierForm`) + `contracts/views/supplier_views.py` + `templates/suppliers/*` + `transactions/signals.py`.
 
 ### When changing `Nsn` fields
 Required: `products/models.py` + migration + `contracts/forms.py` (`NsnForm`) + `contracts/views/nsn_views.py`/`idiq_views.py` + `processing` matching views + raw SQL in `SQL/migrate_data.sql` if table/column names change.
@@ -490,8 +499,6 @@ Required: `products/models.py` + migration + `contracts/forms.py` (`NsnForm`) + 
 ### When sending data from `processing` → `contracts`
 Finalization is the only write path. Never write `Contract`/`Clin` from processing views outside of the finalization functions (`finalize_contract`, `finalize_idiq_contract`).
 
-### When sending data from `contracts` → `sales`
-`sales` reads via SQL views — it receives no pushed updates. Changes to `Clin` supplier/NSN fields can affect Tier 1 match counts; run `refresh_match_counts` after bulk changes.
 
 ### When using `request.active_company`
 Injected by `users/middleware.py`. Every queryset on company-scoped data must filter by it. `ActiveCompanyQuerysetMixin` handles this on CBVs. Never query company-scoped models without this filter.
@@ -554,7 +561,7 @@ The `tags` array will fail validation if it does not contain exactly two items:
 ## Anthropic API Budget Tracker
 - Model: `core.APIBudget` (singleton, pk=1) tracks estimated running balance. `core.APIUsageLog` logs every call with model, tokens, cost, and call site.
 - Central wrapper: `core.anthropic_client.call_anthropic(payload, call_site)` — all Anthropic API calls must route through this. It has no budget/rate-limit context manager and no `with` statement; the only retry logic is an HTTP-429 backoff loop. Callers are expected to wrap it in their own `except Exception`.
-- Callers as of 2026-09-14: `intake/pdf_parser.py` (×3, each locally guarded), `reports/views.py::_call_ai_sql_builder` (guarded by all three of its callers), `mailer/tasks/generate_ai.py::process_ai_snippets` (per-campaign `try/except Exception`), `sales/services/competitor_supplier_intel.py::_extract_award_entities_via_claude_api` (guarded). All are adequately guarded.
+- Callers as of 2026-09-14: `intake/pdf_parser.py` (×3, each locally guarded), `reports/views.py::_call_ai_sql_builder` (guarded by all three of its callers), `mailer/tasks/generate_ai.py::process_ai_snippets` (per-campaign `try/except Exception`), `dibbs/services/competitor_supplier_intel.py::_extract_award_entities_via_claude_api` (guarded). All are adequately guarded.
 - Pricing constants in `core/anthropic_client.py` — update `MODEL_PRICING` when adding new models.
 - Context processor `core.context_processors.api_budget` injects `api_budget` and `api_budget_calls_today` into superuser requests only.
 - Budget card partial: `core/templates/core/partials/api_budget_card.html` — included on Intake Queue, Processing Queue, Reports hub, and Index pages inside `{% if request.user.is_superuser %}`.

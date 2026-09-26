@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('contracts', '0088_contractlevelcharge_action_type'),
         ('intake', '0002_draftcontract_company_sharepoint'),
-        ('sales', '0052_backfill_dibbs_award_mod_matched_contract'),
+        ('dibbs', '0001_initial'),
     ]
 
     operations = [
@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
                 ('lifecycle_state', models.CharField(choices=[('not_we_won', 'Not We-Won'), ('mod_only', 'Mod Only'), ('awaiting_draft', 'Awaiting Draft'), ('in_draft', 'In Draft'), ('draft_worked', 'Draft Worked'), ('live_contract', 'Live Contract')], db_index=True, default='', max_length=20)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('contract', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='award_ledger_entries', to='contracts.contract')),
-                ('dibbs_award', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='ledger_entries', to='sales.dibbsaward')),
+                ('dibbs_award', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='ledger_entries', to='dibbs.dibbsaward')),
             ],
             options={
                 'verbose_name': 'Award Ledger Entry',

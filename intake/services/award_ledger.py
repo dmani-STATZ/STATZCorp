@@ -7,7 +7,7 @@ finalization, this ledger is the ONLY persistent record of that journey.
 
 Conventions (mirror ``intake.services.queue_we_won_drafts``):
   - Module logger + ``_LOG_PREFIX``.
-  - Lazy cross-app imports inside functions (intake → sales, intake →
+  - Lazy cross-app imports inside functions (intake → dibbs, intake →
     contracts). No ``processing.*`` imports.
   - NEVER raise to callers. Every public entry point wraps its body in a
     try/except and logs; scrapes, polls, and finalization must never be
@@ -208,7 +208,7 @@ def upsert_ledger_for_batch(
         return result
 
     try:
-        from sales.models import (
+        from dibbs.models import (
             CompanyCAGE,
             DibbsAward,
             DibbsAwardMod,
@@ -596,7 +596,7 @@ def log_draft_ingestion(draft, source: str, user=None) -> None:
                 changed = True
             else:
                 if draft.company:
-                    from sales.models import CompanyCAGE
+                    from dibbs.models import CompanyCAGE
                     active_cages = list(
                         CompanyCAGE.objects.filter(
                             company=draft.company, is_active=True

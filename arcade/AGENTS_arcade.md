@@ -1,7 +1,7 @@
 # AGENTS_arcade.md — Safe-Edit Rules for Arcade App
 
 > **CRITICAL RULE:**
-> **The arcade app imports nothing from other STATZWeb apps (`contracts`, `intake`, `processing`, `sales`, `suppliers`, `products`, `core`, `reports`, `training`, `transactions`). The only coupling point is the trigger script in `templates/base_template.html` (`static/js/arcade_trigger.js`).**
+> **The arcade app imports nothing from other STATZWeb apps (`contracts`, `intake`, `processing`, `dibbs`, `quote`, `suppliers`, `products`, `core`, `reports`, `training`, `transactions`). The only coupling point is the trigger script in `templates/base_template.html` (`static/js/arcade_trigger.js`).**
 
 ---
 

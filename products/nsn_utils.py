@@ -1,7 +1,7 @@
 """
 NSN normalization utilities for cross-app string joins.
 
-All sales-app NSN string column filters must use ``nsn_query_variants()`` so
+All dibbs/quote NSN string column filters must use ``nsn_query_variants()`` so
 existing indexes remain sargable — never wrap indexed columns in DB functions.
 """
 import re

@@ -6,7 +6,7 @@ Anything touching the STATZ Web App itself: contracts, reports, the ERP's Django
 ## The stack
 - Python / Django
 - Microsoft SQL Server backend
-- Multi-app Django monolith (`contracts`, `users`, `sales`, `products`, `suppliers`, `processing`, `transactions`, `reports`, etc.)
+- Multi-app Django monolith (`contracts`, `users`, `dibbs`, `quote`, `products`, `suppliers`, `processing`, `transactions`, `reports`, etc.)
 
 ## Read the existing docs first — don't skip this
 This repo already has a real documentation system for coding agents. Follow it before writing or changing code:

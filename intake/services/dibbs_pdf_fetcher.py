@@ -51,7 +51,7 @@ def _resolve_pdf_url(draft: 'DraftContract') -> str | None:
         return None
 
     try:
-        from sales.models import DibbsAward
+        from dibbs.models import DibbsAward
         from django.db.models import Q
         award = DibbsAward.objects.filter(
             Q(delivery_order_number=contract_number) |
@@ -126,7 +126,7 @@ def fetch_and_apply_dibbs_pdf(draft: 'DraftContract') -> dict:
 
     # 2. Download PDF bytes.
     try:
-        from sales.services.dibbs_session import make_dibbs2_session
+        from dibbs.services.dibbs_session import make_dibbs2_session
         session = make_dibbs2_session()
         response = session.get(pdf_url, timeout=_DIBBS2_DOWNLOAD_TIMEOUT)
         response.raise_for_status()

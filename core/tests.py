@@ -18,7 +18,8 @@ from core.views import (
     global_search_related,
 )
 from products.models import Nsn
-from sales.models import Solicitation, SolicitationLine, SupplierMatch
+from dibbs.models import Solicitation, SolicitationLine
+from quote.models import QuoteSolicitationMatch
 from suppliers.models import Supplier
 
 
@@ -239,11 +240,10 @@ class GlobalSearchTests(TestCase):
             nsn="5935011299512",
             line_number="0001",
         )
-        SupplierMatch.objects.create(
-            line=line,
+        QuoteSolicitationMatch.objects.create(
+            solicitation=line.solicitation,
             supplier=supplier,
-            match_tier=1,
-            match_method="DIRECT_NSN",
+            source=QuoteSolicitationMatch.SOURCE_NSN,
         )
         render.return_value = SimpleNamespace(status_code=200)
 
@@ -274,7 +274,7 @@ class GlobalSearchTests(TestCase):
     def test_nsn_expands_relations_without_cross_company_supplier_leak(self, render):
         supplier = Supplier.objects.create(name="Current Company Supplier")
         hidden_supplier = Supplier.objects.create(name="Other Company Supplier")
-        sales_supplier = Supplier.objects.create(name="Sales Match Supplier")
+        match_supplier = Supplier.objects.create(name="Quote Match Supplier")
         nsn = Nsn.objects.create(nsn_code="5935-01-129-9512")
         contract = Contract.objects.create(
             company=self.company,
@@ -305,11 +305,10 @@ class GlobalSearchTests(TestCase):
             niin="011299512",
             line_number="0001",
         )
-        SupplierMatch.objects.create(
-            line=line,
-            supplier=sales_supplier,
-            match_tier=1,
-            match_method="DIRECT_NSN",
+        QuoteSolicitationMatch.objects.create(
+            solicitation=line.solicitation,
+            supplier=match_supplier,
+            source=QuoteSolicitationMatch.SOURCE_NSN,
         )
         render.return_value = SimpleNamespace(status_code=200)
 
@@ -330,7 +329,7 @@ class GlobalSearchTests(TestCase):
         by_category = {group["category"]: group for group in related["groups"]}
         self.assertIn(str(contract.pk), by_category["contracts"]["html"])
         self.assertIn(str(supplier.pk), by_category["suppliers"]["html"])
-        self.assertIn(str(sales_supplier.pk), by_category["suppliers"]["html"])
+        self.assertIn(str(match_supplier.pk), by_category["suppliers"]["html"])
         self.assertNotIn(str(hidden_supplier.pk), by_category["suppliers"]["html"])
 
     @patch("core.views.render")

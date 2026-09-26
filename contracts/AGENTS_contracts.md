@@ -66,7 +66,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `contracts/migrations/` — check the latest migration before adding fields; 37+ migrations exist with compound indexes
 - `transactions` app signals — signals in `transactions/` fire on `Contract`, `Clin`, `ClinShipment` (tracked `pod_date`), and `Supplier` post/pre_save; renaming tracked fields will silently break the audit trail
 - `processing/models.py` — `QueueContract` and `QueueClin` mirror Contract/Clin fields; a schema change may require parallel updates there
-- `sales/` views/services that reference contract fields (e.g. SQL view DDL under `sales/sql/` joining `contracts_clin` / `contracts_contract` / `contracts_nsn`)
+- `dibbs/services/contract_mods.py` (matches DIBBS award mods to `Contract` by normalized contract number)
 
 ### Before changing views
 - `contracts/views/mixins.py` — `ActiveCompanyQuerysetMixin` must remain on every queryset-based view; removing it leaks cross-tenant data
@@ -338,7 +338,7 @@ NSN search is dash-agnostic. `get_select_options` in `contracts/views/api_views.
 |-----|---------------|
 | `processing` | `QueueContract`/`QueueClin` map fields to `Contract`/`Clin`; matching engine creates live `Contract`/`Clin` rows |
 | `transactions` | Registers pre/post_save signals on `Contract` and `Clin`; reads a list of tracked field names — **renaming any tracked field on these models silently drops audit history** |
-| `sales` | Tier-1 supplier NSN scoring reads `contracts_*` via SQL Server view `dibbs_supplier_nsn_scored` (not Django `Clin` in `matching.py`) |
+| `dibbs` | `DibbsAwardMod.matched_contract` FK; `contract_mods.mods_for_contract` feeds the Modifications card; `CompanyCAGE.company` FK to `Company` |
 | `suppliers` | Some supplier URL patterns may reverse into contracts URLs |
 
 ### Specific high-risk field names (tracked by `transactions` signals):
@@ -367,7 +367,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 ## 8. Model and Schema Change Rules
 
 - **ContractPackaging financial fields:** `quote_amount` and `amount_paid` are updated via `PaymentHistory` rows (entity_type `contract_packaging`, payment types `packaging_quote` / `packaging_paid`). The write-back from `new_total` after a payment delete must also update the stored field. `invoice_number` and `payment_date` are updated via `update_packaging_finance`. `packhouse` and `notes` are updated via `update_packaging_details`. Do not add direct form-POST edit paths for the financial fields — they must go through PaymentHistory to preserve the audit ledger. Note that `ContentType.objects.get_for_model(ContractPackaging).model` returns `'contractpackaging'` (no underscore); the URL/JS-facing `entity_type` is `'contract_packaging'` (with underscore). Keep both forms in sync in `payment_history_views.py`.
-- **Before renaming any `Contract` or `Clin` field:** search `transactions/` (signals, TRACKED_FIELDS), `processing/` (QueueContract/QueueClin field mapping), `sales/` (matching.py, views), and all `contracts/views/*.py` for string references to the field name.
+- **Before renaming any `Contract` or `Clin` field:** search `transactions/` (signals, TRACKED_FIELDS), `processing/` (QueueContract/QueueClin field mapping), `dibbs/services/contract_mods.py`, and all `contracts/views/*.py` for string references to the field name.
 - **`Nsn` FK on `Clin` uses `PROTECT`.** You cannot delete an `Nsn` that has CLINs. Any migration that changes this behavior will affect `products` app.
 - **`Company` FK on most models uses `PROTECT`.** Deleting a `Company` will fail if any Contract, Clin, Note, Reminder, or GovAction exists for it. This is intentional.
 - **Generic relations on `Note` and `PaymentHistory`** (`content_type` + `object_id`) are stable. Do not add direct FKs. If adding a new attachable model, follow the existing `ContentType` pattern.
@@ -516,7 +516,7 @@ Partner Commission Reconciliation matching normalizes contract numbers using `st
 
 9. **Breaking the `ClinForm.clean()` auto-calculation.** `item_value` and `quote_value` are not always entered by users; they are derived. If `clean()` fails, these fields silently remain zero and financial reporting is wrong.
 
-10. **Changing URL pattern names without searching templates.** There are ~90 named URLs. `{% url 'contracts:...' %}` is used throughout `contracts/templates/contracts/` and possibly in `sales`, `processing`, and `suppliers` templates.
+10. **Changing URL pattern names without searching templates.** There are ~90 named URLs. `{% url 'contracts:...' %}` is used throughout `contracts/templates/contracts/` and possibly in `dibbs`, `processing`, and `suppliers` templates.
 
 11. **PO Acknowledgement Letter** — views live in `acknowledgment_views.py` only (single-e spelling). Do not recreate `acknowledgement_letter_views.py` (double-e) or legacy full-page routes.
 
@@ -591,7 +591,7 @@ Partner Commission Reconciliation matching normalizes contract numbers using `st
 ### Main cross-app dependencies
 - `transactions` app: audit signals on `Contract`/`Clin` saves
 - `processing` app: `QueueContract`/`QueueClin` mirror Contract/Clin schema
-- `sales` app: tier-1 NSN scoring joins `contracts_*` in SQL Server view `dibbs_supplier_nsn_scored` (deployed via SSMS; see `sales/sql/dibbs_supplier_nsn_scored.sql`)
+- `dibbs` app: award-mod matching reads `contracts_contract`; the Modifications card acknowledges via `dibbs:acknowledge_contract_mod`
 - `suppliers` app: `Supplier` model FKed from `Clin`
 - `products` app: `Nsn` model FKed from `Clin` (PROTECT)
 - `users` app: `request.active_company` middleware, `UserCompanyMembership`

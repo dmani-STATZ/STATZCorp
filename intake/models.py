@@ -235,7 +235,7 @@ class AwardLedger(models.Model):
                   'DraftContract.contract_number / Contract.contract_number.',
     )
 
-    # -- DIBBS mirror (types copied from sales.DibbsAward) --------------------
+    # -- DIBBS mirror (types copied from dibbs.DibbsAward) --------------------
     award_basic_number = models.CharField(max_length=50, blank=True, default='')
     delivery_order_number = models.CharField(max_length=50, blank=True, default='')
     delivery_order_counter = models.CharField(max_length=20, blank=True, default='')
@@ -258,7 +258,7 @@ class AwardLedger(models.Model):
     is_we_won = models.BooleanField(default=False)
     has_award = models.BooleanField(default=False)
     dibbs_award = models.ForeignKey(
-        'sales.DibbsAward',
+        'dibbs.DibbsAward',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

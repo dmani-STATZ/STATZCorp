@@ -1,221 +1,165 @@
 # Quote Context
 
 ## 1. Purpose
-The `quote` app owns the human DIBBS quoting workflow: reviewing matched solicitations,
-dispatching RFQs to suppliers, capturing supplier replies from the shared `quotes@` mailbox,
-building landed cost (supplier cost + packaging adder + freight adder + markup), staging bids,
-exporting the DIBBS BQ batch file, and post-award win/loss analytics ("Our Bids").
+The `quote` app owns the whole human DIBBS quoting workflow and **all of its
+data**: solicitation pipeline state, supplier NSN/FSC capabilities and matching,
+RFQ dispatch, the shared `quotes@` mailbox, supplier quotes with landed-cost
+buildup, bid staging, the BQ export, and post-award win/loss analytics ("Our Bids").
 
-It does **not** ingest DIBBS files. Ingestion, supplier matching and award ingestion stay in
-`sales`. The `quote` app reads those tables and never writes them. See §11.
+It does **not** ingest DIBBS files or awards — the `dibbs` app does. `quote`
+reads `dibbs` tables, never writes them, and reacts to
+`dibbs.signals.import_completed`. See §11.
 
 Functional spec and the two approved UI mockups live in `quote/docs/`:
 `Quote.md`, `Mailbox Workflow - OptionB.html`, `Our Bids Post-Award Intelligence.html`.
 
 ## 2. App Identity
-- **Django app name:** `quote`
-- **AppConfig:** `QuoteConfig` (`quote/apps.py`), label `quote`, verbose name "Quotes (DIBBS Quoting)"
-- **Filesystem path:** `/quote`
-- **URL prefix:** `/quote/`, namespace `quote:`
-- **Role:** Feature app implementing the quoting to bid to export to post-award lifecycle on top of
-  the solicitation data `sales` ingests.
+- **Django app name:** `quote` — `QuoteConfig` (`quote/apps.py`), verbose name
+  "Quotes (DIBBS Quoting)". `ready()` imports `quote/signals.py` to connect receivers.
+- **URL prefix:** `/quote/`, namespace `quote:`.
 
 ## 3. High-Level Responsibilities
-- Own the RFQ dispatch ledger (`QuoteRFQ`), supplier quotes with full cost buildup
-  (`QuoteSupplierQuote`), staged bids (`QuoteBid`), inbound email + attachments
-  (`QuoteEmail`, `QuoteEmailAttachment`, `QuoteEmailSolLink`) and post-award reconciliation
-  (`BidOutcome`).
-- Read solicitations, lines, approved sources, supplier capability tiers and awards from `sales`.
-- Read the supplier directory (including packhouses) from `suppliers`, and part dimensions from
+- Workflow state per solicitation (`QuoteSolicitation`) and supplier matching
+  (`QuoteSupplierNSN`, `QuoteSupplierFSC`, `QuoteSolicitationMatch`).
+- RFQ ledger (`QuoteRFQ`), supplier quotes (`QuoteSupplierQuote`), staged bids
+  (`QuoteBid`), inbound email (`QuoteEmail`, `QuoteEmailAttachment`,
+  `QuoteEmailSolLink`), post-award reconciliation (`BidOutcome`).
+- Reads solicitations, lines, approved sources, awards, `CompanyCAGE`, SAM cache
+  from `dibbs`; suppliers/packhouses from `suppliers`; part dimensions from
   `products.Nsn`.
-- Write the BQ submission file from `SolicitationLine.bq_raw_columns` with the full pre-flight
-  validation set Quote.md specifies.
 
-## 4. Key Files and What They Do
+## 4. Key Files
 | File / Directory | Responsibility |
 |---|---|
-| `apps.py` | `QuoteConfig`, label `quote`. |
-| `urls.py` | `app_name = 'quote'`. **Must stay exactly `'quote'`** — `STATZWeb/middleware.py` resolves the namespace and looks it up in `users.AppRegistry`; a mismatch makes permission gating silently no-op. |
-| `models/base.py` | App-scoped abstract `AuditModel` (`quote_%(class)s_created` / `_modified`). Redefined locally on purpose — every app declares its own; do not cross-import. |
-| `models/rfq.py` | `QuoteRFQ` (`quote_rfq`) — one row per (line, supplier), `unique_together`. Status pipeline `QUEUED` to `READY_TO_SEND` to `SENT` to `RESPONDED`, plus `NO_RESPONSE` / `DECLINED`. Carries `send_attempts` / `last_send_error` for async Graph dispatch diagnostics. |
-| `models/quotes.py` | `QuoteSupplierQuote` (`quote_supplier_quote`) — Quote.md's `Supplier_Quotes`. Supplier cost, both adders, packaging source + packhouse FK, markup type/value, `final_government_unit_price`, `is_selected_for_bid` / `selected_automatically`. The `landed_unit_cost` property is Decimal-only. |
-| `models/bids.py` | `QuoteBid` (`quote_bid`) — OneToOne on `sales.SolicitationLine`. Every BQ overlay column, plus `clin_group` for Combined-mode CLIN entry and `is_auto_award_solicitation` (char 9 of the sol number is `T`/`U`). |
-| `models/email.py` | `QuoteEmail` (`quote_email`) with `raw_payload` + `headers_json` + a 20-minute claim (`CLAIM_DURATION`); `QuoteEmailAttachment` (`quote_email_attachment`, bytes stored); `QuoteEmailSolLink` (`quote_email_sol_link`) — Quote.md's `SOL_Email_Link`, many-to-many email to line. |
-| `models/outcomes.py` | `BidOutcome` (`quote_bid_outcome`) — OneToOne on `QuoteBid`, nullable FK to `sales.DibbsAward`, derived `award_unit_price` / `dollar_delta` / `pct_spread` / `within_5_pct`, plus the frozen bid snapshot. |
-| `templates/quote/base.html` | App shell. Extends `base_template.html`, defines the `body` block, re-exposes the `content` block. **All quote pages extend this**, never `base_template.html` directly (which has no `content` block). |
-| `views/dashboard.py` | Placeholder landing page. Every view carries `@login_required`. |
+| `apps.py` | `QuoteConfig`; `ready()` connects `signals.py`. |
+| `signals.py` | `import_completed` receiver → `services.matching.process_import_batch`. |
+| `urls.py` | `app_name = 'quote'` — **must stay exactly `'quote'`** (permission middleware keys on it). |
+| `models/base.py` | App-scoped abstract `AuditModel`. |
+| `models/solicitation.py` | `QuoteSolicitation` (`quote_solicitation`) — OneToOne on `dibbs.Solicitation` (`related_name='quote_state'`). Status `UNMATCHED → MATCHED → RFQ_SENT → QUOTING → BID_READY → BID_SUBMITTED`, plus `NO_BID`, `ARCHIVED`. 20-minute review claim (`claim_for`, `is_claimed_by_other`). |
+| `models/matching.py` | `QuoteSupplierNSN` (`quote_supplier_nsn`, 13-digit NSN), `QuoteSupplierFSC` (`quote_supplier_fsc`), `QuoteSolicitationMatch` (`quote_solicitation_match`) — one row per (solicitation, supplier, source ∈ NSN/FSC/MANUAL). |
+| `models/rfq.py` | `QuoteRFQ` (`quote_rfq`) — one row per (line, supplier). `QUEUED → READY_TO_SEND → SENT → RESPONDED`, plus `NO_RESPONSE` / `DECLINED`. |
+| `models/quotes.py` | `QuoteSupplierQuote` (`quote_supplier_quote`) — cost, both adders, packhouse FK, markup, `final_government_unit_price`, `is_selected_for_bid`, `source_email` FK back to the reply it was typed from. `landed_unit_cost` is Decimal-only. |
+| `models/bids.py` | `QuoteBid` (`quote_bid`) — OneToOne on `dibbs.SolicitationLine`; the solicitation is reached via `line.solicitation` (no duplicate FK). Every BQ overlay column + `clin_group`. |
+| `models/email.py` | `QuoteEmail` (raw payload, headers, claim), `QuoteEmailAttachment` (bytes), `QuoteEmailSolLink` (many-to-many email ↔ line). |
+| `models/outcomes.py` | `BidOutcome` — OneToOne on `QuoteBid`, nullable FK to `dibbs.DibbsAward`, derived deltas, frozen bid snapshot. |
+| `services/matching.py` | `seed_solicitation_states`, `match_solicitations`, `process_import_batch`, `normalize_nsn`. |
+| `services/graph_inbox.py` | Graph reader for the `GRAPH_MAIL_SENDER_RFQ` mailbox (moved from the retired `sales` app). |
+| `management/commands/seed_quote_demo.py` | Dev-only demo data (§14a). |
+| `templates/quote/base.html` | App shell (`.app-shell` / `.app-subnav`, shared with `dibbs`). |
 
-## 5. Data Model / Domain Objects
-All tables use an explicit **`quote_`** `db_table` prefix (`sales` uses `dibbs_`; `suppliers` and
-`products` use `contracts_` for legacy alignment). Never let Django auto-name a table.
-
-Money conventions, matching the rest of the repo: unit prices `Decimal(13,5)`, totals
-`Decimal(15,2)`, percentages `Decimal(5,2)`, NSN `CharField(max_length=46)`.
-
-- **`QuoteRFQ`** — `unique_together ('line', 'supplier')`; index on `(status, sent_at)`.
-- **`QuoteSupplierQuote`** — `rfq` is nullable so a quote can be logged against a line that never
-  had an outbound RFQ. Index on `(line, is_selected_for_bid)`.
-- **`QuoteBid`** — `line` is a `OneToOneField`, so one bid per line is structural. Split-CLIN is
-  therefore the native shape; **Combined mode is the UI aggregation**, recorded by sharing a
-  `clin_group` value across sibling lines.
-- **`QuoteEmail`** — unlike `sales.InboxMessage`, rows are persisted whether or not a rep has
-  linked them, and the full Graph payload is kept. `is_orphan` drives the "No SOL in Subject" pill.
-- **`BidOutcome`** — `award_unit_price` is **derived** (`award_total_price / award_quantity`)
-  because the DIBBS AW file carries neither quantity nor unit price. `award_unit_price_is_derived`
-  defaults `True`; surface it as derived in the UI, never as a figure DIBBS published.
+## 5. Data Model Notes
+- Every table has an explicit `quote_` `db_table`. Money: unit prices `Decimal(13,5)`,
+  totals `Decimal(15,2)`, percentages `Decimal(5,2)`.
+- `QuoteSolicitation` and `QuoteSolicitationMatch` set `dibbs_disposable = True`:
+  they are auto-created, so dibbs' import-batch delete may cascade through them.
+  Anything a rep creates (RFQs, quotes, bids, email links) blocks that delete.
+- Matching is additive and idempotent; it only moves `UNMATCHED → MATCHED` and
+  never rewinds a worked solicitation (`MATCHING_STATES`).
+- `QuoteBid.line` is OneToOne → Split-CLIN is native; Combined mode shares `clin_group`.
+- `BidOutcome.award_unit_price` is **derived** (`award_total_price / award_quantity`);
+  DIBBS publishes neither quantity nor unit price. Always label it derived.
 
 ## 6. Request / User Flow
-Currently `/quote/` only. The Phase 1 through 4 screens from `quote/docs/Quote.md` are not built yet.
+Currently `/quote/` (placeholder dashboard) only. Phase 1–4 screens from
+`quote/docs/Quote.md` are not built yet. Behind the scenes, every DIBBS import
+seeds `QuoteSolicitation` rows and runs matching.
 
-## 7. Templates and UI Surface Area
-- `templates/quote/base.html` — shell plus `.quote-subnav`.
-- `templates/quote/dashboard.html` — placeholder.
-- Styling: **Bootstrap 5.3.3** (Spacelab), already loaded in `base_template.html`'s head.
-  New named classes go in `static/css/app-core.css` under the "Quotes app" banner — the repo has a
-  three-file CSS architecture and **no new CSS files are permitted**. No Tailwind. No CDN tags in
-  quote templates.
-- Theme: dark overrides are scoped `[data-bs-theme="dark"] .class`. Never a `.dark` class.
-- Drawers use Bootstrap **offcanvas** (`offcanvas-end`); modals use `bootstrap.Modal`; toasts use the
-  global `window.showToast(type, message, duration)`.
-- The mockups in `quote/docs/` hardcode a dark palette and are layout/IA references only — they are
-  not to be pasted in as-is, because the app has a real light/dark toggle.
+## 7. Templates and UI
+- Bootstrap 5.3.3 (Spacelab) from the global base. New classes go in
+  `static/css/app-core.css`. No new CSS files, no Tailwind, no CDN tags.
+- Dark mode: `[data-bs-theme="dark"] .class`. Drawers: `offcanvas-end`;
+  modals: `bootstrap.Modal`; toasts: `window.showToast`.
+- Mockups in `quote/docs/` are IA references only (they hardcode a dark palette).
 
-## 8. Admin / Staff Functionality
-`quote/admin.py` registers nothing yet.
+## 8–10. Admin, Forms, Services
+- `admin.py` registers nothing yet.
+- Business logic belongs in `quote/services/`. Planned: a single Decimal-only
+  cost-buildup service and the BQ writer.
+- **BQ writer reference:** the retired `sales/services/bq_export.py` (git history,
+  commit `c92e273`) overlaid bid fields onto `SolicitationLine.bq_raw_columns`
+  (1-based cols): 6 quoter CAGE, 7 quote-for CAGE, 13 SB rep, 21 affirmative
+  action, 22 previous contracts, 23 ADR, 24 bid type, 25 payment terms,
+  50 unit price, 51 delivery days, 65 hazmat, 67 material, 102 mfr/dealer,
+  103 mfg CAGE, 106–108 part-number offered code/CAGE/P/N, 120 child labor,
+  121 remarks. Header defaults (13, 21–23, 120) come from `dibbs.CompanyCAGE`.
 
-## 9. Forms, Validation, Input Handling
-None yet. When added: business logic belongs in `quote/services/`, not views.
+## 11. Cross-App Dependencies
+### Reads (never writes)
+- `dibbs`: `Solicitation`, `SolicitationLine` (incl. `bq_raw_columns`),
+  `ApprovedSource`, `DibbsAward`, `CompanyCAGE`, `SAMEntityCache`,
+  `NsnProcurementHistory`.
+- `suppliers`: `Supplier` (incl. `is_packhouse`), `Contact`.
+- `products.Nsn` — **one sanctioned write**: the freight sub-modal may update
+  `unit_weight`, `unit_length`/`unit_width`/`unit_height`,
+  `dimension_source_notes`, `dimensions_last_verified`. Nothing else.
 
-## 10. Business Logic and Services
-`quote/services/` is empty. Planned: a single Decimal-only cost-buildup service (the `sales` app
-duplicates its markup formula in five places and mixes `float` into a `Decimal(13,5)` price path —
-do not copy that), and a BQ writer.
-
-## 11. Integrations and Cross-App Dependencies
-
-### Read-only dependencies — the core rule of this app
-`quote` **reads** and **never writes**:
-- `sales.Solicitation`, `sales.SolicitationLine` (including `bq_raw_columns`),
-  `sales.ApprovedSource`, `sales.SupplierNSN` / `SupplierFSC` / `SupplierNSNScored`,
-  `sales.DibbsAward`, `sales.CompanyCAGE`, `sales.SAMEntityCache`
-- `suppliers.Supplier` (including `is_packhouse`, the `packhouse` self-FK, `supplier_type`), `Contact`
-- `products.Nsn` — **exception:** the freight sub-modal writes the dimension fields
-  (`unit_weight`, `unit_length` / `unit_width` / `unit_height`, `dimension_source_notes`,
-  `dimensions_last_verified`). That write is sanctioned; nothing else on `Nsn` is.
-
-### Services worth reusing rather than reimplementing
-- `mailer.services.graph_mail.send_mail_via_graph(...)` — outbound. **GCC High only**
-  (`graph.microsoft.us`, authority `login.microsoftonline.us`). Returns `False`, never raises.
-- `sales.services.graph_inbox` — `fetch_inbox_messages()`, `fetch_message_body(id)`,
-  `mark_message_read(id)` against `GRAPH_MAIL_SENDER_RFQ` (`quotes@statzcorp.com` in prod,
-  `rfq@statzcorp.com` in dev). On-demand, **not polled**.
-- `sales.services.matching.get_live_workbench_matches(line)` and `normalize_nsn(nsn)`.
-- `sales.services.competitor_stats.get_competitor_stats()` — **canonical**. `CONTEXT_sales.md`
-  says do not duplicate that aggregation.
-- `sales.services.bq_export.COMPANY_FILLED_COLUMNS` — the BQ column map.
-- Packhouse lookup pattern: `Q(is_packhouse=True) | Q(supplier_type__description__iexact='packhouse')`
-  as a sort/highlight hint, **not** a hard filter (precedent `contracts/views/supplier_views.py`).
+### Reusable services
+- `mailer.services.graph_mail.send_mail_via_graph(...)` — GCC High only; returns
+  `False` on failure, never raises.
+- `quote.services.graph_inbox` — `fetch_inbox_messages()`, `fetch_message_body(id)`,
+  `mark_message_read(id)`. On demand, not polled.
+- `dibbs.services.competitor_stats.get_competitor_stats()` — canonical; do not duplicate.
+- Packhouse lookup: `Q(is_packhouse=True) | Q(supplier_type__description__iexact='packhouse')`
+  as a sort hint, not a filter.
 
 ### Apps that depend on `quote`
-None yet.
+- `core` global search (supplier ↔ solicitation hops via `QuoteSolicitationMatch`, `QuoteRFQ`).
+- `products` NSN / supplier pages (`QuoteSupplierQuote`, `QuoteBid`, `QuoteSupplierNSN`).
 
 ## 12. URL Surface
 | Name | Path | View |
 |---|---|---|
 | `quote:dashboard` | `/quote/` | `views.dashboard` |
 
-## 13. Permissions / Security Considerations
-- Every view must carry `@login_required`. Global behavior varies with `settings.REQUIRE_LOGIN`;
-  undecorated views become reachable where login is off.
-- **A `users.AppRegistry` row for `quote` has not been created — the app is currently fail-open.**
-  `STATZWeb/middleware.py` allows any authenticated user when no `AppRegistry` row exists, and
-  denies by default once one does (every non-superuser then needs an explicit
-  `AppPermission(has_access=True)`). This is a deliberate open decision; see
-  `AGENTS_quote.md` footgun 1.
-- Company scoping: `quote` data has **no `company` FK**, matching `sales.Solicitation` and
-  `intake.AwardLedger` — DIBBS solicitations are global. Scoping is by CAGE through
-  `sales.CompanyCAGE`. Do not invent a company FK.
-- `QuoteEmail.body_html` is supplier-supplied HTML. Render it **only** inside a sandboxed
-  no-scripts iframe; never inject it into the page DOM.
+## 13. Permissions / Security
+- `@login_required` on every view.
+- `AppRegistry`: `quote/0002` created a `quote` row (deny-by-default) and granted it
+  to users who had `sales` access. **Non-superusers need an explicit
+  `AppPermission(has_access=True)`** — there is no auto-grant signal.
+- No `company` FK on quote data; scope by CAGE via `dibbs.CompanyCAGE`.
+- `QuoteEmail.body_html` is supplier HTML: render only in a sandboxed no-scripts iframe.
 
-## 14. Background Processing / Scheduled Work
-None registered yet. Adding one needs all three legs or it silently never runs:
-1. a zero-arg callable in `quote/tasks/`,
-2. an entry in `TASK_FUNCTIONS` in `core/management/commands/run_background_tasks.py` whose key
-   exactly matches the `ScheduledTask.name` (case-sensitive),
-3. a `core.ScheduledTask` row **seeded by data migration**, not Django admin.
-
-No WebJob redeploy is needed — the 1-minute heartbeat picks up new rows.
-
-Planned: a `quotes@` mailbox poller and a nightly `BidOutcome` reconciliation.
+## 14. Background Work
+- `import_completed` receiver (synchronous, inside the import request / WebJob).
+- Planned: `quotes@` mailbox poller, nightly `BidOutcome` reconciliation, 7-day
+  unmatched archival. Each needs a `quote/tasks/` callable + `TASK_FUNCTIONS` entry +
+  `ScheduledTask` data migration.
 
 ## 14a. Demo Data (dev only)
-`python manage.py seed_quote_demo` seeds ten solicitations covering every stage of the workflow:
-unmatched, matched-not-dispatched, RFQ queued, RFQ sent, and six bid-submitted records resolving to
-2 won / 3 lost / 1 pending — two of the losses inside 5% so the missed-opportunity counter has data.
-Also seeds 8 suppliers (one flagged `is_packhouse`), 3 inbound emails (one auto-matched, one covering
-two solicitations, one orphan), an attachment, competing quotes on one line for the comparison
-drawer, and 121-column BQ templates.
+`python manage.py seed_quote_demo` seeds ten solicitations across every stage
+(unmatched, matched, RFQ queued/sent, six bid-submitted → 2 won / 3 lost /
+1 pending, two losses within 5%), with `QuoteSolicitation` state, capabilities
+and matches. `--clear` / `--list`. Refuses to run in production. Every row is
+tagged (import batch `imported_by`, `DEMO-SEED-` notice/message ids, supplier
+notes marker, NSN `dimension_source_notes` marker) and it never modifies a
+pre-existing `contracts_nsn` row.
 
-- `--clear` removes it all; `--list` reports what is present.
-- **It is a management command, not a data migration, so it never runs on deploy**, and it hard-refuses
-  when `settings.IS_PRODUCTION` or `WEBSITE_SITE_NAME` indicates production.
-- Every row it creates is tagged so `--clear` can never touch real data: solicitations via an
-  `ImportBatch.imported_by='seed_quote_demo'`, awards via a `DEMO-SEED-` `notice_id` prefix,
-  suppliers via a marker in `notes`, emails via a `DEMO-SEED-MSG-` `graph_message_id` prefix, and
-  NSN rows via a marker in `dimension_source_notes`.
-- It **never modifies a pre-existing `contracts_nsn` row** — that is shared product data, so an
-  existing NSN is skipped rather than overwritten (and therefore never becomes deletable).
+## 15. Testing
+`test_scaffold.py` (wiring, table prefixes, FK targets, landed cost, auto-award
+gate, claims, RFQ uniqueness, templates), `test_matching.py` (import signal →
+state seeding, additive matching, idempotency, no rewind, receiver isolation,
+batch-delete protection), `test_permission_seed.py`, `test_seed_quote_demo.py`.
+Run `python manage.py test quote dibbs`.
 
-## 15. Testing Coverage
-`quote/tests/test_scaffold.py` — app wiring, namespace, explicit `quote_` table prefixes, cross-app FK
-targets, Decimal landed-cost math, the auto-award `T`/`U` gate, email claim handoff, the
-one-RFQ-per-(line, supplier) constraint, and template render/CDN/Tailwind guards.
+## 16. Migrations
+- `0001_initial` — seven original `quote_*` tables (FKs retargeted to `dibbs`).
+- `0002_seed_app_registry_and_permissions`.
+- `0003_solicitation_state_and_matching` — adds `QuoteSolicitation`, capability and
+  match tables, `QuoteSupplierQuote.source_email`; drops `QuoteBid.solicitation`.
+- `0004_backfill_solicitation_state` — one set-based `INSERT … SELECT` giving every
+  existing solicitation a state (past due → `ARCHIVED`, else `UNMATCHED`).
+- `products/migrations/0005` added the NSN dimension provenance fields.
 
-`quote/tests/test_permission_seed.py` — the `AppRegistry` / `AppPermission` seeding migration.
+## 17. Known Gaps
+1. `Quote.md` pre-flight item 1: treat BQ rows as **121** columns; prove with a
+   byte-level diff against a DIBBS-accepted `bq` file.
+2. Whole-file BQ round-trip is impossible today — the downloaded file isn't kept.
+3. Real-time "another rep is reviewing" needs no websockets: claim fields +
+   self-scheduling `setTimeout` poll.
+4. Quote.md "margin" presets (2/4/6%) are undefined as markup-on-cost vs margin-on-
+   price; the demo seeder uses markup. Decide before building the cost service.
+5. The "Supplier always requires external packaging" toggle has no quote-owned home yet.
 
-`quote/tests/test_seed_quote_demo.py` — the demo seeder: production guard, stage and outcome
-coverage, cost-buildup consistency, and the isolation guarantee that `--clear` restores exact
-pre-seed row counts and preserves every non-demo row.
-
-Run `python manage.py test quote`.
-
-## 16. Migrations / Schema Notes
-- `quote/migrations/0001_initial.py` — creates the seven `quote_*` tables. Additive only.
-- `products/migrations/0005_nsn_dimension_source_notes_and_more.py` — adds
-  `dimension_source_notes` and `dimensions_last_verified` to `contracts_nsn`.
-- No stored procedure writes `contracts_nsn`, and the only migration-created SQLite view
-  (`dibbs_we_won_awards`) references `dibbs_award`, so no view drop/recreate guard was needed.
-- Any future migration touching a `sales.DibbsAward` field **must** sandwich it between
-  `_drop_we_won_awards_view` / `_recreate_we_won_awards_view`.
-
-## 17. Known Gaps / Ambiguities
-1. `AppRegistry` registration is undecided (see §13).
-2. `Quote.md` pre-flight item 1 says "exactly 99 comma-separated strings" while the same document
-   specs a 121-field layout and the live engine writes 121. Treated as **121**; a byte-level diff
-   against a DIBBS-accepted `bq` file is the intended proof.
-3. A whole-file BQ round-trip ("preserves untouched non-bid lines") is **not possible today** — the
-   downloaded `bq` file is deleted after import and only the per-line 121-cell array survives.
-   A durable artifact store would be needed.
-4. `sales.SolicitationLine` has **no unique constraint on `(solicitation, nsn)`** even though the
-   importer keys its diff on that tuple.
-5. `item_description_indicator`, `trade_agreements_indicator`, `buy_american_indicator` and
-   `higher_level_quality_indicator` on `SolicitationLine` are declared but never populated — the
-   values sit in `bq_raw_columns` at columns 105 / 62 / 68 / 117.
-6. Quote.md's real-time "another rep is reviewing this row" indicator has **no infrastructure** —
-   there are no websockets or Channels in this repo. The in-convention approach is a claim field
-   plus a self-scheduling `setTimeout` poll returning a JSON delta.
-
-## 18. Safe Modification Guidance
-See `AGENTS_quote.md`.
-
-## 19. Quick Reference
-- Tables: `quote_rfq`, `quote_supplier_quote`, `quote_bid`, `quote_email`,
-  `quote_email_attachment`, `quote_email_sol_link`, `quote_bid_outcome`
-- Namespace: `quote:` — URL prefix: `/quote/` — shell: `quote/templates/quote/base.html`
-- Spec and mockups: `quote/docs/`
-
-## 20. CSS Architecture
-Three files only, repo-wide: `static/css/theme-vars.css` (brand tokens),
-`static/css/app-core.css` (all component/layout classes — **quote classes go here**),
-`static/css/utilities.css`. No new CSS files, no Tailwind.
+## 20. CSS
+Three files repo-wide: `theme-vars.css`, `app-core.css` (shared `.app-shell` /
+`.app-subnav` live under the "App shell + sub-nav" banner), `utilities.css`.

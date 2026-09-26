@@ -210,7 +210,7 @@ The daily downloaded `bq*.txt` file from DIBBS is used as the base template. The
 
 ### Pre-Flight Automated Syntax Validations
 Prior to file export, the application validates:
-1. **Column Cardinality Assertion**: Every output line contains exactly 121 comma-separated delimited strings, matching the field layout above. (Corrected from 99 — the layout in this document and the live `sales/services/bq_export.py` writer are both 121. Confirm with a byte-level diff against a DIBBS-accepted `bq` file before trusting either number.)
+1. **Column Cardinality Assertion**: Every output line contains exactly 121 comma-separated delimited strings, matching the field layout above. (Corrected from 99 — the layout in this document and the retired `sales/services/bq_export.py` writer (git history) are both 121. Confirm with a byte-level diff against a DIBBS-accepted `bq` file before trusting either number.)
 2. **Numeric Precision Enforcement**: Col 50 (`Unit Price`) formatted to maximum 5 decimals without leading symbols (`$`).
 3. **Integer Enforcement**: Col 51 (`Delivery Days`) contains whole positive integers without decimal points.
 4. **Auto-Award Protection**: If character 9 of Solicitation Number is `T` or `U`, Col 121 (`Quote Remarks`) is asserted to be empty string `""` to prevent accidental loss of auto-award status.

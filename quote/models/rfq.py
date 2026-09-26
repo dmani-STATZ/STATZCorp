@@ -1,9 +1,7 @@
 """
 QuoteRFQ — outbound RFQ dispatch record, one row per (solicitation line, supplier).
 
-Quote-owned mirror of sales.SupplierRFQ. The quote app treats every sales DIBBS
-table as read-only, so it cannot write SupplierRFQ; this is the quote app's own
-dispatch ledger. Table: quote_rfq.
+The quote app's outbound RFQ dispatch ledger. Table: quote_rfq.
 """
 from django.conf import settings
 from django.db import models
@@ -29,9 +27,9 @@ class QuoteRFQ(AuditModel):
         (STATUS_DECLINED, 'Declined'),
     ]
 
-    # Read-only references into the sales DIBBS tables.
+    # Read-only reference into the dibbs tables.
     line = models.ForeignKey(
-        'sales.SolicitationLine',
+        'dibbs.SolicitationLine',
         on_delete=models.CASCADE,
         related_name='quote_rfqs',
     )
@@ -65,7 +63,7 @@ class QuoteRFQ(AuditModel):
     follow_up_sent_at = models.DateTimeField(null=True, blank=True)
     follow_up_count = models.PositiveSmallIntegerField(default=0)
 
-    # Async Graph dispatch diagnostics — mirrors SupplierRFQ.
+    # Async Graph dispatch diagnostics.
     send_attempts = models.PositiveSmallIntegerField(default=0)
     last_send_error = models.TextField(blank=True, default='')
 
