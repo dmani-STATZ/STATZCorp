@@ -2862,3 +2862,115 @@ main {
   color: var(--bs-link-color);
   border-bottom-color: var(--bs-link-color);
 }
+
+/* ==========================================================================
+   Quotes app (quote/) — Phase 1 queue + workspace
+   Built on Bootstrap variables so light/dark follow data-bs-theme.
+   ========================================================================== */
+
+.quote-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+}
+
+.quote-filter-search {
+  max-width: 280px;
+}
+
+.quote-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.quote-pill-group .label {
+  color: var(--bs-secondary-color);
+  margin-right: 0.125rem;
+}
+
+.quote-pill {
+  padding: 0.125rem 0.625rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.quote-pill:hover {
+  background-color: var(--bs-secondary-bg);
+}
+
+.quote-pill.active {
+  color: #fff;
+  background-color: var(--company-primary, var(--bs-primary));
+  border-color: var(--company-primary, var(--bs-primary));
+}
+
+[data-bs-theme="dark"] .quote-pill.active {
+  background-color: var(--bs-link-color);
+  border-color: var(--bs-link-color);
+  color: var(--bs-body-bg);
+}
+
+.quote-sort {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.quote-sort[data-dir="asc"]::after { content: " \25B2"; font-size: 0.65em; }
+.quote-sort[data-dir="desc"]::after { content: " \25BC"; font-size: 0.65em; }
+
+.quote-queue-table td { vertical-align: top; }
+
+.quote-row-claimed > td { background-color: var(--bs-warning-bg-subtle); }
+
+.quote-claim { color: var(--bs-warning-text-emphasis); white-space: nowrap; }
+
+.quote-lineage { font-weight: 600; border: 1px solid transparent; }
+.quote-lineage-nsn { color: var(--bs-success-text-emphasis); background-color: var(--bs-success-bg-subtle); border-color: var(--bs-success-border-subtle); }
+.quote-lineage-fsc { color: var(--bs-info-text-emphasis); background-color: var(--bs-info-bg-subtle); border-color: var(--bs-info-border-subtle); }
+.quote-lineage-manual { color: var(--bs-primary-text-emphasis); background-color: var(--bs-primary-bg-subtle); border-color: var(--bs-primary-border-subtle); }
+
+.quote-status { font-size: 0.7rem; font-weight: 600; vertical-align: middle; }
+.quote-status-unmatched { color: var(--bs-secondary-text-emphasis); background-color: var(--bs-secondary-bg-subtle); }
+.quote-status-matched { color: var(--bs-success-text-emphasis); background-color: var(--bs-success-bg-subtle); }
+.quote-status-rfq_sent,
+.quote-status-quoting { color: var(--bs-info-text-emphasis); background-color: var(--bs-info-bg-subtle); }
+.quote-status-bid_ready,
+.quote-status-bid_submitted { color: var(--bs-primary-text-emphasis); background-color: var(--bs-primary-bg-subtle); }
+.quote-status-no_bid,
+.quote-status-archived { color: var(--bs-danger-text-emphasis); background-color: var(--bs-danger-bg-subtle); }
+
+.quote-supplier-card {
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.quote-supplier-card:last-of-type { border-bottom: 0; }
+
+.quote-supplier-results {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.quote-email-preview {
+  max-height: 320px;
+  overflow: auto;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}

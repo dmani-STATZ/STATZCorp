@@ -1,13 +1,42 @@
 {% extends "quote/base.html" %}
 
-{% block title %}Quotes{% endblock %}
-
 {% block content %}
-<div class="card card-padded">
-  <h1 class="h4 mb-2">Quotes</h1>
+<div class="card card-padded mb-3">
+  <h1 class="h4 mb-1">Quotes</h1>
   <p class="text-body-secondary mb-0">
-    DIBBS quoting workspace. Solicitation matching, RFQ dispatch, the shared
-    mailbox and post-award intelligence land here as each phase ships.
+    DIBBS quoting workspace. Match open solicitations to suppliers, send RFQs,
+    and (next phases) log supplier quotes, stage bids and track awards.
   </p>
+</div>
+
+<div class="row g-3">
+  <div class="col-sm-6 col-lg-3">
+    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:solicitation_queue' %}?tab=UNMATCHED">
+      <div class="label text-body-secondary">Unmatched</div>
+      <div class="h3 mb-0">{{ counts.UNMATCHED }}</div>
+      <div class="small text-body-secondary">open, no supplier yet</div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:solicitation_queue' %}?tab=MATCHED">
+      <div class="label text-body-secondary">Matched</div>
+      <div class="h3 mb-0">{{ counts.MATCHED }}</div>
+      <div class="small text-body-secondary">ready for RFQ</div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:solicitation_queue' %}?tab=RFQ_SENT">
+      <div class="label text-body-secondary">RFQ sent</div>
+      <div class="h3 mb-0">{{ counts.RFQ_SENT }}</div>
+      <div class="small text-body-secondary">waiting on suppliers</div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:rfq_queue' %}">
+      <div class="label text-body-secondary">RFQ queue</div>
+      <div class="h3 mb-0">{{ rfqs_pending }}</div>
+      <div class="small text-body-secondary">supplier email{{ rfqs_pending|pluralize }} to send</div>
+    </a>
+  </div>
 </div>
 {% endblock content %}

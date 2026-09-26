@@ -147,3 +147,120 @@ def process_import_batch(batch) -> dict:
     summary['states_seeded'] = seeded
     logger.info('quote matching for import batch %s: %s', batch.pk, summary)
     return summary
+
+
+# ── Manual matching + capability learning (Phase 1 feedback loop) ────────────
+
+def _line_keys(solicitation):
+    """13-digit NSNs and 4-char FSCs across a solicitation's lines."""
+    nsns, fscs = set(), set()
+    for nsn, fsc in solicitation.lines.values_list('nsn', 'fsc'):
+        nsn13 = normalize_nsn(nsn)
+        if nsn13:
+            nsns.add(nsn13)
+        fsc4 = (fsc or nsn13[:4] or '').strip()
+        if len(fsc4) == 4:
+            fscs.add(fsc4)
+    return nsns, fscs
+
+
+def open_matchable_ids(nsns=None, fscs=None):
+    """
+    Ids of open solicitations still in a matching state. When ``nsns`` / ``fscs``
+    are given, only those with a line on one of them.
+
+    SolicitationLine.nsn is stored hyphenated, so NSN candidates are narrowed by
+    FSC (the first four digits, an indexed column) and confirmed in Python.
+    """
+    today = timezone.now().date()
+    matchable = QuoteSolicitation.objects.filter(
+        status__in=QuoteSolicitation.MATCHING_STATES,
+        solicitation__return_by_date__gte=today,
+    ).values('solicitation_id')
+    if nsns is None and fscs is None:
+        return set(matchable.values_list('solicitation_id', flat=True))
+
+    nsns = set(nsns or ())
+    fscs = set(fscs or ())
+    lines = SolicitationLine.objects.filter(solicitation_id__in=matchable)
+    sol_ids = set()
+    for chunk in _chunked({n[:4] for n in nsns}, IN_CHUNK):
+        for sol_id, nsn in lines.filter(fsc__in=chunk).values_list('solicitation_id', 'nsn'):
+            if normalize_nsn(nsn) in nsns:
+                sol_ids.add(sol_id)
+    for chunk in _chunked(fscs, IN_CHUNK):
+        sol_ids.update(lines.filter(fsc__in=chunk).values_list('solicitation_id', flat=True))
+    return sol_ids
+
+
+def add_manual_match(solicitation, supplier, user, save_nsn=False, save_fsc=False):
+    """
+    Link a supplier to a solicitation by hand (Quote.md "Manual Matching &
+    Feedback Loop"). Optionally teach the capability tables so future imports
+    match automatically, and immediately re-match other open solicitations
+    that share those NSNs / FSCs.
+    """
+    nsns, fscs = _line_keys(solicitation)
+    with transaction.atomic():
+        QuoteSolicitationMatch.objects.get_or_create(
+            solicitation=solicitation, supplier=supplier,
+            source=QuoteSolicitationMatch.SOURCE_MANUAL,
+            defaults={'matched_by': user},
+        )
+        state, _ = QuoteSolicitation.objects.get_or_create(solicitation=solicitation)
+        if state.status == QuoteSolicitation.STATUS_UNMATCHED:
+            state.set_status(QuoteSolicitation.STATUS_MATCHED)
+            state.save(update_fields=['status', 'status_changed_at', 'modified_on'])
+        learned_nsns = set()
+        if save_nsn:
+            for nsn in nsns:
+                _, created = QuoteSupplierNSN.objects.get_or_create(
+                    supplier=supplier, nsn=nsn, defaults={'added_by': user},
+                )
+                if created:
+                    learned_nsns.add(nsn)
+        learned_fscs = set()
+        if save_fsc:
+            for fsc in fscs:
+                _, created = QuoteSupplierFSC.objects.get_or_create(
+                    supplier=supplier, fsc=fsc, defaults={'added_by': user},
+                )
+                if created:
+                    learned_fscs.add(fsc)
+
+    rematched = {}
+    if learned_nsns or learned_fscs:
+        ids = open_matchable_ids(nsns=learned_nsns, fscs=learned_fscs)
+        ids.discard(solicitation.pk)
+        if ids:
+            rematched = match_solicitations(sorted(ids))
+    return {
+        'learned_nsns': sorted(learned_nsns),
+        'learned_fscs': sorted(learned_fscs),
+        'rematched': rematched,
+    }
+
+
+def remove_manual_match(solicitation, supplier):
+    """Drop a manual link; fall back to UNMATCHED when no supplier is left."""
+    with transaction.atomic():
+        QuoteSolicitationMatch.objects.filter(
+            solicitation=solicitation, supplier=supplier,
+            source=QuoteSolicitationMatch.SOURCE_MANUAL,
+        ).delete()
+        state = QuoteSolicitation.objects.filter(solicitation=solicitation).first()
+        if (
+            state
+            and state.status == QuoteSolicitation.STATUS_MATCHED
+            and not QuoteSolicitationMatch.objects.filter(solicitation=solicitation).exists()
+        ):
+            state.set_status(QuoteSolicitation.STATUS_UNMATCHED)
+            state.save(update_fields=['status', 'status_changed_at', 'modified_on'])
+
+
+def rematch_open_solicitations():
+    """Re-run NSN/FSC matching over every open solicitation still in a matching state."""
+    ids = sorted(open_matchable_ids())
+    summary = match_solicitations(ids)
+    summary['solicitations_scanned'] = len(ids)
+    return summary

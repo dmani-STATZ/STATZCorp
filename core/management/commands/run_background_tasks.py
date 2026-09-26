@@ -13,6 +13,7 @@ from mailer.tasks.generate_ai import process_ai_snippets
 from mailer.tasks.dispatch_followups import dispatch_followups
 from dibbs.tasks.check_dibbs_notices import run as check_dibbs_notices_task
 from intake.tasks.reconcile_award_ledger import reconcile_award_ledger_task
+from quote.tasks.archive_stale_solicitations import archive_stale_solicitations_task
 
 logger = logging.getLogger("core.background_tasks")
 
@@ -24,6 +25,7 @@ TASK_FUNCTIONS = {
     "dispatch_followups": dispatch_followups,
     "check_dibbs_notices": check_dibbs_notices_task,
     "reconcile_award_ledger": reconcile_award_ledger_task,
+    "archive_stale_solicitations": archive_stale_solicitations_task,
 }
 
 

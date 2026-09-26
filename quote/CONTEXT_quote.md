@@ -42,7 +42,11 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `models/bids.py` | `QuoteBid` (`quote_bid`) — OneToOne on `dibbs.SolicitationLine`; the solicitation is reached via `line.solicitation` (no duplicate FK). Every BQ overlay column + `clin_group`. |
 | `models/email.py` | `QuoteEmail` (raw payload, headers, claim), `QuoteEmailAttachment` (bytes), `QuoteEmailSolLink` (many-to-many email ↔ line). |
 | `models/outcomes.py` | `BidOutcome` — OneToOne on `QuoteBid`, nullable FK to `dibbs.DibbsAward`, derived deltas, frozen bid snapshot. |
-| `services/matching.py` | `seed_solicitation_states`, `match_solicitations`, `process_import_batch`, `normalize_nsn`. |
+| `services/matching.py` | `seed_solicitation_states`, `match_solicitations`, `process_import_batch`, `add_manual_match` (+ capability learning and sibling re-match), `remove_manual_match`, `rematch_open_solicitations`. |
+| `services/queue.py` | Queue dataset (`build_queue_rows`), `status_counts`, `queue_delta` (poll), `latest_unit_costs`. |
+| `services/rfq.py` | `queue_rfqs`, `resolve_recipients`, `compose_message`, `pending_groups`, `send_supplier_rfqs`. |
+| `services/archival.py` + `tasks/archive_stale_solicitations.py` | 7-day / past-due archival (daily `ScheduledTask`, seeded by `0005`). |
+| `views/solicitations.py`, `views/rfq.py` | Phase 1 screens (orchestration only). |
 | `services/graph_inbox.py` | Graph reader for the `GRAPH_MAIL_SENDER_RFQ` mailbox (moved from the retired `sales` app). |
 | `management/commands/seed_quote_demo.py` | Dev-only demo data (§14a). |
 | `templates/quote/base.html` | App shell (`.app-shell` / `.app-subnav`, shared with `dibbs`). |
@@ -60,9 +64,33 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
   DIBBS publishes neither quantity nor unit price. Always label it derived.
 
 ## 6. Request / User Flow
-Currently `/quote/` (placeholder dashboard) only. Phase 1–4 screens from
-`quote/docs/Quote.md` are not built yet. Behind the scenes, every DIBBS import
-seeds `QuoteSolicitation` rows and runs matching.
+**Phase 1 (built):**
+1. Every DIBBS import seeds `QuoteSolicitation` rows and runs NSN/FSC matching.
+2. `/quote/solicitations/` — queue of open solicitations (return-by ≥ today) in
+   Unmatched / Matched / RFQ Sent tabs. The whole open set loads once from
+   `queue_data` (columnar, gzipped, ~3 s for ~11k rows) and filters client-side:
+   set-aside, due-date and estimated-value pills + text search. Est. value =
+   qty × latest DLA unit price (`NsnProcurementHistory`). A self-scheduling
+   30 s poll (`queue_poll`) applies status moves and shows who is reviewing a row.
+3. `/quote/solicitations/<sol>/` — workspace. Opening it takes the 20-minute
+   review claim (banner + "Take over" if someone else holds it). Shows lines,
+   approved sources (one-click **Link** when the CAGE is in the supplier
+   directory), recent DLA purchases, linked suppliers with NSN/FSC/Manual badges.
+   **Add supplier** modal: search by name/CAGE/type, optional "save NSN / FSC to
+   this supplier" — saved capabilities immediately re-match other open
+   solicitations. Tick suppliers → **Queue RFQ**. **No bid** / **Reopen**.
+4. `/quote/rfq/` — RFQ Queue: one card per supplier with recipients, preview,
+   Send / Send all. One consolidated email per supplier (SOL # in subject and
+   body, stored PDFs attached up to ~2.8 MB, DIBBS link always in the body).
+   Success → RFQs `SENT`, solicitations `RFQ_SENT`. Failure changes nothing but
+   `send_attempts` / `last_send_error`.
+5. Daily `archive_stale_solicitations` task: Unmatched > 7 days and any
+   Unmatched/Matched past due → `ARCHIVED`.
+
+Recipients: Sales-category contacts, else `rfq_email`, else `business_email`,
+else `primary_email` (`services/rfq.resolve_recipients`).
+
+Phases 2–4 (mailbox + quote entry, bid staging + BQ export, Our Bids) are not built.
 
 ## 7. Templates and UI
 - Bootstrap 5.3.3 (Spacelab) from the global base. New classes go in
@@ -107,9 +135,17 @@ seeds `QuoteSolicitation` rows and runs matching.
 - `products` NSN / supplier pages (`QuoteSupplierQuote`, `QuoteBid`, `QuoteSupplierNSN`).
 
 ## 12. URL Surface
-| Name | Path | View |
+| Name | Path | Notes |
 |---|---|---|
-| `quote:dashboard` | `/quote/` | `views.dashboard` |
+| `quote:dashboard` | `/quote/` | pipeline counts |
+| `quote:solicitation_queue` | `/quote/solicitations/` | `?tab=UNMATCHED\|MATCHED\|RFQ_SENT` |
+| `quote:queue_data` | `/quote/solicitations/data/` | JSON, gzipped |
+| `quote:queue_poll` | `/quote/solicitations/poll/?since=` | JSON delta |
+| `quote:rerun_matching` | `/quote/solicitations/rematch/` | POST |
+| `quote:solicitation_workspace` | `/quote/solicitations/<sol>/` | takes the claim |
+| `quote:add_match` / `remove_match` / `queue_supplier_rfqs` / `set_status` / `claim` | `/quote/solicitations/<sol>/...` | POST |
+| `quote:supplier_search` | `/quote/suppliers/search/?q=` | JSON |
+| `quote:rfq_queue` / `rfq_send` / `rfq_send_all` / `rfq_remove` | `/quote/rfq/...` | POST except the queue page |
 
 ## 13. Permissions / Security
 - `@login_required` on every view.
@@ -121,9 +157,8 @@ seeds `QuoteSolicitation` rows and runs matching.
 
 ## 14. Background Work
 - `import_completed` receiver (synchronous, inside the import request / WebJob).
-- Planned: `quotes@` mailbox poller, nightly `BidOutcome` reconciliation, 7-day
-  unmatched archival. Each needs a `quote/tasks/` callable + `TASK_FUNCTIONS` entry +
-  `ScheduledTask` data migration.
+- `archive_stale_solicitations` (daily, run_order 9) — `quote/tasks/`, seeded by `0005`.
+- Planned: `quotes@` mailbox poller, nightly `BidOutcome` reconciliation.
 
 ## 14a. Demo Data (dev only)
 `python manage.py seed_quote_demo` seeds ten solicitations across every stage
@@ -136,7 +171,8 @@ pre-existing `contracts_nsn` row.
 
 ## 15. Testing
 `test_scaffold.py` (wiring, table prefixes, FK targets, landed cost, auto-award
-gate, claims, RFQ uniqueness, templates), `test_matching.py` (import signal →
+gate, claims, RFQ uniqueness, templates), `test_phase1.py` (queue dataset/estimate, claims + poll, manual match learning,
+RFQ queue/compose/send success + failure, recipients, archival), `test_matching.py` (import signal →
 state seeding, additive matching, idempotency, no rewind, receiver isolation,
 batch-delete protection), `test_permission_seed.py`, `test_seed_quote_demo.py`.
 Run `python manage.py test quote dibbs`.
@@ -148,6 +184,7 @@ Run `python manage.py test quote dibbs`.
   match tables, `QuoteSupplierQuote.source_email`; drops `QuoteBid.solicitation`.
 - `0004_backfill_solicitation_state` — one set-based `INSERT … SELECT` giving every
   existing solicitation a state (past due → `ARCHIVED`, else `UNMATCHED`).
+- `0005_seed_archive_task` — `ScheduledTask` row for `archive_stale_solicitations`.
 - `products/migrations/0005` added the NSN dimension provenance fields.
 
 ## 17. Known Gaps
@@ -159,6 +196,10 @@ Run `python manage.py test quote dibbs`.
 4. Quote.md "margin" presets (2/4/6%) are undefined as markup-on-cost vs margin-on-
    price; the demo seeder uses markup. Decide before building the cost service.
 5. The "Supplier always requires external packaging" toggle has no quote-owned home yet.
+6. Backfilled rows all carry the migration time as `status_changed_at`, so every
+   currently-unmatched solicitation archives on the same day, 7 days after `0004` ran.
+7. Approved sources are not an automatic match source (spec lists NSN / FSC /
+   Manual only); the workspace offers one-click **Link** instead.
 
 ## 20. CSS
 Three files repo-wide: `theme-vars.css`, `app-core.css` (shared `.app-shell` /

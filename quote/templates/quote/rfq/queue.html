@@ -1,0 +1,104 @@
+{% extends "quote/base.html" %}
+
+{% block content %}
+<div class="row-between flex-wrap mb-3">
+  <div>
+    <h1 class="h4 mb-0">RFQ Queue</h1>
+    <div class="text-body-secondary small">One consolidated email per supplier from the shared quotes mailbox.</div>
+  </div>
+  {% if groups %}
+  <form method="post" action="{% url 'quote:rfq_send_all' %}" class="m-0"
+        onsubmit="return confirm('Send {{ groups|length }} supplier email(s) now?');">
+    {% csrf_token %}
+    <button class="btn btn-primary btn-sm"><i class="bi bi-send"></i> Send all ({{ groups|length }})</button>
+  </form>
+  {% endif %}
+</div>
+
+{% for group in groups %}
+<div class="card card-padded mb-3">
+  <div class="row-between flex-wrap">
+    <div>
+      <span class="fw-semibold">{{ group.supplier.name|default:"(no name)" }}</span>
+      <span class="font-monospace small text-body-secondary">{{ group.supplier.cage_code|default:"" }}</span>
+      <div class="small">
+        {% if group.recipients %}
+          To: {{ group.recipients|join:", " }}
+        {% else %}
+          <span class="text-danger">No email on file &mdash; add a Sales contact to this supplier.</span>
+        {% endif %}
+      </div>
+      <div class="small text-body-secondary">
+        {{ group.sol_count }} solicitation{{ group.sol_count|pluralize }},
+        {{ group.rfqs|length }} line{{ group.rfqs|length|pluralize }},
+        {{ group.has_pdf }} PDF{{ group.has_pdf|pluralize }} attached
+        {% if group.earliest_due %}&middot; earliest due {{ group.earliest_due|date:"M j" }}{% endif %}
+      </div>
+      {% if group.last_error %}<div class="small text-danger mt-1">Last attempt: {{ group.last_error }}</div>{% endif %}
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse"
+              data-bs-target="#preview-{{ group.supplier.pk }}" aria-expanded="false">Preview</button>
+      <form method="post" action="{% url 'quote:rfq_send' group.supplier.pk %}" class="m-0">
+        {% csrf_token %}
+        <button class="btn btn-primary btn-sm" {% if not group.recipients %}disabled{% endif %}>Send</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="collapse mt-2" id="preview-{{ group.supplier.pk }}">
+    <div class="small"><strong>Subject:</strong> {{ group.subject }}</div>
+    <pre class="quote-email-preview mt-1 mb-0">{{ group.body }}</pre>
+  </div>
+
+  <div class="table-responsive mt-2">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>SOL</th><th>Line</th><th>NSN</th><th class="text-end">Qty</th><th>Due</th><th></th></tr></thead>
+      <tbody>
+      {% for rfq in group.rfqs %}
+        <tr>
+          <td class="font-monospace"><a href="{% url 'quote:solicitation_workspace' rfq.line.solicitation.solicitation_number %}">{{ rfq.line.solicitation.solicitation_number }}</a></td>
+          <td>{{ rfq.line.line_number|default:"—" }}</td>
+          <td class="font-monospace">{{ rfq.line.nsn }}</td>
+          <td class="text-end">{{ rfq.line.quantity|default:"—" }} {{ rfq.line.unit_of_issue|default:"" }}</td>
+          <td>{{ rfq.line.solicitation.return_by_date|date:"M j, Y"|default:"—" }}</td>
+          <td class="text-end">
+            <form method="post" action="{% url 'quote:rfq_remove' rfq.pk %}" class="m-0">
+              {% csrf_token %}
+              <button class="btn btn-link btn-sm text-danger p-0">Remove</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% empty %}
+<div class="card card-padded mb-3 text-body-secondary">
+  Nothing queued. Open a matched solicitation, tick its suppliers and choose <strong>Queue RFQ for selected</strong>.
+</div>
+{% endfor %}
+
+<div class="card card-padded">
+  <h2 class="h6 mb-2">Recently sent</h2>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Sent</th><th>Supplier</th><th>SOL</th><th>To</th><th>By</th></tr></thead>
+      <tbody>
+      {% for rfq in recent %}
+        <tr>
+          <td>{{ rfq.sent_at|date:"M j, g:i A" }}</td>
+          <td>{{ rfq.supplier.name }}</td>
+          <td class="font-monospace">{{ rfq.line.solicitation.solicitation_number }}</td>
+          <td class="small">{{ rfq.email_sent_to }}</td>
+          <td class="small">{% if rfq.sent_by %}{{ rfq.sent_by.get_full_name|default:rfq.sent_by.username }}{% else %}—{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-body-secondary">No RFQs sent yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock content %}

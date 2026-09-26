@@ -19,9 +19,11 @@
   <nav class="app-subnav" aria-label="Quotes sections">
     <div class="app-subnav-inner">
       <a href="{% url 'quote:dashboard' %}"
-         class="app-subnav-link {% if section == 'dashboard' %}active{% endif %}">
-        Dashboard
-      </a>
+         class="app-subnav-link {% if section == 'dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="{% url 'quote:solicitation_queue' %}"
+         class="app-subnav-link {% if section == 'solicitations' %}active{% endif %}">Solicitations</a>
+      <a href="{% url 'quote:rfq_queue' %}"
+         class="app-subnav-link {% if section == 'rfq' %}active{% endif %}">RFQ Queue</a>
     </div>
   </nav>
 
