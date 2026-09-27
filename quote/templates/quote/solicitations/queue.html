@@ -72,7 +72,13 @@
     </table>
   </div>
   <div class="row-between px-3 py-2 border-top small">
-    <span class="text-body-secondary" id="queueSummary"></span>
+    <span>
+      <span class="text-body-secondary" id="queueSummary"></span>
+      <button type="button" class="btn btn-primary btn-sm ms-2" id="startWorking" disabled
+              title="Open the first solicitation nobody else is on, then step through this filtered list">
+        <i class="bi bi-play-fill"></i> Start working this list
+      </button>
+    </span>
     <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="showMore">Show more</button>
   </div>
 </div>
@@ -85,6 +91,9 @@
 (function () {
   const DATA_URL = '{% url "quote:queue_data" %}';
   const POLL_URL = '{% url "quote:queue_poll" %}';
+  const NEXT_URL = '{% url "quote:walk_next" %}';
+  const CSRF = '{{ csrf_token }}';
+  const TAB_LABELS = { UNMATCHED: 'Unmatched', MATCHED: 'Matched', RFQ_SENT: 'RFQ Sent' };
   const WORKSPACE_URL = '{% url "quote:solicitation_workspace" "__SOL__" %}';
   const SET_ASIDES = JSON.parse(document.getElementById('quoteSetAsides').textContent);
   const PAGE_SIZE = 200;
@@ -176,14 +185,75 @@
       '</tr>';
   }
 
+  // Message left by the workspace when a rep finishes or exits a list.
+  try {
+    const flash = JSON.parse(sessionStorage.getItem('quoteRunFlash') || 'null');
+    if (flash) { sessionStorage.removeItem('quoteRunFlash'); setTimeout(() => window.showToast('success', flash, 6000), 0); }
+  } catch (e) { /* storage blocked */ }
+
+  function visibleRows() {
+    return state.rows.filter(matches).sort(compare);
+  }
+
+  // ── Work-the-list mode: snapshot the filtered, sorted list for the workspace ──
+  function filterLabel() {
+    const parts = [TAB_LABELS[state.tab] || state.tab];
+    document.querySelectorAll('.quote-pill.active').forEach(p => parts.push(p.textContent.trim()));
+    if (state.search) parts.push('"' + state.search + '"');
+    return parts.join(' · ');
+  }
+  function saveRun() {
+    const run = {
+      status: state.tab,
+      label: filterLabel(),
+      sols: visibleRows().map(r => r.sol),
+      queueUrl: window.location.pathname + window.location.search,
+      started: new Date().toISOString(),
+    };
+    try { sessionStorage.setItem('quoteRun', JSON.stringify(run)); } catch (e) { /* storage full or blocked */ }
+    return run;
+  }
+  body.addEventListener('click', e => {
+    if (e.target.closest('a[href]')) saveRun();
+  });
+  document.getElementById('startWorking').addEventListener('click', () => {
+    const run = saveRun();
+    const btn = document.getElementById('startWorking');
+    btn.disabled = true;
+    (function tryFrom(start) {
+      const batch = run.sols.slice(start, start + 50);
+      if (!batch.length) {
+        window.showToast('info', 'Everything in this list is taken or already worked.');
+        btn.disabled = false;
+        return;
+      }
+      fetch(NEXT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ candidates: batch, status: run.status }),
+      })
+        .then(r => r.json())
+        .then(res => {
+          if (res.sol) {
+            try { if (res.skipped.length) sessionStorage.setItem('quoteRunSkipped', JSON.stringify(res.skipped)); } catch (e) { /* ignore */ }
+            window.location.href = res.url;
+          } else {
+            tryFrom(start + batch.length);
+          }
+        })
+        .catch(() => { btn.disabled = false; window.showToast('error', 'Could not start. Try again.'); });
+    })(0);
+  });
+
   function render() {
-    const visible = state.rows.filter(matches).sort(compare);
+    const visible = visibleRows();
     const shown = visible.slice(0, state.limit);
     body.innerHTML = shown.length
       ? shown.map(rowHtml).join('')
       : '<tr><td colspan="8" class="text-center text-body-secondary py-4">No solicitations match.</td></tr>';
     summary.textContent = 'Showing ' + shown.length.toLocaleString() + ' of ' + visible.length.toLocaleString();
     showMore.classList.toggle('d-none', visible.length <= shown.length);
+    document.getElementById('startWorking').disabled = !visible.length;
     document.querySelectorAll('[data-tab]').forEach(el =>
       el.classList.toggle('active', el.dataset.tab === state.tab));
     document.querySelectorAll('.quote-sort').forEach(el => {

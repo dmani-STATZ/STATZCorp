@@ -1,8 +1,26 @@
 {% extends "quote/base.html" %}
 
 {% block content %}
-<div class="mb-2">
+<div id="workspace" data-sol="{{ solicitation.solicitation_number }}"
+     data-claimed-other="{{ claimed_by_other|yesno:'1,0' }}">
+
+<div class="mb-2" id="backToQueue">
   <a href="{% url 'quote:solicitation_queue' %}?tab={{ state.status }}" class="small">&larr; Back to queue</a>
+</div>
+
+{# Work-the-list bar -- shown by JS when this SOL is in the rep's snapshotted list #}
+<div class="quote-run-bar d-none" id="runBar" role="navigation" aria-label="Work the list">
+  <div class="quote-run-info">
+    <span class="label">Working list</span>
+    <span id="runLabel" class="fw-semibold"></span>
+    <span class="text-body-secondary" id="runPosition"></span>
+  </div>
+  <div class="quote-run-progress" aria-hidden="true"><div id="runProgress"></div></div>
+  <div class="d-flex gap-2 align-items-center">
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="runPrev" title="Previous (P)">&larr; Prev</button>
+    <button type="button" class="btn btn-primary btn-sm" id="runNext" title="Next available (N)">Next &rarr;</button>
+    <button type="button" class="btn btn-link btn-sm" id="runExit">Exit list</button>
+  </div>
 </div>
 
 {% if claimed_by_other %}
@@ -10,12 +28,16 @@
   <span><i class="bi bi-eye"></i>
     <strong>{{ state.claimed_by.get_full_name|default:state.claimed_by.username }}</strong>
     is reviewing this solicitation (claim expires {{ state.claim_expires_at|time:"g:i A" }}).</span>
-  <form method="post" action="{% url 'quote:claim' solicitation.solicitation_number %}" class="m-0">
-    {% csrf_token %}<input type="hidden" name="action" value="take">
-    <button class="btn btn-sm btn-outline-dark">Take over</button>
-  </form>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-sm btn-warning run-only d-none" data-run-next>Skip to next available &rarr;</button>
+    <form method="post" action="{% url 'quote:claim' solicitation.solicitation_number %}" class="m-0">
+      {% csrf_token %}<input type="hidden" name="action" value="take">
+      <button class="btn btn-sm btn-outline-dark">Take over</button>
+    </form>
+  </div>
 </div>
 {% endif %}
+<div class="alert alert-warning d-none" id="lostClaim" role="alert"></div>
 
 <div class="card card-padded mb-3">
   <div class="row-between flex-wrap align-items-start">
@@ -42,10 +64,12 @@
           <button class="btn btn-outline-secondary btn-sm">Reopen</button>
         {% else %}
           <input type="hidden" name="action" value="no_bid">
-          <button class="btn btn-outline-danger btn-sm">No bid</button>
+          <button class="btn btn-outline-danger btn-sm run-hide">No bid</button>
+          <button type="button" class="btn btn-outline-danger btn-sm run-only d-none" data-then-next
+                  title="Mark No Bid and open the next available solicitation">No bid &amp; next</button>
         {% endif %}
       </form>
-      <form method="post" action="{% url 'quote:claim' solicitation.solicitation_number %}" class="m-0">
+      <form method="post" action="{% url 'quote:claim' solicitation.solicitation_number %}" class="m-0 run-hide">
         {% csrf_token %}<input type="hidden" name="action" value="release">
         <button class="btn btn-primary btn-sm" title="Release your review claim and go back to the queue">Done</button>
       </form>
@@ -185,7 +209,9 @@
 
       {% if suppliers %}
       <div class="mt-3 d-flex gap-2 align-items-center">
-        <button type="submit" form="rfqForm" class="btn btn-primary btn-sm">Queue RFQ for selected</button>
+        <button type="submit" form="rfqForm" class="btn btn-primary btn-sm run-hide">Queue RFQ for selected</button>
+        <button type="button" form="rfqForm" class="btn btn-primary btn-sm run-only d-none" data-then-next
+                title="Queue RFQs for the ticked suppliers and open the next available solicitation">Queue RFQ &amp; next</button>
         <a href="{% url 'quote:rfq_queue' %}" class="small">Open RFQ Queue &rarr;</a>
       </div>
       {% endif %}
@@ -227,10 +253,164 @@
   </div>
 </div>
 {% endif %}
+</div>{# #workspace #}
 {% endblock content %}
 
 {% block extra_js %}
 {{ block.super }}
+<script>
+(function () {
+  const root = document.getElementById('workspace');
+  const SOL = root.dataset.sol;
+  const NEXT_URL = '{% url "quote:walk_next" %}';
+  const CLAIM_URL = '{% url "quote:claim" solicitation.solicitation_number %}';
+  const WORKSPACE_URL = '{% url "quote:solicitation_workspace" "__SOL__" %}';
+  const QUEUE_URL = '{% url "quote:solicitation_queue" %}';
+  const CSRF = '{{ csrf_token }}';
+  const BATCH = 50;
+  const HEARTBEAT_MS = 5 * 60 * 1000;
+
+  function store(key, value) {
+    try {
+      if (value === undefined) sessionStorage.removeItem(key);
+      else sessionStorage.setItem(key, JSON.stringify(value));
+    } catch (e) { /* storage blocked */ }
+  }
+  function load(key) {
+    try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (e) { return null; }
+  }
+  function post(url, body, isJson) {
+    const headers = { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' };
+    if (isJson) headers['Content-Type'] = 'application/json';
+    return fetch(url, { method: 'POST', headers: headers, body: isJson ? JSON.stringify(body) : body });
+  }
+
+  // Messages carried across navigation (skips, end of list).
+  const skipped = load('quoteRunSkipped');
+  if (skipped && skipped.length) {
+    window.showToast('warning', 'Skipped ' + skipped.map(s => s.sol + ' (' + s.reason + ')').join(', '), 7000);
+  }
+  store('quoteRunSkipped');
+
+  const run = load('quoteRun');
+  const idx = run && Array.isArray(run.sols) ? run.sols.indexOf(SOL) : -1;
+
+  // ── Claim heartbeat: keep the claim alive while this page is open ─────────
+  // Only when we hold it -- renewing someone else's page would steal their
+  // claim the moment it expired.
+  if (root.dataset.claimedOther !== '1') (function heartbeat() {
+    setTimeout(() => {
+      const form = new FormData(); form.append('action', 'renew');
+      post(CLAIM_URL, form)
+        .then(r => r.json())
+        .then(res => {
+          if (!res.held) {
+            const box = document.getElementById('lostClaim');
+            box.textContent = (res.by || 'Another user') + ' is now working this solicitation.';
+            box.classList.remove('d-none');
+            return;  // stop renewing; they hold it
+          }
+          heartbeat();
+        })
+        .catch(heartbeat);
+    }, HEARTBEAT_MS);
+  })();
+
+  if (idx < 0) return;  // not working a list: plain workspace
+
+  // ── Work-the-list mode ──────────────────────────────────────────────────
+  document.getElementById('backToQueue').classList.add('d-none');
+  document.querySelectorAll('.run-only').forEach(el => el.classList.remove('d-none'));
+  document.querySelectorAll('.run-hide').forEach(el => el.classList.add('d-none'));
+  const bar = document.getElementById('runBar');
+  bar.classList.remove('d-none');
+  document.getElementById('runLabel').textContent = run.label || '';
+  document.getElementById('runPosition').textContent =
+    (idx + 1).toLocaleString() + ' of ' + run.sols.length.toLocaleString();
+  document.getElementById('runProgress').style.width =
+    Math.round(((idx + 1) / run.sols.length) * 100) + '%';
+
+  let busy = false;
+  function setBusy(on) {
+    busy = on;
+    bar.querySelectorAll('button').forEach(b => { b.disabled = on; });
+    document.querySelectorAll('[data-then-next],[data-run-next]').forEach(b => { b.disabled = on; });
+  }
+
+  function exitList(message) {
+    store('quoteRun');
+    if (message) store('quoteRunFlash', message);
+    const form = new FormData(); form.append('action', 'release');
+    post(CLAIM_URL, form).finally(() => { window.location.href = run.queueUrl || QUEUE_URL; });
+  }
+
+  function advance() {
+    if (busy) return;
+    setBusy(true);
+    const allSkipped = [];
+    (function tryFrom(start) {
+      const batch = run.sols.slice(start, start + BATCH);
+      if (!batch.length) {
+        exitList('You reached the end of the list.' +
+          (allSkipped.length ? ' ' + allSkipped.length + ' skipped (taken or already worked).' : ''));
+        return;
+      }
+      post(NEXT_URL, { candidates: batch, status: run.status, release: SOL }, true)
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(res => {
+          allSkipped.push.apply(allSkipped, res.skipped);
+          if (res.sol) {
+            store('quoteRunSkipped', allSkipped);
+            window.location.href = res.url;
+          } else {
+            tryFrom(start + batch.length);
+          }
+        })
+        .catch(() => { setBusy(false); window.showToast('error', 'Could not load the next solicitation.'); });
+    })(idx + 1);
+  }
+
+  function prev() {
+    if (busy || idx === 0) return;
+    window.location.href = WORKSPACE_URL.replace('__SOL__', encodeURIComponent(run.sols[idx - 1]));
+  }
+
+  document.getElementById('runNext').addEventListener('click', advance);
+  document.getElementById('runPrev').addEventListener('click', prev);
+  document.getElementById('runPrev').disabled = idx === 0;
+  document.getElementById('runExit').addEventListener('click', () => exitList());
+  document.querySelectorAll('[data-run-next]').forEach(b => b.addEventListener('click', advance));
+
+  // "No bid & next" / "Queue RFQ & next": do the action, then move on.
+  document.querySelectorAll('[data-then-next]').forEach(btn => btn.addEventListener('click', () => {
+    if (busy) return;
+    const form = btn.form;
+    if (form.id === 'rfqForm' && !document.querySelector('input[name="supplier_ids"][form="rfqForm"]:checked')) {
+      window.showToast('warning', 'Tick at least one supplier to queue.');
+      return;
+    }
+    setBusy(true);
+    post(form.action, new FormData(form))
+      .then(r => r.json())
+      .then(res => {
+        if (!res.ok) { setBusy(false); window.showToast('error', 'That did not save. Try again.'); return; }
+        busy = false;
+        advance();
+      })
+      .catch(() => { setBusy(false); window.showToast('error', 'That did not save. Try again.'); });
+  }));
+
+  // Keyboard: N = next, P = previous (ignored while typing or in a modal).
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (document.querySelector('.modal.show')) return;
+    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); advance(); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); prev(); }
+  });
+})();
+</script>
 {% if can_match %}
 <script>
 (function () {

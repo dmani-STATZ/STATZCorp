@@ -9,6 +9,7 @@ Table: quote_solicitation.
 """
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from .base import AuditModel
@@ -97,8 +98,33 @@ class QuoteSolicitation(AuditModel):
             return False
         return self.claim_expires_at >= timezone.now()
 
+    def try_claim(self, user) -> bool:
+        """
+        Atomically take (or renew) the review claim. Succeeds only when the row
+        is unclaimed, the claim has expired, or ``user`` already holds it -- a
+        single conditional UPDATE, so two reps racing for the same solicitation
+        can never both win. On success, any other claim ``user`` held is released.
+        """
+        now = timezone.now()
+        won = QuoteSolicitation.objects.filter(pk=self.pk).filter(
+            Q(claimed_by__isnull=True) | Q(claim_expires_at__lt=now) | Q(claimed_by=user)
+        ).update(claimed_by=user, claimed_at=now, claim_expires_at=now + CLAIM_DURATION)
+        if won:
+            QuoteSolicitation.objects.filter(claimed_by=user).exclude(pk=self.pk).update(
+                claimed_by=None, claimed_at=None, claim_expires_at=None,
+            )
+        self.refresh_from_db(fields=['claimed_by', 'claimed_at', 'claim_expires_at'])
+        return bool(won)
+
+    def release_claim(self, user) -> bool:
+        """Drop the claim if ``user`` holds it. Returns True if released."""
+        released = QuoteSolicitation.objects.filter(pk=self.pk, claimed_by=user).update(
+            claimed_by=None, claimed_at=None, claim_expires_at=None,
+        )
+        return bool(released)
+
     def claim_for(self, user):
-        """Take the claim, releasing any other solicitation this user held."""
+        """Take the claim unconditionally ("take over"), releasing any other the user held."""
         QuoteSolicitation.objects.filter(claimed_by=user).exclude(pk=self.pk).update(
             claimed_by=None, claimed_at=None, claim_expires_at=None,
         )

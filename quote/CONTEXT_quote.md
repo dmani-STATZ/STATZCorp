@@ -44,6 +44,7 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `models/outcomes.py` | `BidOutcome` — OneToOne on `QuoteBid`, nullable FK to `dibbs.DibbsAward`, derived deltas, frozen bid snapshot. |
 | `services/matching.py` | `seed_solicitation_states`, `match_solicitations`, `process_import_batch`, `add_manual_match` (+ capability learning and sibling re-match), `remove_manual_match`, `rematch_open_solicitations`. |
 | `services/queue.py` | Queue dataset (`build_queue_rows`), `status_counts`, `queue_delta` (poll), `latest_unit_costs`. |
+| `services/walk.py` | `claim_next` — next-available navigation for work-the-list mode. |
 | `services/rfq.py` | `queue_rfqs`, `resolve_recipients`, `compose_message`, `pending_groups`, `send_supplier_rfqs`. |
 | `services/archival.py` + `tasks/archive_stale_solicitations.py` | 7-day / past-due archival (daily `ScheduledTask`, seeded by `0005`). |
 | `views/solicitations.py`, `views/rfq.py` | Phase 1 screens (orchestration only). |
@@ -79,6 +80,18 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
    **Add supplier** modal: search by name/CAGE/type, optional "save NSN / FSC to
    this supplier" — saved capabilities immediately re-match other open
    solicitations. Tick suppliers → **Queue RFQ**. **No bid** / **Reopen**.
+3a. **Work the list.** Clicking a SOL (or **Start working this list**) snapshots the
+   current filtered, sorted list into `sessionStorage['quoteRun']`; the queue is
+   not reloaded while working. The workspace shows a sticky run bar (position,
+   progress, Prev / Next / Exit, keys `N` / `P`) and swaps in **No bid & next** /
+   **Queue RFQ & next** (fetch POSTs that answer JSON, then advance).
+   Next = `POST /quote/solicitations/next/` with the upcoming candidates:
+   `services/walk.claim_next` skips SOLs held by a teammate, no longer in the
+   list's status, or past due, and claims the first free one with
+   `QuoteSolicitation.try_claim` — one conditional UPDATE, so two reps can never
+   land on the same SOL. Skips surface as a toast on the next page. The open
+   workspace renews its claim every 5 min (`claim` action `renew`) and warns if
+   a teammate took over. A rep holds at most one claim at a time.
 4. `/quote/rfq/` — RFQ Queue: one card per supplier with recipients, preview,
    Send / Send all. One consolidated email per supplier (SOL # in subject and
    body, stored PDFs attached up to ~2.8 MB, DIBBS link always in the body).
@@ -142,6 +155,7 @@ Phases 2–4 (mailbox + quote entry, bid staging + BQ export, Our Bids) are not 
 | `quote:queue_data` | `/quote/solicitations/data/` | JSON, gzipped |
 | `quote:queue_poll` | `/quote/solicitations/poll/?since=` | JSON delta |
 | `quote:rerun_matching` | `/quote/solicitations/rematch/` | POST |
+| `quote:walk_next` | `/quote/solicitations/next/` | POST JSON `{candidates, status, release}` |
 | `quote:solicitation_workspace` | `/quote/solicitations/<sol>/` | takes the claim |
 | `quote:add_match` / `remove_match` / `queue_supplier_rfqs` / `set_status` / `claim` | `/quote/solicitations/<sol>/...` | POST |
 | `quote:supplier_search` | `/quote/suppliers/search/?q=` | JSON |

@@ -5,6 +5,8 @@ Views orchestrate only -- matching, queueing and claims live in quote/services
 and on the models.
 """
 
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
@@ -27,6 +29,7 @@ from quote.services.matching import (
 )
 from quote.services.queue import SET_ASIDE_LABELS, build_queue_rows, queue_delta, status_counts
 from quote.services.rfq import queue_rfqs
+from quote.services.walk import claim_next
 from suppliers.models import Supplier
 
 SUPPLIER_SEARCH_LIMIT = 25
@@ -48,6 +51,21 @@ def _state_for(solicitation):
 
 def _workspace_url(solicitation):
     return reverse('quote:solicitation_workspace', args=[solicitation.solicitation_number])
+
+
+def _is_xhr(request):
+    return request.headers.get('x-requested-with') == 'XMLHttpRequest'
+
+
+def _done(request, solicitation, ok=True, status=200):
+    """
+    Finish a workspace POST. Fetch callers (the "& next" buttons) get JSON so
+    the browser can move straight on; Django messages stay in the session and
+    appear on the next full page. Plain form posts redirect back as before.
+    """
+    if _is_xhr(request):
+        return JsonResponse({'ok': ok}, status=status)
+    return redirect(_workspace_url(solicitation))
 
 
 # ── Queue ────────────────────────────────────────────────────────────────────
@@ -130,9 +148,7 @@ def solicitation_workspace(request, sol_number):
         Solicitation.objects.select_related('import_batch'), solicitation_number=sol_number,
     )
     state = _state_for(solicitation)
-    claimed_by_other = state.is_claimed_by_other(request.user)
-    if not claimed_by_other:
-        state.claim_for(request.user)
+    claimed_by_other = not state.try_claim(request.user)
 
     lines = list(solicitation.lines.order_by('line_number', 'pk'))
     nsn13s = {normalize_nsn(line.nsn) for line in lines} - {''}
@@ -272,14 +288,14 @@ def queue_supplier_rfqs(request, sol_number):
     suppliers = list(Supplier.objects.filter(pk__in=ids))
     if not suppliers:
         messages.warning(request, 'Pick at least one supplier to queue.')
-        return redirect(_workspace_url(solicitation))
+        return _done(request, solicitation, ok=False, status=400)
     created = queue_rfqs(solicitation, suppliers, request.user)
     messages.success(
         request,
-        f'{created} RFQ line(s) queued for {len(suppliers)} supplier(s). '
+        f'{sol_number}: {created} RFQ line(s) queued for {len(suppliers)} supplier(s). '
         'Send them from the RFQ Queue.',
     )
-    return redirect(_workspace_url(solicitation))
+    return _done(request, solicitation)
 
 
 @login_required
@@ -300,23 +316,60 @@ def set_status(request, sol_number):
         messages.info(request, f'{sol_number} reopened.')
     else:
         messages.error(request, 'Unknown action.')
-        return redirect(_workspace_url(solicitation))
+        return _done(request, solicitation, ok=False, status=400)
     state.save(update_fields=['status', 'status_changed_at', 'modified_on'])
-    return redirect(_workspace_url(solicitation))
+    return _done(request, solicitation)
 
 
 @login_required
 @require_POST
 def claim(request, sol_number):
-    """POST action=take|release -- take over or release the review claim."""
+    """
+    POST action=take|release|renew.
+
+    * take    -- take over from another rep (explicit, unconditional).
+    * release -- drop your claim and return to the queue.
+    * renew   -- heartbeat from an open workspace; JSON says whether you still
+                 hold it (someone may have taken over).
+    """
     state = _state_for(_solicitation_or_404(sol_number))
-    if request.POST.get('action') == 'release':
-        if state.claimed_by_id == request.user.pk:
-            state.claimed_by = None
-            state.claimed_at = None
-            state.claim_expires_at = None
-            state.save(update_fields=['claimed_by', 'claimed_at', 'claim_expires_at'])
+    action = request.POST.get('action')
+    if action == 'renew':
+        held = state.try_claim(request.user)
+        holder = state.claimed_by
+        return JsonResponse({
+            'held': held,
+            'by': '' if held or holder is None else (holder.get_full_name() or holder.username),
+            'expires': state.claim_expires_at.isoformat() if state.claim_expires_at else None,
+        })
+    if action == 'release':
+        state.release_claim(request.user)
+        if _is_xhr(request):
+            return JsonResponse({'ok': True})
         return redirect('quote:solicitation_queue')
     state.claim_for(request.user)
     messages.info(request, 'You now hold the review claim.')
     return redirect(_workspace_url(state.solicitation))
+
+
+@login_required
+@require_POST
+def walk_next(request):
+    """
+    POST JSON {candidates: [sol numbers], status, release} -- claim the next
+    solicitation in the rep's list that is still ``status`` and not held by a
+    teammate. Returns {sol, url, skipped: [{sol, reason}]}.
+    """
+    try:
+        payload = json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'error': 'Bad JSON.'}, status=400)
+    candidates = [str(c) for c in payload.get('candidates') or [] if c]
+    status = payload.get('status') or ''
+    if status and status not in dict(QuoteSolicitation.STATUS_CHOICES):
+        return JsonResponse({'error': 'Unknown status.'}, status=400)
+    result = claim_next(request.user, candidates, status, release=payload.get('release'))
+    result['url'] = (
+        reverse('quote:solicitation_workspace', args=[result['sol']]) if result['sol'] else None
+    )
+    return JsonResponse(result)

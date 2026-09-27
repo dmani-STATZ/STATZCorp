@@ -18,6 +18,7 @@ urlpatterns = [
     path('solicitations/data/', views.queue_data, name='queue_data'),
     path('solicitations/poll/', views.queue_poll, name='queue_poll'),
     path('solicitations/rematch/', views.rerun_matching, name='rerun_matching'),
+    path('solicitations/next/', views.walk_next, name='walk_next'),
     path('solicitations/<str:sol_number>/', views.solicitation_workspace, name='solicitation_workspace'),
     path('solicitations/<str:sol_number>/match/', views.add_match, name='add_match'),
     path(

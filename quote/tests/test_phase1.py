@@ -209,3 +209,76 @@ class ArchivalTests(Phase1Base):
         self.assertEqual(self._status(self.sol), 'ARCHIVED')
         self.assertEqual(self._status(expired), 'ARCHIVED')
         self.assertEqual(self._status(self.other_sol), 'UNMATCHED')
+
+
+class WalkTheListTests(Phase1Base):
+    """Next-available navigation: skip teammates' SOLs and already-worked ones."""
+
+    def setUp(self):
+        super().setUp()
+        self.third = self._sol('SPE1C126Q0530', '5999-01-333-4444', qty=1)
+        self.fourth = self._sol('SPE1C126Q0531', '5999-01-333-4445', qty=1)
+        seed_solicitation_states([self.third.pk, self.fourth.pk])
+        self.list = [s.solicitation_number for s in (self.sol, self.other_sol, self.third, self.fourth)]
+
+    def _next(self, candidates, release=None, status='UNMATCHED'):
+        return self.client.post(
+            reverse('quote:walk_next'),
+            data={'candidates': candidates, 'status': status, 'release': release},
+            content_type='application/json',
+        ).json()
+
+    def _state(self, sol):
+        return QuoteSolicitation.objects.get(solicitation=sol)
+
+    def test_skips_teammate_and_worked_solicitations(self):
+        self._state(self.other_sol).claim_for(self.other)
+        third = self._state(self.third)
+        third.set_status('NO_BID')
+        third.save()
+
+        res = self._next(self.list[1:], release=self.list[0])
+
+        self.assertEqual(res['sol'], 'SPE1C126Q0531')
+        self.assertEqual(res['url'], reverse('quote:solicitation_workspace', args=['SPE1C126Q0531']))
+        reasons = {s['sol']: s['reason'] for s in res['skipped']}
+        self.assertIn('Barb is working it', reasons['SPE1C126Q0529'])
+        self.assertIn('No bid', reasons['SPE1C126Q0530'])
+        self.assertEqual(self._state(self.fourth).claimed_by, self.user)
+
+    def test_moving_on_releases_the_previous_claim(self):
+        self._state(self.sol).claim_for(self.user)
+        self._next(self.list[1:], release=self.list[0])
+        self.assertIsNone(self._state(self.sol).claimed_by)
+
+    def test_end_of_list(self):
+        # One claim per rep, so three teammates each hold one.
+        for i, sol in enumerate((self.other_sol, self.third, self.fourth)):
+            self._state(sol).claim_for(User.objects.create_user(f'teammate{i}'))
+        res = self._next(self.list[1:])
+        self.assertIsNone(res['sol'])
+        self.assertEqual(len(res['skipped']), 3)
+
+    def test_try_claim_is_exclusive_until_expiry(self):
+        state = self._state(self.sol)
+        self.assertTrue(state.try_claim(self.other))
+        self.assertFalse(state.try_claim(self.user))
+        QuoteSolicitation.objects.filter(pk=state.pk).update(
+            claim_expires_at=timezone.now() - timedelta(minutes=1),
+        )
+        self.assertTrue(state.try_claim(self.user))
+
+    def test_heartbeat_reports_takeover(self):
+        self.client.get(self._url('quote:solicitation_workspace'))
+        self._state(self.sol).claim_for(self.other)  # Barb takes over
+        res = self.client.post(self._url('quote:claim'), {'action': 'renew'}).json()
+        self.assertFalse(res['held'])
+        self.assertEqual(res['by'], 'Barb')
+
+    def test_then_next_actions_answer_json(self):
+        res = self.client.post(
+            self._url('quote:set_status'), {'action': 'no_bid'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(res.json(), {'ok': True})
+        self.assertEqual(self._status(self.sol), 'NO_BID')

@@ -12,6 +12,7 @@ from .solicitations import (
     solicitation_queue,
     solicitation_workspace,
     supplier_search,
+    walk_next,
 )
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     'solicitation_queue',
     'solicitation_workspace',
     'supplier_search',
+    'walk_next',
 ]
