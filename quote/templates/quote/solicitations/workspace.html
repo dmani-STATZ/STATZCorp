@@ -54,9 +54,9 @@
       </div>
     </div>
     <div class="d-flex flex-wrap gap-2">
-      <a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"
+      <a class="btn btn-outline-secondary btn-sm" target="statz_sol_pdf"
          href="{% url 'dibbs:solicitation_pdf' solicitation.solicitation_number %}"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
-      <a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"
+      <a class="btn btn-outline-secondary btn-sm" target="statz_dibbs_data"
          href="{% url 'dibbs:solicitation_detail' solicitation.solicitation_number %}">DIBBS data</a>
       <form method="post" action="{% url 'quote:set_status' solicitation.solicitation_number %}" class="m-0">
         {% csrf_token %}
@@ -110,7 +110,7 @@
           <tbody>
           {% for src in approved_sources %}
             <tr>
-              <td class="font-monospace"><a href="{% url 'dibbs:entity_cage_lookup' src.approved_cage %}" target="_blank" rel="noopener">{{ src.approved_cage }}</a></td>
+              <td class="font-monospace"><a href="{% url 'dibbs:entity_cage_lookup' src.approved_cage %}" target="statz_entity">{{ src.approved_cage }}</a></td>
               <td class="font-monospace">{{ src.part_number|default:"—" }}</td>
               <td>{{ src.supplier.name|default:src.company_name|default:"—" }}</td>
               <td class="text-end">
@@ -125,7 +125,7 @@
                   </form>
                 {% elif not src.supplier %}
                   <span class="small text-body-secondary">Not in directory</span>
-                  <a class="small ms-1" href="{{ src.approved_cage|dla_cage_url }}" target="_blank" rel="noopener noreferrer"
+                  <a class="small ms-1" href="{{ src.approved_cage|dla_cage_url }}" target="statz_dla_cage"
                      title="Look up this CAGE on DLA's CAGE site (covers companies not in SAM)">DLA CAGE</a>
                 {% endif %}
               </td>

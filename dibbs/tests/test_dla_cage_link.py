@@ -40,3 +40,6 @@ class EntityLookupDlaLinkTests(TestCase):
         )
         resp = self.client.get(reverse('dibbs:entity_cage_lookup', args=['52497']))
         self.assertContains(resp, 'Look up 52497 on DLA CAGE')
+        # Named target: every DLA link reuses one tab instead of stacking new ones.
+        self.assertContains(resp, 'target="statz_dla_cage"')
+        self.assertNotContains(resp, 'dla_cage_url }}" target="_blank"')

@@ -16,10 +16,10 @@
       </div>
     </div>
     <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"
+      <a class="btn btn-outline-secondary btn-sm" target="statz_sol_pdf"
          href="{% url 'dibbs:solicitation_pdf' solicitation.solicitation_number %}">Stored PDF</a>
       {% if solicitation.dibbs_pdf_url %}
-      <a class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener noreferrer"
+      <a class="btn btn-outline-secondary btn-sm" target="statz_sol_pdf"
          href="{{ solicitation.dibbs_pdf_url }}">PDF on DIBBS</a>
       {% endif %}
     </div>

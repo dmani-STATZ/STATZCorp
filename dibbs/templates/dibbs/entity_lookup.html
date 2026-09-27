@@ -49,11 +49,11 @@
     <strong>Lookup failed:</strong> {{ error }}
   </div>
   <p style="font-size:0.875rem;">
-    <a href="{{ cage_code|dla_cage_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">
+    <a href="{{ cage_code|dla_cage_url }}" target="statz_dla_cage" class="btn btn-primary btn-sm">
       Look up {{ cage_code }} on DLA CAGE &rarr;
     </a>
     <span style="color:#6b7280; margin-left:0.5rem;">or search
-    <a href="https://sam.gov" target="_blank" rel="noopener noreferrer">SAM.gov</a> directly.
+    <a href="https://sam.gov" target="statz_sam">SAM.gov</a> directly.
     DLA asks you to accept its terms once per session.</span>
   </p>
   {% elif not entity or not entity.found %}
@@ -64,7 +64,7 @@
     This company may not be registered in SAM.gov, or the CAGE code may be incorrect.
   </div>
   <p style="font-size:0.875rem;">
-    <a href="{{ cage_code|dla_cage_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">
+    <a href="{{ cage_code|dla_cage_url }}" target="statz_dla_cage" class="btn btn-primary btn-sm">
       Look up {{ cage_code }} on DLA CAGE &rarr;
     </a>
     <span style="color:#6b7280; margin-left:0.5rem;">DLA lists every CAGE, including companies not registered in SAM.
@@ -121,12 +121,12 @@
     </div>
     <div style="text-align:right; flex-shrink:0;">
       {% if entity.sam_url %}
-      <a href="{{ entity.sam_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+      <a href="{{ entity.sam_url }}" target="statz_sam" class="btn btn-primary">
         View on SAM.gov &rarr;
       </a>
       {% endif %}
       <div style="margin-top:0.5rem;">
-        <a href="{{ cage_code|dla_cage_url }}" target="_blank" rel="noopener noreferrer" style="font-size:0.8125rem;">
+        <a href="{{ cage_code|dla_cage_url }}" target="statz_dla_cage" style="font-size:0.8125rem;">
           View on DLA CAGE &rarr;
         </a>
       </div>
@@ -241,7 +241,7 @@
     A company may self-report as Women-Owned, Veteran-Owned, etc. under <em>Business Types</em> above without holding the corresponding SBA certification &mdash;
     but <strong style="color:#374151;">SAM.gov certification data can also lag behind actual status</strong>, particularly for SDVOSB
     (which transferred from VA to SBA certification in 2023). A red &#10007; does not necessarily mean the company is uncertified.
-    Verify directly on <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;">SAM.gov</a> or the
+    Verify directly on <a href="https://sam.gov" target="statz_sam" style="color:#1d4ed8;">SAM.gov</a> or the
     <a href="https://veterans.certify.sba.gov" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;">SBA Veteran Certification portal</a> when eligibility is in question.
   </p>
 
