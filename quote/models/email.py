@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from .base import AuditModel
@@ -53,6 +54,16 @@ class QuoteEmail(AuditModel):
     )
     is_read = models.BooleanField(default=False)
 
+    #: Supplier resolved from the sender address (contact email, supplier
+    #: emails, then domain). Null when unknown -- the rep picks one when logging.
+    supplier = models.ForeignKey(
+        'suppliers.Supplier',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='quote_emails',
+    )
+
     #: True when no solicitation could be detected from subject or body -- the
     #: "No SOL in Subject" orphan pill in the mailbox list.
     is_orphan = models.BooleanField(default=True, db_index=True)
@@ -83,6 +94,19 @@ class QuoteEmail(AuditModel):
         if self.claimed_by_id == user.pk:
             return False
         return self.claim_expires_at >= timezone.now()
+
+    def try_claim(self, user) -> bool:
+        """Atomically take or renew the claim (see QuoteSolicitation.try_claim)."""
+        now = timezone.now()
+        won = QuoteEmail.objects.filter(pk=self.pk).filter(
+            Q(claimed_by__isnull=True) | Q(claim_expires_at__lt=now) | Q(claimed_by=user)
+        ).update(claimed_by=user, claimed_at=now, claim_expires_at=now + CLAIM_DURATION)
+        if won:
+            QuoteEmail.objects.filter(claimed_by=user).exclude(pk=self.pk).update(
+                claimed_by=None, claimed_at=None, claim_expires_at=None,
+            )
+        self.refresh_from_db(fields=['claimed_by', 'claimed_at', 'claim_expires_at'])
+        return bool(won)
 
     def claim_for(self, user):
         """Take the claim, releasing any other email this user was holding."""

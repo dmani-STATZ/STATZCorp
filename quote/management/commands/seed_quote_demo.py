@@ -662,6 +662,7 @@ class Command(BaseCommand):
         """
         e1 = QuoteEmail.objects.create(
             graph_message_id=f'{DEMO_GRAPH_PREFIX}0001',
+            supplier=suppliers['0SKY9'],
             sender_email='sales@vortextactical.com',
             sender_name='Sarah Jenkins',
             subject='RE: RFQ SPE1C126Q0528 (Carabiners)',
@@ -686,6 +687,7 @@ class Command(BaseCommand):
 
         e2 = QuoteEmail.objects.create(
             graph_message_id=f'{DEMO_GRAPH_PREFIX}0002',
+            supplier=suppliers['72914'],
             sender_email='quotes@apexfasteners.com',
             sender_name='Apex Fasteners Inc',
             subject='Pricing for NSN 5305-12-309-7497 & 5330-01-173-8300',
@@ -721,6 +723,7 @@ class Command(BaseCommand):
         # Orphan: no solicitation detectable from subject or body.
         QuoteEmail.objects.create(
             graph_message_id=f'{DEMO_GRAPH_PREFIX}0003',
+            supplier=suppliers['8FRT2'],
             sender_email='bids@titandefense.com',
             sender_name='Titan Defense Systems',
             subject='Quote Ref #TD-8841',

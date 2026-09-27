@@ -29,6 +29,16 @@ urlpatterns = [
     path('solicitations/<str:sol_number>/status/', views.set_status, name='set_status'),
     path('solicitations/<str:sol_number>/claim/', views.claim, name='claim'),
     path('suppliers/search/', views.supplier_search, name='supplier_search'),
+    # Phase 2 -- quotes@ mailbox + quote entry
+    path('mailbox/', views.mailbox_page, name='mailbox'),
+    path('mailbox/sync/', views.mailbox_sync, name='mailbox_sync'),
+    path('mailbox/solicitations/', views.solicitation_search, name='mailbox_sol_search'),
+    path('mailbox/<int:email_id>/', views.email_detail, name='email_detail'),
+    path('mailbox/<int:email_id>/link/', views.email_link, name='email_link'),
+    path('mailbox/<int:email_id>/unlink/', views.email_unlink, name='email_unlink'),
+    path('mailbox/<int:email_id>/supplier/', views.email_set_supplier, name='email_set_supplier'),
+    path('mailbox/<int:email_id>/quote/', views.save_quote, name='save_quote'),
+    path('mailbox/attachments/<int:attachment_id>/', views.attachment_download, name='attachment_download'),
     # Phase 1 -- RFQ dispatch
     path('rfq/', views.rfq_queue, name='rfq_queue'),
     path('rfq/send-all/', views.rfq_send_all, name='rfq_send_all'),

@@ -1,0 +1,237 @@
+{% comment %}
+  Mailbox message pane + Option B quote drawer. HTML fragment: returned to the
+  inbox page by XHR, so it must never {% extends %}. Behaviour is wired by
+  window.quoteInitDetail() in quote/mailbox/inbox.html (inline scripts in
+  innerHTML-swapped content do not run).
+{% endcomment %}
+{% load dibbs_extras %}
+<div class="quote-msg" data-email="{{ email.pk }}"
+     data-link-url="{% url 'quote:email_link' email.pk %}"
+     data-unlink-url="{% url 'quote:email_unlink' email.pk %}"
+     data-supplier-url="{% url 'quote:email_set_supplier' email.pk %}"
+     data-save-url="{% url 'quote:save_quote' email.pk %}">
+
+  {% if claimed_by_other %}
+  <div class="alert alert-warning py-2 mb-2 small">
+    <i class="bi bi-eye"></i> <strong>{{ email.claimed_by.get_full_name|default:email.claimed_by.username }}</strong>
+    is working this message. You can read it, but check with them before logging a quote.
+  </div>
+  {% endif %}
+
+  <header class="quote-msg-header">
+    <div class="quote-msg-heading">
+      <h2 class="h5 mb-1">{{ email.subject|default:"(no subject)" }}</h2>
+      <div class="small text-body-secondary">
+        <strong>From:</strong> {{ email.sender_name|default:"" }} &lt;{{ email.sender_email }}&gt;
+        &middot; {{ email.received_at|date:"M j, Y g:i A" }}
+      </div>
+      <div class="small mt-1">
+        {% if email.supplier %}
+          <span class="badge text-bg-light border"><i class="bi bi-building"></i> {{ email.supplier.name }}</span>
+          <span class="font-monospace text-body-secondary">{{ email.supplier.cage_code|default:"" }}</span>
+          <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-action="set-supplier">change</button>
+        {% else %}
+          <span class="text-warning-emphasis"><i class="bi bi-question-circle"></i> Unknown sender.</span>
+          <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-action="set-supplier">Set supplier</button>
+        {% endif %}
+      </div>
+    </div>
+    <div>
+      <button type="button" class="btn btn-primary btn-sm" data-action="open-drawer"
+              {% if not linked or not email.supplier %}disabled{% endif %}
+              title="{% if not linked %}Link a solicitation first{% elif not email.supplier %}Set the supplier first{% else %}Log this supplier's quote{% endif %}">
+        <i class="bi bi-lightning-charge-fill"></i> Log supplier quote
+      </button>
+    </div>
+  </header>
+
+  <div class="quote-msg-sols">
+    {% for number, entry in linked.items %}
+      <span class="quote-sol-chip">
+        <a href="{% url 'quote:solicitation_workspace' number %}" target="statz_workspace" class="font-monospace">{{ number }}</a>
+        <span class="text-body-secondary">due {{ entry.solicitation.return_by_date|date:"M j" }}</span>
+        {% if entry.all_lines|length > 1 %}<span class="text-body-secondary">&middot; {{ entry.all_lines|length }} lines</span>{% endif %}
+        <span class="badge {% if entry.automatic %}quote-mail-pill-match{% else %}text-bg-light border{% endif %}">{% if entry.automatic %}auto{% else %}manual{% endif %}</span>
+        <button type="button" class="btn-close btn-close-sm" data-action="unlink" data-sol="{{ number }}" aria-label="Unlink {{ number }}"></button>
+      </span>
+    {% empty %}
+      <span class="small text-body-secondary">No solicitation detected in this message.</span>
+    {% endfor %}
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-action="open-link">+ Link SOL</button>
+  </div>
+
+  {% if attachments %}
+  <div class="quote-msg-attachments">
+    {% for att in attachments %}
+      {% if att.downloaded_at %}
+      <a href="{% url 'quote:attachment_download' att.pk %}" target="statz_attachment" class="quote-attachment">
+        <i class="bi bi-paperclip"></i> {{ att.original_name }} <span class="text-body-secondary">{{ att.file_size|filesizeformat }}</span>
+      </a>
+      {% else %}
+      <span class="quote-attachment text-body-secondary" title="Too large to store; open it in Outlook">
+        <i class="bi bi-paperclip"></i> {{ att.original_name }} ({{ att.file_size|filesizeformat }}, not stored)
+      </span>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# Supplier HTML: sandboxed (no scripts, no same-origin) + CSP (no remote loads). Never inject into the page DOM. #}
+  <iframe class="quote-msg-body" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="{{ body_srcdoc }}" title="Message body" referrerpolicy="no-referrer"></iframe>
+
+  {% if quotes %}
+  <div class="quote-msg-quotes">
+    <h3 class="h6 mt-3">Quotes logged from this message</h3>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>SOL / line</th><th>Supplier</th><th class="text-end">Cost</th><th class="text-end">Landed</th><th class="text-end">Gov price</th><th>Days</th><th></th></tr></thead>
+        <tbody>
+        {% for q in quotes %}
+          <tr>
+            <td class="font-monospace">{{ q.line.solicitation.solicitation_number }}{% if q.line.line_number %} / {{ q.line.line_number }}{% endif %}</td>
+            <td>{{ q.supplier.name }}</td>
+            <td class="text-end">${{ q.supplier_unit_cost|floatformat:2 }}</td>
+            <td class="text-end">${{ q.landed_unit_cost|floatformat:2 }}</td>
+            <td class="text-end fw-semibold">${{ q.final_government_unit_price|floatformat:2 }}</td>
+            <td>{{ q.lead_time_days }}</td>
+            <td>{% if q.is_selected_for_bid %}<span class="badge text-bg-primary" title="{% if q.selected_automatically %}Lowest landed cost{% else %}Chosen by a rep{% endif %}">Selected{% if q.selected_automatically %} (auto){% endif %}</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {{ drawer_json|json_script:"quoteDrawerData" }}
+
+  {# ── Option B: slide-out quote drawer ─────────────────────────────────── #}
+  <div class="offcanvas offcanvas-end quote-drawer" tabindex="-1" id="quoteDrawer" aria-labelledby="quoteDrawerLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="quoteDrawerLabel">Log quote &mdash; {{ email.supplier.name|default:"" }}</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <form id="quoteForm" autocomplete="off" novalidate>
+        <input type="hidden" name="supplier_id" value="{{ email.supplier.pk|default:'' }}">
+
+        <label class="form-label label" for="qSol">Solicitation</label>
+        <select class="form-select form-select-sm mb-2" name="sol" id="qSol">
+          {% for number, entry in linked.items %}
+            <option value="{{ number }}">{{ number }} &mdash; {{ entry.all_lines.0.nomenclature|default:"" }}</option>
+          {% endfor %}
+        </select>
+
+        <div class="mb-2" id="qModeWrap">
+          <div class="btn-group btn-group-sm w-100" role="group" aria-label="CLIN mode">
+            <input type="radio" class="btn-check" name="mode" id="qModeCombined" value="combined" checked>
+            <label class="btn btn-outline-secondary" for="qModeCombined">Combined (all lines)</label>
+            <input type="radio" class="btn-check" name="mode" id="qModeSplit" value="split">
+            <label class="btn btn-outline-secondary" for="qModeSplit">Split CLINs</label>
+          </div>
+          <select class="form-select form-select-sm mt-2 d-none" name="line_id" id="qLine"></select>
+        </div>
+
+        <div class="quote-drawer-facts" id="qFacts"></div>
+
+        <div class="row g-2">
+          <div class="col-7">
+            <label class="form-label label" for="qPart">Part # offered</label>
+            <input class="form-control form-control-sm font-monospace" name="offered_part_number" id="qPart" maxlength="40">
+          </div>
+          <div class="col-5">
+            <label class="form-label label" for="qCage">CAGE</label>
+            <input class="form-control form-control-sm font-monospace text-uppercase" name="offered_cage" id="qCage" maxlength="5"
+                   value="{{ email.supplier.cage_code|default:'' }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label label" for="qCost">Unit cost ($)</label>
+            <input class="form-control form-control-sm" name="unit_cost" id="qCost" inputmode="decimal" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label label" for="qLead">Days ARO</label>
+            <input class="form-control form-control-sm" name="lead_time_days" id="qLead" inputmode="numeric" required>
+            <div class="form-text" id="qLeadHint"></div>
+          </div>
+          <div class="col-6">
+            <label class="form-label label" for="qMoq">Min order qty</label>
+            <input class="form-control form-control-sm" name="min_order_qty" id="qMoq" inputmode="numeric">
+          </div>
+          <div class="col-6">
+            <label class="form-label label" for="qTerms">Payment terms</label>
+            <input class="form-control form-control-sm" name="payment_terms" id="qTerms" maxlength="20" placeholder="Net 30">
+          </div>
+        </div>
+
+        <details class="quote-drawer-section">
+          <summary>Packaging <span class="quote-drawer-sum" id="qPackSum">$0.00 / unit</span></summary>
+          <label class="form-label label mt-2" for="qPackSource">Who packages</label>
+          <select class="form-select form-select-sm" name="packaging_source" id="qPackSource">
+            {% for value, label in packaging_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+          <div class="mt-2 d-none" id="qPackhouseWrap">
+            <label class="form-label label" for="qPackhouse">Packhouse</label>
+            <input class="form-control form-control-sm" id="qPackhouse" placeholder="Search packhouses by name or CAGE">
+            <input type="hidden" name="packaging_vendor_id" id="qPackhouseId">
+            <div class="list-group quote-supplier-results mt-1" id="qPackhouseResults"></div>
+          </div>
+          <div class="row g-2 mt-1">
+            <div class="col-6"><label class="form-label label" for="qPackUnit">Per unit ($)</label>
+              <input class="form-control form-control-sm" name="packaging_unit" id="qPackUnit" inputmode="decimal"></div>
+            <div class="col-6"><label class="form-label label" for="qPackTotal">Total ($)</label>
+              <input class="form-control form-control-sm" name="packaging_total" id="qPackTotal" inputmode="decimal"></div>
+          </div>
+        </details>
+
+        <details class="quote-drawer-section">
+          <summary>Freight <span class="quote-drawer-sum" id="qFreightSum">$0.00 / unit</span></summary>
+          <div class="row g-2 mt-1">
+            <div class="col-6"><label class="form-label label" for="qFreightUnit">Per unit ($)</label>
+              <input class="form-control form-control-sm" name="freight_unit" id="qFreightUnit" inputmode="decimal"></div>
+            <div class="col-6"><label class="form-label label" for="qFreightTotal">Total ($)</label>
+              <input class="form-control form-control-sm" name="freight_total" id="qFreightTotal" inputmode="decimal"></div>
+          </div>
+          <div class="label mt-2">Part dimensions <span class="text-body-secondary text-lowercase fw-normal" id="qDimsNote"></span></div>
+          <div class="row g-2">
+            <div class="col-3"><input class="form-control form-control-sm" name="dim_weight" id="qDimW" placeholder="lb" inputmode="decimal" aria-label="Weight (lb)"></div>
+            <div class="col-3"><input class="form-control form-control-sm" name="dim_length" id="qDimL" placeholder="L in" inputmode="decimal" aria-label="Length (in)"></div>
+            <div class="col-3"><input class="form-control form-control-sm" name="dim_width" id="qDimWd" placeholder="W in" inputmode="decimal" aria-label="Width (in)"></div>
+            <div class="col-3"><input class="form-control form-control-sm" name="dim_height" id="qDimH" placeholder="H in" inputmode="decimal" aria-label="Height (in)"></div>
+          </div>
+          <input class="form-control form-control-sm mt-2" name="dim_source_notes" id="qDimSource" placeholder="Source, e.g. vendor spec sheet">
+          <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" name="save_dims" id="qSaveDims">
+            <label class="form-check-label small" for="qSaveDims">Save / update dimensions on the NSN record</label>
+          </div>
+        </details>
+
+        <label class="form-label label mt-3">Markup</label>
+        <div class="quote-tip-pills" id="qTips">
+          {% for p in markup_presets %}<button type="button" class="quote-tip {% if forloop.first %}active{% endif %}" data-pct="{{ p }}">{{ p|floatformat:"0" }}%</button>{% endfor %}
+          <button type="button" class="quote-tip" data-pct="custom">Custom</button>
+        </div>
+        <input type="hidden" name="markup_pct" id="qMarkup" value="{{ markup_presets.0 }}">
+        <input type="hidden" name="target_price" id="qTarget">
+        <div class="row g-2 mt-1 d-none" id="qCustomWrap">
+          <div class="col-6"><label class="form-label label" for="qCustomPct">Markup %</label>
+            <input class="form-control form-control-sm" id="qCustomPct" inputmode="decimal"></div>
+          <div class="col-6 d-flex align-items-end"><span class="small text-body-secondary">or type a final price below</span></div>
+        </div>
+
+        <div class="quote-price-box mt-3">
+          <div class="row-between small text-body-secondary"><span>Landed / unit</span><span id="qLanded">$0.00</span></div>
+          <div class="row-between small text-body-secondary"><span>Markup</span><span id="qPctOut">0.00%</span></div>
+          <label class="form-label label mt-2" for="qPrice">Final gov unit price ($)</label>
+          <input class="form-control quote-price-input" id="qPrice" inputmode="decimal"
+                 title="Type a price to back-calculate the markup">
+        </div>
+
+        <label class="form-label label mt-2" for="qNotes">Notes</label>
+        <textarea class="form-control form-control-sm" name="notes" id="qNotes" rows="2"></textarea>
+
+        <div class="alert alert-danger py-2 mt-2 small d-none" id="qError" role="alert"></div>
+        <button type="submit" class="btn btn-primary w-100 mt-3" id="qSave">Save quote to SOL</button>
+      </form>
+    </div>
+  </div>
+</div>

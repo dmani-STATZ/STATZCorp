@@ -24,6 +24,8 @@
          class="app-subnav-link {% if section == 'solicitations' %}active{% endif %}">Solicitations</a>
       <a href="{% url 'quote:rfq_queue' %}"
          class="app-subnav-link {% if section == 'rfq' %}active{% endif %}">RFQ Queue</a>
+      <a href="{% url 'quote:mailbox' %}"
+         class="app-subnav-link {% if section == 'mailbox' %}active{% endif %}">Mailbox</a>
     </div>
   </nav>
 

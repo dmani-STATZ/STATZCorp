@@ -1,4 +1,15 @@
 from .dashboard import dashboard
+from .mailbox import (
+    attachment_download,
+    email_detail,
+    email_link,
+    email_set_supplier,
+    email_unlink,
+    mailbox_page,
+    mailbox_sync,
+    save_quote,
+    solicitation_search,
+)
 from .rfq import rfq_queue, rfq_remove, rfq_send, rfq_send_all
 from .solicitations import (
     add_match,
@@ -16,6 +27,15 @@ from .solicitations import (
 )
 
 __all__ = [
+    'attachment_download',
+    'email_detail',
+    'email_link',
+    'email_set_supplier',
+    'email_unlink',
+    'mailbox_page',
+    'mailbox_sync',
+    'save_quote',
+    'solicitation_search',
     'add_match',
     'claim',
     'dashboard',

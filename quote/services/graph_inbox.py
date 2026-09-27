@@ -217,3 +217,88 @@ def mark_message_read(graph_message_id: str) -> Optional[str]:
             exc,
         )
         return f'Could not mark message read: {exc}'
+
+
+# ── Full message + attachments (Phase 2 mailbox persistence) ────────────────
+
+#: Largest attachment stored in the database; bigger files keep metadata only.
+MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024
+
+
+def _auth_headers() -> tuple[Optional[dict], Optional[str], str]:
+    """(headers, error, url-encoded mailbox) for Graph calls."""
+    sender = settings.GRAPH_MAIL_SENDER_RFQ
+    if not sender:
+        return None, 'GRAPH_MAIL_SENDER_RFQ is not configured.', ''
+    token = _get_graph_token()
+    if not token:
+        return None, 'Could not acquire Graph token.', ''
+    return (
+        {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'},
+        None,
+        quote(sender, safe=''),
+    )
+
+
+def fetch_message_full(graph_message_id: str) -> tuple[Optional[dict], Optional[str]]:
+    """
+    The full Graph message resource (body, recipients, internet headers,
+    hasAttachments). Returns (payload, error).
+    """
+    headers, error, user_seg = _auth_headers()
+    if error:
+        return None, error
+    mid = quote(graph_message_id, safe='')
+    url = (
+        f'{GRAPH_BASE}/users/{user_seg}/messages/{mid}'
+        '?$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,'
+        'isRead,bodyPreview,body,hasAttachments,internetMessageHeaders,conversationId'
+    )
+    try:
+        resp = requests.get(url, headers=headers, timeout=20)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        logger.error('graph_inbox: fetch_message_full failed for %s: %s', graph_message_id, exc)
+        return None, f'Graph API request failed: {exc}'
+    return resp.json(), None
+
+
+def fetch_attachments(graph_message_id: str) -> tuple[list[dict], Optional[str]]:
+    """
+    File attachments on a message as dicts: graph_attachment_id, name,
+    content_type, size, content (bytes, or None when over MAX_ATTACHMENT_BYTES).
+    Item/reference attachments are skipped.
+    """
+    import base64
+
+    headers, error, user_seg = _auth_headers()
+    if error:
+        return [], error
+    mid = quote(graph_message_id, safe='')
+    url = f'{GRAPH_BASE}/users/{user_seg}/messages/{mid}/attachments'
+    try:
+        resp = requests.get(url, headers=headers, timeout=60)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        logger.error('graph_inbox: fetch_attachments failed for %s: %s', graph_message_id, exc)
+        return [], f'Graph API request failed: {exc}'
+
+    out = []
+    for item in resp.json().get('value', []):
+        if item.get('@odata.type') != '#microsoft.graph.fileAttachment':
+            continue
+        size = int(item.get('size') or 0)
+        content = None
+        if item.get('contentBytes') and size <= MAX_ATTACHMENT_BYTES:
+            try:
+                content = base64.b64decode(item['contentBytes'])
+            except (ValueError, TypeError):
+                content = None
+        out.append({
+            'graph_attachment_id': item.get('id', ''),
+            'name': item.get('name') or 'attachment',
+            'content_type': item.get('contentType') or '',
+            'size': size,
+            'content': content,
+        })
+    return out, None
