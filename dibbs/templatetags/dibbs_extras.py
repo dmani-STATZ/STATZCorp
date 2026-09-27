@@ -1,5 +1,6 @@
 from django import template
 
+from dibbs.services.cage_utils import dla_cage_url as _dla_cage_url
 from dibbs.services.cage_utils import normalize_cage_code
 
 register = template.Library()
@@ -31,3 +32,9 @@ def split(value, delimiter=","):
 def normalize_cage(value):
     """Uppercase/strip a CAGE code for comparison."""
     return normalize_cage_code(value)
+
+
+@register.filter
+def dla_cage_url(value):
+    """DLA CAGE search link for a CAGE code: {{ cage|dla_cage_url }}."""
+    return _dla_cage_url(value)

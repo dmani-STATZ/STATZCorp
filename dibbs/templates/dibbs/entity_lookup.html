@@ -1,4 +1,5 @@
 {% extends "dibbs/base.html" %}
+{% load dibbs_extras %}
 {% block content %}
 <style>
   :root { --navy: #0a1628; --accent: #00b4d8; }
@@ -47,9 +48,13 @@
   <div class="alert-error">
     <strong>Lookup failed:</strong> {{ error }}
   </div>
-  <p style="color:#6b7280; font-size:0.875rem;">
-    You can still search for this entity directly on
-    <a href="https://sam.gov" target="_blank" rel="noopener noreferrer">SAM.gov</a>.
+  <p style="font-size:0.875rem;">
+    <a href="{{ cage_code|dla_cage_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">
+      Look up {{ cage_code }} on DLA CAGE &rarr;
+    </a>
+    <span style="color:#6b7280; margin-left:0.5rem;">or search
+    <a href="https://sam.gov" target="_blank" rel="noopener noreferrer">SAM.gov</a> directly.
+    DLA asks you to accept its terms once per session.</span>
   </p>
   {% elif not entity or not entity.found %}
 
@@ -58,8 +63,12 @@
     No entity found on SAM.gov for CAGE code <strong class="mono">{{ cage_code }}</strong>.
     This company may not be registered in SAM.gov, or the CAGE code may be incorrect.
   </div>
-  <p style="color:#6b7280; font-size:0.875rem;">
-    Search manually on <a href="https://sam.gov" target="_blank" rel="noopener noreferrer">SAM.gov</a>.
+  <p style="font-size:0.875rem;">
+    <a href="{{ cage_code|dla_cage_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">
+      Look up {{ cage_code }} on DLA CAGE &rarr;
+    </a>
+    <span style="color:#6b7280; margin-left:0.5rem;">DLA lists every CAGE, including companies not registered in SAM.
+    It asks you to accept its terms once per session.</span>
   </p>
   {% if cache_record and not fetch_error %}
   <p class="text-muted small mb-0">
@@ -116,6 +125,11 @@
         View on SAM.gov &rarr;
       </a>
       {% endif %}
+      <div style="margin-top:0.5rem;">
+        <a href="{{ cage_code|dla_cage_url }}" target="_blank" rel="noopener noreferrer" style="font-size:0.8125rem;">
+          View on DLA CAGE &rarr;
+        </a>
+      </div>
     </div>
   </div>
 
