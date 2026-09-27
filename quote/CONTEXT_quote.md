@@ -48,6 +48,8 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `services/mailbox.py` | Graph sync + ingest, SOL/NSN detection, supplier resolution, link/unlink, link-modal search. |
 | `services/quotes.py` | `save_supplier_quote` (drawer save), lowest-landed auto-select, NSN dimension write-back. |
 | `views/mailbox.py` | Phase 2 mailbox + drawer endpoints. |
+| `services/bids.py` | Phase 3: bid defaults, `preflight`, `bq_row` / `render_bq` writer, `export_bids`, `reexport`, `reopen_bid`, `select_quote`. |
+| `views/bids.py` | Bid Board, compare drawer, builder, export. |
 | `services/walk.py` | `claim_next` — next-available navigation for work-the-list mode. |
 | `services/rfq.py` | `queue_rfqs`, `resolve_recipients`, `compose_message`, `pending_groups`, `send_supplier_rfqs`. |
 | `services/archival.py` + `tasks/archive_stale_solicitations.py` | 7-day / past-due archival (daily `ScheduledTask`, seeded by `0005`). |
@@ -141,7 +143,47 @@ Pricing is **markup on cost**: `price = landed × (1 + pct)`, rounded to cents
 (the approved mockup's formula). In Combined mode packaging/freight totals are
 spread over the combined quantity of all lines.
 
-Phases 3–4 (bid staging + BQ export, Our Bids) are not built.
+**Phase 3 (built) — Bid Board + BQ Export:**
+1. `/quote/bids/` Bid Board: open solicitations with ≥ 1 supplier quote, per
+   line: tally badge ("3 quotes · Auto: lowest" / "Picked"), selected supplier,
+   landed, gov price, days (red when over the SOL's days), bid status. Tabs:
+   Needs bid / Ready to export / Submitted (past export files, "Download
+   again", "DIBBS rejected it" = reopen to Ready).
+2. **Compare** drawer (`compare_quotes`, XHR): every quote per line side by
+   side — base, packaging (+ packhouse), freight, landed (+delta vs cheapest),
+   gov price, delivery vs required, terms, MOQ, source email. **Select this
+   bid** = a rep's pick (`selected_automatically=False`), which auto-select
+   never overrides; it also re-points any DRAFT bid.
+3. `/quote/bids/<sol>/` builder: one `QuoteBid` per line. Header fields (CAGEs,
+   bid type, terms, our quote #, days valid, packaging Y/N, FOB, inspection,
+   remarks) apply to every line, as in the BQ file; per-line price, days,
+   mfr/dealer, mfr CAGE, FAT waiver, hazmat, material, part offered code /
+   CAGE / P/N, quality code. Defaults come from the selected quote, the default
+   `CompanyCAGE`, and the line's DIBBS template (`services/bids.default_values`):
+   dealer unless the offered CAGE is ours; code 1 (exact) when the offered
+   CAGE + P/N is in the AS file, else code 2 with bid type AB. Pre-flight runs
+   on every save; **Save & mark ready** only succeeds with zero errors
+   (solicitation → `BID_READY`).
+4. `/quote/bids/export/`: READY bids with pre-flight; **Download BQ file**
+   (`bqYYMMDD-HHMMSS.txt`) is all-or-nothing: bids → `SUBMITTED`,
+   `exported_bq_file` set, `BidOutcome` created (`PENDING`) with the frozen
+   snapshot, solicitation → `BID_SUBMITTED`.
+
+**BQ writer (`services/bids`).** Starts from each line's DIBBS template
+(`bq_raw_columns`), overwrites only STATZ's cells (6, 7, 13, 21–28, 32, 36, 50,
+51, 64, 65, 67, 102, 103, 106–108, 118, 120, 121), leaves every other cell as
+DIBBS sent it, **never pads**, writes every field quoted, CRLF rows,
+ISO-8859-1. Real DIBBS templates arrive pre-filled (24 = BI, 25 = 1, 27 = 90,
+29 = NAP, 32/36 = D, 51 = required days...), which is why untouched cells must
+survive. Pre-flight errors: template missing / not 121 columns; price ≤ 0,
+> 5 dp or too large; days not 1–9999; quoter CAGE not ours; T/U solicitation
+with remarks; BI with remarks; BW/AB without remarks; packaging N without
+BW/AB; dealer without mfr CAGE; item bought by P/N (col 105 P/B) without P/N +
+CAGE; code 1 not in the AS file; code 2 not AB; characters ISO-8859-1 cannot
+hold. Warnings: delivery longer than required; template holding U+FFFD.
+
+Phase 4 (Our Bids / award reconciliation) is not built; `BidOutcome` rows are
+created at export and wait for it.
 
 ## 7. Templates and UI
 - Bootstrap 5.3.3 (Spacelab) from the global base. New classes go in
@@ -203,6 +245,12 @@ Phases 3–4 (bid staging + BQ export, Our Bids) are not built.
 | `quote:email_detail` | `/quote/mailbox/<id>/` | XHR fragment (non-XHR redirects to the inbox) |
 | `quote:email_link` / `email_unlink` / `email_set_supplier` / `save_quote` | `/quote/mailbox/<id>/...` | POST, JSON |
 | `quote:mailbox_sol_search` | `/quote/mailbox/solicitations/?q=` | JSON |
+| `quote:bid_board` | `/quote/bids/?tab=needs\|ready\|submitted` | |
+| `quote:compare_quotes` | `/quote/bids/<sol>/compare/` | XHR fragment |
+| `quote:select_quote` | `/quote/quotes/<id>/select/` | POST, JSON |
+| `quote:bid_builder` | `/quote/bids/<sol>/` | GET / POST (`action=draft\|ready`) |
+| `quote:bid_export` | `/quote/bids/export/` | GET list, POST `bid_ids` → file |
+| `quote:bid_reexport` / `bid_reopen_export` | `/quote/bids/export/<file>/` (`reopen/`) | GET file / POST |
 | `quote:attachment_download` | `/quote/mailbox/attachments/<id>/` | always `octet-stream` + `nosniff`, except verified PDFs inline |
 
 ## 13. Permissions / Security
@@ -229,7 +277,10 @@ pre-existing `contracts_nsn` row.
 
 ## 15. Testing
 `test_scaffold.py` (wiring, table prefixes, FK targets, landed cost, auto-award
-gate, claims, RFQ uniqueness, templates), `test_phase2.py` (cost math, SOL/NSN detection, ingest + supplier resolution,
+gate, claims, RFQ uniqueness, templates), `test_phase3.py` (bid defaults, every pre-flight rule, writer preserves the
+DIBBS template / never pads / QUOTE_ALL + CRLF + 121 columns, export → snapshot
+→ re-download → reopen, all-or-nothing export, manual pick sticks, views),
+`test_phase2.py` (cost math, SOL/NSN detection, ingest + supplier resolution,
 Graph sync (mocked — tests must never call Graph), drawer save combined/split,
 auto-select, NSN dimensions, sandboxed body + CSP, attachment headers),
 `test_phase1.py` (queue dataset/estimate, claims + poll, manual match learning,
@@ -250,8 +301,9 @@ Run `python manage.py test quote dibbs`.
 - `products/migrations/0005` added the NSN dimension provenance fields.
 
 ## 17. Known Gaps
-1. `Quote.md` pre-flight item 1: treat BQ rows as **121** columns; prove with a
-   byte-level diff against a DIBBS-accepted `bq` file.
+1. The BQ writer's quoting (every field quoted) and CRLF line endings follow
+   Quote.md but are **unproven against DIBBS**. Before the first live upload,
+   diff an export against a DIBBS-accepted `bq` file (or upload one test bid).
 2. Whole-file BQ round-trip is impossible today — the downloaded file isn't kept.
 3. Real-time "another rep is reviewing" needs no websockets: claim fields +
    self-scheduling `setTimeout` poll.

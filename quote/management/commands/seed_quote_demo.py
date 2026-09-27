@@ -275,6 +275,34 @@ class Command(BaseCommand):
                 match_suppliers=['1ALL7'],
                 rfqs=[('1ALL7', QuoteRFQ.STATUS_SENT)],
             ),
+            # ---- Phase 3: quoted, bid not staged yet -------------------------
+            dict(
+                sol='SPE7M126T0913', stage='quoting',
+                nsn='5340-01-455-2210', nom='BRACKET, ANGLE', qty=40, uoi='EA',
+                due=today + timedelta(days=9),
+                set_aside='R', sol_type='T',
+                match_suppliers=['D2689', '72914', '0SKY9'],
+                approved_sources=[('D2689', 'BRK-2210-A'), ('72914', 'BRK-2210-A')],
+                rfqs=[('D2689', QuoteRFQ.STATUS_RESPONDED),
+                      ('72914', QuoteRFQ.STATUS_RESPONDED),
+                      ('0SKY9', QuoteRFQ.STATUS_RESPONDED)],
+                # Three quotes, no bid: the Bid Board's "Needs bid" tab, the
+                # comparison drawer, and a delivery-days warning (60 > 45).
+                quotes=[
+                    dict(cage='D2689', base='6.10', pack='0.25', freight='0.15',
+                         markup='4.00', lead=30, part='BRK-2210-A',
+                         pack_src=QuoteSupplierQuote.PACKAGING_SUPPLIER_INCLUDED,
+                         terms='Net 30', selected=True, auto=True),
+                    dict(cage='72914', base='6.35', pack='0.20', freight='0.10',
+                         markup='4.00', lead=14, part='BRK-2210-A',
+                         pack_src=QuoteSupplierQuote.PACKAGING_SUPPLIER_INCLUDED,
+                         terms='Net 15', selected=False),
+                    dict(cage='0SKY9', base='5.95', pack='0.60', freight='0.30',
+                         markup='4.00', lead=60, part='ALT-2210',
+                         pack_src=QuoteSupplierQuote.PACKAGING_THIRD_PARTY,
+                         packhouse=True, terms='Net 30', selected=False),
+                ],
+            ),
             # ---- Phase 2-4: quoted, bid, awarded -----------------------------
             dict(
                 sol='SPE1C126Q0528', stage='won',
@@ -749,6 +777,7 @@ class Command(BaseCommand):
             'matched': QuoteSolicitation.STATUS_MATCHED,
             'rfq_queued': QuoteSolicitation.STATUS_MATCHED,
             'rfq_sent': QuoteSolicitation.STATUS_RFQ_SENT,
+            'quoting': QuoteSolicitation.STATUS_QUOTING,
             'won': QuoteSolicitation.STATUS_BID_SUBMITTED,
             'lost_tight': QuoteSolicitation.STATUS_BID_SUBMITTED,
             'lost_wide': QuoteSolicitation.STATUS_BID_SUBMITTED,

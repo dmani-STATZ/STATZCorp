@@ -1,0 +1,151 @@
+{% extends "quote/base.html" %}
+
+{% block content %}
+<div class="row-between flex-wrap mb-3">
+  <div>
+    <h1 class="h4 mb-0">Bid Board</h1>
+    <div class="text-body-secondary small">Open solicitations with supplier quotes. Compare, pick, and stage the DIBBS bid.</div>
+  </div>
+  <a class="btn btn-primary btn-sm" href="{% url 'quote:bid_export' %}"><i class="bi bi-filetype-txt"></i> BQ Export ({{ counts.ready }})</a>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link {% if tab == 'needs' %}active{% endif %}" href="?tab=needs">Needs bid <span class="badge text-bg-secondary">{{ counts.needs }}</span></a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'ready' %}active{% endif %}" href="?tab=ready">Ready to export <span class="badge text-bg-secondary">{{ counts.ready }}</span></a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'submitted' %}active{% endif %}" href="?tab=submitted">Submitted <span class="badge text-bg-secondary">{{ counts.submitted }}</span></a></li>
+</ul>
+
+{% if tab == 'submitted' %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Export file</th><th class="text-end">Solicitations</th><th class="text-end">Lines</th><th>By</th><th></th></tr></thead>
+      <tbody>
+      {% for ex in exports %}
+        <tr>
+          <td class="font-monospace">{{ ex.exported_bq_file }}</td>
+          <td class="text-end">{{ ex.sols }}</td>
+          <td class="text-end">{{ ex.bids }}</td>
+          <td>{{ ex.submitted_by__first_name|default:ex.submitted_by__username }} {{ ex.submitted_by__last_name }}</td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-2">
+              <a class="btn btn-outline-secondary btn-sm" href="{% url 'quote:bid_reexport' ex.exported_bq_file %}">Download again</a>
+              <form method="post" action="{% url 'quote:bid_reopen_export' ex.exported_bq_file %}" class="m-0"
+                    onsubmit="return confirm('Put every bid in {{ ex.exported_bq_file }} back to Ready? Use this only if DIBBS rejected the upload.');">
+                {% csrf_token %}
+                <button class="btn btn-link btn-sm text-danger p-0">DIBBS rejected it</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-body-secondary">No BQ files exported in the last 60 days.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0 quote-queue-table">
+      <thead><tr><th>Solicitation</th><th>Line / NSN</th><th>Quotes</th><th>Selected supplier</th><th class="text-end">Landed</th><th class="text-end">Gov price</th><th>Days</th><th>Bid</th><th></th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        {% for e in row.line_list %}
+        <tr>
+          {% if forloop.first %}
+          <td rowspan="{{ row.line_list|length }}">
+            <a class="font-monospace fw-semibold" href="{% url 'quote:solicitation_workspace' row.solicitation.solicitation_number %}">{{ row.solicitation.solicitation_number }}</a>
+            <div class="small {% if row.days_left <= 3 %}text-danger fw-semibold{% else %}text-body-secondary{% endif %}">due {{ row.solicitation.return_by_date|date:"M j" }} ({{ row.days_left }}d)</div>
+            {% if row.auto_award %}<span class="badge text-bg-light border" title="Automated (T/U) solicitation: remarks must stay blank">Auto-award</span>{% endif %}
+          </td>
+          {% endif %}
+          <td><span class="small text-body-secondary">{{ e.line.line_number|default:"—" }}</span> <span class="font-monospace">{{ e.line.nsn }}</span>
+            <div class="small text-body-secondary">{{ e.line.nomenclature|default:"" }} &middot; qty {{ e.line.quantity|default:"—" }}</div></td>
+          <td>
+            <span class="badge quote-tally" title="{% if e.auto %}The lowest landed cost was picked automatically{% else %}A rep chose this quote{% endif %}">
+              {{ e.quotes }} quote{{ e.quotes|pluralize }}{% if e.selected %} &middot; {% if e.auto %}Auto: lowest{% else %}Picked{% endif %}{% endif %}
+            </span>
+          </td>
+          <td>{% if e.selected %}{{ e.selected.supplier.name }}{% else %}<span class="text-body-secondary">—</span>{% endif %}</td>
+          <td class="text-end">{% if e.selected %}${{ e.selected.landed_unit_cost|floatformat:2 }}{% endif %}</td>
+          <td class="text-end fw-semibold">{% if e.bid %}${{ e.bid.unit_price|floatformat:2 }}{% elif e.selected %}${{ e.selected.final_government_unit_price|floatformat:2 }}{% endif %}</td>
+          <td {% if e.selected and e.line.delivery_days and e.selected.lead_time_days > e.line.delivery_days %}class="text-danger" title="Longer than the {{ e.line.delivery_days }} days required"{% endif %}>
+            {% if e.selected %}{{ e.selected.lead_time_days }}{% endif %}</td>
+          <td>{% if e.bid %}<span class="badge quote-bid-{{ e.bid.bid_status|lower }}">{{ e.bid.get_bid_status_display }}</span>{% else %}<span class="text-body-secondary small">none</span>{% endif %}</td>
+          {% if forloop.first %}
+          <td rowspan="{{ row.line_list|length }}" class="text-end">
+            <div class="d-inline-flex flex-column gap-1">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-compare="{% url 'quote:compare_quotes' row.solicitation.solicitation_number %}">Compare</button>
+              <a class="btn btn-primary btn-sm" href="{% url 'quote:bid_builder' row.solicitation.solicitation_number %}">{% if row.status == 'NONE' %}Build bid{% else %}Edit bid{% endif %}</a>
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      {% empty %}
+        <tr><td colspan="9" class="text-body-secondary py-4 text-center">
+          {% if tab == 'ready' %}Nothing staged. Build a bid and choose <strong>Mark ready</strong>.{% else %}No open solicitations with supplier quotes yet. Log quotes from the Mailbox.{% endif %}
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="offcanvas offcanvas-end quote-compare-drawer" tabindex="-1" id="compareDrawer" aria-labelledby="compareDrawerLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="compareDrawerLabel">Compare quotes</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body" id="compareBody"></div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  const CSRF = '{{ csrf_token }}';
+  const drawerEl = document.getElementById('compareDrawer');
+  const bodyEl = document.getElementById('compareBody');
+  let dirty = false;
+  let currentUrl = null;
+
+  function load(url) {
+    currentUrl = url;
+    bodyEl.innerHTML = '<div class="text-body-secondary">Loading&hellip;</div>';
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.ok ? r.text() : Promise.reject(r.status))
+      .then(html => { bodyEl.innerHTML = html; })
+      .catch(() => { bodyEl.innerHTML = '<div class="text-danger">Could not load quotes.</div>'; });
+  }
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-compare]');
+    if (!btn) return;
+    load(btn.dataset.compare);
+    bootstrap.Offcanvas.getOrCreateInstance(drawerEl).show();
+  });
+
+  bodyEl.addEventListener('click', e => {
+    const btn = e.target.closest('[data-select]');
+    if (!btn) return;
+    btn.disabled = true;
+    fetch(btn.dataset.select, { method: 'POST', headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.json())
+      .then(res => {
+        if (!res.ok) { window.showToast('error', res.error || 'Could not select that quote.'); btn.disabled = false; return; }
+        window.showToast('success', 'Selected for the bid.');
+        dirty = true;
+        load(currentUrl);
+      });
+  });
+
+  // Reflect a changed pick on the board when the drawer closes.
+  drawerEl.addEventListener('hidden.bs.offcanvas', () => { if (dirty) window.location.reload(); });
+})();
+</script>
+{% endblock extra_js %}

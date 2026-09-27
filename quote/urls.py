@@ -39,6 +39,14 @@ urlpatterns = [
     path('mailbox/<int:email_id>/supplier/', views.email_set_supplier, name='email_set_supplier'),
     path('mailbox/<int:email_id>/quote/', views.save_quote, name='save_quote'),
     path('mailbox/attachments/<int:attachment_id>/', views.attachment_download, name='attachment_download'),
+    # Phase 3 -- bid staging + BQ export
+    path('bids/', views.bid_board, name='bid_board'),
+    path('bids/export/', views.bid_export, name='bid_export'),
+    path('bids/export/<str:filename>/', views.bid_reexport, name='bid_reexport'),
+    path('bids/export/<str:filename>/reopen/', views.bid_reopen_export, name='bid_reopen_export'),
+    path('bids/<str:sol_number>/', views.bid_builder, name='bid_builder'),
+    path('bids/<str:sol_number>/compare/', views.compare_quotes, name='compare_quotes'),
+    path('quotes/<int:quote_id>/select/', views.select_quote, name='select_quote'),
     # Phase 1 -- RFQ dispatch
     path('rfq/', views.rfq_queue, name='rfq_queue'),
     path('rfq/send-all/', views.rfq_send_all, name='rfq_send_all'),

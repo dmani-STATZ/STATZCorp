@@ -38,5 +38,12 @@
       <div class="small text-body-secondary">supplier email{{ rfqs_pending|pluralize }} to send</div>
     </a>
   </div>
+  <div class="col-sm-6 col-lg-3">
+    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:bid_export' %}">
+      <div class="label text-body-secondary">Bids ready</div>
+      <div class="h3 mb-0">{{ bids_ready }}</div>
+      <div class="small text-body-secondary">line{{ bids_ready|pluralize }} waiting for the BQ file</div>
+    </a>
+  </div>
 </div>
 {% endblock content %}

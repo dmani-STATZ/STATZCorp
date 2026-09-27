@@ -1,0 +1,191 @@
+{% extends "quote/base.html" %}
+
+{% block content %}
+<div class="mb-2"><a href="{% url 'quote:bid_board' %}" class="small">&larr; Bid Board</a></div>
+
+<div class="row-between flex-wrap mb-3">
+  <div>
+    <h1 class="h4 mb-0">Bid <span class="font-monospace">{{ solicitation.solicitation_number }}</span></h1>
+    <div class="text-body-secondary small">
+      Due {{ solicitation.return_by_date|date:"M j, Y" }} &middot; {{ entries|length }} line{{ entries|length|pluralize }}
+      {% if auto_award %}&middot; <strong>Automated (T/U) solicitation</strong>: remarks must stay blank{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm" target="statz_sol_pdf" href="{% url 'dibbs:solicitation_pdf' solicitation.solicitation_number %}"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'quote:solicitation_workspace' solicitation.solicitation_number %}">Workspace</a>
+  </div>
+</div>
+
+{% if all_locked %}
+<div class="alert alert-info">This bid was exported in <span class="font-monospace">{{ header.exported_bq_file }}</span> and is locked.
+  If DIBBS rejected the upload, reopen it from Bid Board &rsaquo; Submitted.</div>
+{% endif %}
+
+<form method="post" class="quote-bid-form" autocomplete="off">
+  {% csrf_token %}
+  <fieldset {% if all_locked %}disabled{% endif %}>
+  <div class="card card-padded mb-3">
+    <h2 class="h6 mb-1">Bid header</h2>
+    <div class="small text-body-secondary mb-2">Written on every line of the BQ file.</div>
+    <div class="row g-2">
+      <div class="col-sm-4 col-lg-2">
+        <label class="form-label label" for="h_quoter_cage">Quoter CAGE (col 6)</label>
+        <select class="form-select form-select-sm" name="h_quoter_cage" id="h_quoter_cage">
+          {% for c in cages %}<option value="{{ c.cage_code }}" {% if c.cage_code == header.quoter_cage %}selected{% endif %}>{{ c.cage_code }}{% if c.is_default %} (default){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 col-lg-2">
+        <label class="form-label label" for="h_quote_for_cage">Quote for CAGE (col 7)</label>
+        <input class="form-control form-control-sm font-monospace text-uppercase" name="h_quote_for_cage" id="h_quote_for_cage" maxlength="5" value="{{ header.quote_for_cage }}">
+      </div>
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label label" for="h_bid_type_code">Bid type (col 24)</label>
+        <select class="form-select form-select-sm" name="h_bid_type_code" id="h_bid_type_code">
+          {% for code, label in bid_types %}<option value="{{ code }}" {% if code == header.bid_type_code %}selected{% endif %}>{{ code }} — {{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-3 col-lg-1">
+        <label class="form-label label" for="h_payment_terms">Terms (25)</label>
+        <input class="form-control form-control-sm" name="h_payment_terms" id="h_payment_terms" maxlength="2" value="{{ header.payment_terms }}" title="Discount terms code: 1 = Net 30">
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label label" for="h_vendor_quote_number">Our quote # (26)</label>
+        <input class="form-control form-control-sm font-monospace" name="h_vendor_quote_number" id="h_vendor_quote_number" maxlength="15" value="{{ header.vendor_quote_number }}">
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label label" for="h_days_quote_valid">Days valid (27)</label>
+        <input class="form-control form-control-sm" name="h_days_quote_valid" id="h_days_quote_valid" inputmode="numeric" value="{{ header.days_quote_valid }}">
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label label" for="h_meets_packaging_requirement">Meets packaging (28)</label>
+        <select class="form-select form-select-sm" name="h_meets_packaging_requirement" id="h_meets_packaging_requirement">
+          <option value="Y" {% if header.meets_packaging_requirement == 'Y' %}selected{% endif %}>Y — Yes</option>
+          <option value="N" {% if header.meets_packaging_requirement == 'N' %}selected{% endif %}>N — No (BW/AB)</option>
+        </select>
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label label" for="h_fob_point">FOB (32)</label>
+        <select class="form-select form-select-sm" name="h_fob_point" id="h_fob_point">
+          <option value="D" {% if header.fob_point == 'D' %}selected{% endif %}>D — Destination</option>
+          <option value="O" {% if header.fob_point == 'O' %}selected{% endif %}>O — Origin</option>
+        </select>
+      </div>
+      <div class="col-sm-3 col-lg-2">
+        <label class="form-label label" for="h_inspection_point">Inspection (36)</label>
+        <select class="form-select form-select-sm" name="h_inspection_point" id="h_inspection_point">
+          <option value="D" {% if header.inspection_point == 'D' %}selected{% endif %}>D — Destination</option>
+          <option value="O" {% if header.inspection_point == 'O' %}selected{% endif %}>O — Origin</option>
+        </select>
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label label" for="h_bid_remarks">Remarks (col 121)</label>
+        <input class="form-control form-control-sm" name="h_bid_remarks" id="h_bid_remarks" maxlength="255" value="{{ header.bid_remarks }}"
+               {% if auto_award %}placeholder="Must stay blank on automated solicitations"{% else %}placeholder="Required for BW / AB, blank for BI"{% endif %}>
+      </div>
+    </div>
+  </div>
+
+  {% for e in entries %}
+  <div class="card card-padded mb-3 {% if e.locked %}opacity-75{% endif %}">
+    <div class="row-between flex-wrap">
+      <h2 class="h6 mb-0">Line {{ e.line.line_number|default:"—" }} &middot; <span class="font-monospace">{{ e.line.nsn }}</span>
+        <span class="text-body-secondary fw-normal small">{{ e.line.nomenclature|default:"" }} &middot; qty {{ e.line.quantity|default:"—" }} {{ e.line.unit_of_issue|default:"" }}
+        {% if e.item_indicator %}&middot; item by {% if e.item_indicator == 'P' %}approved part #{% elif e.item_indicator == 'D' %}drawing{% elif e.item_indicator == 'B' %}source control{% else %}{{ e.item_indicator }}{% endif %}{% endif %}</span></h2>
+      {% if e.bid.pk %}<span class="badge quote-bid-{{ e.bid.bid_status|lower }}">{{ e.bid.get_bid_status_display }}</span>{% endif %}
+    </div>
+
+    {% if e.quote %}
+    <div class="small mt-1 text-body-secondary">
+      From <strong>{{ e.quote.supplier.name }}</strong> — cost ${{ e.quote.supplier_unit_cost|floatformat:2 }},
+      landed ${{ e.quote.landed_unit_cost|floatformat:2 }}, quoted ${{ e.quote.final_government_unit_price|floatformat:2 }}, {{ e.quote.lead_time_days }} days ARO
+      {% if e.quote_count > 1 %}&middot; {{ e.quote_count }} quotes{% if e.quote.selected_automatically %} (auto: lowest){% endif %}{% endif %}
+    </div>
+    {% else %}
+    <div class="small mt-1 text-warning-emphasis">No supplier quote selected for this line. You can still price it by hand.</div>
+    {% endif %}
+
+    <fieldset {% if e.locked %}disabled{% endif %}>
+    <div class="row g-2 mt-1">
+      <div class="col-6 col-md-2">
+        <label class="form-label label" for="l{{ e.line.pk }}_unit_price">Unit price (50)</label>
+        <input class="form-control form-control-sm fw-semibold" name="l{{ e.line.pk }}_unit_price" id="l{{ e.line.pk }}_unit_price" inputmode="decimal" value="{{ e.bid.unit_price|default_if_none:'' }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label label" for="l{{ e.line.pk }}_delivery_days">Days ARO (51)</label>
+        <input class="form-control form-control-sm" name="l{{ e.line.pk }}_delivery_days" id="l{{ e.line.pk }}_delivery_days" inputmode="numeric" value="{{ e.bid.delivery_days|default_if_none:'' }}">
+        {% if e.line.delivery_days %}<div class="form-text">SOL asks {{ e.line.delivery_days }}</div>{% endif %}
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label label" for="l{{ e.line.pk }}_manufacturer_dealer">Mfr / dealer (102)</label>
+        <select class="form-select form-select-sm" name="l{{ e.line.pk }}_manufacturer_dealer" id="l{{ e.line.pk }}_manufacturer_dealer">
+          <option value="DD" {% if e.bid.manufacturer_dealer == 'DD' %}selected{% endif %}>DD — Dealer</option>
+          <option value="MM" {% if e.bid.manufacturer_dealer == 'MM' %}selected{% endif %}>MM — Manufacturer</option>
+          <option value="QD" {% if e.bid.manufacturer_dealer == 'QD' %}selected{% endif %}>QD — Qualified dealer</option>
+          <option value="QM" {% if e.bid.manufacturer_dealer == 'QM' %}selected{% endif %}>QM — Qualified mfr</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label label" for="l{{ e.line.pk }}_mfg_source_cage">Mfr CAGE (103)</label>
+        <input class="form-control form-control-sm font-monospace text-uppercase" name="l{{ e.line.pk }}_mfg_source_cage" id="l{{ e.line.pk }}_mfg_source_cage" maxlength="5" value="{{ e.bid.mfg_source_cage }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label label" for="l{{ e.line.pk }}_first_article_waiver">FAT waiver (64)</label>
+        <select class="form-select form-select-sm" name="l{{ e.line.pk }}_first_article_waiver" id="l{{ e.line.pk }}_first_article_waiver">
+          <option value="" {% if not e.bid.first_article_waiver %}selected{% endif %}>—</option>
+          <option value="Y" {% if e.bid.first_article_waiver == 'Y' %}selected{% endif %}>Y — Request waiver</option>
+          <option value="N" {% if e.bid.first_article_waiver == 'N' %}selected{% endif %}>N</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-1">
+        <label class="form-label label" for="l{{ e.line.pk }}_hazardous_material">Hazmat (65)</label>
+        <select class="form-select form-select-sm" name="l{{ e.line.pk }}_hazardous_material" id="l{{ e.line.pk }}_hazardous_material">
+          <option value="N" {% if e.bid.hazardous_material != 'Y' %}selected{% endif %}>N</option>
+          <option value="Y" {% if e.bid.hazardous_material == 'Y' %}selected{% endif %}>Y</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-1">
+        <label class="form-label label" for="l{{ e.line.pk }}_material_requirements">Material (67)</label>
+        <input class="form-control form-control-sm" name="l{{ e.line.pk }}_material_requirements" id="l{{ e.line.pk }}_material_requirements" maxlength="1" value="{{ e.bid.material_requirements }}">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label label" for="l{{ e.line.pk }}_part_number_offered_code">Part offered (106)</label>
+        <select class="form-select form-select-sm" name="l{{ e.line.pk }}_part_number_offered_code" id="l{{ e.line.pk }}_part_number_offered_code">
+          <option value="" {% if not e.bid.part_number_offered_code %}selected{% endif %}>—</option>
+          {% for code, label in part_codes %}<option value="{{ code }}" {% if code == e.bid.part_number_offered_code %}selected{% endif %}>{{ code }} — {{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label label" for="l{{ e.line.pk }}_part_number_offered_cage">Offered CAGE (107)</label>
+        <input class="form-control form-control-sm font-monospace text-uppercase" name="l{{ e.line.pk }}_part_number_offered_cage" id="l{{ e.line.pk }}_part_number_offered_cage" maxlength="5" value="{{ e.bid.part_number_offered_cage }}">
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label label" for="l{{ e.line.pk }}_part_number_offered">Offered part # (108)</label>
+        <input class="form-control form-control-sm font-monospace" name="l{{ e.line.pk }}_part_number_offered" id="l{{ e.line.pk }}_part_number_offered" maxlength="40" value="{{ e.bid.part_number_offered }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label label" for="l{{ e.line.pk }}_higher_level_quality_code">Quality code (118)</label>
+        <input class="form-control form-control-sm text-uppercase" name="l{{ e.line.pk }}_higher_level_quality_code" id="l{{ e.line.pk }}_higher_level_quality_code" maxlength="1" value="{{ e.bid.higher_level_quality_code }}">
+      </div>
+    </div>
+    </fieldset>
+
+    {% if e.checks %}
+    <ul class="quote-checks mt-2 mb-0">
+      {% for c in e.checks %}<li class="quote-check-{{ c.level }}"><i class="bi {% if c.level == 'error' %}bi-x-circle-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i> {{ c.message }}</li>{% endfor %}
+    </ul>
+    {% elif e.bid.pk %}
+    <div class="small text-success mt-2"><i class="bi bi-check-circle-fill"></i> Passes DIBBS pre-flight.</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% if not all_locked %}
+  <div class="quote-bid-actions">
+    <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">Save draft</button>
+    <button type="submit" name="action" value="ready" class="btn btn-primary">Save &amp; mark ready</button>
+  </div>
+  {% endif %}
+  </fieldset>
+</form>
+{% endblock content %}

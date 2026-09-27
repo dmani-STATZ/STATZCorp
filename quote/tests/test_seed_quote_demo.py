@@ -94,6 +94,7 @@ class SeedContentTests(TestCase):
                 QuoteSolicitation.STATUS_UNMATCHED,
                 QuoteSolicitation.STATUS_MATCHED,
                 QuoteSolicitation.STATUS_RFQ_SENT,
+                QuoteSolicitation.STATUS_QUOTING,
                 QuoteSolicitation.STATUS_BID_SUBMITTED,
             },
         )

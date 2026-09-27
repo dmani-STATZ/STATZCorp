@@ -243,3 +243,13 @@ opens an isolated tab it can never find by name again, and tabs pile up. Use
 named targets only for trusted destinations (.gov sites, our own pages); links
 to scraped or user-supplied URLs (notice links, company websites) stay
 `target="_blank" rel="noopener noreferrer"`.
+
+## BQ writer rules (Phase 3)
+- Never pad or trim DIBBS template cells; overwrite only the columns in
+  `services/bids.BID_COLUMNS` / `CAGE_COLUMNS`. DIBBS pre-fills defaults in the
+  template that must survive (the retired sales writer padded every field --
+  do not copy it).
+- Unit price: Decimal, formatted `f"{price:.5f}"`. No float, no `$`.
+- A change to the file format (quoting, line endings, encoding) needs a diff
+  against a DIBBS-accepted `bq` file before it ships.
+- Export is all-or-nothing: any pre-flight error blocks the whole file.

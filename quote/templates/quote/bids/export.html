@@ -1,0 +1,77 @@
+{% extends "quote/base.html" %}
+
+{% block content %}
+<div class="row-between flex-wrap mb-3">
+  <div>
+    <h1 class="h4 mb-0">BQ Export</h1>
+    <div class="text-body-secondary small">
+      Builds the DIBBS batch-quote file from each line's own BQ template: ISO-8859-1, 121 quoted fields per row.
+      Downloading marks the bids <strong>Submitted</strong>.
+    </div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'quote:bid_board' %}?tab=submitted">Past exports</a>
+</div>
+
+<form method="post" id="exportForm">
+  {% csrf_token %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr>
+          <th><input type="checkbox" class="form-check-input" id="checkAll" checked aria-label="Select all"></th>
+          <th>Solicitation</th><th>Line / NSN</th><th>Supplier</th><th class="text-end">Unit price</th><th>Days</th><th>Type</th><th>Pre-flight</th>
+        </tr></thead>
+        <tbody>
+        {% for bid in bids %}
+          <tr>
+            <td><input type="checkbox" class="form-check-input" name="bid_ids" value="{{ bid.pk }}" {% if bid.blocked %}disabled{% else %}checked{% endif %} aria-label="Export {{ bid.line.solicitation.solicitation_number }} line {{ bid.line.line_number }}"></td>
+            <td><a class="font-monospace" href="{% url 'quote:bid_builder' bid.line.solicitation.solicitation_number %}">{{ bid.line.solicitation.solicitation_number }}</a>
+              <div class="small text-body-secondary">due {{ bid.line.solicitation.return_by_date|date:"M j" }}</div></td>
+            <td><span class="small text-body-secondary">{{ bid.line.line_number|default:"—" }}</span> <span class="font-monospace">{{ bid.line.nsn }}</span></td>
+            <td>{{ bid.selected_quote.supplier.name|default:"—" }}</td>
+            <td class="text-end fw-semibold">${{ bid.unit_price|floatformat:2 }}</td>
+            <td>{{ bid.delivery_days }}</td>
+            <td>{{ bid.bid_type_code }}</td>
+            <td>
+              {% if not bid.checks %}<span class="small text-success"><i class="bi bi-check-circle-fill"></i> OK</span>{% endif %}
+              <ul class="quote-checks mb-0">
+                {% for c in bid.checks %}<li class="quote-check-{{ c.level }}">{{ c.message }}</li>{% endfor %}
+              </ul>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="text-body-secondary text-center py-4">
+            Nothing is ready. Build a bid on the <a href="{% url 'quote:bid_board' %}">Bid Board</a> and choose <strong>Save &amp; mark ready</strong>.
+          </td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if bids %}
+  <div class="quote-bid-actions">
+    <span class="small text-body-secondary me-auto">{{ exportable }} of {{ bids|length }} line{{ bids|length|pluralize }} pass pre-flight.</span>
+    <button type="submit" class="btn btn-primary" {% if not exportable %}disabled{% endif %}>
+      <i class="bi bi-download"></i> Download BQ file
+    </button>
+  </div>
+  {% endif %}
+</form>
+{% endblock content %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  const all = document.getElementById('checkAll');
+  if (!all) return;
+  all.addEventListener('change', () => {
+    document.querySelectorAll('input[name="bid_ids"]:not(:disabled)').forEach(cb => { cb.checked = all.checked; });
+  });
+  // The download response does not navigate away; refresh so exported rows drop off.
+  document.getElementById('exportForm').addEventListener('submit', () => {
+    setTimeout(() => window.location.reload(), 2500);
+  });
+})();
+</script>
+{% endblock extra_js %}

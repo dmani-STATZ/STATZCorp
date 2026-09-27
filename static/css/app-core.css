@@ -3205,3 +3205,113 @@ main {
 }
 
 .quote-price-input { font-size: 1.125rem; font-weight: 700; }
+
+/* Quotes — sub-nav grouped by phase: pipes between groups, a quiet serif
+   caption under each ("Phase 1", "Phase 2", ...). */
+.app-subnav.quote-phase-nav { height: auto; }
+
+.quote-phase-nav .app-subnav-inner { align-items: stretch; }
+
+.quote-phase {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.quote-phase-links {
+  display: flex;
+  align-items: stretch;
+  height: 36px;
+}
+
+.quote-phase-label {
+  display: block;
+  margin: 0 1rem 0.3rem;
+  padding-top: 0.15rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.72rem;
+  font-style: italic;
+  letter-spacing: 0.08em;
+  color: var(--bs-secondary-color);
+  text-align: center;
+  border-top: 1px solid var(--bs-border-color);
+  opacity: 0.85;
+}
+
+.quote-phase-sep {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 0.125rem;
+  font-weight: 300;
+  color: var(--bs-border-color);
+  user-select: none;
+}
+
+/* Quotes — Phase 3 bid staging, comparison drawer, pre-flight */
+.quote-tally {
+  font-weight: 600;
+  color: var(--bs-primary-text-emphasis);
+  background-color: var(--bs-primary-bg-subtle);
+  border: 1px solid var(--bs-primary-border-subtle);
+}
+
+.quote-bid-draft { color: var(--bs-secondary-text-emphasis); background-color: var(--bs-secondary-bg-subtle); }
+.quote-bid-ready { color: var(--bs-success-text-emphasis); background-color: var(--bs-success-bg-subtle); }
+.quote-bid-submitted { color: var(--bs-primary-text-emphasis); background-color: var(--bs-primary-bg-subtle); }
+
+.quote-compare-drawer { --bs-offcanvas-width: min(960px, 95vw); }
+
+.quote-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.quote-compare-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem;
+  background-color: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.quote-compare-card.selected {
+  border-color: var(--company-primary, var(--bs-primary));
+  box-shadow: 0 0 0 1px var(--company-primary, var(--bs-primary));
+}
+
+[data-bs-theme="dark"] .quote-compare-card.selected {
+  border-color: var(--bs-link-color);
+  box-shadow: 0 0 0 1px var(--bs-link-color);
+}
+
+.quote-compare-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.125rem 0.75rem;
+  margin: 0.5rem 0;
+  font-size: 0.8125rem;
+}
+
+.quote-compare-dl dt { font-weight: 400; color: var(--bs-secondary-color); }
+.quote-compare-dl dd { margin: 0; text-align: right; }
+
+.quote-checks { padding-left: 0; list-style: none; font-size: 0.8125rem; }
+.quote-check-error { color: var(--bs-danger-text-emphasis); }
+.quote-check-warning { color: var(--bs-warning-text-emphasis); }
+
+.quote-bid-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0;
+  background-color: var(--bs-body-bg);
+  border-top: 1px solid var(--bs-border-color);
+}

@@ -1,3 +1,12 @@
+from .bids import (
+    bid_board,
+    bid_builder,
+    bid_export,
+    bid_reexport,
+    bid_reopen_export,
+    compare_quotes,
+    select_quote,
+)
 from .dashboard import dashboard
 from .mailbox import (
     attachment_download,
@@ -27,6 +36,13 @@ from .solicitations import (
 )
 
 __all__ = [
+    'bid_board',
+    'bid_builder',
+    'bid_export',
+    'bid_reexport',
+    'bid_reopen_export',
+    'compare_quotes',
+    'select_quote',
     'attachment_download',
     'email_detail',
     'email_link',

@@ -1,0 +1,50 @@
+{% comment %} XHR fragment for the Bid Board compare drawer -- never {% extends %}. {% endcomment %}
+<div class="mb-2">
+  <span class="font-monospace fw-semibold">{{ solicitation.solicitation_number }}</span>
+  <span class="text-body-secondary small">due {{ solicitation.return_by_date|date:"M j, Y" }}</span>
+</div>
+{% if bid_locked %}
+<div class="alert alert-info py-2 small">This bid was already exported, so the selection is locked.</div>
+{% endif %}
+
+{% for entry in lines %}
+<h6 class="mt-3 mb-2">
+  Line {{ entry.line.line_number|default:"—" }} &middot; <span class="font-monospace">{{ entry.line.nsn }}</span>
+  <span class="text-body-secondary small fw-normal">qty {{ entry.line.quantity|default:"—" }} {{ entry.line.unit_of_issue|default:"" }}
+    {% if entry.line.delivery_days %}&middot; {{ entry.line.delivery_days }} days required{% endif %}</span>
+</h6>
+<div class="quote-compare-grid">
+  {% for q in entry.quotes %}
+  <div class="quote-compare-card {% if q.is_selected_for_bid %}selected{% endif %}">
+    <div class="row-between">
+      <span class="fw-semibold">{{ q.supplier.name }}</span>
+      {% if q.is_selected_for_bid %}<span class="badge text-bg-primary">{% if q.selected_automatically %}Auto: lowest{% else %}Selected{% endif %}</span>{% endif %}
+    </div>
+    <div class="small text-body-secondary font-monospace">{{ q.offered_part_number|default:"(no P/N)" }} {{ q.offered_cage }}</div>
+    <dl class="quote-compare-dl">
+      <dt>Base cost</dt><dd>${{ q.supplier_unit_cost|floatformat:2 }}</dd>
+      <dt>Packaging</dt><dd>${{ q.packaging_adder_unit|floatformat:2 }}{% if q.packaging_vendor %} <span class="text-body-secondary">({{ q.packaging_vendor.name }})</span>{% endif %}</dd>
+      <dt>Freight</dt><dd>${{ q.freight_adder_unit|floatformat:2 }}</dd>
+      <dt>Landed</dt>
+      <dd class="fw-semibold {% if q.is_cheapest %}text-success{% endif %}">${{ q.landed_unit_cost|floatformat:2 }}
+        {% if not q.is_cheapest %}<span class="small text-body-secondary">(+${{ q.landed_delta|floatformat:2 }})</span>{% endif %}</dd>
+      <dt>Gov price</dt><dd>${{ q.final_government_unit_price|floatformat:2 }}</dd>
+      <dt>Delivery</dt>
+      <dd class="{% if q.over_days %}text-danger fw-semibold{% elif q.is_fastest %}text-success{% endif %}">{{ q.lead_time_days }} days ARO
+        {% if q.over_days %}<span class="small">(over {{ entry.line.delivery_days }})</span>{% endif %}</dd>
+      <dt>Terms</dt><dd>{{ q.payment_terms|default:"—" }}</dd>
+      <dt>MOQ</dt><dd>{{ q.min_order_qty|default:"—" }}</dd>
+      <dt>Quoted</dt><dd>{{ q.quote_date|date:"M j" }}</dd>
+    </dl>
+    {% if q.source_email %}
+    <a class="small" href="{% url 'quote:mailbox' %}?email={{ q.source_email.pk }}" target="statz_mailbox">View source email</a>
+    {% endif %}
+    {% if not q.is_selected_for_bid and not bid_locked %}
+    <button type="button" class="btn btn-outline-primary btn-sm w-100 mt-2" data-select="{% url 'quote:select_quote' q.pk %}">Select this bid</button>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% empty %}
+<p class="text-body-secondary">No quotes logged for this solicitation.</p>
+{% endfor %}
