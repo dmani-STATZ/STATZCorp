@@ -235,7 +235,7 @@ Three CSS files repo-wide: `static/css/theme-vars.css` (brand tokens),
 (`card`, `card-padded`, `label`, `row-between`, `btn-outline-brand`) over repeated utility stacks.
 Sidebar, header, toast and modal systems are hands-off — add to them, do not restructure them.
 
-## 10. Links that open another tab
+## Links that open another tab
 Reference lookups reuse one named tab per destination instead of `_blank`:
 `statz_sam`, `statz_dla_cage`, `statz_entity`, `statz_sol_pdf`,
 `statz_dibbs_data`. Do **not** add `rel="noopener"` to these -- Chrome then

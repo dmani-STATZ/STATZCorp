@@ -82,7 +82,7 @@ For award changes also run `verify_stored_procs` against the target DB.
 `release_notes/YYYY-MM-DD-slug.md`, frontmatter `id` = filename stem,
 `tags` exactly one type + one area (use `sales` for DIBBS/quoting changes).
 
-## 10. Links that open another tab
+## Links that open another tab
 Reference lookups reuse one named tab per destination instead of `_blank`:
 `statz_sam`, `statz_dla_cage`, `statz_entity`, `statz_sol_pdf`,
 `statz_dibbs_data`. Do **not** add `rel="noopener"` to these -- Chrome then
