@@ -47,6 +47,10 @@ urlpatterns = [
     path('bids/<str:sol_number>/', views.bid_builder, name='bid_builder'),
     path('bids/<str:sol_number>/compare/', views.compare_quotes, name='compare_quotes'),
     path('quotes/<int:quote_id>/select/', views.select_quote, name='select_quote'),
+    # Phase 4 -- Our Bids (post-award intelligence)
+    path('our-bids/', views.our_bids, name='our_bids'),
+    path('our-bids/reconcile/', views.reconcile_now, name='reconcile_now'),
+    path('our-bids/<int:outcome_id>/', views.outcome_detail, name='outcome_detail'),
     # Phase 1 -- RFQ dispatch
     path('rfq/', views.rfq_queue, name='rfq_queue'),
     path('rfq/send-all/', views.rfq_send_all, name='rfq_send_all'),

@@ -3315,3 +3315,80 @@ main {
   background-color: var(--bs-body-bg);
   border-top: 1px solid var(--bs-border-color);
 }
+
+/* Quotes — Phase 4 Our Bids */
+.quote-time-selector {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 999px;
+}
+
+.quote-time-pill {
+  padding: 0.2rem 0.8rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+  background: none;
+  border: 0;
+  border-radius: 999px;
+}
+
+.quote-time-pill.active {
+  color: #fff;
+  background-color: var(--company-primary, var(--bs-primary));
+}
+
+[data-bs-theme="dark"] .quote-time-pill.active { color: var(--bs-body-bg); background-color: var(--bs-link-color); }
+
+.quote-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.quote-kpi {
+  padding: 0.875rem 1rem;
+  background-color: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.quote-kpi .label { color: var(--bs-secondary-color); }
+
+.quote-kpi-value { font-size: 1.75rem; font-weight: 800; line-height: 1.2; }
+.quote-kpi-value small { font-size: 0.875rem; font-weight: 400; color: var(--bs-secondary-color); }
+.quote-kpi-sub { font-size: 0.8125rem; color: var(--bs-secondary-color); }
+.quote-kpi-won { color: var(--bs-success-text-emphasis); }
+.quote-kpi-lost { color: var(--bs-danger-text-emphasis); }
+.quote-kpi-rate { color: var(--bs-primary-text-emphasis); }
+.quote-kpi-tight { color: var(--bs-warning-text-emphasis); }
+
+.quote-outcome-won { color: var(--bs-success-text-emphasis); background-color: var(--bs-success-bg-subtle); border: 1px solid var(--bs-success-border-subtle); }
+.quote-outcome-lost { color: var(--bs-danger-text-emphasis); background-color: var(--bs-danger-bg-subtle); border: 1px solid var(--bs-danger-border-subtle); }
+.quote-outcome-pending { color: var(--bs-info-text-emphasis); background-color: var(--bs-info-bg-subtle); border: 1px solid var(--bs-info-border-subtle); }
+.quote-outcome-tight { font-size: 0.68rem; color: var(--bs-warning-text-emphasis); background-color: var(--bs-warning-bg-subtle); }
+
+.quote-forensic-drawer { --bs-offcanvas-width: 500px; }
+
+.quote-forensic-card {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.quote-forensic-label {
+  margin-bottom: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--bs-primary-text-emphasis);
+}
+
+.quote-trends { margin: 0; padding-left: 1.1rem; font-size: 0.8125rem; line-height: 1.5; }

@@ -8,6 +8,7 @@ from .bids import (
     select_quote,
 )
 from .dashboard import dashboard
+from .our_bids import our_bids, outcome_detail, reconcile_now
 from .mailbox import (
     attachment_download,
     email_detail,
@@ -36,6 +37,9 @@ from .solicitations import (
 )
 
 __all__ = [
+    'our_bids',
+    'outcome_detail',
+    'reconcile_now',
     'bid_board',
     'bid_builder',
     'bid_export',

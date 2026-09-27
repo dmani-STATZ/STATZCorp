@@ -1,0 +1,60 @@
+{% comment %} Our Bids forensic drawer body. XHR fragment -- never {% extends %}. {% endcomment %}
+<div class="quote-forensic-card">
+  <div class="quote-forensic-label"><i class="bi bi-trophy"></i> Award outcome</div>
+  <dl class="quote-compare-dl">
+    <dt>Status</dt>
+    <dd>{% if o.outcome == 'WON' %}<span class="badge quote-outcome-won">WON</span>
+        {% elif o.outcome == 'LOST' %}<span class="badge quote-outcome-lost">LOST</span>
+        {% else %}<span class="badge quote-outcome-pending">PENDING</span>{% endif %}</dd>
+    {% if o.award %}
+    <dt>Contract / PIID</dt>
+    <dd class="font-monospace">
+      {% if award_url %}<a href="{{ award_url }}" target="statz_dibbs_award">{{ o.award.award_basic_number }}</a>{% else %}{{ o.award.award_basic_number|default:"—" }}{% endif %}
+      {% if o.award.delivery_order_number %} / {{ o.award.delivery_order_number }}{% endif %}
+    </dd>
+    <dt>Award date</dt><dd>{{ o.award.award_date|date:"M j, Y" }}</dd>
+    <dt>Winner</dt><dd>{{ o.winning_entity_name|default:"—" }}</dd>
+    <dt>Winning CAGE</dt>
+    <dd class="font-monospace">{% if o.winning_cage %}<a href="{% url 'dibbs:entity_cage_lookup' o.winning_cage %}" target="statz_entity">{{ o.winning_cage }}</a>{% else %}—{% endif %}</dd>
+    <dt>Award total</dt><dd>{% if o.award_total_price is not None %}${{ o.award_total_price|floatformat:2 }}{% else %}not published{% endif %}</dd>
+    <dt title="Award total / our line quantity">Unit (derived)</dt>
+    <dd>{% if o.award_unit_price is not None %}${{ o.award_unit_price|floatformat:2 }} &times; {{ o.award_quantity }}{% else %}—{% endif %}</dd>
+    <dt>Our delta</dt>
+    <dd class="{% if o.outcome == 'LOST' and o.dollar_delta > 0 %}text-danger{% endif %}">
+      {% if o.dollar_delta is not None %}{% if o.dollar_delta > 0 %}+{% endif %}${{ o.dollar_delta|floatformat:2 }} ({% if o.pct_spread > 0 %}+{% endif %}{{ o.pct_spread|floatformat:1 }}%){% else %}—{% endif %}
+    </dd>
+    {% if o.award.is_faux %}<dt></dt><dd class="small text-body-secondary">Placeholder award (a modification arrived first); price follows when the award posts.</dd>{% endif %}
+    {% else %}
+    <dt>Award</dt><dd>Not posted yet</dd>
+    {% endif %}
+  </dl>
+</div>
+
+<div class="quote-forensic-card">
+  <div class="quote-forensic-label"><i class="bi bi-camera"></i> Frozen bid snapshot</div>
+  <dl class="quote-compare-dl">
+    <dt>Solicitation</dt>
+    <dd class="font-monospace"><a href="{% url 'quote:bid_builder' line.solicitation.solicitation_number %}">{{ line.solicitation.solicitation_number }}</a>{% if line.line_number %} / {{ line.line_number }}{% endif %}</dd>
+    <dt>Submitted</dt><dd>{{ o.submission_date|date:"M j, Y" }} in <span class="font-monospace">{{ o.bid.exported_bq_file|default:"—" }}</span></dd>
+    <dt>Supplier</dt><dd>{{ o.snapshot_supplier_name|default:"—" }}</dd>
+    <dt>Supplier cost</dt><dd>{% if o.snapshot_supplier_unit_cost is not None %}${{ o.snapshot_supplier_unit_cost|floatformat:2 }}{% else %}—{% endif %}</dd>
+    <dt>Packhouse</dt><dd>{{ o.snapshot_packhouse_name|default:"Supplier / in-house" }}</dd>
+    <dt>Pack adder</dt><dd>+${{ o.snapshot_packaging_adder_unit|floatformat:2 }}</dd>
+    <dt>Freight adder</dt><dd>+${{ o.snapshot_freight_adder_unit|floatformat:2 }}</dd>
+    <dt>Physical</dt><dd>{% if o.snapshot_weight_lbs %}{{ o.snapshot_weight_lbs|floatformat:"-3" }} lb{% endif %}{% if o.snapshot_dimensions %} &middot; {{ o.snapshot_dimensions }}{% endif %}{% if not o.snapshot_weight_lbs and not o.snapshot_dimensions %}—{% endif %}</dd>
+    <dt>Markup</dt><dd>{% if o.snapshot_margin_pct is not None %}{{ o.snapshot_margin_pct|floatformat:2 }}%{% else %}—{% endif %}</dd>
+    <dt>Unit submitted</dt><dd class="fw-semibold">${{ o.our_unit_price|floatformat:2 }}</dd>
+    <dt>Submitted by</dt><dd>{{ o.snapshot_submitter_name|default:"—" }}</dd>
+    <dt>Source email</dt>
+    <dd>{% if o.source_email %}<a href="{% url 'quote:mailbox' %}?email={{ o.source_email.pk }}" target="statz_mailbox">{{ o.source_email.subject|truncatechars:40 }}</a>{% else %}—{% endif %}</dd>
+  </dl>
+</div>
+
+<div class="quote-forensic-card">
+  <div class="quote-forensic-label"><i class="bi bi-lightbulb"></i> Competitive trends</div>
+  {% if trends %}
+  <ul class="quote-trends">{% for t in trends %}<li>{{ t }}</li>{% endfor %}</ul>
+  {% else %}
+  <p class="small text-body-secondary mb-0">Not enough history on this NSN yet.</p>
+  {% endif %}
+</div>

@@ -1,0 +1,232 @@
+{% extends "quote/base.html" %}
+
+{% block content %}
+<div class="row-between flex-wrap mb-3">
+  <div>
+    <h1 class="h4 mb-0">Our Bids</h1>
+    <div class="text-body-secondary small">
+      Submitted bids matched to DIBBS awards.
+      {% if last_reconciled %}Last checked {{ last_reconciled|timesince }} ago.{% endif %}
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <div class="quote-time-selector" id="timeframe" role="group" aria-label="Timeframe">
+      <button type="button" class="quote-time-pill" data-tf="week">Week</button>
+      <button type="button" class="quote-time-pill active" data-tf="month">Month</button>
+      <button type="button" class="quote-time-pill" data-tf="quarter">Quarter</button>
+      <button type="button" class="quote-time-pill" data-tf="all">All time</button>
+    </div>
+    <form method="post" action="{% url 'quote:reconcile_now' %}" class="m-0">
+      {% csrf_token %}
+      <button class="btn btn-outline-brand btn-sm" title="Match pending bids to DIBBS awards now (runs hourly on its own)">
+        <i class="bi bi-arrow-repeat"></i> Check awards now
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="quote-kpi-row">
+  <div class="quote-kpi">
+    <div class="label">Bids won</div>
+    <div class="quote-kpi-value quote-kpi-won"><span id="kWon">0</span> <small id="kWonValue"></small></div>
+    <div class="quote-kpi-sub">Avg markup: <strong id="kWonMargin">—</strong></div>
+  </div>
+  <div class="quote-kpi">
+    <div class="label">Bids lost</div>
+    <div class="quote-kpi-value quote-kpi-lost"><span id="kLost">0</span> <small id="kLostValue"></small></div>
+    <div class="quote-kpi-sub" title="Average of how far above the winning price our lost bids were">Avg over winner: <strong id="kLostSpread">—</strong></div>
+  </div>
+  <div class="quote-kpi">
+    <div class="label">Win rate</div>
+    <div class="quote-kpi-value quote-kpi-rate" id="kRate">—</div>
+    <div class="quote-kpi-sub"><span id="kDecided">0</span> bids decided &middot; <span id="kPending">0</span> pending</div>
+  </div>
+  <div class="quote-kpi">
+    <div class="label">"Within 5%" misses</div>
+    <div class="quote-kpi-value quote-kpi-tight"><span id="kTight">0</span> <small id="kTightValue"></small></div>
+    <div class="quote-kpi-sub">Lost by 5% or less</div>
+  </div>
+</div>
+
+<div class="row-between flex-wrap gap-2 mb-2">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <input type="search" id="bidSearch" class="form-control form-control-sm quote-filter-search"
+           placeholder="Search SOL #, NSN, item, winner, supplier" autocomplete="off">
+    <div class="quote-pill-group" id="statusFilter">
+      <button type="button" class="quote-pill active" data-status="ALL">All <span data-count="ALL"></span></button>
+      <button type="button" class="quote-pill" data-status="WON">Won <span data-count="WON"></span></button>
+      <button type="button" class="quote-pill" data-status="LOST">Lost <span data-count="LOST"></span></button>
+      <button type="button" class="quote-pill" data-status="PENDING">Pending <span data-count="PENDING"></span></button>
+      <button type="button" class="quote-pill" data-status="TIGHT">Within 5% <span data-count="TIGHT"></span></button>
+    </div>
+  </div>
+  <div class="small text-body-secondary">Showing bids from <strong id="tfLabel">the last 30 days</strong></div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead><tr>
+        <th>Status</th><th>Solicitation</th><th>NSN / item</th><th>Bid date</th>
+        <th class="text-end">Our unit bid</th>
+        <th class="text-end" title="Derived: award total / our line quantity">Award price*</th>
+        <th class="text-end">$ delta</th><th class="text-end">% spread</th><th>Winner</th><th></th>
+      </tr></thead>
+      <tbody id="bidBody"></tbody>
+    </table>
+  </div>
+  <div class="px-3 py-2 border-top small text-body-secondary">
+    * DIBBS publishes award totals, not unit prices: award price = total contract price &divide; our line quantity (approximate on multi-line awards).
+  </div>
+</div>
+
+{{ rows|json_script:"ourBidsData" }}
+
+<div class="offcanvas offcanvas-end quote-forensic-drawer" tabindex="-1" id="forensicDrawer" aria-labelledby="forensicTitle">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="forensicTitle">Bid forensics</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body" id="forensicBody"></div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  const ROWS = JSON.parse(document.getElementById('ourBidsData').textContent);
+  const DETAIL_URL = '{% url "quote:outcome_detail" 0 %}';
+  const TF_LABELS = { week: 'the past 7 days', month: 'the last 30 days', quarter: 'this quarter', all: 'all time' };
+  const state = { tf: 'month', status: 'ALL', q: '' };
+  const body = document.getElementById('bidBody');
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+  function money(v, dp) {
+    if (v == null) return '—';
+    return '$' + v.toLocaleString(undefined, { minimumFractionDigits: dp == null ? 2 : dp, maximumFractionDigits: dp == null ? 2 : dp });
+  }
+  function short(v) {
+    if (!v) return '';
+    if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+    return money(v, 0);
+  }
+  function since(tf) {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    if (tf === 'week') { d.setDate(d.getDate() - 7); return d; }
+    if (tf === 'month') { d.setDate(d.getDate() - 30); return d; }
+    if (tf === 'quarter') { return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1); }
+    return null;
+  }
+  function inTimeframe(r) {
+    const s = since(state.tf);
+    return !s || new Date(r.bidDate + 'T00:00:00') >= s;
+  }
+  function matchesStatus(r) {
+    if (state.status === 'ALL') return true;
+    if (state.status === 'TIGHT') return r.tight;
+    return r.status === state.status;
+  }
+  function matchesSearch(r) {
+    if (!state.q) return true;
+    return (r.sol + ' ' + r.nsn + ' ' + r.nsn.replace(/-/g, '') + ' ' + r.nomen + ' ' + r.winner + ' ' + r.cage + ' ' + r.supplier)
+      .toLowerCase().includes(state.q);
+  }
+
+  function kpis(rows) {
+    const won = rows.filter(r => r.status === 'WON');
+    const lost = rows.filter(r => r.status === 'LOST');
+    const tight = rows.filter(r => r.tight);
+    const sum = (arr, k) => arr.reduce((a, r) => a + (r[k] || 0), 0);
+    const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+    document.getElementById('kWon').textContent = won.length;
+    document.getElementById('kWonValue').textContent = short(sum(won, 'value'));
+    const m = avg(won.filter(r => r.margin != null).map(r => r.margin));
+    document.getElementById('kWonMargin').textContent = m == null ? '—' : m.toFixed(1) + '%';
+    document.getElementById('kLost').textContent = lost.length;
+    document.getElementById('kLostValue').textContent = short(sum(lost, 'value'));
+    const sp = avg(lost.filter(r => r.pct != null).map(r => r.pct));
+    document.getElementById('kLostSpread').textContent = sp == null ? '—' : (sp >= 0 ? '+' : '') + sp.toFixed(1) + '%';
+    const decided = won.length + lost.length;
+    document.getElementById('kRate').textContent = decided ? (won.length / decided * 100).toFixed(1) + '%' : '—';
+    document.getElementById('kDecided').textContent = decided;
+    document.getElementById('kPending').textContent = rows.filter(r => r.status === 'PENDING').length;
+    document.getElementById('kTight').textContent = tight.length;
+    document.getElementById('kTightValue').textContent = short(sum(tight, 'value'));
+  }
+
+  function badge(r) {
+    const cls = { WON: 'quote-outcome-won', LOST: 'quote-outcome-lost', PENDING: 'quote-outcome-pending' }[r.status];
+    return '<span class="badge ' + cls + '">' + r.status + '</span>';
+  }
+
+  function render() {
+    const inTf = ROWS.filter(inTimeframe);
+    kpis(inTf);
+    const counts = { ALL: inTf.length, WON: 0, LOST: 0, PENDING: 0, TIGHT: 0 };
+    inTf.forEach(r => { counts[r.status] += 1; if (r.tight) counts.TIGHT += 1; });
+    Object.keys(counts).forEach(k => {
+      const el = document.querySelector('[data-count="' + k + '"]');
+      if (el) el.textContent = '(' + counts[k] + ')';
+    });
+    const shown = inTf.filter(r => matchesStatus(r) && matchesSearch(r));
+    body.innerHTML = shown.length ? shown.map(r => {
+      const delta = r.delta == null ? '—' : (r.delta > 0 ? '+' : '') + money(r.delta).replace('$-', '-$');
+      const pct = r.pct == null ? '—' : (r.pct > 0 ? '+' : '') + r.pct.toFixed(1) + '%' +
+        (r.tight ? ' <span class="badge quote-outcome-tight">Within 5%</span>' : '');
+      return '<tr>' +
+        '<td>' + badge(r) + '</td>' +
+        '<td class="font-monospace fw-semibold">' + esc(r.sol) + '</td>' +
+        '<td><span class="font-monospace">' + esc(r.nsn) + '</span><div class="small text-body-secondary">' + esc(r.nomen) + '</div></td>' +
+        '<td>' + esc(r.bidDate) + '</td>' +
+        '<td class="text-end">' + money(r.ourPrice) + '</td>' +
+        '<td class="text-end">' + money(r.awardPrice) + '</td>' +
+        '<td class="text-end ' + (r.status === 'LOST' && r.delta > 0 ? 'text-danger' : '') + '">' + delta + '</td>' +
+        '<td class="text-end">' + pct + '</td>' +
+        '<td>' + esc(r.winner || '—') + (r.cage && r.winner !== r.cage ? ' <span class="font-monospace small text-body-secondary">' + esc(r.cage) + '</span>' : '') + '</td>' +
+        '<td class="text-end"><button type="button" class="btn btn-outline-secondary btn-sm" data-detail="' + r.id + '">Details</button></td>' +
+        '</tr>';
+    }).join('') : '<tr><td colspan="10" class="text-center text-body-secondary py-4">No bids match.</td></tr>';
+    document.getElementById('tfLabel').textContent = TF_LABELS[state.tf];
+  }
+
+  document.getElementById('timeframe').addEventListener('click', e => {
+    const b = e.target.closest('[data-tf]'); if (!b) return;
+    state.tf = b.dataset.tf;
+    document.querySelectorAll('.quote-time-pill').forEach(p => p.classList.toggle('active', p === b));
+    render();
+  });
+  document.getElementById('statusFilter').addEventListener('click', e => {
+    const b = e.target.closest('[data-status]'); if (!b) return;
+    state.status = b.dataset.status;
+    document.querySelectorAll('#statusFilter .quote-pill').forEach(p => p.classList.toggle('active', p === b));
+    render();
+  });
+  let t = null;
+  document.getElementById('bidSearch').addEventListener('input', e => {
+    clearTimeout(t); t = setTimeout(() => { state.q = e.target.value.trim().toLowerCase(); render(); }, 150);
+  });
+
+  const drawerEl = document.getElementById('forensicDrawer');
+  body.addEventListener('click', e => {
+    const b = e.target.closest('[data-detail]'); if (!b) return;
+    const row = ROWS.find(r => String(r.id) === b.dataset.detail);
+    document.getElementById('forensicTitle').textContent = 'Bid forensics: ' + (row ? row.sol : '');
+    const out = document.getElementById('forensicBody');
+    out.innerHTML = '<div class="text-body-secondary">Loading&hellip;</div>';
+    bootstrap.Offcanvas.getOrCreateInstance(drawerEl).show();
+    fetch(DETAIL_URL.replace('/0/', '/' + b.dataset.detail + '/'), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.ok ? r.text() : Promise.reject(r.status))
+      .then(html => { out.innerHTML = html; })
+      .catch(() => { out.innerHTML = '<div class="text-danger">Could not load this bid.</div>'; });
+  });
+
+  render();
+})();
+</script>
+{% endblock extra_js %}

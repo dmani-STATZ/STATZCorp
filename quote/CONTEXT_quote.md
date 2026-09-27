@@ -50,6 +50,8 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `views/mailbox.py` | Phase 2 mailbox + drawer endpoints. |
 | `services/bids.py` | Phase 3: bid defaults, `preflight`, `bq_row` / `render_bq` writer, `export_bids`, `reexport`, `reopen_bid`, `select_quote`. |
 | `views/bids.py` | Bid Board, compare drawer, builder, export. |
+| `services/outcomes.py` + `tasks/reconcile_bid_outcomes.py` | Phase 4: award matching, won/lost + derived deltas, KPI rows, trends. |
+| `views/our_bids.py` | Our Bids page, forensic drawer, reconcile-now. |
 | `services/walk.py` | `claim_next` — next-available navigation for work-the-list mode. |
 | `services/rfq.py` | `queue_rfqs`, `resolve_recipients`, `compose_message`, `pending_groups`, `send_supplier_rfqs`. |
 | `services/archival.py` + `tasks/archive_stale_solicitations.py` | 7-day / past-due archival (daily `ScheduledTask`, seeded by `0005`). |
@@ -182,8 +184,32 @@ BW/AB; dealer without mfr CAGE; item bought by P/N (col 105 P/B) without P/N +
 CAGE; code 1 not in the AS file; code 2 not AB; characters ISO-8859-1 cannot
 hold. Warnings: delivery longer than required; template holding U+FFFD.
 
-Phase 4 (Our Bids / award reconciliation) is not built; `BidOutcome` rows are
-created at export and wait for it.
+**Phase 4 (built) — Our Bids (`/quote/our-bids/`):**
+1. Reconciliation (`services/outcomes.reconcile`, hourly task
+   `reconcile_bid_outcomes` + **Check awards now**) re-checks every outcome
+   that is PENDING or rests on a faux award. `find_award`: awards for the SOL
+   (FK or indexed `sol_number` -- never `dibbs_solicitation_number`, which is
+   unindexed on 900k rows) → same purchase request, else same NSN (excluding
+   awards naming a *different* PR), else any award when the SOL has one line;
+   priced beats faux, newest first. WON when the awardee CAGE is one of our
+   active CAGEs. Award unit price is **derived** = total ÷ our line quantity.
+   `within_5_pct` = lost by (0, 5]%.
+2. Page: every outcome ships once (json_script); timeframe (Week = 7 days,
+   Month = 30 days, Quarter = calendar quarter, All time), status pills
+   (All / Won / Lost / Pending / Within 5%) and search filter in the browser and
+   recompute the KPI cards: won count + value (our price × qty) + avg markup;
+   lost count + value + avg % over winner; win rate over decided bids;
+   within-5% count + value.
+3. **Details** drawer (`outcome_detail`, XHR): award outcome (PIID linked to
+   DIBBS, winner, winning CAGE → entity lookup, total, derived unit, delta),
+   frozen bid snapshot, and computed competitive trends
+   (`services/outcomes.trends`): our record on the NSN, a what-if at the lowest
+   preset markup (or "no markup would have won" when landed ≥ winning), top DLA
+   winners on the NSN (2 years), the winner's wins in the FSC, and how bids
+   built on this supplier have fared.
+
+Winner names come from our CAGEs, the supplier directory, then cached SAM names
+(`entity_names`); reconciliation never calls the SAM API.
 
 ## 7. Templates and UI
 - Bootstrap 5.3.3 (Spacelab) from the global base. New classes go in
@@ -251,6 +277,9 @@ created at export and wait for it.
 | `quote:bid_builder` | `/quote/bids/<sol>/` | GET / POST (`action=draft\|ready`) |
 | `quote:bid_export` | `/quote/bids/export/` | GET list, POST `bid_ids` → file |
 | `quote:bid_reexport` / `bid_reopen_export` | `/quote/bids/export/<file>/` (`reopen/`) | GET file / POST |
+| `quote:our_bids` | `/quote/our-bids/` | |
+| `quote:outcome_detail` | `/quote/our-bids/<id>/` | XHR fragment |
+| `quote:reconcile_now` | `/quote/our-bids/reconcile/` | POST |
 | `quote:attachment_download` | `/quote/mailbox/attachments/<id>/` | always `octet-stream` + `nosniff`, except verified PDFs inline |
 
 ## 13. Permissions / Security
@@ -264,7 +293,8 @@ created at export and wait for it.
 ## 14. Background Work
 - `import_completed` receiver (synchronous, inside the import request / WebJob).
 - `archive_stale_solicitations` (daily, run_order 9) — `quote/tasks/`, seeded by `0005`.
-- Planned: `quotes@` mailbox poller, nightly `BidOutcome` reconciliation.
+- `reconcile_bid_outcomes` (hourly, run_order 10) — seeded by `0007`.
+- Mailbox sync is on demand (**Check for new mail**); no poller.
 
 ## 14a. Demo Data (dev only)
 `python manage.py seed_quote_demo` seeds ten solicitations across every stage
@@ -277,7 +307,9 @@ pre-existing `contracts_nsn` row.
 
 ## 15. Testing
 `test_scaffold.py` (wiring, table prefixes, FK targets, landed cost, auto-award
-gate, claims, RFQ uniqueness, templates), `test_phase3.py` (bid defaults, every pre-flight rule, writer preserves the
+gate, claims, RFQ uniqueness, templates), `test_phase4.py` (pending → won / lost, derived unit + deltas, within 5%, faux
+→ real upgrade, purchase-request line matching, trends what-if, task, views),
+`test_phase3.py` (bid defaults, every pre-flight rule, writer preserves the
 DIBBS template / never pads / QUOTE_ALL + CRLF + 121 columns, export → snapshot
 → re-download → reopen, all-or-nothing export, manual pick sticks, views),
 `test_phase2.py` (cost math, SOL/NSN detection, ingest + supplier resolution,
@@ -298,6 +330,7 @@ Run `python manage.py test quote dibbs`.
   existing solicitation a state (past due → `ARCHIVED`, else `UNMATCHED`).
 - `0005_seed_archive_task` — `ScheduledTask` row for `archive_stale_solicitations`.
 - `0006_email_supplier` — nullable `QuoteEmail.supplier` FK (resolved sender).
+- `0007_seed_reconcile_task` — `ScheduledTask` row for `reconcile_bid_outcomes`.
 - `products/migrations/0005` added the NSN dimension provenance fields.
 
 ## 17. Known Gaps
