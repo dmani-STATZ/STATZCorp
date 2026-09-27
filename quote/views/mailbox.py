@@ -295,9 +295,9 @@ def save_quote(request, email_id):
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
 
     message = (
-        f"Saved {supplier.name} at ${result['price']} "
+        f"Saved {supplier.name} at ${result['price']:,.2f} "
         f"({len(result['quotes'])} line{'s' if len(result['quotes']) != 1 else ''} on "
-        f"{solicitation.solicitation_number}, landed ${result['landed']}, "
+        f"{solicitation.solicitation_number}, landed ${result['landed']:,.2f}, "
         f"markup {result['markup_pct']}%)."
     )
     if result['dims_saved']:

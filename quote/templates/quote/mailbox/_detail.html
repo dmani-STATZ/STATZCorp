@@ -37,9 +37,10 @@
       </div>
     </div>
     <div>
+      {# Never disabled: when something is missing, clicking says what and opens the right picker. #}
       <button type="button" class="btn btn-primary btn-sm" data-action="open-drawer"
-              {% if not linked or not email.supplier %}disabled{% endif %}
-              title="{% if not linked %}Link a solicitation first{% elif not email.supplier %}Set the supplier first{% else %}Log this supplier's quote{% endif %}">
+              data-needs="{% if not linked %}sol{% elif not email.supplier %}supplier{% endif %}"
+              title="Log this supplier's quote">
         <i class="bi bi-lightning-charge-fill"></i> Log supplier quote
       </button>
     </div>

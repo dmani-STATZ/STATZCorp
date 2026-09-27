@@ -232,6 +232,9 @@
   function money(n) { return '$' + n.toFixed(2); }
 
   let current = null;   // { root, urls }
+  // Set when "Log supplier quote" had to ask for a SOL or supplier first; the
+  // drawer then opens by itself once the message reloads with what it needed.
+  let openDrawerAfterReload = false;
 
   // Modals are page-level; they act on whichever message is loaded.
   const linkModalEl = document.getElementById('linkSolModal');
@@ -257,6 +260,7 @@
       if (!res.ok) { window.showToast('error', 'Could not link that solicitation.'); return; }
       bootstrap.Modal.getOrCreateInstance(linkModalEl).hide();
       window.showToast('success', btn.dataset.sol + ' linked.');
+      linkModalEl.dataset.done = '1';
       window.quoteMailbox.reload();
     });
   });
@@ -279,9 +283,29 @@
       if (!res.ok) { window.showToast('error', 'Could not set the supplier.'); return; }
       bootstrap.Modal.getOrCreateInstance(supplierModalEl).hide();
       window.showToast('success', 'Supplier set to ' + res.body.supplier + '.');
+      supplierModalEl.dataset.done = '1';
       window.quoteMailbox.reload();
     });
   });
+
+  // Closing a picker without choosing cancels the pending drawer open.
+  [linkModalEl, supplierModalEl].forEach(el => el.addEventListener('hidden.bs.modal', () => {
+    if (el.dataset.done !== '1') openDrawerAfterReload = false;
+    el.dataset.done = '';
+  }));
+
+  function openLinkModal() {
+    document.getElementById('linkSolSearch').value = '';
+    document.getElementById('linkSolResults').innerHTML = '';
+    bootstrap.Modal.getOrCreateInstance(linkModalEl).show();
+    setTimeout(() => document.getElementById('linkSolSearch').focus(), 300);
+  }
+  function openSupplierModal() {
+    document.getElementById('supplierModalSearch').value = '';
+    document.getElementById('supplierModalResults').innerHTML = '';
+    bootstrap.Modal.getOrCreateInstance(supplierModalEl).show();
+    setTimeout(() => document.getElementById('supplierModalSearch').focus(), 300);
+  }
 
   // ── Per-message wiring (called after each fragment swap) ──────────────────
   window.quoteInitDetail = function (container) {
@@ -296,19 +320,26 @@
       if (!btn) return;
       const action = btn.dataset.action;
       if (action === 'open-link') {
-        document.getElementById('linkSolSearch').value = '';
-        document.getElementById('linkSolResults').innerHTML = '';
-        bootstrap.Modal.getOrCreateInstance(linkModalEl).show();
+        openLinkModal();
       } else if (action === 'set-supplier') {
-        document.getElementById('supplierModalSearch').value = '';
-        document.getElementById('supplierModalResults').innerHTML = '';
-        bootstrap.Modal.getOrCreateInstance(supplierModalEl).show();
+        openSupplierModal();
       } else if (action === 'unlink') {
         post(root.dataset.unlinkUrl, { sol: btn.dataset.sol }).then(res => {
           if (res.ok) { window.showToast('info', btn.dataset.sol + ' unlinked.'); window.quoteMailbox.reload(); }
         });
       } else if (action === 'open-drawer') {
-        bootstrap.Offcanvas.getOrCreateInstance(container.querySelector('#quoteDrawer')).show();
+        const needs = btn.dataset.needs;
+        if (needs === 'sol') {
+          window.showToast('info', 'First, link the solicitation this quote is for.');
+          openDrawerAfterReload = true;
+          openLinkModal();
+        } else if (needs === 'supplier') {
+          window.showToast('info', 'First, pick the supplier who sent this.');
+          openDrawerAfterReload = true;
+          openSupplierModal();
+        } else {
+          bootstrap.Offcanvas.getOrCreateInstance(container.querySelector('#quoteDrawer')).show();
+        }
       }
     });
 
@@ -480,6 +511,13 @@
     });
 
     renderSol();
+
+    // Finish a "Log supplier quote" that had to ask for a SOL / supplier first.
+    if (openDrawerAfterReload) {
+      openDrawerAfterReload = false;
+      const btn = root.querySelector('[data-action="open-drawer"]');
+      if (btn) btn.click();
+    }
   };
 })();
 </script>
