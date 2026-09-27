@@ -119,6 +119,8 @@ else `primary_email` (`services/rfq.resolve_recipients`).
 3. Inbox (left) filters client-side: All / No SOL / Needs quote / Unread +
    search; ↑/↓ move between messages. Selecting one swaps in a detail fragment
    (`email_detail`, XHR) — no page reload — and takes the email's 20-minute claim.
+   Read state is app-only: the real mailbox is never marked read (reps watch
+   its unread count in Outlook). The sync is read-only against Graph.
 4. Message pane: supplier (or **Set supplier**), linked SOL chips (unlink ×,
    **+ Link SOL** search by SOL/NSN/part #), attachments, body, quotes already
    logged from it. Body renders only in `<iframe sandbox="allow-popups

@@ -208,7 +208,7 @@ class SaveQuoteTests(MailboxBase):
 class MailboxViewTests(MailboxBase):
     def setUp(self):
         super().setUp()
-        # Opening a message marks it read in the real mailbox -- never from tests.
+        # Opening a message must never write to the real mailbox.
         patcher = patch('quote.views.mailbox.graph_inbox.mark_message_read', return_value=None)
         self.mark_read = patcher.start()
         self.addCleanup(patcher.stop)
@@ -229,7 +229,7 @@ class MailboxViewTests(MailboxBase):
         self.assertContains(resp, 'SPE1C126Q0528')
         self.email.refresh_from_db()
         self.assertTrue(self.email.is_read)
-        self.mark_read.assert_called_once_with('AAMk-1')
+        self.mark_read.assert_not_called()
         self.assertEqual(self.email.claimed_by, self.user)
 
     def test_attachment_never_served_as_html(self):

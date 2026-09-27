@@ -31,7 +31,6 @@ from suppliers.models import Supplier
 logger = logging.getLogger(__name__)
 
 INBOX_LIMIT = 300
-DEMO_PREFIX = 'DEMO-SEED-MSG-'
 
 #: Prepended to every rendered email body. With the iframe's empty ``sandbox``
 #: (no scripts, no same-origin) this also blocks remote images / tracking
@@ -167,11 +166,11 @@ def email_detail(request, email_id):
         QuoteEmail.objects.select_related('supplier', 'claimed_by'), pk=email_id,
     )
     claimed_by_other = not email.try_claim(request.user)
+    # Read state is tracked in the app only. The real quotes@ mailbox is never
+    # written to -- people watch its unread count in Outlook.
     if not email.is_read:
         email.is_read = True
         email.save(update_fields=['is_read', 'modified_on'])
-        if not email.graph_message_id.startswith(DEMO_PREFIX):
-            graph_inbox.mark_message_read(email.graph_message_id)  # best effort; logs on failure
 
     grouped = _linked_solicitations(email)
     quotes = (
