@@ -241,6 +241,11 @@ class DibbsAwardMod(models.Model):
         blank=True,
         related_name="acknowledged_dibbs_mods",
     )
+    notified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the new-mod email went out. NULL = not sent (or send failed).",
+    )
 
     class Meta:
         db_table = "dibbs_award_mod"

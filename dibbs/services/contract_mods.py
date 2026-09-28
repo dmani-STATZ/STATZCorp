@@ -3,6 +3,7 @@ DIBBS contract modification helpers for contract-page display and matching.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -19,6 +20,7 @@ from dibbs.constants import PARTNER_CAGES
 from dibbs.models import CompanyCAGE, DibbsAwardMod
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 _DIBBS_AWDREC_BASE = "https://www.dibbs.bsm.dla.mil/Awards/AwdRec.aspx"
 
@@ -125,7 +127,8 @@ def match_new_mods_after_import(
     Attempt contract matching for DibbsAwardMod rows created after import.
 
     Only mods whose ``awardee_cage`` is in active CompanyCAGE codes or
-    ``PARTNER_CAGES`` are considered. Returns the number of mods newly matched.
+    ``PARTNER_CAGES`` are considered. Newly matched mods trigger a new-mod
+    email (see ``mod_notifications``). Returns the number of mods newly matched.
     """
     cages = active_cages if active_cages is not None else active_company_cage_codes()
     if not cages:
@@ -138,11 +141,22 @@ def match_new_mods_after_import(
     if before_max_mod_id is not None:
         qs = qs.filter(id__gt=before_max_mod_id)
 
-    matched = 0
+    matched_ids: list[int] = []
     for mod in qs.iterator(chunk_size=200):
         if match_dibbs_award_mod(mod):
-            matched += 1
-    return matched
+            matched_ids.append(mod.pk)
+
+    if matched_ids:
+        # Email failures must never break the import.
+        try:
+            from dibbs.services.mod_notifications import notify_new_mods
+
+            notify_new_mods(matched_ids)
+        except Exception:
+            logger.exception(
+                "match_new_mods_after_import: new-mod notification failed"
+            )
+    return len(matched_ids)
 
 
 def max_dibbs_award_mod_id() -> int | None:

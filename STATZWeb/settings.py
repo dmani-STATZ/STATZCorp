@@ -378,6 +378,10 @@ GRAPH_MAIL_CLIENT_SECRET = os.environ.get("GRAPH_MAIL_CLIENT_SECRET", "")
 GRAPH_MAIL_SENDER_CONTRACT = os.environ.get("GRAPH_MAIL_SENDER_CONTRACT", "info@statzcorp.com")
 GRAPH_MAIL_SENDER_RFQ = os.environ.get("GRAPH_MAIL_SENDER_RFQ", "quotes@statzcorp.com")
 
+# Public base URL of this app (e.g. https://statz.example.com), used for links in
+# outbound emails. Blank = emails omit the link back into STATZ.
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "").strip()
+
 # Set to True to send via Graph API.
 # Set to False to fall back to mailto: links (manual send from user's email client).
 GRAPH_MAIL_ENABLED = (

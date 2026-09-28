@@ -50,6 +50,11 @@ table keyed to the solicitation/line.
 - `import_completed` must be fired with `send_import_completed()` (robust send),
   after lines and approved sources are written — receivers query them.
 - `CompanyCAGE`: exactly one active `is_default=True` row; the CAGE views enforce it.
+- `match_new_mods_after_import` emails the contract reviewer (or the
+  "Contract Administrators" group) for each newly matched mod via
+  `mod_notifications.notify_new_mods`. Keep that call wrapped in try/except —
+  mail must never break an import. Bulk/backfill matching (`rematch_unmatched_mods`)
+  must not notify, or old mods get emailed en masse.
 
 ## 5. Before changing views / templates
 - `@login_required` everywhere; AW upload also checks `is_staff`.

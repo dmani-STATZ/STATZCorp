@@ -40,6 +40,7 @@ spec is archived at `docs/legacy/sales_DIBBS_System_Spec.md`.
 | `services/dibbs_fetch.py`, `dibbs_session.py`, `dibbs_pdf.py`, `ca_parser.py` | DIBBS downloads (Playwright + requests), PDF fetch/parse, CA zip procurement history |
 | `services/awards_file_importer.py`, `awards_file_parser.py`, `awdrecs_parser.py`, `dibbs_awards_scraper.py`, `poll_we_won_today.py` | Award ingestion — all paths stage rows and call `usp_process_award_staging` |
 | `services/contract_mods.py` | DIBBS mod ↔ `contracts.Contract` matching; `mods_for_contract` used by contracts |
+| `services/mod_notifications.py` | New-mod email (Graph, from `GRAPH_MAIL_SENDER_CONTRACT`). Fired by `match_new_mods_after_import` for newly matched mods; one email per contract to `contract.reviewed_by`, else active members of the **"Contract Administrators"** group (seeded by `0005`). `DibbsAwardMod.notified_at` prevents repeats; NULL after a failed send. `rematch_unmatched_mods` does **not** notify. Needs `GRAPH_MAIL_ENABLED`; `APP_BASE_URL` adds the contract link |
 | `services/competitor_stats.py`, `competitor_supplier_intel.py` | Competitors Numbers aggregation (canonical) + award-PDF entity extraction |
 | `services/sam_entity.py`, `cage_utils.py`, `dibbs_notices.py`, `sol_analysis.py`, `staging_cleanup.py`, `proc_versions.py`, `proc_verification.py` | Supporting services |
 | `signals.py` | `import_completed` signal + `send_import_completed(batch)` |
