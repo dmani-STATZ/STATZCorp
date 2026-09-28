@@ -4,7 +4,7 @@
 
 <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem; margin-bottom:1.25rem; flex-wrap:wrap;">
   <h1 class="h4 mb-0">{{ page_title }}</h1>
-  <span style="font-size:0.8125rem; color:#6b7280;">{{ total_groups }} contract{{ total_groups|pluralize }} won</span>
+  <span style="font-size:0.8125rem; color:var(--bs-secondary-color);">{{ total_groups }} contract{{ total_groups|pluralize }} won</span>
 </div>
 
 <div class="data-table-wrap">
@@ -22,7 +22,7 @@
     <tbody>
       {% for group in page_obj %}
         {# Group header row #}
-        <tr style="border-top:2px solid #e5e7eb; background:#f9fafb;">
+        <tr style="border-top:2px solid var(--bs-border-color); background:var(--bs-tertiary-bg);">
           <td class="font-monospace small fw-semibold" style="padding:0.75rem 0.75rem;">
             {{ group.award_basic_number|default:"—" }}
             {% if group.has_mods %}
@@ -53,14 +53,14 @@
         </tr>
         {# CLIN continuation rows — skip first line already shown in header #}
         {% for line in group.lines|slice:"1:" %}
-        <tr style="background:#fff;">
+        <tr style="background:var(--bs-body-bg);">
           <td style="padding:0.55rem 0.75rem;"></td>
           <td style="padding:0.55rem 0.75rem;"></td>
           <td style="padding:0.55rem 0.75rem;"></td>
-          <td class="font-monospace small" style="color:#6b7280; padding:0.55rem 0.75rem;">
+          <td class="font-monospace small" style="color:var(--bs-secondary-color); padding:0.55rem 0.75rem;">
             {{ line.nsn|default:"—" }}
           </td>
-          <td class="small" style="color:#6b7280; padding:0.55rem 0.75rem;">
+          <td class="small" style="color:var(--bs-secondary-color); padding:0.55rem 0.75rem;">
             {{ line.nomenclature|default:"—" }}
           </td>
           <td style="padding:0.55rem 0.75rem;"></td>

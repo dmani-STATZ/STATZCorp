@@ -6,12 +6,12 @@
 
 {% block body %}
 
-<div class="min-h-screen bg-body {% block body_class %}{% endblock %}">
+<div class="min-h-screen {% block body_class %}{% endblock %}">
     <span id="activeUsersList" class="d-none" data-users="{{ active_users_json }}" data-current-user-id="{{ request.user.id }}"></span>
     <!-- Main Content -->
     <main>
         <!-- Default width container that all pages will inherit -->
-        <div class="mx-auto" style="width: 75%">
+        <div class="mx-auto contract-main-container">
             {% block content %}
                 {% block contract_content %}{% endblock contract_content %}
             {% endblock content %}
@@ -19,20 +19,20 @@
     </main>
 
     <!-- Sticky Footer -->
-    <div class="fixed bottom-0 left-0 right-0 bg-body shadow-lg border-t z-50">
-        <div class="container mx-auto px-4 py-3">
-            <div class="flex justify-between items-center">
+    <div class="contract-footer">
+        <div class="container-fluid px-3 px-md-4 py-2">
+            <div class="d-flex justify-content-between align-items-center gap-3">
                 <!-- Left side: Contract Navigation Menu -->
                 <div class="relative">
-                    <button id="menuBtn" class="flex items-center gap-2 text-gray-700 hover:text-blue-600 px-4 py-2 rounded-md transition-colors">
+                    <button id="menuBtn" type="button" class="btn btn-secondary contract-footer-menu">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
-                        <span class="font-medium">Contract Menu</span>
+                        <span class="font-medium d-none d-sm-inline">Contract Menu</span>
                     </button>
 
                     <!-- Menu Panel with updated styling -->
-                    <div class="menu-panel absolute bottom-full left-0 mb-2 bg-body rounded-lg shadow-xl border border-gray-200" id="menuPanel">
+                    <div class="menu-panel absolute bottom-full left-0 mb-2 bg-body" id="menuPanel">
                         <div class="py-2">
                             <a href="{% url 'contracts:contracts_dashboard' %}"
                                class="menu-item {% if request.resolver_match.url_name == 'contracts_dashboard' %}active{% endif %}">
@@ -48,7 +48,7 @@
                 </div>
 
                 <!-- Center: Action Buttons -->
-                <div class="flex gap-3">
+                <div class="d-flex gap-2">
                     {% block footer_actions %}
                         <!-- Default action buttons - can be overridden by child templates -->
                         {% if show_cancel_button|default:False %}
@@ -65,9 +65,9 @@
                 </div>
 
                 <!-- Right side: Reminders Button -->
-                <div class="flex items-center">
+                <div class="d-flex align-items-center">
                     <button type="button" id="contracts-reminders-footer-pill" onclick="openRemindersPopup()"
-                            class="flex items-center gap-2 px-6 py-2 rounded-full shadow-md transition-all transform hover:scale-105 {% if footer_overdue_count > 0 %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white">
+                            class="contract-footer-pill {% if footer_overdue_count > 0 %}bg-red-600 hover:bg-red-700{% else %}bg-green-600 hover:bg-green-700{% endif %} text-white">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>

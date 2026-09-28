@@ -16,6 +16,7 @@
 
   <nav class="app-subnav" aria-label="DIBBS sections">
     <div class="app-subnav-inner">
+      <span class="app-subnav-title"><i class="bi bi-cloud-download" aria-hidden="true"></i>DIBBS</span>
       <a href="{% url 'dibbs:dashboard' %}"
          class="app-subnav-link {% if url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
       <a href="{% url 'dibbs:import_upload' %}"

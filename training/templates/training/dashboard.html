@@ -2,91 +2,149 @@
 {% load static %}
 
 {% block body %}
-    <div class="container mx-auto p-4">
-        <h1 class="text-3xl font-bold mb-6">Training Dashboard</h1>
+<div class="container-xl py-4 px-3 px-md-4">
+    <div class="page-heading">
+        <div>
+            <h1 class="page-title">Training</h1>
+            <p class="page-subtitle">CMMC requirements, document reviews and Arctic Wolf security awareness.</p>
+        </div>
+    </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
-            <div class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-xl font-medium mb-4">CMMC Training and Document Review Status</h2>
-                <p class="text-gray-600 mb-2">You are current on {{ cmmc_courses_count }} out of {{ cmmc_total_courses_count }} required trainings.</p>
-                <a href="{% url 'training:user_requirements' %}" class="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 mt-2">View Requirements</a>
-
-                {% if is_superuser %}
-                    <div class="mt-4 border-t pt-4">
-                        <h3 class="text-lg font-medium mb-2">Admin Actions</h3>
-                        <a href="{% url 'training:training_audit' %}" class="inline-block px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 mt-2">View CMMC Audit Matrix</a>
-                        <a href="{% url 'training:manage_matrix' %}" class="inline-block px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 mt-2">Manage Matrix</a>
-                        <a href="{% url 'training:admin_cmmc_upload' %}" class="inline-block px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition duration-300 mt-2">Upload CMMC Documents</a>
+    <div class="row g-4">
+        <!-- CMMC -->
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex align-items-start gap-3 mb-3">
+                        <span class="icon-tile icon-tile-primary"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
+                        <div>
+                            <h2 class="h5 mb-1">CMMC Training &amp; Document Review</h2>
+                            <p class="text-body-secondary small mb-0">You are current on <strong class="text-body">{{ cmmc_courses_count }}</strong> of <strong class="text-body">{{ cmmc_total_courses_count }}</strong> required trainings.</p>
+                        </div>
                     </div>
-                {% endif %}
-                <div class="mt-4 border-t pt-4">
-                    <h3 class="text-lg font-medium mb-2">Overall Training Status</h3>
-                    <p class="text-gray-600 mt-2">Overall Current: {{ total_completed_cmmc_trainings }} / {{ total_possible_cmmc_trainings }}</p>
-                    <div class="flex justify-center mt-4" style="width: 300px; height: 300px;">
-                        <canvas id="cmmcChart" width="200" height="200"></canvas>
+
+                    <div class="training-progress mb-4">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-body-secondary">Your progress</span>
+                            <span class="fw-semibold">{% if cmmc_total_courses_count %}{% widthratio cmmc_courses_count cmmc_total_courses_count 100 %}{% else %}0{% endif %}%</span>
+                        </div>
+                        <div class="progress" role="progressbar" aria-label="CMMC progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" style="width: {% if cmmc_total_courses_count %}{% widthratio cmmc_courses_count cmmc_total_courses_count 100 %}{% else %}0{% endif %}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <a href="{% url 'training:user_requirements' %}" class="btn btn-primary"><i class="bi bi-list-check" aria-hidden="true"></i>View Requirements</a>
+                    </div>
+
+                    {% if is_superuser %}
+                    <div class="border-top mt-4 pt-3 mb-4">
+                        <p class="section-kicker">Admin actions</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="{% url 'training:training_audit' %}" class="btn btn-secondary btn-sm"><i class="bi bi-grid-3x3" aria-hidden="true"></i>CMMC Audit Matrix</a>
+                            <a href="{% url 'training:manage_matrix' %}" class="btn btn-secondary btn-sm"><i class="bi bi-sliders" aria-hidden="true"></i>Manage Matrix</a>
+                            <a href="{% url 'training:admin_cmmc_upload' %}" class="btn btn-secondary btn-sm"><i class="bi bi-cloud-upload" aria-hidden="true"></i>Upload CMMC Documents</a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="border-top pt-3 d-flex align-items-center gap-4 mt-auto">
+                        <div class="training-chart"><canvas id="cmmcChart" aria-label="Company CMMC completion"></canvas></div>
+                        <div>
+                            <p class="section-kicker mb-1">Company-wide</p>
+                            <p class="fs-4 fw-bold mb-0">{{ total_completed_cmmc_trainings }} <span class="fs-6 fw-normal text-body-secondary">/ {{ total_possible_cmmc_trainings }} current</span></p>
+                            <p class="small text-body-secondary mb-0">{{ uncompleted_cmmc_trainings }} outstanding</p>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-xl font-medium mb-4">Arctic Wolf Security Awareness Training</h2>
-                <p class="text-gray-600 mb-2">View and complete Arctic Wolf specific training courses.</p>
-                <p class="text-gray-600 mb-2">You have completed {{ aw_completed_count }} out of {{ aw_total_courses_count }} Arctic Wolf trainings.</p>
-
-                <a href="{% url 'training:user_arctic_wolf_courses' %}" class="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 mt-2">View My Courses</a>
-                {% if is_superuser %}
-                    <div class="mt-4 border-t pt-4">
-                        <h3 class="text-lg font-medium mb-2">Admin Actions</h3>
-                        <a href="{% url 'training:add_arctic_wolf_course' %}" class="inline-block px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 mr-2">Add New Course</a>
-                        <a href="{% url 'training:arctic_wolf_course_list' %}" class="inline-block px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 mr-2">View Course List</a>
-                        <a href="{% url 'training:arctic_wolf_audit' %}" class="inline-block px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300 mt-2">View AW Audit Matrix</a>
+        <!-- Arctic Wolf -->
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex align-items-start gap-3 mb-3">
+                        <span class="icon-tile icon-tile-info"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
+                        <div>
+                            <h2 class="h5 mb-1">Arctic Wolf Security Awareness</h2>
+                            <p class="text-body-secondary small mb-0">You have completed <strong class="text-body">{{ aw_completed_count }}</strong> of <strong class="text-body">{{ aw_total_courses_count }}</strong> Arctic Wolf trainings.</p>
+                        </div>
                     </div>
-                {% endif %}
-                <div class="mt-4 border-t pt-4">
-                    <h3 class="text-lg font-medium mb-2">Overall Training Status</h3>
-                    <p class="text-gray-600 mt-2">Overall Completed: {{ total_actual_aw_completions }} / {{ total_possible_aw_completions }}</p>
-                    <div class="flex justify-center mt-4" style="width: 300px; height: 300px;">
-                        <canvas id="arcticWolfChart" width="200" height="200"></canvas>
+
+                    <div class="training-progress mb-4">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span class="text-body-secondary">Your progress</span>
+                            <span class="fw-semibold">{% if aw_total_courses_count %}{% widthratio aw_completed_count aw_total_courses_count 100 %}{% else %}0{% endif %}%</span>
+                        </div>
+                        <div class="progress" role="progressbar" aria-label="Arctic Wolf progress" style="height: 8px;">
+                            <div class="progress-bar bg-info" style="width: {% if aw_total_courses_count %}{% widthratio aw_completed_count aw_total_courses_count 100 %}{% else %}0{% endif %}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <a href="{% url 'training:user_arctic_wolf_courses' %}" class="btn btn-primary"><i class="bi bi-play-circle" aria-hidden="true"></i>View My Courses</a>
+                    </div>
+
+                    {% if is_superuser %}
+                    <div class="border-top mt-4 pt-3 mb-4">
+                        <p class="section-kicker">Admin actions</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="{% url 'training:add_arctic_wolf_course' %}" class="btn btn-secondary btn-sm"><i class="bi bi-plus-lg" aria-hidden="true"></i>Add New Course</a>
+                            <a href="{% url 'training:arctic_wolf_course_list' %}" class="btn btn-secondary btn-sm"><i class="bi bi-collection" aria-hidden="true"></i>Course List</a>
+                            <a href="{% url 'training:arctic_wolf_audit' %}" class="btn btn-secondary btn-sm"><i class="bi bi-grid-3x3" aria-hidden="true"></i>AW Audit Matrix</a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="border-top pt-3 d-flex align-items-center gap-4 mt-auto">
+                        <div class="training-chart"><canvas id="arcticWolfChart" aria-label="Company Arctic Wolf completion"></canvas></div>
+                        <div>
+                            <p class="section-kicker mb-1">Company-wide</p>
+                            <p class="fs-4 fw-bold mb-0">{{ total_actual_aw_completions }} <span class="fs-6 fw-normal text-body-secondary">/ {{ total_possible_aw_completions }} completed</span></p>
+                            <p class="small text-body-secondary mb-0">{{ uncompleted_aw_completions }} outstanding</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        // CMMC Chart
-        const cmmcChartCtx = document.getElementById('cmmcChart').getContext('2d');
-        const cmmcChart = new Chart(cmmcChartCtx, {
-            type: 'pie',
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'js/vendor/chart.umd.min.js' %}"></script>
+<script>
+(function () {
+    const styles = getComputedStyle(document.documentElement);
+    const track = styles.getPropertyValue('--bs-secondary-bg').trim() || '#e5e7eb';
+
+    function donut(id, done, open, color) {
+        const el = document.getElementById(id);
+        if (!el || typeof Chart === 'undefined') return;
+        const empty = (Number(done) + Number(open)) === 0;
+        new Chart(el, {
+            type: 'doughnut',
             data: {
-                labels: ['Current', 'Not Current'],
+                labels: ['Done', 'Outstanding'],
                 datasets: [{
-                    data: ['{{ total_completed_cmmc_trainings }}', '{{ uncompleted_cmmc_trainings }}'],
-                    backgroundColor: ['rgba(0, 127, 0, 0.8)', 'rgba(200, 0, 0, 0.8)'],
-                    borderWidth: 1
+                    data: empty ? [0, 1] : [done, open],
+                    backgroundColor: [color, track],
+                    borderWidth: 0,
                 }]
             },
             options: {
-                // Add any chart options here
+                cutout: '72%',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { display: false }, tooltip: { enabled: !empty } }
             }
         });
+    }
 
-        // Arctic Wolf Chart
-        const arcticWolfChartCtx = document.getElementById('arcticWolfChart').getContext('2d');
-        const arcticWolfChart = new Chart(arcticWolfChartCtx, {
-            type: 'pie',
-            data: {
-                labels: ['Completed', 'Uncompleted'],
-                datasets: [{
-                    data: ['{{ total_actual_aw_completions }}', '{{ uncompleted_aw_completions }}'],
-                    backgroundColor: ['rgba(0, 0, 250, 0.8)', 'rgba(200, 0, 0, 0.8)'],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                // Add any chart options here
-            }
-        });
-    </script>
+    donut('cmmcChart', {{ total_completed_cmmc_trainings|default:0 }}, {{ uncompleted_cmmc_trainings|default:0 }}, '#2f9a1a');
+    donut('arcticWolfChart', {{ total_actual_aw_completions|default:0 }}, {{ uncompleted_aw_completions|default:0 }}, '#3399f3');
+})();
+</script>
 {% endblock %}

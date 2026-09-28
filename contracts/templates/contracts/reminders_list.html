@@ -85,9 +85,9 @@
     <!-- Reminders List -->
     <div class="card overflow-hidden">
         {% if reminders_page %}
-            <ul class="divide-y divide-gray-200">
+            <ul class="list-unstyled mb-0 divide-y divide-gray-200">
                 {% for reminder in reminders_page %}
-                <li class="{% if reminder.reminder_completed %}bg-gray-50{% elif reminder.is_overdue %}bg-red-50{% elif reminder.reminder_date.date <= today %}bg-blue-50{% else %}bg-green-50{% endif %}">
+                <li class="{% if reminder.reminder_completed %}bg-gray-50{% elif reminder.is_overdue %}bg-red-50{% elif reminder.reminder_date <= today %}bg-blue-50{% else %}bg-green-50{% endif %}">
                     <div class="px-4 py-4 sm:px-6">
                         <div class="row-between">
                             <div class="flex items-center">
@@ -120,7 +120,7 @@
                                         bg-green-100 text-green-800
                                     {% elif reminder.is_overdue %}
                                         bg-red-100 text-red-800
-                                    {% elif reminder.reminder_date.date <= today %}
+                                    {% elif reminder.reminder_date <= today %}
                                         bg-blue-100 text-blue-800
                                     {% else %}
                                         bg-green-100 text-green-800
@@ -130,7 +130,7 @@
                                         Completed
                                     {% elif reminder.is_overdue %}
                                         Overdue
-                                    {% elif reminder.reminder_date.date <= today %}
+                                    {% elif reminder.reminder_date <= today %}
                                         Due
                                     {% else %}
                                         Upcoming
@@ -149,8 +149,8 @@
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
                                 </svg>
                                 <p>
-                                    {{ reminder.reminder_date|date:"M d, Y g:i A" }}
-                                    ({{ reminder.reminder_date|naturaltime }})
+                                    {{ reminder.reminder_date|date:"M d, Y" }}
+                                    ({{ reminder.reminder_date|naturalday }})
                                 </p>
                             </div>
                         </div>
@@ -176,7 +176,7 @@
                                         data-id="{{ reminder.id }}"
                                         data-title="{{ reminder.reminder_title|escapejs }}"
                                         data-description="{{ reminder.reminder_text|escapejs }}"
-                                        data-date="{{ reminder.reminder_date|date:'Y-m-d H:i' }}">
+                                        data-date="{{ reminder.reminder_date|date:'Y-m-d' }}">
                                     Edit
                                 </button>
                                 <a href="{% url 'contracts:delete_reminder' reminder.id %}?next={{ request.get_full_path|urlencode }}" class="text-sm text-red-600 hover:text-red-800">

@@ -36,28 +36,15 @@
         box-sizing: inherit;
     }
 
-    header {
+    #header {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
-        background: repeating-linear-gradient(
-            45deg,
-            #3e3e4150,
-            #3e3e4150 2px,
-            #d0d1d450 4px,
-            #d0d1d450 6px
-        ), repeating-linear-gradient(
-            90deg,
-            #3e3e4150,
-            #3e3e4150 2px,
-            #d0d1d450 4px,
-            #d0d1d450 6px
-        );
-        background-blend-mode: multiply;
-        background-color: #b30000;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(0, 0, 0, 0.16) 100%), #b30000;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.3);
         z-index: 1000;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
         color: #ffffff;
         padding: 0.5rem 1rem;
         display: flex;
@@ -72,10 +59,12 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background-image: url("{% static 'images/gears-metal-stainless-technology.jpg' %}?v={{ cache_version }}-{% now 'U' %}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
+        background-color: #0d131b;
+        background-image:
+            radial-gradient(ellipse 60% 45% at 50% 0%, rgba(179, 0, 27, 0.30), transparent 70%),
+            radial-gradient(ellipse 50% 40% at 85% 100%, rgba(68, 110, 155, 0.26), transparent 70%),
+            radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+        background-size: auto, auto, 22px 22px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;

@@ -4,7 +4,7 @@
 <style>
   /* ── Progress bar ─────────────────────────────────────────────── */
   .prog-track {
-    height: 6px; background: #e5e7eb; border-radius: 99px;
+    height: 6px; background: var(--bs-border-color); border-radius: 99px;
     margin-bottom: 2rem; overflow: hidden;
   }
   .prog-fill {
@@ -17,29 +17,29 @@
   .step-row {
     display: flex; align-items: center; gap: 1rem;
     padding: 1rem 1.25rem;
-    border: 1px solid #e5e7eb; border-radius: 8px;
+    border: 1px solid var(--bs-border-color); border-radius: 8px;
     margin-bottom: 0.625rem;
-    background: #fff;
+    background: var(--bs-body-bg);
     transition: border-color 0.2s, background 0.2s;
   }
-  .step-row.running  { border-color: #93c5fd; background: #eff6ff; }
-  .step-row.done     { border-color: #bbf7d0; background: #f0fdf4; }
-  .step-row.errored  { border-color: #fca5a5; background: #fff1f2; }
+  .step-row.running  { border-color: #93c5fd; background: var(--bs-primary-bg-subtle); }
+  .step-row.done     { border-color: #bbf7d0; background: var(--bs-success-bg-subtle); }
+  .step-row.errored  { border-color: #fca5a5; background: var(--bs-danger-bg-subtle); }
 
   .step-icon {
     width: 36px; height: 36px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 1rem; flex-shrink: 0;
-    border: 2px solid #d1d5db; color: #9ca3af;
-    background: #f9fafb;
+    border: 2px solid #d1d5db; color: var(--bs-secondary-color);
+    background: var(--bs-tertiary-bg);
   }
-  .step-icon.running { border-color: #93c5fd; background: #dbeafe; color: #2563eb; }
+  .step-icon.running { border-color: #93c5fd; background: var(--bs-primary-bg-subtle); color: #2563eb; }
   .step-icon.done    { border-color: #86efac; background: #dcfce7; color: #16a34a; font-size: 1.1rem; }
   .step-icon.errored { border-color: #fca5a5; background: #fee2e2; color: #dc2626; }
 
-  .step-label  { font-weight: 600; font-size: 0.9375rem; color: #1a2940; flex: 1; }
-  .step-detail { font-size: 0.8125rem; color: #6b7280; margin-top: 2px; }
-  .step-result { font-size: 0.8125rem; color: #374151; text-align: right; white-space: nowrap; }
+  .step-label  { font-weight: 600; font-size: 0.9375rem; color: var(--bs-emphasis-color); flex: 1; }
+  .step-detail { font-size: 0.8125rem; color: var(--bs-secondary-color); margin-top: 2px; }
+  .step-result { font-size: 0.8125rem; color: var(--bs-body-color); text-align: right; white-space: nowrap; }
 
   @keyframes pulse-ring {
     0%   { transform: scale(0.9); opacity: 1; }
@@ -52,7 +52,7 @@
   .sum-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 1.5rem; }
   .sum-card {
     border-radius: 8px; padding: 14px 16px;
-    border: 1px solid #bfdbfe; background: #eff6ff;
+    border: 1px solid #bfdbfe; background: var(--bs-primary-bg-subtle);
   }
   .sum-card .label { font-size: 11px; font-weight: 600; letter-spacing: .07em;
                      text-transform: uppercase; color: #1e40af; margin-bottom: 4px; }
@@ -61,7 +61,7 @@
   .sum-card .sub   { font-size: 11px; color: #3b82f6; margin-top: 2px; }
 
   .sum-grid-sol { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 0.75rem; }
-  .sum-card-sm  { border-radius: 8px; padding: 12px 14px; border: 1px solid #d1fae5; background: #f0fdf4; }
+  .sum-card-sm  { border-radius: 8px; padding: 12px 14px; border: 1px solid #d1fae5; background: var(--bs-success-bg-subtle); }
   .sum-card-sm .label { font-size: 11px; font-weight: 600; letter-spacing: .07em;
                         text-transform: uppercase; color: #15803d; margin-bottom: 4px; }
   .sum-card-sm .value { font-family: 'Barlow Condensed', sans-serif;
@@ -70,7 +70,7 @@
 
   .done-header {
     text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.25rem;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--bs-border-color);
   }
   .done-icon {
     width: 64px; height: 64px; border-radius: 50%;
@@ -87,7 +87,7 @@
   </div>
 
   {# File names #}
-  <div style="font-size:0.8125rem; color:#6b7280; font-family:monospace; margin-bottom:1.25rem;">
+  <div style="font-size:0.8125rem; color:var(--bs-secondary-color); font-family:monospace; margin-bottom:1.25rem;">
     {{ job.in_file_name }} &nbsp;·&nbsp; {{ job.bq_file_name }} &nbsp;·&nbsp; {{ job.as_file_name }}
   </div>
 
@@ -131,10 +131,10 @@
   <div id="summary-panel" style="display:none; margin-top:1.75rem;">
     <div class="done-header">
       <div class="done-icon">✅</div>
-      <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.75rem; font-weight:800; color:#0a1628;">
+      <div style="font-family:'Barlow Condensed',sans-serif; font-size:1.75rem; font-weight:800; color:var(--bs-emphasis-color);">
         Import Complete
       </div>
-      <div style="font-size:0.875rem; color:#6b7280; margin-top:4px;" id="sum-date-line"></div>
+      <div style="font-size:0.875rem; color:var(--bs-secondary-color); margin-top:4px;" id="sum-date-line"></div>
     </div>
 
     <div class="sum-grid-sol">
@@ -163,7 +163,7 @@
       </a>
       <a href="{% url 'dibbs:import_upload' %}"
          style="padding:0.5625rem 1.25rem; border:1px solid #d1d5db; border-radius:7px;
-                text-decoration:none; font-size:0.875rem; color:#6b7280;">
+                text-decoration:none; font-size:0.875rem; color:var(--bs-secondary-color);">
         New Import
       </a>
     </div>
@@ -171,7 +171,7 @@
 
   {# Error panel — hidden unless a step fails #}
   <div id="error-panel" style="display:none; margin-top:1.25rem;
-       background:#fff1f2; border:1px solid #fca5a5; border-radius:8px; padding:1rem 1.25rem;">
+       background:var(--bs-danger-bg-subtle); border:1px solid #fca5a5; border-radius:8px; padding:1rem 1.25rem;">
     <div style="font-weight:600; color:#b91c1c; margin-bottom:0.375rem;">Import Error</div>
     <div id="error-msg" style="font-size:0.875rem; color:#7f1d1d; font-family:monospace;"></div>
     <div style="margin-top:0.75rem;">

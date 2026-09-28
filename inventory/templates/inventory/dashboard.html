@@ -3,27 +3,31 @@
 {% load custom_filters %}
 
 {% block body %}
-<div class="card card-padded">
-    <div class="row-between mb-6 w-full grid grid-cols-3">
-        <div class="col-span-1 row gap-4">
-            <a href="{% url 'inventory:add_item' %}" class="btn btn-primary text-2xl">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-            </a>
-            <button id="clearSort" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 hidden">
-                Clear Sorting
-            </button>
+<div class="container-fluid px-3 px-md-4 py-3">
+<div class="page-heading">
+    <div class="d-flex align-items-center gap-3">
+        <span class="icon-tile icon-tile-primary"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
+        <div>
+            <h1 class="page-title">Inventory</h1>
+            <p class="page-subtitle">Stock on hand, locations and value.</p>
         </div>
-        <div class="col-span-1 flex justify-center"><h2 class="text-3xl font-bold text-black">Inventory</h2></div>
-        <div class="col-span-1 flex justify-end"><p class="text-2xl">Total Inventory Value: <p class="text-2xl text-red-500"> {{ total_inventory_value|custom_currency }}</p></div>
     </div>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="inventory-value">
+            <span class="section-kicker d-block mb-0">Total inventory value</span>
+            <span class="inventory-value-amount">{{ total_inventory_value|custom_currency }}</span>
+        </div>
+        <button id="clearSort" class="btn btn-secondary hidden">Clear Sorting</button>
+        <a href="{% url 'inventory:add_item' %}" class="btn btn-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i>Add Item</a>
+    </div>
+</div>
+<div class="card card-padded">
 
     <div class="overflow-x-auto">
         <div class="flex justify-end">
         </div>
 
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="table table-hover align-middle mb-0 min-w-full">
             <thead>
                 <tr>
                     <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="nsn">
@@ -105,12 +109,13 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.purchaseprice|custom_currency }}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.totalcost|custom_currency }}</td>
                         <td><a href="{% url 'inventory:edit_item' item.id %}" class="btn btn-outline-secondary">Edit</a></td>
-                        <td><button class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700" onclick="confirmDelete('{{ item.id }}', '{{ item.nsn }}')">Delete</button></td>
+                        <td><button class="btn btn-outline-danger btn-sm" onclick="confirmDelete('{{ item.id }}', '{{ item.nsn }}')">Delete</button></td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+</div>
 </div>
 
 <!-- Modal -->

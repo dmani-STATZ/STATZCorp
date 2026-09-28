@@ -1,48 +1,60 @@
 {% extends "quote/base.html" %}
 
 {% block content %}
-<div class="card card-padded mb-3">
-  <h1 class="h4 mb-1">Quotes</h1>
-  <p class="text-body-secondary mb-0">
-    DIBBS quoting workspace. Match open solicitations to suppliers, send RFQs,
-    and (next phases) log supplier quotes, stage bids and track awards.
-  </p>
+<div class="page-heading">
+  <div>
+    <h1 class="page-title">Quotes</h1>
+    <p class="page-subtitle">
+      DIBBS quoting workspace. Match open solicitations to suppliers, send RFQs,
+      log supplier quotes, stage bids and track awards.
+    </p>
+  </div>
 </div>
 
-<div class="row g-3">
-  <div class="col-sm-6 col-lg-3">
-    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:solicitation_queue' %}?tab=UNMATCHED">
-      <div class="label text-body-secondary">Unmatched</div>
-      <div class="h3 mb-0">{{ counts.UNMATCHED }}</div>
-      <div class="small text-body-secondary">open, no supplier yet</div>
+<div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 quote-pipeline">
+  <div class="col">
+    <a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=UNMATCHED">
+      <span class="kpi-tile-step">Phase 1</span>
+      <span class="icon-tile icon-tile-warning"><i class="bi bi-question-diamond" aria-hidden="true"></i></span>
+      <span class="kpi-tile-label">Unmatched</span>
+      <span class="kpi-tile-value">{{ counts.UNMATCHED }}</span>
+      <span class="kpi-tile-help">open, no supplier yet</span>
     </a>
   </div>
-  <div class="col-sm-6 col-lg-3">
-    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:solicitation_queue' %}?tab=MATCHED">
-      <div class="label text-body-secondary">Matched</div>
-      <div class="h3 mb-0">{{ counts.MATCHED }}</div>
-      <div class="small text-body-secondary">ready for RFQ</div>
+  <div class="col">
+    <a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=MATCHED">
+      <span class="kpi-tile-step">Phase 1</span>
+      <span class="icon-tile icon-tile-success"><i class="bi bi-link-45deg" aria-hidden="true"></i></span>
+      <span class="kpi-tile-label">Matched</span>
+      <span class="kpi-tile-value">{{ counts.MATCHED }}</span>
+      <span class="kpi-tile-help">ready for RFQ</span>
     </a>
   </div>
-  <div class="col-sm-6 col-lg-3">
-    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:solicitation_queue' %}?tab=RFQ_SENT">
-      <div class="label text-body-secondary">RFQ sent</div>
-      <div class="h3 mb-0">{{ counts.RFQ_SENT }}</div>
-      <div class="small text-body-secondary">waiting on suppliers</div>
+  <div class="col">
+    <a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=RFQ_SENT">
+      <span class="kpi-tile-step">Phase 1</span>
+      <span class="icon-tile icon-tile-info"><i class="bi bi-send-check" aria-hidden="true"></i></span>
+      <span class="kpi-tile-label">RFQ sent</span>
+      <span class="kpi-tile-value">{{ counts.RFQ_SENT }}</span>
+      <span class="kpi-tile-help">waiting on suppliers</span>
     </a>
   </div>
-  <div class="col-sm-6 col-lg-3">
-    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:rfq_queue' %}">
-      <div class="label text-body-secondary">RFQ queue</div>
-      <div class="h3 mb-0">{{ rfqs_pending }}</div>
-      <div class="small text-body-secondary">supplier email{{ rfqs_pending|pluralize }} to send</div>
+  <div class="col">
+    <a class="card kpi-tile h-100" href="{% url 'quote:rfq_queue' %}">
+      <span class="kpi-tile-step">Phase 1</span>
+      <span class="icon-tile icon-tile-primary"><i class="bi bi-envelope-paper" aria-hidden="true"></i></span>
+      <span class="kpi-tile-label">RFQ queue</span>
+      <span class="kpi-tile-value">{{ rfqs_pending }}</span>
+      <span class="kpi-tile-help">supplier email{{ rfqs_pending|pluralize }} to send</span>
     </a>
   </div>
-  <div class="col-sm-6 col-lg-3">
-    <a class="card card-padded h-100 text-decoration-none" href="{% url 'quote:bid_export' %}">
-      <div class="label text-body-secondary">Bids ready</div>
-      <div class="h3 mb-0">{{ bids_ready }}</div>
-      <div class="small text-body-secondary">line{{ bids_ready|pluralize }} waiting for the BQ file</div>
+  <div class="col">
+    <a class="card kpi-tile h-100" href="{% url 'quote:bid_export' %}">
+      <span class="kpi-tile-step">Phase 3</span>
+      <span class="icon-tile icon-tile-danger"><i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i></span>
+      <span class="kpi-tile-label">Bids ready</span>
+      <span class="kpi-tile-value">{{ bids_ready }}</span>
+      <span class="kpi-tile-help">line{{ bids_ready|pluralize }} waiting for the BQ file</span>
     </a>
   </div>
 </div>

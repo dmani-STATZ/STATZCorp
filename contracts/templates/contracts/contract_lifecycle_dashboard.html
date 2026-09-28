@@ -48,7 +48,7 @@
                    class="btn btn-outline-brand btn-tinted d-inline-flex align-items-center justify-content-center text-decoration-none">
                     Competitors Numbers
                 </a>
-                <a href="{% url 'intake:queue' %}" class="btn-primary text-white d-inline-flex align-items-center justify-content-center text-decoration-none">
+                <a href="{% url 'intake:queue' %}" class="btn btn-primary btn-sm text-white text-decoration-none">
                     <svg xmlns="http://www.w3.org/2000/svg" class="me-1 flex-shrink-0" style="width:1.25rem;height:1.25rem" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
@@ -61,7 +61,7 @@
     <!-- Main Dashboard Card -->
     <div class="card overflow-hidden">
         <!-- Dashboard Header -->
-        <div class="row-between" style="padding: 0.5rem 1rem; background: linear-gradient(to right, #2563eb, #1e40af);">
+        <div class="section-header-gradient">
             <div style="display:flex; align-items:center; gap:0.75rem;">
                 <h1 style="font-size:1.1rem; font-weight:600; color:#ffffff; margin:0;">Dashboard</h1>
                 <div class="seg-control" role="group" aria-label="View toggle">
@@ -104,7 +104,7 @@
                         <div class="d-flex flex-wrap gap-3 w-100">
                             <!-- Contracts Due Card -->
                             <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
-                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                <div class="card card-padded stat-card stat-card-hover text-center h-100">
                                     <h3 class="fs-6 fw-semibold text-body-secondary mb-2">Due</h3>
                                     <p class="display-6 fw-bold text-primary" id="contracts-due" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due }}</p>
                                 </div>
@@ -112,7 +112,7 @@
 
                             <!-- Contracts Due Late Card -->
                             <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
-                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                <div class="card card-padded stat-card stat-card-hover text-center h-100">
                                     <h3 class="fs-6 fw-semibold text-body-secondary mb-2">Due Late</h3>
                                     <p class="display-6 fw-bold text-danger" id="contracts-due-late" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due_late }}</p>
                                 </div>
@@ -120,7 +120,7 @@
 
                             <!-- Contracts Due OnTime Card -->
                             <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
-                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                <div class="card card-padded stat-card stat-card-hover text-center h-100">
                                     <h3 class="fs-6 fw-semibold text-body-secondary mb-2">Due OnTime</h3>
                                     <p class="display-6 fw-bold text-success" id="contracts-due-ontime" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.contracts_due_ontime }}</p>
                                 </div>
@@ -128,7 +128,7 @@
 
                             <!-- New Contracts Card -->
                             <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
-                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                <div class="card card-padded stat-card stat-card-hover text-center h-100">
                                     <h3 class="fs-6 fw-semibold text-body-secondary mb-2">New Contracts</h3>
                                     <p class="display-6 fw-bold text-primary" id="new-contracts" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ periods.this_week.new_contracts }}</p>
                                 </div>
@@ -136,7 +136,7 @@
 
                             <!-- New Contract Value Card -->
                             <div class="flex-fill" style="min-width: min(100%, 10rem); max-width: 100%;">
-                                <div class="card card-padded border border-primary border-3 stat-card-hover text-center h-100">
+                                <div class="card card-padded stat-card stat-card-hover text-center h-100">
                                     <h3 class="fs-6 fw-semibold text-body-secondary mb-2">New Contracts Value</h3>
                                     <p class="fw-bold text-primary" id="new-contract-value" style="font-size: clamp(1rem, 1.5vw, 1.5rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${{ periods.this_week.new_contract_value|floatformat:2|intcomma }}</p>
                                 </div>
@@ -160,7 +160,7 @@
                     </div>
 
                     <!-- Total Contracts Card -->
-                    <div class="card card-padded border border-primary border-3 stat-card-hover d-flex flex-column justify-content-center flex-shrink-0" style="width: 16rem; max-width: 100%;">
+                    <div class="card card-padded stat-card stat-card-hover d-flex flex-column justify-content-center flex-shrink-0" style="width: 16rem; max-width: 100%;">
                         <h3 class="fs-5 fw-semibold text-body-secondary mb-3 text-center">Total Contracts</h3>
                         <p class="display-5 fw-bold text-primary text-center mb-0" id="total-contracts">{{ total_contracts }}</p>
                     </div>
@@ -171,7 +171,7 @@
             <div id="table-view" class="{% if dashboard_view == 'table' %}{% else %}d-none{% endif %}">
                 <div class="table-responsive p-3">
                     <table class="table table-sm table-hover table-bordered align-middle mb-0 w-100">
-                        <thead class="table-dark">
+                        <thead class="table-light">
                             <tr>
                                 <th scope="col" class="text-start label">Category</th>
                                 <th scope="col" class="text-start label">This Week</th>
@@ -256,7 +256,7 @@
             </div>
             <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                 <table class="table table-sm table-hover table-bordered align-middle mb-0 w-100">
-                    <thead class="table-dark position-sticky top-0">
+                    <thead class="table-light position-sticky top-0">
                         <tr>
                             <th scope="col" class="text-start label">
                                 Status
@@ -508,8 +508,10 @@
         </div>
     </div>
 </div>
+{% endblock content %}
 
 {% block extra_js %}
+{{ block.super }}
 {{ periods|json_script:"period-data" }}
 
 <script>
@@ -695,5 +697,4 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleView(currentView);
 });
 </script>
-{% endblock %}
-{% endblock %}
+{% endblock extra_js %}

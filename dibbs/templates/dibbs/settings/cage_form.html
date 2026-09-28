@@ -4,16 +4,16 @@
 <div style="max-width:680px;">
     <div style="margin-bottom:1.5rem;">
         <a href="{% url 'dibbs:settings_cages' %}"
-           style="font-size:0.8125rem; color:var(--text-muted,#6b7280); text-decoration:none;">← Settings</a>
+           style="font-size:0.8125rem; color:var(--bs-secondary-color); text-decoration:none;">← Settings</a>
         <h1 style="font-size:1.375rem; font-weight:600; margin:0.5rem 0 0;">{{ action }} CAGE</h1>
     </div>
 
     <form method="post"
-          style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:1.5rem 2rem;">
+          style="background:var(--bs-body-bg); border:1px solid var(--bs-border-color); border-radius:8px; padding:1.5rem 2rem;">
         {% csrf_token %}
 
         {% if form.non_field_errors %}
-        <div style="padding:0.75rem 1rem; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; color:#991b1b; font-size:0.875rem; margin-bottom:1rem;">
+        <div style="padding:0.75rem 1rem; background:var(--bs-danger-bg-subtle); border:1px solid #fecaca; border-radius:8px; color:#991b1b; font-size:0.875rem; margin-bottom:1rem;">
             {{ form.non_field_errors }}
         </div>
         {% endif %}
@@ -39,7 +39,7 @@
                     Linked company (contracts)
                 </label>
                 {{ form.company }}
-                <span style="display:block; font-size:0.75rem; color:#6b7280; margin-top:0.35rem;">
+                <span style="display:block; font-size:0.75rem; color:var(--bs-secondary-color); margin-top:0.35rem;">
                     Link this CAGE to a contracts company to enable automatic award queue injection.
                 </span>
                 {% if form.company.errors %}
@@ -62,7 +62,7 @@
                     RFQ Reply-To Email
                 </label>
                 {{ form.smtp_reply_to }}
-                <span style="font-size:0.75rem; color:#6b7280;">Supplier responses go here</span>
+                <span style="font-size:0.75rem; color:var(--bs-secondary-color);">Supplier responses go here</span>
                 {% if form.smtp_reply_to.errors %}
                 <div style="font-size:0.75rem; color:#dc2626; margin-top:0.25rem;">{{ form.smtp_reply_to.errors }}</div>
                 {% endif %}
@@ -142,7 +142,7 @@
             </button>
             <a href="{% url 'dibbs:settings_cages' %}"
                style="padding:0.5rem 1rem; border:1px solid #d1d5db; border-radius:6px;
-                      text-decoration:none; font-size:0.875rem; color:#6b7280;">
+                      text-decoration:none; font-size:0.875rem; color:var(--bs-secondary-color);">
                 Cancel
             </a>
         </div>

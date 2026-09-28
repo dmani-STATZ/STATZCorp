@@ -22,13 +22,13 @@
     transition: background .3s, color .3s;
   }
   .step-label { font-size: 13px; transition: color .3s, font-weight .3s; }
-  .step-connector { flex: 1; height: 2px; background: #eef2f8; margin: 0 12px; min-width: 40px; }
+  .step-connector { flex: 1; height: 2px; background: var(--bs-primary-bg-subtle); margin: 0 12px; min-width: 40px; }
 
   /* ── Drop zone ───────────────────────────────────────────────────────── */
   .drop-zone {
     border: 2px dashed #c8d6e8;
     border-radius: 10px;
-    background: #f8fafc;
+    background: var(--bs-tertiary-bg);
     padding: 40px 24px;
     text-align: center;
     cursor: pointer;
@@ -36,11 +36,11 @@
   }
   .drop-zone:hover, .drop-zone.dragover {
     border-color: var(--company-primary, #004eb3);
-    background: #eef4ff;
+    background: var(--bs-primary-bg-subtle);
   }
   .drop-zone-icon { font-size: 36px; display: block; margin-bottom: 10px; }
-  .drop-zone-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; color: #1a2940; margin-bottom: 4px; }
-  .drop-zone-sub { font-size: 13px; color: #7a90b0; margin-bottom: 14px; }
+  .drop-zone-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; color: var(--bs-emphasis-color); margin-bottom: 4px; }
+  .drop-zone-sub { font-size: 13px; color: var(--bs-secondary-color); margin-bottom: 14px; }
 
   /* ── File check rows ─────────────────────────────────────────────────── */
   .file-check-row {
@@ -48,13 +48,13 @@
     padding: 9px 0;
     border-bottom: 1px solid #eef2f8;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px; color: #1a2940;
+    font-size: 12px; color: var(--bs-emphasis-color);
   }
   .file-check-row:last-child { border: none; padding-bottom: 0; }
   .file-check-row .fname { flex: 1; }
   .chk-ok   { color: #16a34a; font-size: 16px; font-weight: 700; }
   .chk-fail { color: #dc2626; font-size: 16px; font-weight: 700; }
-  .chk-wait { color: #9ca3af; font-size: 14px; }
+  .chk-wait { color: var(--bs-secondary-color); font-size: 14px; }
 
   /* ── Stat cards ──────────────────────────────────────────────────────── */
   .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
@@ -64,12 +64,12 @@
     border: 1px solid transparent;
   }
   .istat-accent  { background: #fff8e8; border-color: #fde68a; }
-  .istat-navy    { background: #eef4ff; border-color: #bfdbfe; }
-  .istat-success { background: #f0fdf4; border-color: #bbf7d0; }
-  .istat-warn    { background: #fffbeb; border-color: #fde68a; }
-  .istat .slabel { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: #7a90b0; margin-bottom: 4px; }
-  .istat .svalue { font-family: 'Barlow Condensed', sans-serif; font-size: 32px; font-weight: 800; color: #0a1628; line-height: 1; }
-  .istat .ssub   { font-size: 11px; color: #7a90b0; margin-top: 2px; }
+  .istat-navy    { background: var(--bs-primary-bg-subtle); border-color: #bfdbfe; }
+  .istat-success { background: var(--bs-success-bg-subtle); border-color: #bbf7d0; }
+  .istat-warn    { background: var(--bs-warning-bg-subtle); border-color: #fde68a; }
+  .istat .slabel { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--bs-secondary-color); margin-bottom: 4px; }
+  .istat .svalue { font-family: 'Barlow Condensed', sans-serif; font-size: 32px; font-weight: 800; color: var(--bs-emphasis-color); line-height: 1; }
+  .istat .ssub   { font-size: 11px; color: var(--bs-secondary-color); margin-top: 2px; }
 
   /* ── Misc ────────────────────────────────────────────────────────────── */
   .format-hint {
@@ -79,7 +79,7 @@
   .format-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
   .mono { font-family: 'IBM Plex Mono', monospace; }
   .text-xs { font-size: 12px; }
-  .text-muted { color: #7a90b0; }
+  .text-muted { color: var(--bs-secondary-color); }
   .btn-primary-lg {
     font-size: 15px; padding: 12px 32px;
     background: var(--company-primary, #004eb3);
@@ -90,20 +90,20 @@
   .btn-primary-lg:hover { opacity: .88; }
   .btn-ghost-sm {
     font-size: 13px; padding: 9px 18px;
-    background: transparent; color: #4b6080;
+    background: transparent; color: var(--bs-secondary-color);
     border: 1px solid #cbd5e1; border-radius: 7px;
     font-weight: 500; cursor: pointer;
   }
-  .btn-ghost-sm:hover { background: #f1f5f9; }
+  .btn-ghost-sm:hover { background: var(--bs-tertiary-bg); }
   .alert-info {
     display: flex; gap: 10px; padding: 12px 16px;
-    background: #eff6ff; border: 1px solid #bfdbfe;
+    background: var(--bs-primary-bg-subtle); border: 1px solid #bfdbfe;
     border-radius: 8px; font-size: 13px; color: #1e40af;
     margin-bottom: 18px;
   }
   .alert-warn {
     display: flex; gap: 10px; padding: 12px 16px;
-    background: #fffbeb; border: 1px solid #fde68a;
+    background: var(--bs-warning-bg-subtle); border: 1px solid #fde68a;
     border-radius: 8px; font-size: 13px; color: #854d0e;
     margin-bottom: 18px;
   }
@@ -151,17 +151,17 @@
   <div class="step-bar" id="step-bar">
     <div class="step-item">
       <div class="step-circle" id="sc1" style="background:var(--company-primary,#004eb3); color:#fff;">1</div>
-      <span class="step-label" id="sl1" style="font-weight:600; color:#1a2940;">Upload Files</span>
+      <span class="step-label" id="sl1" style="font-weight:600; color:var(--bs-emphasis-color);">Upload Files</span>
     </div>
     <div class="step-connector"></div>
     <div class="step-item">
-      <div class="step-circle" id="sc2" style="background:#eef2f8; color:#a0aec0;">2</div>
-      <span class="step-label" id="sl2" style="font-weight:500; color:#a0aec0;">Confirm &amp; Submit</span>
+      <div class="step-circle" id="sc2" style="background:var(--bs-primary-bg-subtle); color:var(--bs-secondary-color);">2</div>
+      <span class="step-label" id="sl2" style="font-weight:500; color:var(--bs-secondary-color);">Confirm &amp; Submit</span>
     </div>
     <div class="step-connector"></div>
     <div class="step-item">
-      <div class="step-circle" id="sc3" style="background:#eef2f8; color:#a0aec0;">3</div>
-      <span class="step-label" id="sl3" style="font-weight:500; color:#a0aec0;">Processing</span>
+      <div class="step-circle" id="sc3" style="background:var(--bs-primary-bg-subtle); color:var(--bs-secondary-color);">3</div>
+      <span class="step-label" id="sl3" style="font-weight:500; color:var(--bs-secondary-color);">Processing</span>
     </div>
   </div>
 
@@ -172,8 +172,8 @@
 
     <div style="text-align:center; margin-bottom:28px;">
       <div style="font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800;
-                  color:#0a1628; margin-bottom:8px;">Upload Today's DIBBS Files</div>
-      <div style="font-size:13px; color:#7a90b0; max-width:420px; margin:0 auto;">
+                  color:var(--bs-emphasis-color); margin-bottom:8px;">Upload Today's DIBBS Files</div>
+      <div style="font-size:13px; color:var(--bs-secondary-color); max-width:420px; margin:0 auto;">
         Download the IN, BQ, and AS files from DIBBS for the same date,
         then drop them all here or select them individually.
       </div>
@@ -191,9 +191,9 @@
     {# Fetch from DIBBS (default: yesterday; optional date for weekend/other days) #}
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
       <span style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
-                   color:#16a34a; background:#f0fdf4; border:1px solid #bbf7d0;
+                   color:#16a34a; background:var(--bs-success-bg-subtle); border:1px solid #bbf7d0;
                    border-radius:4px; padding:2px 8px;">⚡ Automatic</span>
-      <span style="font-size:12px; color:#6b7280;">Recommended — fetches files directly from DIBBS</span>
+      <span style="font-size:12px; color:var(--bs-secondary-color);">Recommended — fetches files directly from DIBBS</span>
     </div>
     <form method="post" action="{% url 'dibbs:import_fetch_dibbs' %}" id="fetch-dibbs-form" style="margin-bottom:18px;">
       {% csrf_token %}
@@ -205,7 +205,7 @@
         </div>
       </div>
       <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:10px;">
-        <label for="fetch-date" style="font-size:13px; font-weight:600; color:#1a2940;">Import date:</label>
+        <label for="fetch-date" style="font-size:13px; font-weight:600; color:var(--bs-emphasis-color);">Import date:</label>
         <input type="date" id="fetch-date" name="fetch_date" value="{{ default_fetch_date|default:'' }}"
                style="font-size:14px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; min-width:140px;"
                title="Default is yesterday. Change to get weekend or other dates.">
@@ -217,18 +217,18 @@
 
     {# OR divider — separates automatic fetch from manual upload #}
     <div style="display:flex; align-items:center; gap:14px; margin:20px 0;">
-      <div style="flex:1; height:1px; background:#e5e7eb;"></div>
-      <span style="font-size:12px; font-weight:700; color:#9ca3af; letter-spacing:.08em;
-                   background:#fff; padding:0 4px;">OR</span>
-      <div style="flex:1; height:1px; background:#e5e7eb;"></div>
+      <div style="flex:1; height:1px; background:var(--bs-border-color);"></div>
+      <span style="font-size:12px; font-weight:700; color:var(--bs-secondary-color); letter-spacing:.08em;
+                   background:var(--bs-body-bg); padding:0 4px;">OR</span>
+      <div style="flex:1; height:1px; background:var(--bs-border-color);"></div>
     </div>
 
     {# Manual upload label #}
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
       <span style="font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
-                   color:#6b7280; background:#f8fafc; border:1px solid #e2e8f0;
+                   color:var(--bs-secondary-color); background:var(--bs-tertiary-bg); border:1px solid #e2e8f0;
                    border-radius:4px; padding:2px 8px;">Manual Upload</span>
-      <span style="font-size:12px; color:#6b7280;">Download files from DIBBS then upload them here</span>
+      <span style="font-size:12px; color:var(--bs-secondary-color);">Download files from DIBBS then upload them here</span>
     </div>
 
     {# Visible drop zone — feeds the hidden form fields #}
@@ -250,10 +250,10 @@
 
     {# File status card — revealed after files picked #}
     <div id="file-status" style="display:none; margin-top:18px;">
-      <div style="border:1px solid #e5e7eb; border-radius:8px; background:#fff;
+      <div style="border:1px solid var(--bs-border-color); border-radius:8px; background:var(--bs-body-bg);
                   padding:16px 20px;">
         <div style="font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
-                    letter-spacing:.08em; text-transform:uppercase; color:#1a2940; margin-bottom:12px;">
+                    letter-spacing:.08em; text-transform:uppercase; color:var(--bs-emphasis-color); margin-bottom:12px;">
           File Check
         </div>
         <div id="row-in"   class="file-check-row"><span class="chk-wait">○</span> <span class="fname text-muted">IN file — not detected</span></div>
@@ -276,19 +276,19 @@
       <div class="format-grid">
         <div>
           <div class="mono" style="font-size:13px;">
-            <span style="color:var(--company-primary,#004eb3);">in</span><span style="color:#7a90b0;">YYMMDD</span><span style="color:#1a2940;">.txt</span>
+            <span style="color:var(--company-primary,#004eb3);">in</span><span style="color:var(--bs-secondary-color);">YYMMDD</span><span style="color:var(--bs-emphasis-color);">.txt</span>
           </div>
           <div class="text-xs text-muted" style="margin-top:2px;">Solicitation Index</div>
         </div>
         <div>
           <div class="mono" style="font-size:13px;">
-            <span style="color:var(--company-primary,#004eb3);">bq</span><span style="color:#7a90b0;">YYMMDD</span><span style="color:#1a2940;">.txt</span>
+            <span style="color:var(--company-primary,#004eb3);">bq</span><span style="color:var(--bs-secondary-color);">YYMMDD</span><span style="color:var(--bs-emphasis-color);">.txt</span>
           </div>
           <div class="text-xs text-muted" style="margin-top:2px;">Batch Quote Template</div>
         </div>
         <div>
           <div class="mono" style="font-size:13px;">
-            <span style="color:var(--company-primary,#004eb3);">as</span><span style="color:#7a90b0;">YYMMDD</span><span style="color:#1a2940;">.txt</span>
+            <span style="color:var(--company-primary,#004eb3);">as</span><span style="color:var(--bs-secondary-color);">YYMMDD</span><span style="color:var(--bs-emphasis-color);">.txt</span>
           </div>
           <div class="text-xs text-muted" style="margin-top:2px;">Approved Sources</div>
         </div>
@@ -313,10 +313,10 @@
       <div>Files look good. Click <strong>Confirm Import</strong> to parse and load into the database.</div>
     </div>
 
-    <div style="border:1px solid #e5e7eb; border-radius:8px; background:#fff;
+    <div style="border:1px solid var(--bs-border-color); border-radius:8px; background:var(--bs-body-bg);
                 padding:16px 20px; margin-bottom:20px;">
       <div style="font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
-                  letter-spacing:.08em; text-transform:uppercase; color:#1a2940; margin-bottom:12px;">
+                  letter-spacing:.08em; text-transform:uppercase; color:var(--bs-emphasis-color); margin-bottom:12px;">
         Files Queued
       </div>
       <div id="confirm-in"   class="file-check-row"></div>
@@ -339,12 +339,12 @@
   {# ── RIGHT COLUMN — calendar (GET only; omitted when context has no cal_weeks) ── #}
   {% if cal_weeks %}
   <div style="flex:1; min-width:260px;">
-    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:18px 16px;">
+    <div style="background:var(--bs-body-bg); border:1px solid var(--bs-border-color); border-radius:10px; padding:18px 16px;">
 
       {# Calendar header #}
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
         <div style="font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:800;
-                    color:#0a1628; letter-spacing:.02em;">
+                    color:var(--bs-emphasis-color); letter-spacing:.02em;">
           {{ month_name }} {{ cal_year }}
         </div>
         <div style="display:flex; gap:10px; font-size:11px;">
@@ -363,7 +363,7 @@
       <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:4px;">
         {% for dow in "Mo,Tu,We,Th,Fr,Sa,Su"|split:"," %}
         <div style="text-align:center; font-size:10px; font-weight:700; letter-spacing:.06em;
-                    text-transform:uppercase; color:#9ca3af; padding:2px 0;">{{ dow }}</div>
+                    text-transform:uppercase; color:var(--bs-secondary-color); padding:2px 0;">{{ dow }}</div>
         {% endfor %}
       </div>
 
@@ -377,8 +377,8 @@
               {% with sol=sol_by_day|dict_key:day aw=aw_by_day|dict_key:day %}
               <div style="
                 height:44px; border-radius:6px; padding:3px 4px;
-                background:{% if sol and aw %}#ede9fe{% elif sol %}#eff6ff{% elif aw %}#faf5ff{% else %}#f8fafc{% endif %};
-                border:1px solid {% if sol and aw %}#c4b5fd{% elif sol %}#bfdbfe{% elif aw %}#e9d5ff{% else %}#f1f5f9{% endif %};
+                background:{% if sol and aw %}rgba(168,85,247,.16){% elif sol %}var(--bs-primary-bg-subtle){% elif aw %}rgba(168,85,247,.10){% else %}var(--bs-tertiary-bg){% endif %};
+                border:1px solid {% if sol and aw %}rgba(168,85,247,.45){% elif sol %}var(--bs-primary-border-subtle){% elif aw %}rgba(168,85,247,.30){% else %}var(--bs-border-color){% endif %};
                 position:relative; cursor:default;
                 {% if day == today_day %}outline:2px solid var(--company-primary,#004eb3); outline-offset:-2px;{% endif %}
                 "
@@ -387,13 +387,13 @@
                 {% endif %}
               >
                 <div style="font-size:11px; font-weight:{% if day == today_day %}700{% else %}500{% endif %};
-                            color:{% if day == today_day %}var(--company-primary,#004eb3){% else %}#374151{% endif %};">
+                            color:{% if day == today_day %}var(--company-primary,#004eb3){% else %}var(--bs-body-color){% endif %};">
                   {{ day }}
                 </div>
                 <div style="display:flex; gap:2px; margin-top:2px; flex-wrap:wrap;">
                   {% if sol %}
                     <span style="font-size:9px; font-weight:700; color:#1d4ed8;
-                                 background:#dbeafe; border-radius:2px; padding:0 3px;
+                                 background:var(--bs-primary-bg-subtle); border-radius:2px; padding:0 3px;
                                  line-height:14px;">SOL</span>
                   {% endif %}
                   {% if aw %}
@@ -410,13 +410,13 @@
       </div>
 
       {# Legend / summary below calendar #}
-      <div style="margin-top:14px; padding-top:12px; border-top:1px solid #f1f5f9;
+      <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--bs-border-color);
                   display:flex; gap:12px; flex-wrap:wrap;">
-        <div style="font-size:11px; color:#6b7280;">
+        <div style="font-size:11px; color:var(--bs-secondary-color);">
           <span style="font-weight:600; color:#1d4ed8;">{{ sol_by_day|length }}</span>
           SOL import{{ sol_by_day|length|pluralize }} this month
         </div>
-        <div style="font-size:11px; color:#6b7280;">
+        <div style="font-size:11px; color:var(--bs-secondary-color);">
           <span style="font-weight:600; color:#7e22ce;">{{ aw_by_day|length }}</span>
           AW import{{ aw_by_day|length|pluralize }} this month
         </div>

@@ -41,7 +41,7 @@
   .drop-zone {
     border: 2px dashed #c8d6e8;
     border-radius: 10px;
-    background: #f8fafc;
+    background: var(--bs-tertiary-bg);
     padding: 40px 24px;
     text-align: center;
     cursor: pointer;
@@ -49,11 +49,11 @@
   }
   .drop-zone:hover, .drop-zone.dragover {
     border-color: var(--company-primary, #004eb3);
-    background: #eef4ff;
+    background: var(--bs-primary-bg-subtle);
   }
   .drop-zone-icon { font-size: 36px; display: block; margin-bottom: 10px; }
-  .drop-zone-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; color: #1a2940; margin-bottom: 4px; }
-  .drop-zone-sub { font-size: 13px; color: #7a90b0; margin-bottom: 14px; }
+  .drop-zone-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; color: var(--bs-emphasis-color); margin-bottom: 4px; }
+  .drop-zone-sub { font-size: 13px; color: var(--bs-secondary-color); margin-bottom: 14px; }
   .btn-primary-lg {
     font-size: 15px; padding: 12px 32px;
     background: var(--company-primary, #004eb3);
@@ -64,14 +64,14 @@
   .btn-primary-lg:hover { opacity: .88; }
   .btn-ghost-sm {
     font-size: 13px; padding: 9px 18px;
-    background: transparent; color: #4b6080;
+    background: transparent; color: var(--bs-secondary-color);
     border: 1px solid #cbd5e1; border-radius: 7px;
     font-weight: 500; cursor: pointer;
   }
-  .btn-ghost-sm:hover { background: #f1f5f9; }
-  .aw-crumb { font-size: 0.8125rem; color: #6b7280; margin-bottom: 0.5rem; }
+  .btn-ghost-sm:hover { background: var(--bs-tertiary-bg); }
+  .aw-crumb { font-size: 0.8125rem; color: var(--bs-secondary-color); margin-bottom: 0.5rem; }
   .aw-crumb a { color: var(--company-primary, #004eb3); text-decoration: none; }
-  .data-table-wrap table tbody tr:hover { background: #f8fafc; }
+  .data-table-wrap table tbody tr:hover { background: var(--bs-tertiary-bg); }
   .badge-src-upload { background: #6c757d; color: #fff; font-size: 0.7rem; }
   .badge-src-scrape { background: #0d6efd; color: #fff; font-size: 0.7rem; }
   .scrape-status-success { color: #198754; font-weight: 600; }

@@ -3,27 +3,27 @@
 {% block content %}
 <style>
   :root { --navy: #0a1628; --accent: #00b4d8; }
-  .info-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1.75rem; max-width: 860px; }
+  .info-card { background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); border-radius: 10px; padding: 1.75rem; max-width: 860px; }
   .info-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #eef2f8; }
-  .field-label { font-size: 0.7rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
-  .field-value { font-size: 0.9375rem; color: #111827; }
+  .field-label { font-size: 0.7rem; font-weight: 700; color: var(--bs-secondary-color); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .field-value { font-size: 0.9375rem; color: var(--bs-emphasis-color); }
   .field-value.mono { font-family: ui-monospace, monospace; }
-  .section-title { font-size: 0.75rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.06em; margin: 1.25rem 0 0.75rem; }
+  .section-title { font-size: 0.75rem; font-weight: 700; color: var(--bs-body-color); text-transform: uppercase; letter-spacing: 0.06em; margin: 1.25rem 0 0.75rem; }
   .pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin: 2px; }
   .pill-blue  { background: rgba(0,180,216,0.1); color: #00849e; border: 1px solid rgba(0,180,216,0.25); }
   .pill-green { background: rgba(45,198,83,0.1); color: #1a8a3a; border: 1px solid rgba(45,198,83,0.25); }
-  .pill-gray  { background: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
-  .pill-red   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .pill-gray  { background: var(--bs-tertiary-bg); color: var(--bs-body-color); border: 1px solid var(--bs-border-color); }
+  .pill-red   { background: var(--bs-danger-bg-subtle); color: #b91c1c; border: 1px solid #fecaca; }
   .alert-warn  { background: #fff3e0; border: 1px solid #fbbf24; color: #92400e; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; }
-  .alert-info  { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; }
-  .alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; }
-  .sam-notice { background: #f0fdf4; border: 1px solid #86efac; color: #166534; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.8125rem; margin-bottom: 1.5rem; }
+  .alert-info  { background: var(--bs-primary-bg-subtle); border: 1px solid #bfdbfe; color: #1e40af; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; }
+  .alert-error { background: var(--bs-danger-bg-subtle); border: 1px solid #fecaca; color: #991b1b; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; }
+  .sam-notice { background: var(--bs-success-bg-subtle); border: 1px solid #86efac; color: #166534; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.8125rem; margin-bottom: 1.5rem; }
   .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
-  .btn-ghost { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  .btn-ghost { background: var(--bs-tertiary-bg); color: var(--bs-body-color); border: 1px solid #d1d5db; }
   .btn-primary { background: #0a1628; color: #fff; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-  .excluded-banner { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 1rem 1.25rem; color: #7f1d1d; font-weight: 600; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+  .excluded-banner { background: var(--bs-danger-bg-subtle); border: 1px solid #fca5a5; border-radius: 8px; padding: 1rem 1.25rem; color: #7f1d1d; font-weight: 600; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
   @media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 </style>
 
@@ -52,7 +52,7 @@
     <a href="{{ cage_code|dla_cage_url }}" target="statz_dla_cage" class="btn btn-primary btn-sm">
       Look up {{ cage_code }} on DLA CAGE &rarr;
     </a>
-    <span style="color:#6b7280; margin-left:0.5rem;">or search
+    <span style="color:var(--bs-secondary-color); margin-left:0.5rem;">or search
     <a href="https://sam.gov" target="statz_sam">SAM.gov</a> directly.
     DLA asks you to accept its terms once per session.</span>
   </p>
@@ -67,7 +67,7 @@
     <a href="{{ cage_code|dla_cage_url }}" target="statz_dla_cage" class="btn btn-primary btn-sm">
       Look up {{ cage_code }} on DLA CAGE &rarr;
     </a>
-    <span style="color:#6b7280; margin-left:0.5rem;">DLA lists every CAGE, including companies not registered in SAM.
+    <span style="color:var(--bs-secondary-color); margin-left:0.5rem;">DLA lists every CAGE, including companies not registered in SAM.
     It asks you to accept its terms once per session.</span>
   </p>
   {% if cache_record and not fetch_error %}
@@ -97,7 +97,7 @@
   <div class="info-card-header">
     <div>
       <div class="field-label">Legal Business Name</div>
-      <div style="font-size: 1.25rem; font-weight: 700; color: #0a1628;">{{ entity.legal_name|default:"—" }}</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--bs-emphasis-color);">{{ entity.legal_name|default:"—" }}</div>
       {% if cache_record and not fetch_error %}
       <span class="text-muted small">
         Last verified: {{ days_since_fetch }} day{{ days_since_fetch|pluralize }} ago
@@ -163,7 +163,7 @@
   <div class="grid-2" style="margin-bottom: 1rem;">
     <div>
       <div class="section-title">Physical Address</div>
-      <div style="font-size: 0.9375rem; color: #374151; line-height: 1.6;">
+      <div style="font-size: 0.9375rem; color: var(--bs-body-color); line-height: 1.6;">
         {% with a=entity.address %}
         {% if a.street %}{{ a.street }}<br>{% endif %}
         {% if a.street2 %}{{ a.street2 }}<br>{% endif %}
@@ -176,9 +176,9 @@
     <div>
       <div class="section-title">Mailing Address</div>
       {% if entity.addresses_same %}
-      <div style="font-size: 0.875rem; color: #6b7280; font-style: italic;">Same as physical address</div>
+      <div style="font-size: 0.875rem; color: var(--bs-secondary-color); font-style: italic;">Same as physical address</div>
       {% else %}
-      <div style="font-size: 0.9375rem; color: #374151; line-height: 1.6;">
+      <div style="font-size: 0.9375rem; color: var(--bs-body-color); line-height: 1.6;">
         {% with a=entity.mailing_address %}
         {% if a.street %}{{ a.street }}<br>{% endif %}
         {% if a.street2 %}{{ a.street2 }}<br>{% endif %}
@@ -193,7 +193,7 @@
 
   {# Business Types #}
   {% if entity.business_types %}
-  <div class="section-title">Business Types <span style="font-size:0.7rem; font-weight:400; color:#6b7280; text-transform:none; letter-spacing:0;">(confirmed registrations from SAM.gov)</span></div>
+  <div class="section-title">Business Types <span style="font-size:0.7rem; font-weight:400; color:var(--bs-secondary-color); text-transform:none; letter-spacing:0;">(confirmed registrations from SAM.gov)</span></div>
   <div style="display:flex; flex-wrap:wrap; gap:0.4rem;">
     {% for bt in entity.business_types %}
     <span style="display:inline-flex; align-items:center; gap:5px; padding:0.3rem 0.75rem; border-radius:20px; font-size:0.8rem; font-weight:600; background:rgba(45,198,83,0.1); color:#166534; border:1px solid rgba(45,198,83,0.3);">
@@ -203,7 +203,7 @@
   </div>
   {% else %}
   <div class="section-title">Business Types</div>
-  <p style="font-size:0.875rem; color:#6b7280;">No business types listed.</p>
+  <p style="font-size:0.875rem; color:var(--bs-secondary-color);">No business types listed.</p>
   {% endif %}
 
   {# SBA Certifications #}
@@ -236,10 +236,10 @@
     </div>
     {% endwith %}
   </div>
-  <p style="font-size:0.8rem; color:#6b7280; margin-top:0.6rem; line-height:1.5;">
-    <strong style="color:#374151;">Note:</strong> These reflect SBA-program certification data as stored in SAM.gov.
+  <p style="font-size:0.8rem; color:var(--bs-secondary-color); margin-top:0.6rem; line-height:1.5;">
+    <strong style="color:var(--bs-body-color);">Note:</strong> These reflect SBA-program certification data as stored in SAM.gov.
     A company may self-report as Women-Owned, Veteran-Owned, etc. under <em>Business Types</em> above without holding the corresponding SBA certification &mdash;
-    but <strong style="color:#374151;">SAM.gov certification data can also lag behind actual status</strong>, particularly for SDVOSB
+    but <strong style="color:var(--bs-body-color);">SAM.gov certification data can also lag behind actual status</strong>, particularly for SDVOSB
     (which transferred from VA to SBA certification in 2023). A red &#10007; does not necessarily mean the company is uncertified.
     Verify directly on <a href="https://sam.gov" target="statz_sam" style="color:#1d4ed8;">SAM.gov</a> or the
     <a href="https://veterans.certify.sba.gov" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;">SBA Veteran Certification portal</a> when eligibility is in question.
@@ -248,7 +248,7 @@
   {# Temporary raw data debug panel — staff only. Set display:block to re-enable. #}
   {% if request.user.is_staff and debug_raw %}
   <div style="display:none; margin-top:1.25rem; background:#0f172a; border-radius:6px; padding:1rem;">
-    <div style="font-size:0.7rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.75rem;">
+    <div style="font-size:0.7rem; font-weight:700; color:var(--bs-secondary-color); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.75rem;">
       DEBUG — Raw SAM.gov API response (staff only)
     </div>
     <pre style="font-size:0.75rem; color:#e2e8f0; font-family:ui-monospace,monospace; white-space:pre-wrap; word-break:break-all; margin:0; max-height:600px; overflow-y:auto;">{{ debug_raw }}</pre>
@@ -261,8 +261,8 @@
   <div style="font-size: 0.875rem;">
     {% for n in entity.naics_codes %}
     <div style="padding: 0.3rem 0; border-bottom: 1px solid #f3f4f6; display:flex; gap:0.5rem; align-items:baseline;">
-      <span class="mono" style="font-weight:600; color:#0a1628; min-width:60px;">{{ n.code }}</span>
-      <span style="color:#374151;">{{ n.desc }}</span>
+      <span class="mono" style="font-weight:600; color:var(--bs-emphasis-color); min-width:60px;">{{ n.code }}</span>
+      <span style="color:var(--bs-body-color);">{{ n.desc }}</span>
       {% if n.primary %}<span class="pill pill-blue" style="font-size:0.7rem;">Primary</span>{% endif %}
       {% if n.small_business %}<span class="pill pill-green" style="font-size:0.7rem;">SBA Small Biz</span>{% endif %}
     </div>
@@ -276,8 +276,8 @@
   <div style="font-size: 0.875rem;">
     {% for p in entity.psc_codes %}
     <div style="padding: 0.3rem 0; border-bottom: 1px solid #f3f4f6; display:flex; gap:0.5rem; align-items:baseline;">
-      <span class="mono" style="font-weight:600; color:#0a1628; min-width:60px;">{{ p.code }}</span>
-      <span style="color:#374151;">{{ p.desc }}</span>
+      <span class="mono" style="font-weight:600; color:var(--bs-emphasis-color); min-width:60px;">{{ p.code }}</span>
+      <span style="color:var(--bs-body-color);">{{ p.desc }}</span>
     </div>
     {% endfor %}
   </div>

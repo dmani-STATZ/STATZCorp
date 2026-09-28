@@ -23,6 +23,9 @@ Read `PROJECT_CONTEXT.md`, `core/CONTEXT_core.md`, `STATZWeb/settings.py`, and `
 - The portal home (`templates/index.html`) uses `active_company.logo_url` with the STATZ static mark as fallback, same rule as the header.
 - The header logo in `templates/base_template.html` links to `/home/` (`index`), not the public landing page. Do not change `msapplication-starturl`.
 - Do not alter the fixed 48px `#header` height when adding controls.
+- Header controls use the shell classes in `app-core.css` section 3: `.hdr-icon-btn` (round icon buttons: menu, bell, theme, settings), `.hdr-text-link`, `.hdr-company`, `.hdr-user` + `.hdr-avatar`, `.hdr-search-btn` (contracts only), `.hdr-dev-pill`. Hide low-priority controls on phones with `.hdr-hide-sm` / `.hdr-hide-md`. Keep the IDs JS depends on: `#theme-toggle`, `#theme-toggle-icon`, `#settings-trigger`, `#unreadMessageCount`, `#portal-app-launcher`.
+- The sidebar is a `<nav id="sidebar" class="sidebar inactive">` drawer under the header, toggled by `toggleSidebar()` (also closed by Esc and by clicking `.sidebar-backdrop`). Links use `.sidebar-link` / `.sidebar-sublink` with `.is-active` from `request.resolver_match`; groups are `<details class="sidebar-group">`. The version/build lives in `.sidebar-footer`; keep `#build-number` there (the arcade trigger counts clicks on it).
+- Colours come from the tokens in `static/css/theme-vars.css` (`--statz-page-bg`, `--statz-surface`, `--statz-border`, `--statz-nav-*`, `--statz-shadow-*`, `--statz-radius*`). Use them instead of hard-coded hex so light/dark stay in step.
 - DIBBS recent-count logic belongs in `dibbs.services.dibbs_notices`; both the API and context processor reuse it.
 - The badge context processor is authenticated-only and cached for 30 minutes.
 

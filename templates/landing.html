@@ -31,77 +31,142 @@
     <meta name="msapplication-config" content="none">
 
     <style>
-        .logo-container {
-            text-align: center;
-            margin-top: 2vh;
-            margin-bottom: -0.5rem; /* keeps logo snug with content box */
-        }
-
-        .logo {
-            max-width: 650px;  /* go big or go home */
-            height: auto;
-            display: inline-block;
-            filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.25)); /* gives weight and presence */
-            transition: transform 0.2s ease, filter 0.2s ease;
-        }
-
-        .logo:hover {
-            transform: scale(1.05);
-            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.35));
-        }
-
-        .content-box {
-            max-width: 650px;
-            margin: -0.75rem auto 0 auto; /* pulls the text box closer */
-            padding: 2.25rem 2.75rem;
-            background-color: rgba(255, 255, 255, 0.65);
-            border-radius: 12px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
-            text-align: center;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            color: #222;
-        }
-
-        .title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            color: #800000; /* Or match your logo’s red */
-        }
-
-        .text p {
-            margin-bottom: 1rem;
-            text-align: justify;
-        }
-
-        .button {
-            display: inline-block;
-            background-color: #0056d2;
-            color: #fff;
-            padding: 0.75rem 1.75rem;
-            font-size: 1rem;
-            border-radius: 6px;
-            text-decoration: none;
-            transition: background-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .button:hover {
-            background-color: #0041a3;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-        }
+        *, *::before, *::after { box-sizing: border-box; }
 
         body {
-            font-family: Arial, sans-serif;
             margin: 0;
-            padding: 0;
-            background: url('{% static "images/gears-metal-stainless-technology.jpg" %}?v={{ cache_version }}-{% now "U" %}') center/cover no-repeat fixed;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            padding: 2rem 1rem;
+            font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #e6ebf1;
+            background-color: #0d131b;
+            background-image:
+                radial-gradient(ellipse 60% 45% at 50% 0%, rgba(179, 0, 27, 0.34), transparent 70%),
+                radial-gradient(ellipse 50% 40% at 85% 100%, rgba(68, 110, 155, 0.28), transparent 70%),
+                radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+            background-size: auto, auto, 22px 22px;
+            background-attachment: fixed;
         }
 
+        .logo-container {
+            text-align: center;
+            margin-bottom: -1.75rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            width: min(440px, 80vw);
+            height: auto;
+            display: inline-block;
+            filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.45));
+            transition: transform 0.25s ease;
+        }
+
+        .logo:hover {
+            transform: translateY(-2px);
+        }
+
+        .content-box {
+            width: min(600px, 100%);
+            padding: 3.25rem 2.5rem 1.75rem;
+            background: linear-gradient(180deg, rgba(27, 36, 49, 0.92), rgba(18, 25, 34, 0.94));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            text-align: center;
+            backdrop-filter: blur(6px);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 0.9rem;
+            padding: 0.25rem 0.7rem;
+            border-radius: 999px;
+            background: rgba(251, 191, 36, 0.12);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            color: #fcd34d;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .title {
+            margin: 0 0 1rem;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.015em;
+            line-height: 1.25;
+            color: #ffffff;
+        }
+
+        .text p {
+            margin: 0 0 0.9rem;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #aab6c4;
+        }
+
+        .text strong {
+            color: #e6ebf1;
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding: 0.8rem 1.9rem;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #c8102e, #a00d24);
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            box-shadow: 0 10px 24px -8px rgba(200, 16, 46, 0.65);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+        }
+
+        .button:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.08);
+            box-shadow: 0 14px 28px -8px rgba(200, 16, 46, 0.75);
+        }
+
+        .button:focus-visible {
+            outline: 3px solid rgba(255, 255, 255, 0.6);
+            outline-offset: 3px;
+        }
+
+        .version {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.35rem 1.25rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.72rem;
+            color: #6f7d8e;
+        }
+
+        .version span b {
+            font-weight: 600;
+            color: #8d9aab;
+        }
+
+        @media (max-width: 520px) {
+            .content-box { padding: 2.75rem 1.25rem 1.5rem; }
+            .title { font-size: 1.3rem; }
+        }
     </style>
     <link rel="shortcut icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}?v={{ cache_version }}-{% now 'U' %}">
     <title>Welcome to STATZ Corporation</title>
@@ -114,6 +179,7 @@
 
     <!-- White box with text and button -->
     <div class="content-box">
+        <div class="eyebrow">Authorized use only</div>
         <h1 class="title">Welcome to the STATZ Corporation Web Application</h1>
         <div class="text">
             <p>
@@ -126,16 +192,16 @@
                 By clicking <strong>Accept & Continue</strong>, you acknowledge and consent to monitoring and compliance with STATZ Corporation security policies.
             </p>
         </div>
-        <a href="{% url 'users:login' %}" class="button">Accept & Continue</a>
+        <a href="{% url 'users:login' %}" class="button">Accept &amp; Continue <span aria-hidden="true">&rarr;</span></a>
 
         <!-- Version Information -->
-        <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e0e0e0; font-size: 0.85rem; color: #666;">
-            <p style="margin: 0.25rem 0;">Version: {{ display_version }}</p>
+        <div class="version">
+            <span><b>Version</b> {{ display_version }}</span>
             {% if version_info.build_number %}
-            <p style="margin: 0.25rem 0;">Build: {{ version_info.build_number }}</p>
+            <span><b>Build</b> {{ version_info.build_number }}</span>
             {% endif %}
-            <p style="margin: 0.25rem 0;">Build Date: {{ version_info.date }}</p>
-            <p style="margin: 0.25rem 0;">Branch: {{ version_info.branch }}</p>
+            {% if version_info.date %}<span><b>Date</b> {{ version_info.date }}</span>{% endif %}
+            {% if version_info.branch %}<span><b>Branch</b> {{ version_info.branch }}</span>{% endif %}
         </div>
     </div>
 

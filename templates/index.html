@@ -17,6 +17,13 @@
         {% else %}
         <img src="{% static 'images/StatzCorpColorFINAL.png' %}?v={{ cache_version }}" class="portal-home-logo" alt="STATZ Corporation">
         {% endif %}
+        {% if user.is_authenticated %}
+        {% now "G" as hour %}
+        <p class="portal-greeting">
+            {% if hour|add:0 < 12 %}Good morning{% elif hour|add:0 < 17 %}Good afternoon{% else %}Good evening{% endif %}{% if user.first_name %}, {{ user.first_name }}{% endif %}
+            <span class="portal-greeting-date">{% now "l, F j" %}</span>
+        </p>
+        {% endif %}
         <h1 class="visually-hidden">{% if active_company %}{{ active_company.name }} portal search{% else %}STATZ portal search{% endif %}</h1>
 
         <form method="get" action="{% url 'core:global_search' %}" class="mt-4" role="search">
@@ -60,6 +67,18 @@
                 </a>
             </div>
         </div>
+
+        {% if user.is_authenticated %}
+        <nav class="portal-quicklinks" aria-label="Jump to an app">
+            <span class="portal-quicklinks-label">Jump to</span>
+            <a href="{% url 'contracts:contracts_dashboard' %}"><i class="bi bi-file-earmark-text" aria-hidden="true"></i>Contracts</a>
+            <a href="{% url 'quote:dashboard' %}"><i class="bi bi-calculator" aria-hidden="true"></i>Quotes</a>
+            <a href="{% url 'dibbs:dashboard' %}"><i class="bi bi-cloud-download" aria-hidden="true"></i>DIBBS</a>
+            <a href="{% url 'suppliers:supplier_dashboard' %}"><i class="bi bi-truck" aria-hidden="true"></i>Suppliers</a>
+            <a href="{% url 'products:observatory' %}"><i class="bi bi-upc-scan" aria-hidden="true"></i>NSN Portal</a>
+            <a href="{% url 'reports:hub' %}"><i class="bi bi-bar-chart-line" aria-hidden="true"></i>Reports</a>
+        </nav>
+        {% endif %}
     </section>
 </main>
 {% endblock body %}
