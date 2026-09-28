@@ -1,7 +1,7 @@
 ---
 id: 2026-09-25-dibbs-data-app
 title: DIBBS data now lives in its own app
-published: false
+published: true
 publish_date: 2026-09-25
 tags: [improved, sales]
 critical: false

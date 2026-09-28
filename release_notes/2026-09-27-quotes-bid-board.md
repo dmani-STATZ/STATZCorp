@@ -1,7 +1,7 @@
 ---
 id: 2026-09-27-quotes-bid-board
 title: STATZ Quotes — Bid Board and DIBBS BQ file export
-published: false
+published: true
 publish_date: 2026-09-27
 tags: [new, sales]
 critical: false

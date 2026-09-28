@@ -39,6 +39,11 @@
             clinSelect.value = '';
             clinSelect.classList.remove('is-invalid');
         }
+        document.getElementById('addPartialShipmentId').value = '';
+        document.getElementById('addPartialModalLabel').textContent = 'Add Shipment';
+        if (!isFinanceAuditPage) {
+            document.querySelectorAll('.add-partial-money-fields').forEach(el => el.style.display = '');
+        }
     }
 
     // Open modal — delegated to handle dynamically rendered buttons
@@ -86,6 +91,32 @@
             document.getElementById('addPartialModal')
         );
         modal.show();
+    });
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.js-open-edit-shipment');
+        if (!btn) return;
+        const row = btn.closest('tr.shipment-row');
+        if (!row) return;
+
+        resetModal();
+        document.getElementById('addPartialModalLabel').textContent = 'Edit Shipment';
+        document.getElementById('addPartialShipmentId').value = btn.dataset.shipmentId;
+        document.getElementById('addPartialClinId').value = btn.dataset.clinId;
+        document.getElementById('addPartialClinSelectRow').style.display = 'none';
+
+        document.getElementById('addPartialName').value = row.dataset.name || '';
+        document.getElementById('addPartialQty').value = row.dataset.shipQty || '';
+        document.getElementById('addPartialUom').value = row.dataset.uom || '';
+        document.getElementById('addPartialShipDate').value = row.dataset.shipDate || '';
+        document.getElementById('addPartialQuoteValue').value = row.dataset.quoteValue || '';
+        document.getElementById('addPartialItemValue').value = row.dataset.itemValue || '';
+        document.getElementById('addPartialComments').value = row.dataset.comment || '';
+
+        // Paid / Customer Pay are ledger-backed (PaymentHistory) — not editable here
+        document.querySelectorAll('.add-partial-money-fields').forEach(el => el.style.display = 'none');
+
+        new bootstrap.Modal(document.getElementById('addPartialModal')).show();
     });
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -177,10 +208,19 @@
                 payload.wawf_payment = document.getElementById('addPartialCustomerPay').value || null;
             }
 
+            const shipmentId = document.getElementById('addPartialShipmentId').value;
+            if (shipmentId) {
+                delete payload.paid_amount;
+                delete payload.wawf_payment;
+            }
+            const url = shipmentId
+                ? '/contracts/api/shipments/update/' + shipmentId + '/'
+                : '/contracts/api/partials/add/';
+
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
 
-            fetch('/contracts/api/partials/add/', {
+            fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -194,7 +234,7 @@
                     bootstrap.Modal.getInstance(
                         document.getElementById('addPartialModal')
                     ).hide();
-                    if (window.notify) window.notify('success', 'Partial shipment added', 3000);
+                    if (window.notify) window.notify('success', shipmentId ? 'Shipment updated' : 'Partial shipment added', 3000);
                     window.location.reload();
                 } else {
                     if (window.notify) window.notify('error', data.error || 'Failed to add partial', 3000);

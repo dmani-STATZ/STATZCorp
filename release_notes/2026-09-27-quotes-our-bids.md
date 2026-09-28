@@ -1,7 +1,7 @@
 ---
 id: 2026-09-27-quotes-our-bids
 title: STATZ Quotes — Our Bids win/loss tracking
-published: false
+published: true
 publish_date: 2026-09-27
 tags: [new, sales]
 critical: false

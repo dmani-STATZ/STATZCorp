@@ -1,7 +1,7 @@
 ---
 id: 2026-09-26-quotes-phase-1
 title: STATZ Quotes — solicitation matching and RFQ dispatch
-published: false
+published: true
 publish_date: 2026-09-26
 tags: [new, sales]
 critical: false

@@ -154,9 +154,14 @@ def update_shipment(request, shipment_id):
     """Update an existing shipment."""
     try:
         data = json.loads(request.body)
-        shipment = get_object_or_404(ClinShipment, id=shipment_id)
-        
+        company = getattr(request, 'active_company', None)
+        if not company:
+            return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
+        shipment = get_object_or_404(ClinShipment, id=shipment_id, clin__contract__company=company)
+
         # Update shipment fields
+        if 'name' in data:
+            shipment.name = (data['name'] or '').strip() or None
         if 'ship_qty' in data:
             shipment.ship_qty = float(data['ship_qty'])
         if 'uom' in data:

@@ -1,7 +1,7 @@
 ---
 id: 2026-09-27-quotes-mailbox
 title: STATZ Quotes — shared mailbox and quote entry
-published: false
+published: true
 publish_date: 2026-09-27
 tags: [new, sales]
 critical: false
