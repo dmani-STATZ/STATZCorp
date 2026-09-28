@@ -754,6 +754,11 @@ SAM_OUR_CAGE = os.environ.get(
     "SAM_OUR_CAGE", ""
 )  # e.g. '1ABC2' — used to detect we_won
 
+# TypeSafe AI (Jev) — structured decision primitives (Choice/Score/Noul).
+# core.typesafe_client.get_client() is the single place that reads these.
+TYPESAFE_ENABLED = os.environ.get("TYPESAFE_ENABLED", "False").strip().lower() == "true"
+TYPESAFE_API_KEY = os.environ.get("TYPESAFE_API_KEY", "")
+
 # Speed up password hashing in tests (reduces test duration dramatically)
 if IS_TESTING:
     PASSWORD_HASHERS = [

@@ -41,6 +41,9 @@ pdfplumber==0.11.5
 # LLM — solicitation PDF analysis (workbench)
 anthropic>=0.40.0
 
+# TypeSafe AI (Jev) — structured decision primitives (mailbox orphan-email triage)
+typesafe-sdk>=0.7.0
+
 # Utilities
 python-dateutil==2.9.0.post0
 requests==2.33.0  # Latest version with .netrc fix

@@ -327,6 +327,11 @@
         post(root.dataset.unlinkUrl, { sol: btn.dataset.sol }).then(res => {
           if (res.ok) { window.showToast('info', btn.dataset.sol + ' unlinked.'); window.quoteMailbox.reload(); }
         });
+      } else if (action === 'accept-suggestion') {
+        post(root.dataset.linkUrl, { sol: btn.dataset.sol }).then(res => {
+          if (res.ok) { window.showToast('success', btn.dataset.sol + ' linked.'); window.quoteMailbox.reload(); }
+          else { window.showToast('error', 'Could not link that solicitation.'); }
+        });
       } else if (action === 'open-drawer') {
         const needs = btn.dataset.needs;
         if (needs === 'sol') {

@@ -58,6 +58,15 @@
     {% empty %}
       <span class="small text-body-secondary">No solicitation detected in this message.</span>
     {% endfor %}
+    {% if suggestion %}
+      <span class="quote-sol-chip">
+        <i class="bi bi-stars" title="Suggested by Jev"></i>
+        <span class="font-monospace">{{ suggestion.sol }}</span>
+        <span class="text-body-secondary">{{ suggestion.nomenclature }}</span>
+        <span class="badge text-bg-light border">Jev suggests &middot; {% widthratio suggestion.confidence 1 100 %}%</span>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-action="accept-suggestion" data-sol="{{ suggestion.sol }}">Accept</button>
+      </span>
+    {% endif %}
     <button type="button" class="btn btn-outline-secondary btn-sm" data-action="open-link">+ Link SOL</button>
   </div>
 

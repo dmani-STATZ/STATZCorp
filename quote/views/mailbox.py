@@ -23,7 +23,7 @@ from quote.models import (
     QuoteEmailAttachment,
     QuoteSupplierQuote,
 )
-from quote.services import cost, graph_inbox, mailbox
+from quote.services import cost, graph_inbox, mailbox, mailbox_ai
 from quote.services.matching import normalize_nsn
 from quote.services.quotes import QuoteInput, QuoteInputError, save_supplier_quote
 from suppliers.models import Supplier
@@ -173,6 +173,7 @@ def email_detail(request, email_id):
         email.save(update_fields=['is_read', 'modified_on'])
 
     grouped = _linked_solicitations(email)
+    suggestion = mailbox_ai.suggest_link(email) if email.is_orphan else None
     quotes = (
         QuoteSupplierQuote.objects.filter(source_email=email)
         .select_related('supplier', 'line__solicitation')
@@ -186,6 +187,7 @@ def email_detail(request, email_id):
             'id', 'original_name', 'file_size', 'content_type', 'downloaded_at',
         ),
         'linked': grouped,
+        'suggestion': suggestion,
         'drawer_json': _drawer_payload(grouped),
         'quotes': quotes,
         'markup_presets': [str(p) for p in cost.MARKUP_PRESETS],
