@@ -8,7 +8,7 @@ toward dibbs, and the auto-award remarks gate.
 from decimal import Decimal
 
 from django.apps import apps
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from quote.models import QuoteBid, QuoteEmail, QuoteRFQ, QuoteSupplierQuote
@@ -177,6 +177,7 @@ class QuoteRFQConstraintTests(TestCase):
                 QuoteRFQ.objects.create(line=line, supplier=supplier)
 
 
+@override_settings(REQUIRE_LOGIN=True)
 class DashboardRenderTests(TestCase):
     """The shell must actually render -- a missing block or bad {% url %} is a 500."""
 
