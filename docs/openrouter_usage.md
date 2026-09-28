@@ -1,8 +1,8 @@
-# OpenRouter Usage in STATZCorp
+# AI Supplier Enrichment in STATZCorp
 
-This document summarizes how we integrate OpenRouter for supplier enrichment and how to extend it elsewhere in the project.
+This document summarizes how we integrate Anthropic Claude (Haiku) for supplier enrichment and how to extend it elsewhere in the project. (Previously used OpenRouter, now standardized on Anthropic).
 
-## What we use OpenRouter for
+## What we use AI for
 - Extracting supplier metadata from raw website HTML (company name, logo URL, addresses, phone numbers, emails, CAGE code, social links, notes).
 - Returning structured JSON that downstream UI can apply to supplier records.
 - Providing a manual-mode fallback where users can run the generated prompt in their own LLM and paste the JSON result.
@@ -10,27 +10,22 @@ This document summarizes how we integrate OpenRouter for supplier enrichment and
 ## Key Django components
 - `suppliers/views.py`
   - `build_supplier_prompt_bundle(html)`: builds system/user messages, truncates/sanitizes HTML.
-  - `call_openrouter_for_supplier(html, model_override=None, prompt_bundle=None)`: posts to OpenRouter chat/completions with model, messages, temperature 0.2, and optional fallbacks.
-  - `SupplierEnrichView (GET)`: fetches website HTML, builds prompt, calls OpenRouter unless manual_only. Returns HTML, AI result/error, prompt context, model info. Auto-saves `logo_url` and `last_enriched_at` if provided, and updates audit fields.
+  - `call_openrouter_for_supplier(html, model_override=None, prompt_bundle=None)`: calls Anthropic Messages API (`core.anthropic_client.call_anthropic`) with model (defaults to `claude-haiku-4-5-20251001`), messages, temperature 0.2.
+  - `SupplierEnrichView (GET)`: fetches website HTML, builds prompt, calls AI enrichment unless manual_only. Returns HTML, AI result/error, prompt context, model info. Auto-saves `logo_url` and `last_enriched_at` if provided, and updates audit fields.
   - `SupplierApplyEnrichmentView (POST)`: applies a single field (logo_url, phones, emails, website_url, cage_code, or addresses). Creates one Address instance and can attach to multiple address types. Updates `last_enriched_at`, `modified_on`, and `modified_by` when available.
   - `GlobalAIModelConfigView`: gets/sets shared model configuration (superuser gated).
   - `sanitize_html_for_enrichment`: strips `<style>` blocks before prompting to reduce noise.
   - Address parsing helpers (`_parse_address_text`, `_normalize_addresses`) and JSON cleanup (`_extract_json_payload`).
-- `suppliers/openrouter_config.py` (not shown here): handles stored model, fallback list, and selection logic.
+- `suppliers/openrouter_config.py`: handles stored model and selection logic (defaults to `claude-haiku-4-5-20251001`).
 
 ## Settings and environment
 - Required:
-  - `OPENROUTER_API_KEY`: Bearer token for requests.
-- Optional:
-  - `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`)
-  - `OPENROUTER_HTTP_REFERER`, `OPENROUTER_X_TITLE` (branding/attribution headers)
-  - `OPENROUTER_MODEL_FALLBACKS`: comma-separated list or iterable of fallback model slugs
+  - `ANTHROPIC_API_KEY`: API key for Anthropic API.
 - Global model storage:
   - We store the shared model in the database (see `GlobalAIModelConfigView` and `openrouter_config.py`). It exposes `stored_model`, `effective_model`, and a `needs_update` flag.
   - The `needs_update` flag is settable via the UI and signals that the current model stopped working or should be replaced; the frontend surfaces this status so users know to update the shared model.
 - Model selection:
-  - `get_model_for_request(model_override)` chooses the explicit override or the stored/effective default.
-  - Payload includes `model` and, if present, `models` for fallbacks.
+  - `get_model_for_request(model_override)` chooses the explicit override or the stored/effective default (`claude-haiku-4-5-20251001`).
 
 ## Prompt structure
 - System prompt: instructs the model to extract JSON with fields:

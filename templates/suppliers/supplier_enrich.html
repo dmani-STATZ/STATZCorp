@@ -22,15 +22,15 @@
     <button id="run-enrichment-btn" data-supplier-id="{{ supplier.id }}" class="px-3 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700">Run Enrichment</button>
     <label for="manual-mode-toggle" class="row gap-2 text-sm text-gray-700">
       <input type="checkbox" id="manual-mode-toggle" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-      Run manually with my own LLM (skip OpenRouter call)
+      Run manually with my own LLM (skip AI call)
     </label>  </div>
     <div id="manual-mode-section" class="hidden">
     <p class="text-xs text-gray-500">We'll still fetch the HTML and provide the full context for copying.</p></div>
     <div  id="ai-model-section" >
     <div class="row gap-3">
       <label for="ai-model-input" class="label text-gray-700">AI Model</label>
-      <input id="ai-model-input" type="text" class="flex-1 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3" value="{{ default_ai_model|default:'' }}" placeholder="mistralai/mistral-small:free">
-      <span class="text-xs text-gray-500">Enter an OpenRouter model slug to override the default.</span>
+      <input id="ai-model-input" type="text" class="flex-1 rounded-md border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 py-2 px-3" value="{{ default_ai_model|default:'' }}" placeholder="claude-haiku-4-5-20251001">
+      <span class="text-xs text-gray-500">Enter a Claude model slug to override the default.</span>
     </div>
     <div class="mt-1">
       <p id="ai-model-status" class="text-xs {% if not global_ai_model_info.has_stored_model %}text-yellow-600{% elif global_ai_model_info.needs_update %}text-orange-600{% else %}text-gray-500{% endif %}">
@@ -78,7 +78,7 @@
   <div id="ai-panel" class="card card-padded shadow-sm hidden">
     <div class="row-between mb-2">
       <h2 class="text-lg font-semibold text-gray-900">AI Extracted Details</h2>
-      <span class="text-xs text-gray-500">Powered by OpenRouter</span>
+      <span class="text-xs text-gray-500">Powered by Anthropic Claude</span>
     </div>
     <p class="text-xs text-gray-500 mb-2">We asked the model to extract logos, addresses, phone numbers, emails, CAGE code, and any public contact info.</p>
     <p id="ai-model-used" class="text-xs text-gray-500 hidden mb-2"></p>

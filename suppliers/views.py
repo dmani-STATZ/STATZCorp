@@ -52,6 +52,7 @@ from suppliers.models import (
     SupplierContactCategory,
 )
 import requests
+from core.anthropic_client import call_anthropic
 
 from .openrouter_config import (
     get_model_for_request,
@@ -262,7 +263,7 @@ def _build_supplier_enrich_prompt(html: str) -> str:
 
 def _extract_json_payload(text: str) -> dict:
     if not text:
-        raise RuntimeError("OpenRouter returned an empty response.")
+        raise RuntimeError("AI model returned an empty response.")
     cleaned = text.strip()
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```(?:json)?", "", cleaned, count=1).strip()
@@ -277,7 +278,7 @@ def _extract_json_payload(text: str) -> dict:
                 return json.loads(match.group(0))
             except json.JSONDecodeError:
                 pass
-        raise RuntimeError("OpenRouter response was not valid JSON.")
+        raise RuntimeError("AI model response was not valid JSON.")
 
 
 def _normalize_contact_rows(items, value_key="value", label_fallback="label", extra_value_keys=None):
@@ -329,57 +330,37 @@ def _normalize_ai_result(data: dict) -> dict:
 def call_openrouter_for_supplier(
     html: str, model_override: str | None = None, prompt_bundle: dict | None = None
 ) -> tuple[dict, str]:
-    api_key = getattr(settings, "OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY", "")).strip()
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("OpenRouter API key is not configured.")
-    base_url = getattr(settings, "OPENROUTER_BASE_URL", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")).rstrip("/")
+        raise RuntimeError("Anthropic API key is not configured.")
     model, _ = get_model_for_request(model_override)
-    http_referer = getattr(settings, "OPENROUTER_HTTP_REFERER", os.environ.get("OPENROUTER_HTTP_REFERER", "")).strip()
-    x_title = getattr(settings, "OPENROUTER_X_TITLE", os.environ.get("OPENROUTER_X_TITLE", "STATZCorp")).strip()
-    fallback_models = getattr(settings, "OPENROUTER_MODEL_FALLBACKS", os.environ.get("OPENROUTER_MODEL_FALLBACKS", ""))
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    if http_referer:
-        headers["HTTP-Referer"] = http_referer
-        headers["Referer"] = http_referer
-    if x_title:
-        headers["X-Title"] = x_title
-
     prompt_bundle = prompt_bundle or build_supplier_prompt_bundle(html)
-
-    messages = [
-        {"role": "system", "content": prompt_bundle["system"]},
-        {"role": "user", "content": prompt_bundle["user"]},
-    ]
 
     payload = {
         "model": model,
-        "messages": messages,
+        "max_tokens": 2048,
         "temperature": 0.2,
+        "system": prompt_bundle["system"],
+        "messages": [
+            {"role": "user", "content": prompt_bundle["user"]},
+        ],
     }
-    if fallback_models:
-        if isinstance(fallback_models, (list, tuple)):
-            models_list = [m for m in fallback_models if m]
-        else:
-            models_list = [m.strip() for m in fallback_models.split(",") if m.strip()]
-        if models_list:
-            payload["models"] = models_list
 
     try:
-        response = requests.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=(15, 120))
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
+        data = call_anthropic(payload, "suppliers.supplier_enrich")
+    except Exception as exc:
+        raise RuntimeError(f"Anthropic request failed: {exc}") from exc
 
-    data = response.json()
-    choices = data.get("choices") or []
-    if not choices:
-        raise RuntimeError("OpenRouter response did not include choices.")
-    content = choices[0].get("message", {}).get("content") or ""
-    parsed = _extract_json_payload(content)
+    blocks = data.get("content") or []
+    text_content = ""
+    for block in blocks:
+        if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):
+            text_content = block["text"].strip()
+            break
+    if not text_content:
+        raise RuntimeError("Anthropic API returned no text content.")
+
+    parsed = _extract_json_payload(text_content)
     return _normalize_ai_result(parsed), model
 
 def fetch_website_html(url: str, *, timeout: int = 10) -> str:

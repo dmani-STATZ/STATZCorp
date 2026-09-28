@@ -5,12 +5,11 @@ from django.conf import settings
 
 from .models import OpenRouterModelSetting
 
-DEFAULT_MODEL = "mistralai/mistral-small:free"
+DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 
 
 def _env_default_model() -> str:
-    env_value = getattr(settings, "OPENROUTER_MODEL", os.environ.get("OPENROUTER_MODEL", "")).strip()
-    return env_value or DEFAULT_MODEL
+    return DEFAULT_MODEL
 
 
 def _serialize_setting(setting: OpenRouterModelSetting) -> Dict:

@@ -329,22 +329,7 @@ else:
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
 REPORT_CREATOR_EMAIL = os.environ.get("REPORT_CREATOR_EMAIL", "dmani@statzcorp.com")
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_HTTP_REFERER = os.environ.get(
-    "OPENROUTER_HTTP_REFERER", "http://localhost:8000/"
-)
-OPENROUTER_X_TITLE = os.environ.get("OPENROUTER_X_TITLE", "STATZCorp Reports")
-# Default model can be overridden via env; switch to minimax free by default
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "minimax/minimax-m2:free")
-# Allow overriding base URL in case of proxy or routing issues
-OPENROUTER_BASE_URL = os.environ.get(
-    "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
-)
 
-# Optional: a comma-separated list of fallback models to try if the primary
-# model is not available for this API key/providers.
-_fallbacks = os.environ.get("OPENROUTER_MODEL_FALLBACKS", "")
-OPENROUTER_MODEL_FALLBACKS = [m.strip() for m in _fallbacks.split(",") if m.strip()]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

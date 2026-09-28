@@ -194,7 +194,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - There is no `suppliers/forms.py`. All form validation for supplier create/edit lives in `contracts/forms.py` (`SupplierForm`).
 - `SupplierApplyEnrichmentView` validates field names against a hard-coded allowlist and rejects empty values. This is the only server-side gate on enrichment writes — do not weaken it.
 - `GlobalAIModelConfigView.post` requires at least one of `model` or `needs_update` in the POST body. Do not remove this check.
-- `SupplierEnrichView` normalizes the `manual_only` query param and only calls OpenRouter when `OPENROUTER_API_KEY` is set — keep this guard.
+- `SupplierEnrichView` normalizes the `manual_only` query param and only calls the AI model when `ANTHROPIC_API_KEY` is set — keep this guard.
 - Address creation in `SupplierApplyEnrichmentView` creates new `contracts.Address` rows without deduplication. Be aware of this if implementing bulk enrichment.
 
 ---
