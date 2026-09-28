@@ -364,10 +364,13 @@ EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_HOST_USER", "noreply@example.com")
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL",
+    os.environ.get("EMAIL_HOST_USER", "statzweb-noreply@statzcorp.com"),
+)
 
 # ── Microsoft Graph Mail ──────────────────────────────────────────────────
-# Used for programmatic RFQ email dispatch via Graph API.
+# Used for programmatic RFQ and automated notifications dispatch via Graph API.
 # Distinct from MICROSOFT_AUTH_* which handles user login OAuth flow.
 # !! GCC HIGH TENANT — all endpoints use .us not .com !!
 # Authority: login.microsoftonline.us | Graph: graph.microsoft.us | Scope: graph.microsoft.us/.default
@@ -375,7 +378,10 @@ GRAPH_MAIL_TENANT_ID = os.environ.get("GRAPH_MAIL_TENANT_ID", "")
 GRAPH_MAIL_CLIENT_ID = os.environ.get("GRAPH_MAIL_CLIENT_ID", "")
 GRAPH_MAIL_CLIENT_SECRET = os.environ.get("GRAPH_MAIL_CLIENT_SECRET", "")
 #GRAPH_MAIL_SENDER = os.environ.get("GRAPH_MAIL_SENDER", "quotes@statzcorp.com")
-GRAPH_MAIL_SENDER_CONTRACT = os.environ.get("GRAPH_MAIL_SENDER_CONTRACT", "info@statzcorp.com")
+GRAPH_MAIL_SENDER_CONTRACT = os.environ.get(
+    "GRAPH_MAIL_SENDER_CONTRACT",
+    "statzweb-noreply@statzcorp.com",
+)
 GRAPH_MAIL_SENDER_RFQ = os.environ.get("GRAPH_MAIL_SENDER_RFQ", "quotes@statzcorp.com")
 
 # Public base URL of this app (e.g. https://statz.example.com), used for links in
