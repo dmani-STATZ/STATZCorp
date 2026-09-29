@@ -15,17 +15,19 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import escape
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_POST
 
-from dibbs.models import Solicitation, SolicitationLine
+from dibbs.models import Solicitation
 from quote.models import (
     QuoteEmail,
     QuoteEmailAttachment,
     QuoteSupplierQuote,
 )
 from quote.services import cost, graph_inbox, mailbox, mailbox_ai, packhouse
-from quote.services.matching import normalize_nsn
-from quote.services.quotes import QuoteInput, QuoteInputError, save_supplier_quote
+from quote.services.drawer import drawer_payload
+from quote.services.quotes import saved_cards, via_text
+from quote.views.quote_save import save_response
 from suppliers.models import Supplier
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,11 @@ EMAIL_CSP = (
     '<style>body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;'
     'margin:12px;color:#1f2937;background:#fff;word-wrap:break-word}</style>'
 )
+
+
+#: For attachments shown in the split-screen viewer. Nothing may load from or run in the
+#: response; only our own pages may frame it.
+PREVIEW_CSP = "default-src 'none'; img-src 'self'; frame-ancestors 'self'"
 
 
 def _is_xhr(request):
@@ -118,53 +125,6 @@ def _linked_solicitations(email):
     return grouped
 
 
-def _drawer_payload(grouped):
-    """JSON the drawer uses to fill line facts and NSN dimensions."""
-    from products.models import Nsn
-
-    nsns = {
-        normalize_nsn(line.nsn)
-        for entry in grouped.values() for line in entry['all_lines']
-    } - {''}
-    dims = {
-        n.nsn_normalized: n for n in Nsn.objects.filter(nsn_normalized__in=nsns).order_by('-pk')
-    }
-    asked = packhouse.requests_payload([entry['solicitation'].pk for entry in grouped.values()])
-    out = {}
-    for number, entry in grouped.items():
-        out[number] = {
-            'due': entry['solicitation'].return_by_date.isoformat() if entry['solicitation'].return_by_date else '',
-            'lines': [],
-            # Packaging-quote requests already sent for this SOL, and packhouses that
-            # packed these NSNs before -- the drawer's packhouse panel renders both.
-            'packhouse_requests': asked.get(entry['solicitation'].pk, []),
-            'packhouse_history': packhouse.history(
-                {normalize_nsn(line.nsn) for line in entry['all_lines']} - {''}
-            ),
-        }
-        for line in entry['all_lines']:
-            d = dims.get(normalize_nsn(line.nsn))
-            out[number]['lines'].append({
-                'id': line.pk,
-                'line': line.line_number or '',
-                'nsn': line.nsn,
-                'nomen': line.nomenclature or '',
-                'qty': line.quantity or 0,
-                'uoi': line.unit_of_issue or '',
-                'days': line.delivery_days,
-                'dims': {
-                    'weight': str(d.unit_weight) if d and d.unit_weight is not None else '',
-                    'length': str(d.unit_length) if d and d.unit_length is not None else '',
-                    'width': str(d.unit_width) if d and d.unit_width is not None else '',
-                    'height': str(d.unit_height) if d and d.unit_height is not None else '',
-                    'source': (d.dimension_source_notes if d else '') or '',
-                    'verified': d.dimensions_last_verified.isoformat() if d and d.dimensions_last_verified else '',
-                    'known': d is not None,
-                },
-            })
-    return out
-
-
 @login_required
 @require_GET
 def email_detail(request, email_id):
@@ -183,13 +143,31 @@ def email_detail(request, email_id):
 
     grouped = _linked_solicitations(email)
     suggestion = mailbox_ai.suggest_link(email) if email.is_orphan else None
-    quotes = (
-        QuoteSupplierQuote.objects.filter(source_email=email)
-        .select_related('supplier', 'line__solicitation')
-        .order_by('line__solicitation__solicitation_number', 'line__line_number', '-pk')
-    )
+    sols = [entry['solicitation'] for entry in grouped.values()]
+    # One quote per supplier per line, whichever message or channel it came in by: the tray shows the
+    # sender's quotes on this message's solicitations, so a revised quote edits the earlier one.
+    cards = saved_cards(email.supplier, sols)
+    # SOLs this supplier already has a quote on: the tray opens on the first one that has none and
+    # marks the rest, so a multi-SOL message is worked through in order.
+    logged_sols = set(cards)
+    if email.supplier_id and sols:
+        quotes = (
+            QuoteSupplierQuote.objects.filter(supplier=email.supplier, line__solicitation__in=sols)
+            .select_related('supplier', 'line__solicitation')
+            .order_by('line__solicitation__solicitation_number', 'line__line_number', '-pk')
+        )
+    else:
+        quotes = QuoteSupplierQuote.objects.none()
+    card_of_row = {pk: card for sol_cards in cards.values() for card in sol_cards for pk in card['ids']}
+    for q in quotes:
+        q.card = card_of_row.get(q.pk)
+        # Say so when a quote did not come from this very message (an earlier email, a phone call, ...).
+        q.source_note = via_text(q) if q.source_email_id != email.pk else ''
     return render(request, 'quote/mailbox/_detail.html', {
         'email': email,
+        'logged_sols': logged_sols,
+        # Keeps one rep's unsaved entries from showing up for another on a shared browser.
+        'draft_owner': request.user.pk,
         'claimed_by_other': claimed_by_other,
         'body_srcdoc': EMAIL_CSP + (email.body_html or f'<pre>{escape(email.body_preview)}</pre>'),
         'attachments': email.attachments.only(
@@ -197,7 +175,7 @@ def email_detail(request, email_id):
         ),
         'linked': grouped,
         'suggestion': suggestion,
-        'drawer_json': _drawer_payload(grouped),
+        'drawer_json': drawer_payload(grouped, cards),
         'quotes': quotes,
         'packhouse_replies': [
             packhouse.serialize(r) for r in packhouse.reply_candidates(
@@ -224,6 +202,32 @@ def attachment_download(request, attachment_id):
     resp['Content-Disposition'] = f'{disposition}; filename="{safe_name}"'
     resp['X-Content-Type-Options'] = 'nosniff'
     resp['Content-Security-Policy'] = "default-src 'none'; sandbox"
+    return resp
+
+
+@login_required
+@require_GET
+@xframe_options_sameorigin
+def attachment_view(request, attachment_id):
+    """
+    Serve a PDF or image inline so the mailbox can show it beside the message. Same rules as
+    the download: the type comes from the bytes, `nosniff`, and anything else is refused (the
+    Download link still works). Framing is allowed for our own pages only -- the site default
+    is DENY, which would blank the viewer.
+    """
+    att = get_object_or_404(QuoteEmailAttachment, pk=attachment_id)
+    if att.content is None:
+        raise Http404('Attachment bytes were not downloaded (too large or unavailable).')
+    data = bytes(att.content)
+    content_type = mailbox.sniff_preview_type(data)
+    if content_type is None:
+        return HttpResponse('This file type cannot be previewed. Use Download.', status=415,
+                            content_type='text/plain; charset=utf-8')
+    resp = HttpResponse(data, content_type=content_type)
+    safe_name = att.original_name.replace('"', '').replace('\r', '').replace('\n', '')
+    resp['Content-Disposition'] = f'inline; filename="{safe_name}"'
+    resp['X-Content-Type-Options'] = 'nosniff'
+    resp['Content-Security-Policy'] = PREVIEW_CSP
     return resp
 
 
@@ -270,53 +274,12 @@ def email_set_supplier(request, email_id):
 @login_required
 @require_POST
 def save_quote(request, email_id):
+    """
+    POST -- log a supplier quote from this message, or (with ``entry``) update one the supplier already
+    has on the solicitation. One quote per supplier per line, so a revised quote updates the earlier one
+    in place rather than adding a second; refused once its bid went to DIBBS. See ``quote_save``.
+    """
     email = get_object_or_404(QuoteEmail, pk=email_id)
     solicitation = get_object_or_404(Solicitation, solicitation_number=request.POST.get('sol'))
     supplier = Supplier.objects.filter(pk=request.POST.get('supplier_id') or 0).first()
-
-    if request.POST.get('mode') == 'split':
-        lines = SolicitationLine.objects.filter(
-            pk=request.POST.get('line_id') or 0, solicitation=solicitation,
-        )
-    else:
-        lines = solicitation.lines.all()
-
-    data = QuoteInput(
-        supplier_unit_cost=request.POST.get('unit_cost'),
-        lead_time_days=request.POST.get('lead_time_days'),
-        offered_part_number=request.POST.get('offered_part_number', ''),
-        offered_cage=request.POST.get('offered_cage', ''),
-        payment_terms=request.POST.get('payment_terms', ''),
-        min_order_qty=request.POST.get('min_order_qty', ''),
-        packaging_source=request.POST.get('packaging_source') or QuoteSupplierQuote.PACKAGING_SUPPLIER_INCLUDED,
-        packaging_vendor_id=int(request.POST['packaging_vendor_id'])
-        if (request.POST.get('packaging_vendor_id') or '').isdigit() else None,
-        packaging_unit=request.POST.get('packaging_unit', ''),
-        packaging_total=request.POST.get('packaging_total', ''),
-        freight_unit=request.POST.get('freight_unit', ''),
-        freight_total=request.POST.get('freight_total', ''),
-        markup_pct=request.POST.get('markup_pct', ''),
-        target_price=request.POST.get('target_price', ''),
-        notes=request.POST.get('notes', ''),
-        dims={k: request.POST.get(f'dim_{k}', '') for k in ('weight', 'length', 'width', 'height', 'source_notes')},
-        save_dims=request.POST.get('save_dims') == 'on',
-    )
-    try:
-        result = save_supplier_quote(
-            solicitation=solicitation, supplier=supplier, lines=lines,
-            data=data, user=request.user, email=email,
-        )
-    except (QuoteInputError, cost.CostError) as exc:
-        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
-
-    message = (
-        f"Saved {supplier.name} at ${result['price']:,.2f} "
-        f"({len(result['quotes'])} line{'s' if len(result['quotes']) != 1 else ''} on "
-        f"{solicitation.solicitation_number}, landed ${result['landed']:,.2f}, "
-        f"markup {result['markup_pct']}%)."
-    )
-    if result['dims_saved']:
-        message += f" Dimensions saved to NSN {', '.join(result['dims_saved'])}."
-    elif data.save_dims:
-        message += ' No catalog NSN record to save dimensions to.'
-    return JsonResponse({'ok': True, 'message': message})
+    return save_response(request, solicitation=solicitation, supplier=supplier, email=email)

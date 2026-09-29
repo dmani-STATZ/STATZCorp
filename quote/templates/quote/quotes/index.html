@@ -1,0 +1,256 @@
+{% extends "quote/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="row-between flex-wrap mb-2">
+  <div>
+    <h1 class="h4 mb-0">Quotes</h1>
+    <div class="text-body-secondary small">Who still owes us a quote, every quote on file, and a place to enter one that did not come by email.
+      Happy with a quote? Press <strong>Build bid</strong> on it (or open the <a href="{% url 'quote:bid_board' %}">Bid Board</a>) to stage it for DIBBS.</div>
+  </div>
+  <button type="button" class="btn btn-primary btn-sm" id="enterQuoteBtn">
+    <i class="bi bi-plus-lg"></i> Enter a quote
+  </button>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'waiting' %}active{% endif %}"
+       href="?tab=waiting{% if show_closed %}&closed=1{% endif %}{% if show_past %}&past=1{% endif %}">
+      Waiting on suppliers <span class="badge text-bg-secondary ms-1">{{ waiting_open }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'logged' %}active{% endif %}"
+       href="?tab=logged{% if show_sent %}&sent=1{% endif %}{% if show_past %}&past=1{% endif %}">
+      Logged quotes <span class="badge text-bg-secondary ms-1">{{ logged|length }}</span>
+    </a>
+  </li>
+</ul>
+
+<div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+  <input type="search" class="form-control form-control-sm" id="rowSearch" style="max-width: 20rem;"
+         placeholder="Search SOL, NSN, item, supplier" autocomplete="off">
+  {% if tab == 'waiting' %}
+    <a class="small" href="?tab=waiting{% if not show_closed %}&closed=1{% endif %}{% if show_past %}&past=1{% endif %}">
+      {% if show_closed %}Hide{% else %}Show{% endif %} closed out (no response / declined)</a>
+  {% else %}
+    <a class="small" href="?tab=logged{% if not show_sent %}&sent=1{% endif %}{% if show_past %}&past=1{% endif %}">
+      {% if show_sent %}Hide{% else %}Show{% endif %} quotes already sent to DIBBS</a>
+  {% endif %}
+  <a class="small" href="?tab={{ tab }}{% if show_closed %}&closed=1{% endif %}{% if show_sent %}&sent=1{% endif %}{% if not show_past %}&past=1{% endif %}">
+    {% if show_past %}Hide{% else %}Include{% endif %} past-due solicitations</a>
+</div>
+
+{% if tab == 'waiting' %}
+<div class="card card-padded">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0" id="waitingTable">
+      <thead>
+        <tr><th>SOL</th><th>Item</th><th class="text-end">Qty</th><th>Due</th><th>Supplier</th><th>Asked</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for g in waiting %}
+        <tr data-row data-search="{{ g.solicitation.solicitation_number|lower }} {{ g.lines.0.nsn|lower }} {{ g.lines.0.nomenclature|default:''|lower }} {{ g.supplier.name|default:''|lower }} {{ g.supplier.cage_code|default:''|lower }}">
+          <td class="font-monospace text-nowrap"><a href="{% url 'quote:solicitation_workspace' g.solicitation.solicitation_number %}" target="statz_workspace">{{ g.solicitation.solicitation_number }}</a></td>
+          <td>
+            {{ g.lines.0.nomenclature|default:"—" }}
+            <div class="small text-body-secondary"><span class="font-monospace">{{ g.lines.0.nsn }}</span>{% if g.lines|length > 1 %} &middot; +{{ g.lines|length|add:"-1" }} more line{{ g.lines|length|add:"-1"|pluralize }}{% endif %}</div>
+          </td>
+          <td class="text-end text-nowrap">{{ g.qty }} {{ g.lines.0.unit_of_issue|default:"" }}</td>
+          <td class="text-nowrap">
+            {{ g.solicitation.return_by_date|date:"M j"|default:"—" }}
+            {% if g.due_label %}
+              <span class="badge {% if g.days_to_due <= 3 %}text-bg-danger{% elif g.days_to_due <= 7 %}text-bg-warning{% else %}text-bg-light border{% endif %}">{{ g.due_label }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="fw-semibold">{{ g.supplier.name|default:"(no name)" }}</span>
+            <div class="small font-monospace text-body-secondary">{{ g.supplier.cage_code|default:"" }}</div>
+          </td>
+          <td class="text-nowrap small">
+            {{ g.sent_at|date:"M j"|default:"—" }}
+            {% if g.days_waiting is not None %}<div class="text-body-secondary">{{ g.days_waiting }} day{{ g.days_waiting|pluralize }} ago</div>{% endif %}
+          </td>
+          <td>
+            {% if g.state == 'replied' %}
+              <span class="badge text-bg-info" title="They answered, but no quote has been entered yet">Replied &middot; not entered</span>
+            {% elif g.state == 'closed' %}
+              <span class="badge text-bg-secondary">{% if g.status == 'DECLINED' %}Declined{% else %}No response{% endif %}</span>
+              {% if g.reason %}<div class="small text-body-secondary">{{ g.reason }}</div>{% endif %}
+            {% else %}
+              <span class="badge text-bg-light border">Waiting</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <button type="button" class="btn btn-primary btn-sm py-0" data-enter-quote
+                    data-sol="{{ g.solicitation.solicitation_number }}" data-supplier="{{ g.supplier.pk }}">Enter quote</button>
+            {% if g.reply_email_id %}<a class="btn btn-outline-secondary btn-sm py-0" href="{% url 'quote:mailbox' %}?email={{ g.reply_email_id }}" title="Open their latest message on this solicitation">Open reply</a>{% endif %}
+            {% if g.state == 'closed' %}
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-rfq-action="reopen"
+                      data-sol="{{ g.solicitation.solicitation_number }}" data-supplier="{{ g.supplier.pk }}" data-name="{{ g.supplier.name }}">Back to waiting</button>
+            {% else %}
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-rfq-action="no_response"
+                      data-sol="{{ g.solicitation.solicitation_number }}" data-supplier="{{ g.supplier.pk }}" data-name="{{ g.supplier.name }}">No response</button>
+              <button type="button" class="btn btn-link btn-sm p-0 ms-1" data-rfq-action="declined"
+                      data-sol="{{ g.solicitation.solicitation_number }}" data-supplier="{{ g.supplier.pk }}" data-name="{{ g.supplier.name }}">Declined&hellip;</button>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="text-body-secondary py-3">
+          Nobody is owing us a quote right now. RFQs we send from the RFQ Queue show up here until a quote is entered
+          (from the Mailbox or with <strong>Enter a quote</strong>) or the supplier is closed out.
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="card card-padded">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0" id="loggedTable">
+      <thead>
+        <tr><th>SOL</th><th>Supplier</th><th>Covers</th><th class="text-end">Cost</th><th class="text-end">Gov price</th><th>Days</th><th>Received</th><th>Bid</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for sol, c in logged %}
+        <tr data-row data-search="{{ sol.solicitation_number|lower }} {{ c.supplier|lower }} {{ c.covers|lower }} {{ c.fields.part|lower }}">
+          <td class="text-nowrap">
+            <a class="font-monospace" href="{% url 'quote:solicitation_workspace' sol.solicitation_number %}" target="statz_workspace">{{ sol.solicitation_number }}</a>
+            <div class="small text-body-secondary">due {{ sol.return_by_date|date:"M j"|default:"—" }}</div>
+          </td>
+          <td>{{ c.supplier }}{% if c.duplicate %} <span class="badge text-bg-warning" title="This supplier has more than one quote on a line. Remove the old one.">Duplicate</span>{% endif %}</td>
+          <td>{{ c.covers }}</td>
+          <td class="text-end">${{ c.cost }}</td>
+          <td class="text-end fw-semibold">${{ c.price }}</td>
+          <td>{{ c.days }}</td>
+          <td class="small">{{ c.via }}</td>
+          <td class="small text-nowrap" title="{{ c.bid_note }}">
+            {% if c.bid_status == 'SUBMITTED' %}<span class="badge text-bg-secondary"><i class="bi bi-lock"></i> Sent to DIBBS</span>
+            {% elif c.bid_status == 'READY' %}<span class="badge text-bg-success">Bid ready</span>
+              <a href="{% url 'quote:bid_export' %}" class="ms-1">Export &rarr;</a>
+            {% elif c.bid_status == 'DRAFT' %}<span class="badge text-bg-info">On a bid</span>
+              <a href="{% url 'quote:bid_builder' sol.solicitation_number %}" class="ms-1">Continue &rarr;</a>
+            {% else %}<a href="{% url 'quote:bid_builder' sol.solicitation_number %}" class="btn btn-outline-secondary btn-sm py-0">Build bid</a>{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <button type="button" class="btn btn-outline-primary btn-sm py-0" data-edit-quote
+                    data-sol="{{ sol.solicitation_number }}" data-supplier="{{ c.supplier_id }}" data-entry="{{ c.entry }}"
+                    title="{% if c.locked %}{{ c.lock_reason }}{% else %}Open this quote in the side tray to change it{% endif %}">
+              {% if c.locked %}<i class="bi bi-lock"></i> View{% else %}<i class="bi bi-pencil"></i> Edit{% endif %}
+            </button>
+            {% if not c.locked %}
+              <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-1" data-remove-quote
+                      data-sol="{{ sol.solicitation_number }}" data-supplier="{{ c.supplier_id }}" data-entry="{{ c.entry }}"
+                      data-name="{{ c.supplier }}" data-covers="{{ c.covers }}">Remove</button>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="9" class="text-body-secondary py-3">
+          No quotes on file{% if not show_past %} for open solicitations{% endif %}. Log one from the Mailbox, or use <strong>Enter a quote</strong>.
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Enter a quote: pick the solicitation, then who quoted ── #}
+<div class="modal fade" id="enterQuoteModal" tabindex="-1" aria-labelledby="enterQuoteLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="enterQuoteLabel">Enter a quote</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="eqStepSol">
+          <label class="form-label small" for="eqSolSearch">Solicitation</label>
+          <input type="search" class="form-control" id="eqSolSearch" placeholder="SOL #, NSN or part number" autocomplete="off">
+          <div class="list-group mt-2" id="eqSolResults"></div>
+        </div>
+        <div id="eqStepSupplier" class="d-none">
+          <div class="row-between mb-2">
+            <div><span class="font-monospace fw-semibold" id="eqSolName"></span> <span class="small text-body-secondary" id="eqSolInfo"></span></div>
+            <button type="button" class="btn btn-link btn-sm p-0" id="eqBack">change</button>
+          </div>
+          <div class="small text-body-secondary mb-1">We sent an RFQ to</div>
+          <div class="list-group mb-3" id="eqRfqSuppliers"></div>
+          <label class="form-label small" for="eqSupplierSearch">Or any other supplier</label>
+          <input type="search" class="form-control" id="eqSupplierSearch" placeholder="Supplier name or CAGE" autocomplete="off">
+          <div class="list-group mt-2" id="eqSupplierResults"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Declined: ask why ── #}
+<div class="modal fade" id="declineModal" tabindex="-1" aria-labelledby="declineLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="declineLabel">Declined</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small mb-2"><span id="declineWho" class="fw-semibold"></span> will stop showing as waiting.</p>
+        <label class="form-label small" for="declineReason">Why (optional)</label>
+        <input class="form-control" id="declineReason" maxlength="255" placeholder="e.g. no longer stocks it, MOQ too high">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="declineConfirm">Close out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Remove a logged quote ── #}
+<div class="modal fade" id="removeModal" tabindex="-1" aria-labelledby="removeLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="removeLabel">Remove this quote?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2"><span id="removeWho" class="fw-semibold"></span> will be deleted, and the supplier goes back on the
+          waiting list for those lines if we had sent them an RFQ.</p>
+        <div class="alert alert-danger py-2 small d-none" id="removeError" role="alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Keep it</button>
+        <button type="button" class="btn btn-danger btn-sm" id="removeConfirm">Remove quote</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="trayHost"></div>
+{% endblock content %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+  window.QUOTES_PAGE = {
+    csrf: '{{ csrf_token }}',
+    urls: {
+      tray: '{% url "quote:quote_tray" %}',
+      solSearch: '{% url "quote:mailbox_sol_search" %}',
+      solSuppliers: '{% url "quote:quote_sol_suppliers" %}',
+      supplierSearch: '{% url "quote:supplier_search" %}',
+      rfqClose: '{% url "quote:rfq_close" %}',
+      remove: '{% url "quote:quote_remove" %}',
+    },
+  };
+</script>
+<script src="{% static 'quote/js/packhouse.js' %}?v={{ cache_version }}"></script>
+<script src="{% static 'quote/js/quote-drawer.js' %}?v={{ cache_version }}"></script>
+<script src="{% static 'quote/js/quotes-page.js' %}?v={{ cache_version }}"></script>
+{% endblock extra_js %}

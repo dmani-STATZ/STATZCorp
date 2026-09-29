@@ -1,0 +1,14 @@
+{% comment %}
+  The Log quote tray for the Quotes page: an HTML fragment, so it must never {% extends %}. The page
+  fetches it (quote:quote_tray), drops it into #trayHost and wires it with QuoteDrawer.init.
+{% endcomment %}
+{{ drawer_json|json_script:"quoteDrawerData" }}
+<div id="trayRoot"
+     data-save-url="{% url 'quote:quote_save' solicitation.solicitation_number %}"
+     data-draft-owner="{{ draft_owner }}"
+     data-draft-scope="manual-{{ supplier.pk }}"
+     data-packhouse-preview-url="{% url 'quote:packhouse_preview' '_SOL_' %}"
+     data-packhouse-send-url="{% url 'quote:packhouse_send' '_SOL_' %}"
+     data-packhouse-reply-url="{% url 'quote:packhouse_record_reply' 0 %}">
+  {% include "quote/mailbox/_tray.html" %}
+</div>

@@ -149,6 +149,21 @@ class QuoteEmailAttachment(models.Model):
     def __str__(self):
         return f'{self.original_name} ({self.file_size} bytes)'
 
+    #: File extensions the split-screen viewer offers a preview for. Only a hint for the
+    #: button: ``mailbox.sniff_preview_type`` decides from the bytes when it is served.
+    PREVIEW_EXTENSIONS = {
+        '.pdf': 'pdf',
+        '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.gif': 'image', '.webp': 'image',
+    }
+
+    @property
+    def preview_kind(self) -> str:
+        """'pdf' / 'image' when the viewer can show this file, else ''."""
+        if not self.downloaded_at:
+            return ''
+        ext = '.' + self.original_name.rsplit('.', 1)[-1].lower() if '.' in self.original_name else ''
+        return self.PREVIEW_EXTENSIONS.get(ext, '')
+
 
 class QuoteEmailSolLink(models.Model):
     """

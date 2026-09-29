@@ -46,6 +46,14 @@
   </div>
 </div>
 {% else %}
+{% if hidden_submitted %}
+<div class="alert alert-secondary py-2 small" role="status">
+  <i class="bi bi-info-circle"></i>
+  {{ hidden_submitted }} open solicitation{{ hidden_submitted|pluralize }} with quotes {{ hidden_submitted|pluralize:"is,are" }} not listed here:
+  every bid on {{ hidden_submitted|pluralize:"it was,them were" }} already exported to DIBBS. Find the file on the
+  <a href="?tab=submitted">Submitted</a> tab (use <em>DIBBS rejected it</em> there to reopen).
+</div>
+{% endif %}
 <div class="card">
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0 quote-queue-table">
@@ -86,7 +94,9 @@
         {% endfor %}
       {% empty %}
         <tr><td colspan="9" class="text-body-secondary py-4 text-center">
-          {% if tab == 'ready' %}Nothing staged. Build a bid and choose <strong>Mark ready</strong>.{% else %}No open solicitations with supplier quotes yet. Log quotes from the Mailbox.{% endif %}
+          {% if tab == 'ready' %}Nothing staged. Open a solicitation under <strong>Needs bid</strong>, press <strong>Build bid</strong>, then <strong>Save &amp; mark ready</strong>.
+          {% else %}Nothing needs a bid. A solicitation lands here once it has a supplier quote: log one from the
+            <a href="{% url 'quote:mailbox' %}">Mailbox</a> or the <a href="{% url 'quote:quotes' %}">Quotes</a> page, then press <strong>Build bid</strong>.{% endif %}
         </td></tr>
       {% endfor %}
       </tbody>

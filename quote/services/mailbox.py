@@ -73,6 +73,26 @@ def find_nsns(*texts):
     return found
 
 
+def sniff_preview_type(data):
+    """
+    The content type to serve an attachment inline as, decided from its bytes -- never from
+    the sender's name or content type. Only PDFs and raster images qualify (no SVG: it can
+    carry script). Returns None for anything else.
+    """
+    head = bytes(data[:16])
+    if head.startswith(b'%PDF-'):
+        return 'application/pdf'
+    if head.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if head.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if head[:6] in (b'GIF87a', b'GIF89a'):
+        return 'image/gif'
+    if head[:4] == b'RIFF' and head[8:12] == b'WEBP':
+        return 'image/webp'
+    return None
+
+
 # ── Supplier resolution ──────────────────────────────────────────────────────
 
 def resolve_supplier(sender_email):

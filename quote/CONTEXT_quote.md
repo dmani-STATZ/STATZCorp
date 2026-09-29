@@ -43,7 +43,7 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `models/solicitation.py` | `QuoteSolicitation` (`quote_solicitation`) — OneToOne on `dibbs.Solicitation` (`related_name='quote_state'`). Status `UNMATCHED → MATCHED → RFQ_SENT → QUOTING → BID_READY → BID_SUBMITTED`, plus `NO_BID`, `ARCHIVED`. 20-minute review claim (`claim_for`, `is_claimed_by_other`). |
 | `models/matching.py` | `QuoteSupplierNSN` (`quote_supplier_nsn`, 13-digit NSN), `QuoteSupplierFSC` (`quote_supplier_fsc`), `QuoteSolicitationMatch` (`quote_solicitation_match`) — one row per (solicitation, supplier, source ∈ NSN/FSC/MANUAL). |
 | `models/rfq.py` | `QuoteRFQ` (`quote_rfq`) — one row per (line, supplier). `QUEUED → READY_TO_SEND → SENT → RESPONDED`, plus `NO_RESPONSE` / `DECLINED`. |
-| `models/quotes.py` | `QuoteSupplierQuote` (`quote_supplier_quote`) — cost, both adders, packhouse FK, markup, `final_government_unit_price`, `is_selected_for_bid`, `source_email` FK back to the reply it was typed from. `landed_unit_cost` is Decimal-only. |
+| `models/quotes.py` | `QuoteSupplierQuote` (`quote_supplier_quote`) — cost, both adders, packhouse FK, markup, `final_government_unit_price`, `is_selected_for_bid`, `source_email` FK back to the reply it was typed from. `entry` = shared key of the rows one drawer save wrote (a quote as the rep sees it; blank on rows saved before 0010). `landed_unit_cost` is Decimal-only. |
 | `models/packhouse.py` | `QuotePackhouseRFQ` (`quote_packhouse_rfq`) — one row per packhouse per request. `SENT → RESPONDED`. `line` null = every line on the SOL (Combined). Snapshot of what was sent (qty, weight / L / W / H, subject, note, recipients) + what came back (`quoted_unit`, `quoted_total`, `quoted_lead_days`, `response_email`). Deliberately **not** `QuoteRFQ`: it never moves the solicitation status. |
 | `models/bids.py` | `QuoteBid` (`quote_bid`) — OneToOne on `dibbs.SolicitationLine`; the solicitation is reached via `line.solicitation` (no duplicate FK). Every BQ overlay column + `clin_group`. |
 | `models/email.py` | `QuoteEmail` (raw payload, headers, claim), `QuoteEmailAttachment` (bytes), `QuoteEmailSolLink` (many-to-many email ↔ line). |
@@ -57,8 +57,13 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `services/queue.py` | Queue dataset (`build_queue_rows`), `status_counts`, `queue_delta` (poll), `latest_unit_costs`. |
 | `services/cost.py` | Decimal landed cost + markup-on-cost pricing (`build`, `price_from_markup`, `markup_from_price`). |
 | `services/mailbox.py` | Graph sync + ingest, SOL/NSN detection, supplier resolution, link/unlink, link-modal search. |
-| `services/quotes.py` | `save_supplier_quote` (drawer save), lowest-landed auto-select, `save_dimensions` (NSN dimension write-back). |
+| `services/quotes.py` | `save_supplier_quote` (drawer save, creates a new entry), `update_supplier_quote` (rewrites an entry's rows in place; `QuoteLockedError` once its bid went to DIBBS), `saved_cards` / `quotes_for_entry` (what the drawer reopens), `lock_reason` / `bid_state`, lowest-landed auto-select, `save_dimensions` (NSN dimension write-back). |
 | `services/packhouse.py` | `parse_dims`, `packaging_requirements` (SolAnalysis, else Section D), `compose_message`, `preview_request` (dry run), `send_requests`, `record_reply`, plus screen data (`requests_payload`, `reply_candidates`, `history`). |
+| `services/quote_review.py` | The Quotes page's queries and actions: `waiting_groups`, `logged_cards`, `solicitation_suppliers`, `close_rfqs` / `reopen_rfqs`. |
+| `services/drawer.py` | `drawer_payload` (the tray's JSON: lines + NSN dimensions, the supplier's cards, uncovered lines, packhouse data) and `solicitation_group`; shared by the mailbox and the Quotes page. |
+| `views/quotes.py`, `views/quote_save.py` | The Quotes page, tray fragment, save, close-out, remove; `quote_save.save_response` turns a tray POST into a save / update (mailbox and Quotes page share it). |
+| `static/quote/js/quote-drawer.js`, `quotes-page.js` | The Log quote tray script (`QuoteDrawer.init`, used by both pages) and the Quotes page script. Markup: `templates/quote/mailbox/_tray.html` (include) and `templates/quote/quotes/`. |
+| `static/quote/js/attachment-viewer.js` | Split-screen attachment viewer (panel beside the message body, resizable divider, tabs per file, remembers width / open). Served by `views/mailbox.attachment_view`. |
 | `views/packhouse.py`, `static/quote/js/packhouse.js` | Preview / send / record-reply endpoints; the drawer's packhouse panel and the message-pane reply banner. |
 | `views/mailbox.py` | Phase 2 mailbox + drawer endpoints. |
 | `services/bids.py` | Phase 3: bid defaults, `preflight`, `bq_row` / `render_bq` writer, `export_bids`, `reexport`, `reopen_bid`, `select_quote`. |
@@ -190,6 +195,13 @@ modal). They are now first-class, reachable from both directions:
    logged from it. Body renders only in `<iframe sandbox="allow-popups
    allow-popups-to-escape-sandbox" srcdoc>` with a CSP meta blocking scripts and
    every remote load (tracking pixels, external CSS).
+4a. **Attachments** list with a **View** button on PDFs and images. It opens the file in a panel
+   *beside* the message body (`attachment-viewer.js`), not a new tab: drag the divider (or use ←/→ on
+   it) to resize, tabs flip between files, ⧉ pops it out to its own tab, ✕ closes. Width and "was
+   open" are remembered per browser, so it reappears as you step through messages. Under ~760 px
+   it stacks below the message. While the quote drawer is open too, the inbox list steps aside so
+   message, attachment and drawer are all on screen. The drawer is **docked, not modal** (no
+   backdrop, page stays scrollable, Esc / ✕ still close it).
 5. **Log supplier quote** opens the offcanvas drawer: solicitation, Combined
    (all lines) / Split CLINs, facts, part/CAGE, unit cost, days ARO (SOL
    requirement shown), MOQ, terms, packaging (who packages, packhouse search,
@@ -201,6 +213,76 @@ modal). They are now first-class, reachable from both directions:
    `RESPONDED`, moves the SOL to `QUOTING`, and auto-selects the lowest landed
    quote per line unless a rep already chose one.
 
+5a. **One drawer, one draft per SOL (and per saved quote).** A message can quote several SOLs, but the
+   drawer is a single form, so it keeps a *draft per SOL*, and per saved quote on that SOL (every
+   field, Combined / Split + line, which side of packaging / freight was typed, markup mode, typed
+   dimensions). Switching SOL stashes the one being left and loads (or blanks) the other, so nothing
+   follows the rep from one SOL to the next. Drafts autosave to `localStorage`
+   (`quoteDraft:v1:<user>:<email>:<SOL>[|<entry>]`, 14-day expiry) on every edit, so they survive
+   closing the drawer, another message, or a reload; a draft is deleted when its quote saves, or
+   with **Clear this SOL's entries** / **Undo my changes**. The SOL list marks `• draft` and
+   `✓ quote logged` (server: `logged_sols`). The drawer opens where the rep left off (first SOL with
+   unsaved work, on its most recently edited quote); else the first SOL with no quote yet; else the
+   first SOL's saved quote. Drafts are per browser, not shared.
+5b. **Quantity is explicit.** Packaging / freight totals are spread over the quantity being priced
+   (all lines in Combined, one line in Split); the drawer says so ("Totals are spread over N units")
+   and shows the extended amount (`price × qty`). When that quantity changes (other SOL,
+   Combined ⇄ Split, other line) the side of each unit / total pair the rep did **not** type is
+   recomputed, so a stale per-unit figure can never sit beside the wrong total.
+5c. **One quote per supplier per line, and a logged quote is the thing the tray shows.** A supplier has
+   at most one quote on a solicitation line, whichever message or channel it arrived by:
+   `save_supplier_quote` **updates** a line the supplier already quoted instead of adding a row (a revised
+   quote in a later email, or a phone call, edits the earlier one; the recorded source follows the newest
+   touch). Each save is one *entry* (`QuoteSupplierQuote.entry`: the rows it wrote; a line moves to the
+   newest save's entry). The tray therefore shows *the sender's quotes on the SOL*, not "this message's":
+   opening it on a SOL the supplier already quoted shows that quote, never a blank form. A **Quote**
+   picker appears only when there is something to choose (the supplier priced lines separately, or some
+   lines are still unquoted): each saved quote ("Line 0001 · $32.50 cost → $43.35 · 45 days") plus
+   **＋ Quote the other line(s)**, whose scope is only the lines the supplier has not quoted (the tray
+   sends them as `line_ids`, so a new quote can never overwrite a saved one by accident). With a single
+   quote covering every line there is no picker; the line under the SOL still says when / by whom / how it
+   arrived / where it stands. The **Edit** button beside each row under the message jumps straight to a
+   quote. Editing loads exactly what was saved (which side of packaging / freight was typed, markup pill
+   or typed price, part, terms, notes), **Update quote** rewrites those rows in place
+   (`update_supplier_quote`), and the lines it covers stay fixed (a Combined quote stays all-lines; a
+   Split quote stays that line).
+   *Pending* = no bid built on the quote has been exported. Then:
+   * DRAFT bid on it: price / days follow the edit if the bid still carried the quote's old number
+     (a price the rep typed into the bid by hand is kept, and the message says so); margin recomputed.
+   * READY bid on it: if price, days or offered part / CAGE changed it goes back to DRAFT ("Needs
+     bid") for a re-check and its solicitation drops from `BID_READY` to `QUOTING`.
+   * SUBMITTED bid (in a BQ file): the quote is **read-only** ("Sent"): fields disabled, lock note
+     with the file name; the server refuses too (409). Reopen the export on the Bid Board to edit.
+   `_reselect_lowest` re-picks after an edit and never disturbs a line whose bid was sent. Unsaved
+   edits to a saved quote (5a) are kept only while they differ from what is saved, and dropped if the
+   quote changed on the server since they began.
+5d. **The Quotes page (`/quote/quotes/`, Phase 2 after Mailbox)** is where quotes are chased, reviewed and
+   entered when they did not arrive by email (phone, fax, website, a message outside the mailbox).
+   * **Waiting on suppliers** (`services/quote_review.waiting_groups`): every `QuoteRFQ` we sent (SENT, or
+     RESPONDED with no quote entered) that has no quote from that supplier on that line, one row per
+     solicitation + supplier, soonest-due first, on open solicitations only. Shows days waiting, a red /
+     amber due badge, and "Replied · not entered" when their message came in but nobody has entered it
+     (with **Open reply** to their newest message). **Enter quote** opens the tray; **No response** /
+     **Declined…** (with a reason) close the supplier out (`QuoteRFQ` NO_RESPONSE / DECLINED) so they stop
+     showing; **Show closed out** lists them with **Back to waiting**. A quote for that supplier (from any
+     source) takes them off automatically and marks the RFQ RESPONDED, and a supplier we had written off who
+     quotes anyway is back in play.
+   * **Logged quotes** (`logged_cards`): every quote on file for open solicitations (toggles: include
+     past-due, include ones already sent to DIBBS): SOL, supplier, covers, cost, gov price, days, how it
+     arrived ("Phone · Sep 29 · Sam"), bid state with the next step (**Build bid** → the builder,
+     **Continue** on a draft, **Export** when ready). There is no "send to Phase 3" trigger: a solicitation
+     appears on the Bid Board as soon as it has a quote; the rep's trigger is **Save & mark ready** in the builder. **Edit** opens the same tray on it (**View** and read-only
+     once sent); **Remove** deletes a quote nothing rests on (refused while any bid uses it; the supplier
+     goes back to waiting on those lines). A supplier with two rows on one line (older data) is flagged
+     **Duplicate**.
+   * **＋ Enter a quote**: pick a solicitation (same search as the mailbox link picker), then who quoted:
+     the suppliers we sent an RFQ to (with Waiting / Has a quote / Closed out) or any other supplier.
+   * The tray here is the *same tray* as the mailbox's (`static/quote/js/quote-drawer.js`,
+     `templates/quote/mailbox/_tray.html`) with `manual=True`: a **Received via** (phone, fax, email,
+     website, other), **Date received** (not in the future) and **Spoke with / reference #** block, saved as
+     `source_channel` / `received_on` / `contact_name` with no `source_email`. Saved through
+     `POST quotes/<sol>/save/` (channel required), which shares `views/quote_save.save_response` with the
+     mailbox save. Editing a quote here keeps its message link unless how / when / who actually changed.
 6. **Weight & dimensions** is one block in the drawer, above Packaging and Freight (inputs
    `dim_weight/length/width/height/source_notes`, prefilled from `products.Nsn`). Both
    sections just show a read-out of it (`[data-dims-readout]`, "edit" opens the block), so
@@ -364,7 +446,7 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 | `quote:mailbox` | `/quote/mailbox/?email=<id>` | inbox page |
 | `quote:mailbox_sync` | `/quote/mailbox/sync/` | POST, JSON |
 | `quote:email_detail` | `/quote/mailbox/<id>/` | XHR fragment (non-XHR redirects to the inbox) |
-| `quote:email_link` / `email_unlink` / `email_set_supplier` / `save_quote` | `/quote/mailbox/<id>/...` | POST, JSON |
+| `quote:email_link` / `email_unlink` / `email_set_supplier` / `save_quote` | `/quote/mailbox/<id>/...` | POST, JSON. `save_quote` with `entry=<key>` updates that logged quote (404 if it is not this message's, 409 `{locked: true}` once sent to DIBBS); without `entry` it creates one |
 | `quote:mailbox_sol_search` | `/quote/mailbox/solicitations/?q=` | JSON |
 | `quote:bid_board` | `/quote/bids/?tab=needs\|ready\|submitted` | |
 | `quote:compare_quotes` | `/quote/bids/<sol>/compare/` | XHR fragment |
@@ -375,8 +457,15 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 | `quote:our_bids` | `/quote/our-bids/` | |
 | `quote:outcome_detail` | `/quote/our-bids/<id>/` | XHR fragment |
 | `quote:reconcile_now` | `/quote/our-bids/reconcile/` | POST |
+| `quote:quotes` | `/quote/quotes/?tab=waiting\|logged&closed=1&sent=1&past=1` | the Quotes page |
+| `quote:quote_tray` | `/quote/quotes/tray/?sol=&supplier=` | tray fragment for a chosen SOL + supplier (XHR) |
+| `quote:quote_save` | `/quote/quotes/<sol>/save/` | POST: the tray's fields + `supplier_id`, `source_channel` (required), `received_on`, `contact_name`, optional `entry` / `line_ids` |
+| `quote:quote_sol_suppliers` | `/quote/quotes/sol-suppliers/?sol=` | JSON: who we sent an RFQ to on that SOL |
+| `quote:rfq_close` | `/quote/quotes/rfq-close/` | POST `sol`, `supplier_id`, `action=no_response\|declined\|reopen`, `reason` |
+| `quote:quote_remove` | `/quote/quotes/remove/` | POST `sol`, `supplier_id`, `entry`; 404 unknown, 400 bid rests on it, 409 sent to DIBBS |
 | `quote:packhouse_preview` / `packhouse_send` | `/quote/packhouse/<sol>/preview/` / `send/` | POST: `packhouse_ids` (repeat), `line_id` (Split only), `note`, `dim_*`, `save_dims` → JSON |
 | `quote:packhouse_record_reply` | `/quote/packhouse/reply/<rfq_id>/` | POST: `total` or `unit`, `lead_days`, `notes`, `email_id` → JSON |
+| `quote:attachment_view` | `/quote/mailbox/attachments/<id>/view/` | inline PDF / PNG / JPEG / GIF / WebP for the viewer; type from the bytes, else 415; `X-Frame-Options: SAMEORIGIN` (site default is DENY) |
 | `quote:attachment_download` | `/quote/mailbox/attachments/<id>/` | always `octet-stream` + `nosniff`, except verified PDFs inline |
 
 ## 13. Permissions / Security
@@ -407,6 +496,17 @@ notes marker, NSN `dimension_source_notes` marker) and it never modifies a
 pre-existing `contracts_nsn` row.
 
 ## 15. Testing
+`test_quote_manual.py` (one quote per supplier per line: re-quoting updates, from a later message or a phone
+call, other suppliers untouched, refused once sent; manual entry channel / date rules and RFQ effects; edit
+follows the newest source; delete; `waiting_groups`, `logged_cards`, close-out / reopen),
+`test_quotes_page.py` (the page, nav link, tray fragment, save / update / lock, `line_ids`, close-out,
+remove, enter-a-quote picker, login required),
+`test_quote_edit.py` (entries + saved-card shape incl. typed sides / FIXED price / legacy key-less
+rows, in-place update over the quote's own lines, rejected edits change nothing, the lock, bid follow /
+demote rules, re-pick, `save_quote` update path 404 / 409 / 400, Edit buttons, no template syntax
+leaking to the page),
+`test_mailbox_drawer.py` (attachment sniffing + `attachment_view` rules, View buttons, multi-SOL
+`logged` markers, draft owner, docked drawer markup),
 `test_packhouse.py` (dimension parsing, requirements lookup, message, preview never sends,
 send / duplicate / failure / no-address, NSN write-back, record reply maths, mailbox reply hook,
 endpoints, banner + shared dimensions block),
@@ -442,6 +542,10 @@ Run `python manage.py test quote dibbs`.
 - `0008_capability_imports` — `QuoteCapabilityImport` + nullable `import_batch` FK on
   `QuoteSupplierNSN` / `QuoteSupplierFSC`. Additive only.
 - `0009_packhouse_rfq` — `QuotePackhouseRFQ`. Additive only.
+- `0010_supplier_quote_entry` — `QuoteSupplierQuote.entry` (blank default, indexed). Additive only; no
+  backfill: older key-less rows are grouped at read time and pinned with a real key on their first edit.
+- `0011_quote_source_channel` — `QuoteSupplierQuote.source_channel` (default EMAIL), `received_on`,
+  `contact_name`. Additive only; existing rows read as email quotes with no date.
 - `products/migrations/0005` added the NSN dimension provenance fields.
 
 ## 17. Known Gaps
@@ -485,6 +589,35 @@ Run `python manage.py test quote dibbs`.
 14. Not yet exercised on SQL Server: the reply hook's `update()` filters through
    `solicitation__lines__quote_email_links` (same shape as the `QuoteRFQ` one). Smoke-test after
    deploying.
+
+15. Drawer drafts live in the browser (`localStorage`): another rep, another machine or a cleared
+   browser does not see them. Server-side drafts would need a model and a claim rule.
+16. The viewer previews only what the browser can show itself (PDF via its built-in viewer, raster
+   images). Word / Excel / CSV attachments still download. The PDF frame deliberately has no
+   `sandbox` attribute (browsers refuse to run their PDF viewer in a sandboxed frame); safety comes
+   from serving only bytes that sniff as PDF / raster image, `nosniff`, and a no-load CSP.
+17. The drawer's Min order qty is recorded but does not change the price. A supplier MOQ above the
+   SOL quantity (or a price break) is still for the rep to fold into the unit cost by hand.
+18. The tray form is one hand-written script, `static/quote/js/quote-drawer.js` (shared by the mailbox and
+   the Quotes page). A new tray field must be added to `TEXT_FIELDS` (or `snapshot()` / `applyDraft()` /
+   `resetForm()` / `applyCard()`) or it will leak between SOLs again.
+19. An edit cannot change which lines a quote covers (a Combined quote stays all-lines, a Split quote
+   stays that line). To restructure, **Remove** the quote on the Quotes page and enter it again. Remove is
+   refused while any bid rests on the quote.
+20. "One quote per supplier per line" is enforced by the service (`save_supplier_quote` updates in place),
+   not by a database constraint, because older data can hold duplicates and a constraint would fail the
+   migration. Such rows are flagged **Duplicate** on the Quotes page; a save updates the newest and
+   **Remove** clears the rest. Older rows saved before `entry` existed are grouped by SOL + identical
+   numbers; rows written by the demo seed or scripts have no key until first edited.
+21. The waiting list is built from `QuoteRFQ` rows, so a supplier we never RFQ'd through the app (asked by
+   phone, say) is not on it; use **Enter a quote** for those. **Enter quote** on a waiting row opens the
+   tray with every line open, not just the lines that RFQ covered: pick Split to enter one line.
+22. Manual entry stores how / when / who but not the fax or PDF itself. Attaching the document to the quote
+   (and viewing it beside the tray) would need file storage on the quote.
+23. Removing the only quote on a SOL leaves the solicitation in QUOTING (it does not step back to RFQ sent).
+24. The bid follows an edit only for price, days, margin and status. Other bid fields derived from the
+   quote when the bid was created (offered code, manufacturer / dealer, vendor quote #) are not
+   re-derived; a changed part number / CAGE is flagged in the save message instead.
 
 ## 20. CSS
 Three files repo-wide: `theme-vars.css`, `app-core.css` (shared `.app-shell` /

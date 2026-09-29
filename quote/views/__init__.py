@@ -21,6 +21,7 @@ from .dashboard import dashboard
 from .our_bids import our_bids, outcome_detail, reconcile_now
 from .mailbox import (
     attachment_download,
+    attachment_view,
     email_detail,
     email_link,
     email_set_supplier,
@@ -31,6 +32,14 @@ from .mailbox import (
     solicitation_search,
 )
 from .packhouse import packhouse_preview, packhouse_record_reply, packhouse_send
+from .quotes import (
+    quote_remove,
+    quote_save,
+    quote_sol_suppliers,
+    quote_tray,
+    quotes_page,
+    rfq_close,
+)
 from .rfq import rfq_queue, rfq_remove, rfq_send, rfq_send_all
 from .solicitations import (
     add_match,
@@ -61,6 +70,12 @@ __all__ = [
     'packhouse_preview',
     'packhouse_record_reply',
     'packhouse_send',
+    'quote_remove',
+    'quote_save',
+    'quote_sol_suppliers',
+    'quote_tray',
+    'quotes_page',
+    'rfq_close',
     'reconcile_now',
     'bid_board',
     'bid_builder',
@@ -70,6 +85,7 @@ __all__ = [
     'compare_quotes',
     'select_quote',
     'attachment_download',
+    'attachment_view',
     'email_detail',
     'email_link',
     'email_set_supplier',

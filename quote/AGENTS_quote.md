@@ -96,6 +96,75 @@ permission gating silently stops applying.
 - Supplier-page users need Quotes access to edit: gate embeds with
   `services.access.user_can_use_quote`, not by hiding the URL.
 
+### The Phase 2 drawer form (`templates/quote/mailbox/inbox.html`)
+- **It is one form shared by every SOL in the message.** All per-SOL state goes through
+  `snapshot()` / `applyDraft()` / `resetForm()` (field list: `TEXT_FIELDS`). Add a drawer input
+  without adding it there and it will carry over from one SOL to the next, which silently prices
+  the wrong SOL. Test by switching SOLs with a value typed.
+- Quantity-dependent amounts (packaging / freight totals) must be re-derived whenever the basis
+  quantity changes: `renderLines()` does it through `rederive()`. Anything new that depends on
+  quantity belongs there too.
+- `services/cost.build` remains the only price authority; the drawer is a preview. Keep the JS and
+  server formulas identical (markup on cost, totals ÷ combined quantity).
+- Drafts are `localStorage`; after a successful save `draftsLocked` stops the autosave from writing the
+  SOL's draft back before the message reloads.
+
+### One quote per supplier per line, and quotes from anywhere
+- **Only `save_supplier_quote` / `update_supplier_quote` / `delete_quotes` may write a rep's
+  `QuoteSupplierQuote` rows.** Saving *updates* the supplier's row on a line if it has one (from any message
+  or channel); it never adds a second. Do not `QuoteSupplierQuote.objects.create` from a view, a task or an
+  import: it bypasses the lock, the bid sync and the one-per-line rule.
+- The rule is enforced in the service, not by a unique constraint (older data may hold duplicates). If you
+  add a constraint, ship a cleanup first.
+- A quote's source is `source_email` (a mailbox message) **or** `source_channel` phone / fax / web / other with
+  `received_on` / `contact_name`. Manual entry requires a channel at the view (`views/quotes.quote_save`); the
+  service defaults a blank one to OTHER so scripts and tests do not have to say.
+- **The tray is shared.** `quote-drawer.js` and `mailbox/_tray.html` serve both the mailbox and the Quotes
+  page. Anything mailbox-only (the split viewer, docking, `quoteMailbox.reload`) stays in `mailbox/inbox.html`;
+  anything tray-wide goes in `quote-drawer.js` behind `cfg` (`onSaved`, `searchUrl`, `phCtx`). Manual-only
+  fields exist only when `manual=True` and every script path must tolerate their absence.
+- The tray's size is one knob: `--quote-drawer-scale` (currently `0.9`, applied as CSS `zoom` on the drawer body in
+  `app-core.css`). Do not shrink it with per-element font sizes, and do not touch page-wide sizing for it.
+  Anything that measures the drawer's width (the split-screen dock) must read the resting edge, not mid-slide.
+- There is no "ready for DIBBS" trigger to add. Phase 3 lists a solicitation once it has a quote; the rep's step is
+  **Save & mark ready** in the bid builder. The Quotes page's Bid column only links to that step.
+- A new quote names its lines with `line_ids` (only lines the supplier has not quoted); do not rely on
+  `mode=combined`, which means "every line" and would update quotes already on file.
+- The Quotes page's waiting list is derived from `QuoteRFQ` rows and quotes; nothing else stores "waiting".
+  Closing a supplier out changes RFQ status only. `delete_quotes` must never remove a quote a bid rests on.
+
+### Editing a logged quote
+- **One save = one entry.** `save_supplier_quote` writes a row per line and stamps them all with the same
+  `entry`; the drawer edits that group as one quote. Never write `QuoteSupplierQuote` rows for a rep's
+  quote outside `save_supplier_quote` / `update_supplier_quote`, or the drawer cannot find them.
+- **Update in place, never delete-and-recreate.** Bids point at quote rows (`QuoteBid.selected_quote`);
+  replacing rows would null those links. `update_supplier_quote` keeps the primary keys.
+- **The lock is `QuoteBid.SUBMITTED` on a bid whose `selected_quote` is any row of the entry.** Enforce it
+  in the service (`QuoteLockedError`), not only in the UI. Anything else that mutates a quote's price
+  or days (a new edit path, an import) must go through the same check and call
+  `bids.sync_after_quote_edit`.
+- `sync_after_quote_edit` must never touch a SUBMITTED bid; it only follows numbers the bid still
+  carries from the quote and demotes READY -> DRAFT (and `BID_READY` -> `QUOTING`) when something a
+  bid depends on changed.
+- The drawer payload's `cards` are the contract with `inbox.html` (`applyCard`, `cardLabel`,
+  `applyCardState`): change the keys in `services/quotes._card` and those together.
+- `{# #}` template comments must be **one line**. A wrapped one is printed on the page. A test
+  (`TemplateSyntaxLeakTests`) fails the build if template syntax reaches the browser; use
+  `{% comment %}` for anything longer.
+
+### Attachment viewer
+- `attachment_view` decides the content type from the **bytes** (`mailbox.sniff_preview_type`), never
+  from the name or the sender's content type. PDFs and raster images only, **never SVG**. Everything
+  else is 415; the download route is unchanged.
+- It is the only quote view that may be framed (`@xframe_options_sameorigin`); the site default is
+  `DENY`. Don't relax `X_FRAME_OPTIONS` globally for this.
+- The PDF `<iframe>` has no `sandbox` attribute on purpose (browsers won't run their PDF viewer in a
+  sandboxed frame). Don't add one without re-testing a PDF in real Chrome. The message body iframe
+  keeps its sandbox.
+- The quote drawer is docked (`data-bs-backdrop="false"`, `data-bs-scroll="true"`) so the message and
+  viewer stay readable while typing. Measure its *resting* edge (`clientWidth - offsetWidth`), not
+  `getBoundingClientRect()`, which is mid-slide when Bootstrap's `shown` timer fires early.
+
 ### Packhouse quote requests
 - **Not `QuoteRFQ`.** `QuoteRFQ` is the part-supplier ledger and its send path moves the
   solicitation to `RFQ_SENT`; a packhouse request must never do that. Packaging requests live in

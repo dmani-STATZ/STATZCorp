@@ -48,10 +48,18 @@ urlpatterns = [
     path('mailbox/<int:email_id>/supplier/', views.email_set_supplier, name='email_set_supplier'),
     path('mailbox/<int:email_id>/quote/', views.save_quote, name='save_quote'),
     path('mailbox/attachments/<int:attachment_id>/', views.attachment_download, name='attachment_download'),
+    path('mailbox/attachments/<int:attachment_id>/view/', views.attachment_view, name='attachment_view'),
     # Phase 2 -- packhouse packaging-quote requests (drawer packaging section + message pane)
     path('packhouse/<str:sol_number>/preview/', views.packhouse_preview, name='packhouse_preview'),
     path('packhouse/<str:sol_number>/send/', views.packhouse_send, name='packhouse_send'),
     path('packhouse/reply/<int:rfq_id>/', views.packhouse_record_reply, name='packhouse_record_reply'),
+    # Phase 2 -- the Quotes page: who owes us a quote, quotes on file, quotes entered by hand
+    path('quotes/', views.quotes_page, name='quotes'),
+    path('quotes/tray/', views.quote_tray, name='quote_tray'),
+    path('quotes/sol-suppliers/', views.quote_sol_suppliers, name='quote_sol_suppliers'),
+    path('quotes/rfq-close/', views.rfq_close, name='rfq_close'),
+    path('quotes/remove/', views.quote_remove, name='quote_remove'),
+    path('quotes/<str:sol_number>/save/', views.quote_save, name='quote_save'),
     # Phase 3 -- bid staging + BQ export
     path('bids/', views.bid_board, name='bid_board'),
     path('bids/export/', views.bid_export, name='bid_export'),

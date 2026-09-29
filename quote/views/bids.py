@@ -101,6 +101,9 @@ def bid_board(request):
         'rows': shown,
         'counts': counts,
         'exports': exports,
+        # Open solicitations that have quotes but whose bids all went to DIBBS already: the board leaves
+        # them out (nothing left to bid), which otherwise looks like "my quotes did not arrive".
+        'hidden_submitted': sum(1 for r in rows if r['status'] == 'SUBMITTED'),
     })
 
 

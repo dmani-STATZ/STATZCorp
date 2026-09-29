@@ -149,6 +149,67 @@ def select_quote(quote):
         )
 
 
+def sync_after_quote_edit(quote, old, user=None):
+    """
+    A supplier quote was edited while still pending. Bring the not-yet-sent bids that rest on it
+    along, without ever touching a SUBMITTED one:
+
+    * price / days follow the quote when the bid still carries the quote's old number; a figure the
+      rep typed into the bid by hand is left as they set it (and said so);
+    * a READY bid that is affected goes back to DRAFT so it is checked again before export, and its
+      solicitation drops from BID_READY to QUOTING;
+    * the bid's margin is recomputed against the quote's new landed cost.
+
+    ``old`` = (final price, lead days, offered part, offered CAGE) before the edit.
+    Returns short sentences for the rep.
+    """
+    old_price, old_days, old_part, old_cage = old
+    price_changed = quote.final_government_unit_price != old_price
+    days_changed = quote.lead_time_days != old_days
+    part_changed = ((quote.offered_part_number or '') != (old_part or '')
+                    or (quote.offered_cage or '') != (old_cage or ''))
+    messages, demoted_sols = [], set()
+    bids = (
+        QuoteBid.objects.filter(selected_quote=quote)
+        .exclude(bid_status=QuoteBid.STATUS_SUBMITTED)
+        .select_related('line__solicitation')
+    )
+    for bid in bids:
+        line = bid.line
+        label = f'{line.solicitation.solicitation_number}' + (f' line {line.line_number}' if line.line_number else '')
+        notes = []
+        if price_changed:
+            if bid.unit_price == old_price:
+                bid.unit_price = quote.final_government_unit_price
+                notes.append(f'now bids ${quote.final_government_unit_price:,.2f}')
+            else:
+                notes.append('kept the price set on the bid')
+        if days_changed:
+            if bid.delivery_days == old_days:
+                bid.delivery_days = quote.lead_time_days
+                notes.append(f'now {quote.lead_time_days} days')
+            else:
+                notes.append('kept the delivery days set on the bid')
+        if part_changed:
+            notes.append('still lists the old part number / CAGE, so check the builder')
+        bid.margin_pct = margin_for(bid)
+        if (price_changed or days_changed or part_changed) and bid.bid_status == QuoteBid.STATUS_READY:
+            bid.bid_status = QuoteBid.STATUS_DRAFT
+            demoted_sols.add(line.solicitation_id)
+            notes.append('was ready to export and is back in Needs bid for a re-check')
+        if user is not None:
+            bid.modified_by = user
+        bid.save()
+        if notes:
+            messages.append(f'Bid {label}: ' + '; '.join(notes) + '.')
+    for state in QuoteSolicitation.objects.filter(
+        solicitation_id__in=demoted_sols, status=QuoteSolicitation.STATUS_BID_READY,
+    ):
+        state.set_status(QuoteSolicitation.STATUS_QUOTING)
+        state.save(update_fields=['status', 'status_changed_at', 'modified_on'])
+    return messages
+
+
 # ── Building a bid ───────────────────────────────────────────────────────────
 
 def default_values(line, quote, cage):

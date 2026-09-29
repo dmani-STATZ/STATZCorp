@@ -25,6 +25,28 @@ class QuoteSupplierQuote(AuditModel):
         (MARKUP_FIXED_PRICE, 'Fixed price'),
     ]
 
+    # How the quote reached us. EMAIL is the mailbox; the rest are entered by hand on the Quotes page.
+    CHANNEL_EMAIL = 'EMAIL'
+    CHANNEL_PHONE = 'PHONE'
+    CHANNEL_FAX = 'FAX'
+    CHANNEL_WEB = 'WEB'
+    CHANNEL_OTHER = 'OTHER'
+    CHANNEL_CHOICES = [
+        (CHANNEL_EMAIL, 'Email'),
+        (CHANNEL_PHONE, 'Phone'),
+        (CHANNEL_FAX, 'Fax'),
+        (CHANNEL_WEB, 'Website / portal'),
+        (CHANNEL_OTHER, 'Other'),
+    ]
+    #: Channels offered when a rep enters a quote by hand (email quotes come from the mailbox).
+    MANUAL_CHANNELS = [
+        (CHANNEL_PHONE, 'Phone'),
+        (CHANNEL_FAX, 'Fax'),
+        (CHANNEL_EMAIL, 'Email'),
+        (CHANNEL_WEB, 'Website / portal'),
+        (CHANNEL_OTHER, 'Other'),
+    ]
+
     PACKAGING_SUPPLIER_INCLUDED = 'INCLUDED'
     PACKAGING_IN_HOUSE = 'IN_HOUSE'
     PACKAGING_THIRD_PARTY = 'THIRD_PARTY'
@@ -141,6 +163,27 @@ class QuoteSupplierQuote(AuditModel):
         related_name='supplier_quotes',
         help_text='The supplier reply these numbers were transcribed from, so '
                   'the quote screen can link straight back to it.',
+    )
+    source_channel = models.CharField(
+        max_length=8, choices=CHANNEL_CHOICES, default=CHANNEL_EMAIL,
+        help_text='How the quote reached us. Null source_email + a non-email channel = entered by hand.',
+    )
+    received_on = models.DateField(
+        null=True, blank=True,
+        help_text='The day the supplier gave us the quote (the message date for email).',
+    )
+    contact_name = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text='Who at the supplier gave it, or a fax / reference number, for quotes entered by hand.',
+    )
+    entry = models.CharField(
+        max_length=36,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text='Shared by the rows one drawer save created (Combined = every line, '
+                  'Split = one line), so the drawer can reopen and edit that quote as '
+                  'one thing. Blank on rows saved before quotes could be edited.',
     )
 
     notes = models.TextField(blank=True, default='')

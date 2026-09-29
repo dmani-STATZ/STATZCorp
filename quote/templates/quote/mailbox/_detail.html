@@ -10,6 +10,7 @@
      data-unlink-url="{% url 'quote:email_unlink' email.pk %}"
      data-supplier-url="{% url 'quote:email_set_supplier' email.pk %}"
      data-save-url="{% url 'quote:save_quote' email.pk %}"
+     data-draft-owner="{{ draft_owner }}"
      data-packhouse-preview-url="{% url 'quote:packhouse_preview' '_SOL_' %}"
      data-packhouse-send-url="{% url 'quote:packhouse_send' '_SOL_' %}"
      data-packhouse-reply-url="{% url 'quote:packhouse_record_reply' 0 %}">
@@ -108,9 +109,21 @@
   <div class="quote-msg-attachments">
     {% for att in attachments %}
       {% if att.downloaded_at %}
-      <a href="{% url 'quote:attachment_download' att.pk %}" target="statz_attachment" class="quote-attachment">
-        <i class="bi bi-paperclip"></i> {{ att.original_name }} <span class="text-body-secondary">{{ att.file_size|filesizeformat }}</span>
-      </a>
+      <span class="quote-attachment-group">
+        <a href="{% url 'quote:attachment_download' att.pk %}" target="statz_attachment" class="quote-attachment">
+          <i class="bi bi-paperclip"></i> {{ att.original_name }} <span class="text-body-secondary">{{ att.file_size|filesizeformat }}</span>
+        </a>
+        {% if att.preview_kind %}
+        <button type="button" class="btn btn-outline-secondary btn-sm quote-attachment-view"
+                data-view-attachment="{{ att.pk }}" data-view-kind="{{ att.preview_kind }}"
+                data-view-name="{{ att.original_name }}"
+                data-view-url="{% url 'quote:attachment_view' att.pk %}"
+                data-open-url="{% url 'quote:attachment_download' att.pk %}"
+                title="Show beside the message">
+          <i class="bi bi-layout-sidebar-inset-reverse"></i> View
+        </button>
+        {% endif %}
+      </span>
       {% else %}
       <span class="quote-attachment text-body-secondary" title="Too large to store; open it in Outlook">
         <i class="bi bi-paperclip"></i> {{ att.original_name }} ({{ att.file_size|filesizeformat }}, not stored)
@@ -121,24 +134,48 @@
   {% endif %}
 
   {# Supplier HTML: sandboxed (no scripts, no same-origin) + CSP (no remote loads). Never inject into the page DOM. #}
-  <iframe class="quote-msg-body" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="{{ body_srcdoc }}" title="Message body" referrerpolicy="no-referrer"></iframe>
+  <div class="quote-msg-split" id="qSplit">
+    <iframe class="quote-msg-body" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="{{ body_srcdoc }}" title="Message body" referrerpolicy="no-referrer"></iframe>
+
+    {# Split-screen attachment viewer: hidden until a View button is used. Wired by static/quote/js/attachment-viewer.js. #}
+    <div class="quote-split-handle d-none" id="qSplitHandle" role="separator" aria-orientation="vertical"
+         aria-label="Resize attachment viewer" tabindex="0"></div>
+    <section class="quote-viewer d-none" id="qViewer" aria-label="Attachment viewer">
+      <header class="quote-viewer-head">
+        <div class="quote-viewer-tabs" id="qViewerTabs"></div>
+        <a class="btn btn-outline-secondary btn-sm" id="qViewerPop" href="#" target="statz_attachment"
+           title="Open in its own tab"><i class="bi bi-box-arrow-up-right"></i></a>
+        <button type="button" class="btn-close" id="qViewerClose" aria-label="Close viewer"></button>
+      </header>
+      <div class="quote-viewer-body" id="qViewerBody"></div>
+    </section>
+  </div>
 
   {% if quotes %}
   <div class="quote-msg-quotes">
-    <h3 class="h6 mt-3">Quotes logged from this message</h3>
+    <h3 class="h6 mt-3">Quotes from {{ email.supplier.name }} on {% if linked|length == 1 %}this solicitation{% else %}these solicitations{% endif %}</h3>
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
-        <thead><tr><th>SOL / line</th><th>Supplier</th><th class="text-end">Cost</th><th class="text-end">Landed</th><th class="text-end">Gov price</th><th>Days</th><th></th></tr></thead>
+        <thead><tr><th>SOL / line</th><th>Supplier</th><th class="text-end">Cost</th><th class="text-end">Landed</th><th class="text-end">Gov price</th><th>Days</th><th></th><th></th></tr></thead>
         <tbody>
         {% for q in quotes %}
           <tr>
             <td class="font-monospace">{{ q.line.solicitation.solicitation_number }}{% if q.line.line_number %} / {{ q.line.line_number }}{% endif %}</td>
-            <td>{{ q.supplier.name }}</td>
+            <td>{{ q.supplier.name }}{% if q.source_note %}<div class="small text-body-secondary">{{ q.source_note }}</div>{% endif %}</td>
             <td class="text-end">${{ q.supplier_unit_cost|floatformat:2 }}</td>
             <td class="text-end">${{ q.landed_unit_cost|floatformat:2 }}</td>
             <td class="text-end fw-semibold">${{ q.final_government_unit_price|floatformat:2 }}</td>
             <td>{{ q.lead_time_days }}</td>
             <td>{% if q.is_selected_for_bid %}<span class="badge text-bg-primary" title="{% if q.selected_automatically %}Lowest landed cost{% else %}Chosen by a rep{% endif %}">Selected{% if q.selected_automatically %} (auto){% endif %}</span>{% endif %}</td>
+            <td class="text-end text-nowrap">
+              {% if q.card %}
+                <button type="button" class="btn btn-outline-primary btn-sm py-0" data-edit-quote
+                        data-sol="{{ q.line.solicitation.solicitation_number }}" data-entry="{{ q.card.entry }}"
+                        title="{% if q.card.locked %}{{ q.card.lock_reason }}{% else %}Open this quote in the side tray to change it{% endif %}">
+                  {% if q.card.locked %}<i class="bi bi-lock"></i> Sent{% else %}<i class="bi bi-pencil"></i> Edit{% endif %}
+                </button>
+              {% endif %}
+            </td>
           </tr>
         {% endfor %}
         </tbody>
@@ -149,171 +186,5 @@
 
   {{ drawer_json|json_script:"quoteDrawerData" }}
 
-  {# ── Option B: slide-out quote drawer ─────────────────────────────────── #}
-  <div class="offcanvas offcanvas-end quote-drawer" tabindex="-1" id="quoteDrawer" aria-labelledby="quoteDrawerLabel">
-    <div class="offcanvas-header">
-      <h5 class="offcanvas-title" id="quoteDrawerLabel">Log quote &mdash; {{ email.supplier.name|default:"" }}</h5>
-      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-    <div class="offcanvas-body">
-      <form id="quoteForm" autocomplete="off" novalidate>
-        <input type="hidden" name="supplier_id" value="{{ email.supplier.pk|default:'' }}">
-
-        <label class="form-label label" for="qSol">Solicitation</label>
-        <select class="form-select form-select-sm mb-2" name="sol" id="qSol">
-          {% for number, entry in linked.items %}
-            <option value="{{ number }}">{{ number }} &mdash; {{ entry.all_lines.0.nomenclature|default:"" }}</option>
-          {% endfor %}
-        </select>
-
-        <div class="mb-2" id="qModeWrap">
-          <div class="btn-group btn-group-sm w-100" role="group" aria-label="CLIN mode">
-            <input type="radio" class="btn-check" name="mode" id="qModeCombined" value="combined" checked>
-            <label class="btn btn-outline-secondary" for="qModeCombined">Combined (all lines)</label>
-            <input type="radio" class="btn-check" name="mode" id="qModeSplit" value="split">
-            <label class="btn btn-outline-secondary" for="qModeSplit">Split CLINs</label>
-          </div>
-          <select class="form-select form-select-sm mt-2 d-none" name="line_id" id="qLine"></select>
-        </div>
-
-        <div class="quote-drawer-facts" id="qFacts"></div>
-
-        <div class="row g-2">
-          <div class="col-7">
-            <label class="form-label label" for="qPart">Part # offered</label>
-            <input class="form-control form-control-sm font-monospace" name="offered_part_number" id="qPart" maxlength="40">
-          </div>
-          <div class="col-5">
-            <label class="form-label label" for="qCage">CAGE</label>
-            <input class="form-control form-control-sm font-monospace text-uppercase" name="offered_cage" id="qCage" maxlength="5"
-                   value="{{ email.supplier.cage_code|default:'' }}">
-          </div>
-          <div class="col-6">
-            <label class="form-label label" for="qCost">Unit cost ($)</label>
-            <input class="form-control form-control-sm" name="unit_cost" id="qCost" inputmode="decimal" required>
-          </div>
-          <div class="col-6">
-            <label class="form-label label" for="qLead">Days ARO</label>
-            <input class="form-control form-control-sm" name="lead_time_days" id="qLead" inputmode="numeric" required>
-            <div class="form-text" id="qLeadHint"></div>
-          </div>
-          <div class="col-6">
-            <label class="form-label label" for="qMoq">Min order qty</label>
-            <input class="form-control form-control-sm" name="min_order_qty" id="qMoq" inputmode="numeric">
-          </div>
-          <div class="col-6">
-            <label class="form-label label" for="qTerms">Payment terms</label>
-            <input class="form-control form-control-sm" name="payment_terms" id="qTerms" maxlength="20" placeholder="Net 30">
-          </div>
-        </div>
-
-        {# One set of weight / dimensions for the part. Packaging (packhouse requests) and freight both read it. #}
-        <details class="quote-drawer-section" id="qDimsSection">
-          <summary>Weight &amp; dimensions <span class="quote-drawer-sum" data-dims-readout>not entered</span></summary>
-          <div class="small text-body-secondary mt-1">Used by packaging and freight below
-            <span id="qDimsNote"></span></div>
-          <div class="row g-2 mt-1">
-            <div class="col-3"><input class="form-control form-control-sm" name="dim_weight" id="qDimW" placeholder="lb" inputmode="decimal" aria-label="Weight (lb)"></div>
-            <div class="col-3"><input class="form-control form-control-sm" name="dim_length" id="qDimL" placeholder="L in" inputmode="decimal" aria-label="Length (in)"></div>
-            <div class="col-3"><input class="form-control form-control-sm" name="dim_width" id="qDimWd" placeholder="W in" inputmode="decimal" aria-label="Width (in)"></div>
-            <div class="col-3"><input class="form-control form-control-sm" name="dim_height" id="qDimH" placeholder="H in" inputmode="decimal" aria-label="Height (in)"></div>
-          </div>
-          <input class="form-control form-control-sm mt-2" name="dim_source_notes" id="qDimSource" placeholder="Source, e.g. vendor spec sheet">
-          <div class="form-check mt-1">
-            <input class="form-check-input" type="checkbox" name="save_dims" id="qSaveDims">
-            <label class="form-check-label small" for="qSaveDims">Save / update these on the NSN record (when a packhouse request is sent or the quote is saved)</label>
-          </div>
-        </details>
-
-        <details class="quote-drawer-section">
-          <summary>Packaging <span class="quote-drawer-sum" id="qPackSum">$0.00 / unit</span></summary>
-          <label class="form-label label mt-2" for="qPackSource">Who packages</label>
-          <select class="form-select form-select-sm" name="packaging_source" id="qPackSource">
-            {% for value, label in packaging_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
-          </select>
-          <div class="mt-2 d-none" id="qPackhouseWrap">
-            <label class="form-label label" for="qPackhouse">Packhouse</label>
-            <input class="form-control form-control-sm" id="qPackhouse" placeholder="Search packhouses by name or CAGE">
-            <input type="hidden" name="packaging_vendor_id" id="qPackhouseId">
-            <div class="list-group quote-supplier-results mt-1" id="qPackhouseResults"></div>
-
-            {# Ask packhouses for a price by email, then use their answer here. Wired by static/quote/js/packhouse.js. #}
-            <div class="quote-ph mt-3" id="qPh">
-              <div class="label">Packhouse quotes for this SOL</div>
-              <div id="qPhRequests"></div>
-              <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" id="qPhOpen">
-                <i class="bi bi-envelope-paper"></i> Email packhouses for a quote
-              </button>
-              <div class="d-none" id="qPhCompose">
-                <div class="label mt-3">Who to ask</div>
-                <div class="d-flex flex-wrap gap-1" id="qPhHistory"></div>
-                <input class="form-control form-control-sm mt-1" id="qPhSearch" placeholder="Add a packhouse to ask (name or CAGE)" autocomplete="off">
-                <div class="list-group quote-supplier-results mt-1" id="qPhResults"></div>
-                <div class="d-flex flex-wrap gap-1 mt-2" id="qPhChosen"></div>
-                <label class="form-label label mt-2" for="qPhNote">Note to the packhouse (optional)</label>
-                <textarea class="form-control form-control-sm" id="qPhNote" rows="2" maxlength="1000"
-                          placeholder="e.g. need your price by Friday"></textarea>
-                <div class="small text-body-secondary mt-1">Goes with: <span data-dims-readout>not entered</span>,
-                  the item and quantity, the packaging requirements and the solicitation PDF.
-                  <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-dims-edit>edit</button></div>
-                <div class="alert alert-danger py-1 px-2 small mt-2 mb-0 d-none" id="qPhError" role="alert"></div>
-                <div class="d-flex gap-2 mt-2">
-                  <button type="button" class="btn btn-outline-primary btn-sm" id="qPhPreviewBtn" disabled>Preview</button>
-                  <button type="button" class="btn btn-link btn-sm" id="qPhCancel">Cancel</button>
-                </div>
-                <div class="quote-ph-preview d-none mt-2" id="qPhPreview"></div>
-              </div>
-            </div>
-          </div>
-          <div class="row g-2 mt-1">
-            <div class="col-6"><label class="form-label label" for="qPackUnit">Per unit ($)</label>
-              <input class="form-control form-control-sm" name="packaging_unit" id="qPackUnit" inputmode="decimal"></div>
-            <div class="col-6"><label class="form-label label" for="qPackTotal">Total ($)</label>
-              <input class="form-control form-control-sm" name="packaging_total" id="qPackTotal" inputmode="decimal"></div>
-          </div>
-          <div class="small text-body-secondary mt-2">Part: <span data-dims-readout>not entered</span>
-            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-dims-edit>edit</button></div>
-        </details>
-
-        <details class="quote-drawer-section">
-          <summary>Freight <span class="quote-drawer-sum" id="qFreightSum">$0.00 / unit</span></summary>
-          <div class="row g-2 mt-1">
-            <div class="col-6"><label class="form-label label" for="qFreightUnit">Per unit ($)</label>
-              <input class="form-control form-control-sm" name="freight_unit" id="qFreightUnit" inputmode="decimal"></div>
-            <div class="col-6"><label class="form-label label" for="qFreightTotal">Total ($)</label>
-              <input class="form-control form-control-sm" name="freight_total" id="qFreightTotal" inputmode="decimal"></div>
-          </div>
-          <div class="small text-body-secondary mt-2">Part: <span data-dims-readout>not entered</span>
-            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-dims-edit>edit</button></div>
-        </details>
-
-        <label class="form-label label mt-3">Markup</label>
-        <div class="quote-tip-pills" id="qTips">
-          {% for p in markup_presets %}<button type="button" class="quote-tip {% if forloop.first %}active{% endif %}" data-pct="{{ p }}">{{ p|floatformat:"0" }}%</button>{% endfor %}
-          <button type="button" class="quote-tip" data-pct="custom">Custom</button>
-        </div>
-        <input type="hidden" name="markup_pct" id="qMarkup" value="{{ markup_presets.0 }}">
-        <input type="hidden" name="target_price" id="qTarget">
-        <div class="row g-2 mt-1 d-none" id="qCustomWrap">
-          <div class="col-6"><label class="form-label label" for="qCustomPct">Markup %</label>
-            <input class="form-control form-control-sm" id="qCustomPct" inputmode="decimal"></div>
-          <div class="col-6 d-flex align-items-end"><span class="small text-body-secondary">or type a final price below</span></div>
-        </div>
-
-        <div class="quote-price-box mt-3">
-          <div class="row-between small text-body-secondary"><span>Landed / unit</span><span id="qLanded">$0.00</span></div>
-          <div class="row-between small text-body-secondary"><span>Markup</span><span id="qPctOut">0.00%</span></div>
-          <label class="form-label label mt-2" for="qPrice">Final gov unit price ($)</label>
-          <input class="form-control quote-price-input" id="qPrice" inputmode="decimal"
-                 title="Type a price to back-calculate the markup">
-        </div>
-
-        <label class="form-label label mt-2" for="qNotes">Notes</label>
-        <textarea class="form-control form-control-sm" name="notes" id="qNotes" rows="2"></textarea>
-
-        <div class="alert alert-danger py-2 mt-2 small d-none" id="qError" role="alert"></div>
-        <button type="submit" class="btn btn-primary w-100 mt-3" id="qSave">Save quote to SOL</button>
-      </form>
-    </div>
-  </div>
+  {% include "quote/mailbox/_tray.html" with tray_supplier=email.supplier %}
 </div>
