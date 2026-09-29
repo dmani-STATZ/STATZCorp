@@ -66,6 +66,15 @@ The **Copy Category** control in the Contacts section header (`supplier_detail.h
 
 ## Views
 
+### NSN & FSC Capabilities (supplier detail page + dashboard)
+
+`supplier_detail.html` has a `#section-capabilities` block (sidebar link with a count badge, entry in the `sectionIds` scroll-spy list, between Contacts and Addresses). It shows which NSNs / whole FSCs the supplier can supply, the lists that drive Quotes solicitation matching. **The data and every write belong to the `quote` app** (`QuoteSupplierNSN` / `QuoteSupplierFSC`, `quote/services/capabilities.py`); this page only hosts the editor:
+
+- `SupplierDetailView` / `DashboardView` call `capability_context(user, supplier=None)` in `suppliers/views.py`, which adds `can_manage_capabilities` (`quote.services.access.user_can_use_quote`) and, for the detail page, `capability_nsn_count` / `capability_fsc_count` / `capability_total`. `quote` is imported lazily inside the helper; `suppliers` has no module-level dependency on it.
+- With Quotes access the section lazy-loads the editor fragment (`quote:capability_supplier`) into `#capabilities-mount` via `QuoteCapabilities.mountEditor` (`quote/static/quote/js/capabilities.js`, loaded in `extra_scripts`). Without it, the section shows the two counts and a "needs Quotes access" note. The suppliers dashboard shows an "NSN & FSC Capabilities" button under the same rule.
+- Changing that section's id, or the `data-role` hooks in `quote/templates/quote/capabilities/_editor.html`, breaks the embed. See `CONTEXT_quote.md` §6 "Capabilities".
+- This is the internal ERP page, **not** the supplier portal API (`suppliers/portal/`): the portal exposes no capability data and its field allowlist is unchanged.
+
 ### status_report (GET `/suppliers/status-report/`)
 
 - **Auth:** `login_required`

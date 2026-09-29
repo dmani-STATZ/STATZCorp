@@ -7,10 +7,86 @@ to and why. Matching is additive (Quote.md Phase 1): one row per
 (solicitation, supplier, source), so a supplier hit by NSN and FSC and manual
 assignment carries all three lineage badges.
 
-Tables: quote_supplier_nsn, quote_supplier_fsc, quote_solicitation_match.
+QuoteCapabilityImport is the audit record of one bulk add (paste or file). The
+capability rows it created point back at it, which is what makes an import
+undoable and every pairing explainable.
+
+Tables: quote_supplier_nsn, quote_supplier_fsc, quote_solicitation_match,
+quote_capability_import.
 """
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
+
+
+
+class QuoteCapabilityImport(models.Model):
+    """One committed bulk add of supplier capabilities (pasted text or a file)."""
+
+    MODE_SINGLE = 'SINGLE'
+    MODE_MULTI = 'MULTI'
+    MODE_CHOICES = [
+        (MODE_SINGLE, 'One supplier'),
+        (MODE_MULTI, 'Several suppliers'),
+    ]
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+    )
+    # default=, not auto_now_add: rows are read back for the "recent imports" list.
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    source_name = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text='Uploaded file name, or a label for pasted text.',
+    )
+    mode = models.CharField(max_length=8, choices=MODE_CHOICES, default=MODE_MULTI)
+    supplier = models.ForeignKey(
+        'suppliers.Supplier',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='quote_capability_imports',
+        help_text='Set for one-supplier imports.',
+    )
+    suppliers_touched = models.PositiveIntegerField(default=0)
+    nsns_added = models.PositiveIntegerField(default=0)
+    fscs_added = models.PositiveIntegerField(default=0)
+    nsns_existing = models.PositiveIntegerField(default=0)
+    fscs_existing = models.PositiveIntegerField(default=0)
+    unreadable = models.PositiveIntegerField(default=0)
+    matches_created = models.PositiveIntegerField(default=0)
+    solicitations_matched = models.PositiveIntegerField(
+        default=0, help_text='Open solicitations moved Unmatched -> Matched by this import.',
+    )
+    undone_at = models.DateTimeField(null=True, blank=True)
+    undone_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+    )
+
+    class Meta:
+        db_table = 'quote_capability_import'
+        ordering = ['-created_at', '-pk']
+        verbose_name = 'Capability import'
+        verbose_name_plural = 'Capability imports'
+
+    def __str__(self):
+        return f'Capability import #{self.pk} ({self.source_name or self.mode})'
+
+    @property
+    def is_undone(self):
+        return self.undone_at is not None
+
+    @property
+    def pairings_added(self):
+        return self.nsns_added + self.fscs_added
 
 
 class QuoteSupplierNSN(models.Model):
@@ -35,6 +111,14 @@ class QuoteSupplierNSN(models.Model):
         related_name='+',
     )
     added_at = models.DateTimeField(auto_now_add=True)
+    import_batch = models.ForeignKey(
+        'quote.QuoteCapabilityImport',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='nsn_rows',
+        help_text='The bulk import that created this row, if any.',
+    )
 
     class Meta:
         db_table = 'quote_supplier_nsn'
@@ -64,6 +148,14 @@ class QuoteSupplierFSC(models.Model):
         related_name='+',
     )
     added_at = models.DateTimeField(auto_now_add=True)
+    import_batch = models.ForeignKey(
+        'quote.QuoteCapabilityImport',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='fsc_rows',
+        help_text='The bulk import that created this row, if any.',
+    )
 
     class Meta:
         db_table = 'quote_supplier_fsc'

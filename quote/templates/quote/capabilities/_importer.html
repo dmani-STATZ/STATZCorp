@@ -1,0 +1,51 @@
+{% comment %}
+  The paste / file importer, shared by the supplier editor (supplier fixed) and
+  the import page (supplier chosen there, or read from a column). Behaviour is
+  in quote/static/quote/js/capabilities.js (QuoteCapabilities.initImporter);
+  everything after "Review" is rendered by that script from the preview JSON.
+
+  Not a page: no {% extends %}. Pass `supplier` to fix the supplier.
+{% endcomment %}
+<div class="cap-importer" data-role="importer"
+     data-csrf="{{ csrf_token }}"
+     data-preview-url="{% url 'quote:capability_import_preview' %}"
+     data-commit-url="{% url 'quote:capability_import_commit' %}"
+     data-search-url="{% url 'quote:supplier_search' %}"
+     data-queue-url="{% url 'quote:solicitation_queue' %}"
+     {% if supplier %}data-supplier-id="{{ supplier.pk }}" data-supplier-name="{{ supplier.name }}"{% endif %}>
+
+  <div data-role="input">
+    <div class="cap-drop" data-role="drop" tabindex="0" role="button"
+         aria-label="Drop a CSV or Excel file here, or press Enter to browse">
+      <i class="bi bi-file-earmark-arrow-up cap-drop-icon" aria-hidden="true"></i>
+      <div>
+        <strong>Drop a CSV or Excel file</strong>
+        <span class="text-body-secondary">or</span>
+        <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-role="browse">browse</button>
+      </div>
+      <div class="small text-body-secondary">.csv &middot; .txt &middot; .xlsx &nbsp;(up to 10&nbsp;MB)</div>
+      <input type="file" class="d-none" data-role="file" accept=".csv,.tsv,.txt,.xlsx,.xlsm">
+    </div>
+
+    <div class="cap-or"><span>or paste a list</span></div>
+
+    <textarea class="form-control font-monospace cap-paste" rows="5" data-role="text"
+              spellcheck="false" aria-label="Paste NSNs and FSCs"
+              placeholder="{% if supplier %}One per line, or straight from a spreadsheet:&#10;5340-01-234-5678&#10;5305-00-111-2222&#10;5310{% else %}CAGE&#9;NSN&#10;0SKY9&#9;5340-01-234-5678&#10;72914&#9;5305{% endif %}"></textarea>
+
+    <div class="cap-actions-row">
+      <button type="button" class="btn btn-primary btn-sm" data-role="review">
+        <i class="bi bi-search" aria-hidden="true"></i> Review
+      </button>
+      <span class="small text-body-secondary" data-role="hint">
+        NSNs (13 digits, any hyphenation) and 4-digit FSCs are picked out automatically. Nothing is saved until you confirm.
+      </span>
+    </div>
+  </div>
+
+  <div class="cap-filechip d-none" data-role="file-chip"></div>
+  <div class="d-none" data-role="error" role="alert"></div>
+  <div class="d-none" data-role="mapping"></div>
+  <div class="d-none" data-role="preview" aria-live="polite"></div>
+  <div class="d-none" data-role="done" aria-live="polite"></div>
+</div>

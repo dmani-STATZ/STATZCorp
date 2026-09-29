@@ -29,6 +29,15 @@ urlpatterns = [
     path('solicitations/<str:sol_number>/status/', views.set_status, name='set_status'),
     path('solicitations/<str:sol_number>/claim/', views.claim, name='claim'),
     path('suppliers/search/', views.supplier_search, name='supplier_search'),
+    # Supplier capabilities -- the NSN / FSC lists that drive matching
+    path('capabilities/', views.capabilities, name='capabilities'),
+    path('capabilities/import/', views.capability_import_page, name='capability_import'),
+    path('capabilities/import/preview/', views.capability_import_preview, name='capability_import_preview'),
+    path('capabilities/import/commit/', views.capability_import_commit, name='capability_import_commit'),
+    path('capabilities/import/<int:import_id>/undo/', views.capability_import_undo, name='capability_import_undo'),
+    path('capabilities/export/', views.capability_export, name='capability_export'),
+    path('capabilities/supplier/<int:supplier_id>/', views.capability_supplier, name='capability_supplier'),
+    path('capabilities/supplier/<int:supplier_id>/remove/', views.capability_remove, name='capability_remove'),
     # Phase 2 -- quotes@ mailbox + quote entry
     path('mailbox/', views.mailbox_page, name='mailbox'),
     path('mailbox/sync/', views.mailbox_sync, name='mailbox_sync'),

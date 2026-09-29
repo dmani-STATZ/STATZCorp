@@ -1,0 +1,111 @@
+{% load nsn_filters %}
+{% comment %}
+  One supplier's capability editor. A fragment (no {% extends %}): fetched by
+  QuoteCapabilities.openDrawer for the Capabilities page / workspace drawer and
+  mounted inline on the supplier detail page. `live-top` and `live-bottom` are
+  re-rendered after every change; the importer between them keeps its state.
+{% endcomment %}
+<div class="cap-editor" data-role="editor"
+     data-supplier-id="{{ supplier.pk }}"
+     data-editor-url="{% url 'quote:capability_supplier' supplier.pk %}"
+     data-remove-url="{% url 'quote:capability_remove' supplier.pk %}"
+     data-csrf="{{ csrf_token }}">
+
+  <div data-role="live-top">
+    <div class="cap-editor-head">
+      <div class="cap-stats">
+        <div class="cap-stat"><span class="cap-stat-value">{{ nsn_total }}</span><span class="cap-stat-label">NSN{{ nsn_total|pluralize }}</span></div>
+        <div class="cap-stat"><span class="cap-stat-value">{{ fscs|length }}</span><span class="cap-stat-label">FSC{{ fscs|length|pluralize }}</span></div>
+        <div class="cap-stat" title="Open solicitations that still need work and are linked to this supplier">
+          <span class="cap-stat-value">{{ linked_open }}</span><span class="cap-stat-label">open solicitation{{ linked_open|pluralize }} linked</span>
+        </div>
+      </div>
+      <div class="cap-head-actions">
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'quote:capability_export' %}?supplier={{ supplier.pk }}"
+           title="Download this supplier's list as CSV (re-importable)"><i class="bi bi-download" aria-hidden="true"></i> Export</a>
+      </div>
+    </div>
+
+    <section class="cap-block">
+      <h3 class="cap-block-title">FSCs <span class="cap-block-sub">whole classes: every NSN in the class matches</span></h3>
+      <div class="cap-chips">
+        {% for f in fscs %}
+        <span class="cap-chip cap-chip-fsc" data-fsc="{{ f.fsc }}"
+              title="Added {{ f.added_at|date:'M j, Y' }}{% if f.added_by %} by {{ f.added_by.get_full_name|default:f.added_by.username }}{% endif %}{% if f.import_batch %} &middot; from {{ f.import_batch.source_name|default:'an import' }}{% endif %}">
+          {{ f.fsc }}<button type="button" class="cap-chip-x" data-remove-fsc="{{ f.fsc }}" aria-label="Remove FSC {{ f.fsc }}">&times;</button>
+        </span>
+        {% empty %}
+        <span class="small text-body-secondary">None yet. Add an FSC below to match a whole class.</span>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <section class="cap-block">
+    <h3 class="cap-block-title">Add NSNs &amp; FSCs</h3>
+    {% include "quote/capabilities/_importer.html" with supplier=supplier %}
+  </section>
+
+  <div data-role="live-bottom">
+    <section class="cap-block">
+      <div class="row-between flex-wrap gap-2 mb-2">
+        <h3 class="cap-block-title mb-0">NSNs
+          {% if query %}<span class="cap-block-sub">{{ nsn_page.paginator.count }} matching &ldquo;{{ query }}&rdquo;</span>{% endif %}
+        </h3>
+        {% if nsn_total %}
+        <input type="search" class="form-control form-control-sm cap-filter" data-role="filter"
+               value="{{ query }}" placeholder="Filter by NSN, FSC or note" aria-label="Filter NSNs" autocomplete="off">
+        {% endif %}
+      </div>
+
+      {% if nsn_page.object_list %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle cap-table mb-0">
+          <thead>
+            <tr>
+              <th class="cap-col-pick"><input type="checkbox" class="form-check-input" data-pick-all aria-label="Select all on this page"></th>
+              <th>NSN</th>
+              <th>Added</th>
+              <th class="text-end"></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for row in nsn_page %}
+            <tr data-nsn="{{ row.nsn }}">
+              <td class="cap-col-pick"><input type="checkbox" class="form-check-input" data-pick aria-label="Select {{ row.nsn|format_nsn }}"></td>
+              <td class="font-monospace">{{ row.nsn|format_nsn }}{% if row.notes %} <span class="cap-note">{{ row.notes }}</span>{% endif %}</td>
+              <td class="small text-body-secondary">
+                {{ row.added_at|date:"M j, Y" }}{% if row.added_by %} &middot; {{ row.added_by.get_full_name|default:row.added_by.username }}{% endif %}
+                {% if row.import_batch %}<span class="badge text-bg-light border" title="{{ row.import_batch.source_name|default:'Bulk import' }}">import</span>{% endif %}
+              </td>
+              <td class="text-end">
+                <button type="button" class="cap-row-x" data-remove-one aria-label="Remove {{ row.nsn|format_nsn }}" title="Remove">&times;</button>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="cap-bulkbar d-none" data-role="bulkbar">
+        <span><strong data-role="picked-count">0</strong> selected</span>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-remove-picked>Remove selected</button>
+      </div>
+
+      {% if nsn_page.has_other_pages %}
+      <nav class="cap-pager" aria-label="NSN pages">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-page="{{ nsn_page.previous_page_number|default:'' }}"
+                {% if not nsn_page.has_previous %}disabled{% endif %}>&larr; Prev</button>
+        <span class="small text-body-secondary">Page {{ nsn_page.number }} of {{ nsn_page.paginator.num_pages }}</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-page="{{ nsn_page.next_page_number|default:'' }}"
+                {% if not nsn_page.has_next %}disabled{% endif %}>Next &rarr;</button>
+      </nav>
+      {% endif %}
+      {% elif query %}
+      <p class="small text-body-secondary mb-0">Nothing matches &ldquo;{{ query }}&rdquo;.</p>
+      {% else %}
+      <p class="small text-body-secondary mb-0">No NSNs yet. Paste a list above, or link this supplier on a solicitation with &ldquo;Save NSN&rdquo; ticked.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>

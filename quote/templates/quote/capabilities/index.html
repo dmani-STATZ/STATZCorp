@@ -1,0 +1,217 @@
+{% extends "quote/base.html" %}
+{% load static %}
+
+{% block content %}
+<div id="capPage"
+     {% if open_supplier %}data-open-url="{% url 'quote:capability_supplier' open_supplier.pk %}" data-open-name="{{ open_supplier.name }}"{% endif %}>
+
+<div class="page-heading">
+  <div>
+    <h1 class="page-title">Supplier capabilities</h1>
+    <p class="page-subtitle">
+      Which NSNs and whole FSCs each supplier can supply. Every new solicitation is matched
+      against these lists, and a change here re-matches everything still open.
+    </p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'quote:capability_export' %}">
+      <i class="bi bi-download" aria-hidden="true"></i> Export all
+    </a>
+    <a class="btn btn-primary" href="{% url 'quote:capability_import' %}">
+      <i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i> Import pairings
+    </a>
+  </div>
+</div>
+
+<div class="row row-cols-2 row-cols-lg-4 g-3 mb-3">
+  <div class="col"><div class="card kpi-tile h-100">
+    <span class="icon-tile icon-tile-primary"><i class="bi bi-truck" aria-hidden="true"></i></span>
+    <span class="kpi-tile-label">Suppliers</span>
+    <span class="kpi-tile-value">{{ totals.suppliers }}</span>
+    <span class="kpi-tile-help">with a capability list</span>
+  </div></div>
+  <div class="col"><div class="card kpi-tile h-100">
+    <span class="icon-tile icon-tile-success"><i class="bi bi-upc" aria-hidden="true"></i></span>
+    <span class="kpi-tile-label">NSN pairings</span>
+    <span class="kpi-tile-value">{{ totals.nsns }}</span>
+    <span class="kpi-tile-help">exact parts</span>
+  </div></div>
+  <div class="col"><div class="card kpi-tile h-100">
+    <span class="icon-tile icon-tile-info"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>
+    <span class="kpi-tile-label">FSC pairings</span>
+    <span class="kpi-tile-value">{{ totals.fscs }}</span>
+    <span class="kpi-tile-help">whole classes</span>
+  </div></div>
+  <div class="col"><a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=UNMATCHED">
+    <span class="icon-tile icon-tile-warning"><i class="bi bi-question-diamond" aria-hidden="true"></i></span>
+    <span class="kpi-tile-label">Still unmatched</span>
+    <span class="kpi-tile-value">{{ unmatched_open }}</span>
+    <span class="kpi-tile-help">open solicitations with no supplier</span>
+  </a></div>
+</div>
+
+<div class="card card-padded mb-3">
+  <div class="row-between flex-wrap gap-2 mb-3">
+    <input type="search" id="capFilter" class="form-control cap-filter-wide" autocomplete="off"
+           placeholder="Filter suppliers by name or CAGE" aria-label="Filter suppliers">
+    <div class="cap-adder">
+      <input type="search" id="capAdder" class="form-control" autocomplete="off"
+             placeholder="+ Add capabilities for a supplier&hellip;" aria-label="Find a supplier to add capabilities for">
+      <div id="capAdderResults" class="list-group cap-adder-results d-none"></div>
+    </div>
+  </div>
+
+  {% if rows %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0 cap-suppliers" id="capTable">
+      <thead>
+        <tr><th>Supplier</th><th>CAGE</th><th class="text-end">NSNs</th><th class="text-end">FSCs</th><th>Last change</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr class="cap-row" tabindex="0" role="button"
+            data-url="{% url 'quote:capability_supplier' r.id %}" data-name="{{ r.name }}"
+            data-search="{{ r.name|lower }} {{ r.cage_code|lower }}">
+          <td class="fw-semibold">{{ r.name|default:"(no name)" }}
+            {% if r.archived %}<span class="badge text-bg-secondary ms-1">Archived</span>{% endif %}</td>
+          <td class="font-monospace small">{{ r.cage_code|default:"" }}</td>
+          <td class="text-end"><span class="badge quote-lineage quote-lineage-nsn">{{ r.nsns }}</span></td>
+          <td class="text-end"><span class="badge quote-lineage quote-lineage-fsc">{{ r.fscs }}</span></td>
+          <td class="small text-body-secondary">{{ r.last|date:"M j, Y"|default:"—" }}</td>
+          <td class="text-end text-body-secondary"><i class="bi bi-chevron-right" aria-hidden="true"></i></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="small text-body-secondary mt-2 mb-0 d-none" id="capNoMatch">No supplier on file matches that.</p>
+  {% else %}
+  <div class="cap-empty">
+    <i class="bi bi-inboxes" aria-hidden="true"></i>
+    <p class="mb-1 fw-semibold">No capability lists yet</p>
+    <p class="text-body-secondary mb-3">
+      Import a supplier's NSN / FSC list, or link a supplier on a solicitation with &ldquo;Save NSN&rdquo; ticked
+      and it starts building itself.
+    </p>
+    <a class="btn btn-primary btn-sm" href="{% url 'quote:capability_import' %}">Import pairings</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card card-padded">
+  <h2 class="h6 mb-2">Recent imports</h2>
+  {% if recent_imports %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>When</th><th>By</th><th>Source</th><th class="text-end">Added</th><th class="text-end">Matched</th><th></th></tr></thead>
+      <tbody>
+      {% for imp in recent_imports %}
+        <tr {% if imp.is_undone %}class="text-body-secondary"{% endif %}>
+          <td class="small">{{ imp.created_at|date:"M j, g:i A" }}</td>
+          <td class="small">{{ imp.created_by.get_full_name|default:imp.created_by.username|default:"—" }}</td>
+          <td class="small">
+            {{ imp.source_name|default:"Pasted text" }}
+            <span class="text-body-secondary">&middot;
+              {% if imp.supplier %}{{ imp.supplier.name }}{% else %}{{ imp.suppliers_touched }} supplier{{ imp.suppliers_touched|pluralize }}{% endif %}</span>
+          </td>
+          <td class="text-end small">
+            <span class="badge quote-lineage quote-lineage-nsn">{{ imp.nsns_added }} NSN</span>
+            <span class="badge quote-lineage quote-lineage-fsc">{{ imp.fscs_added }} FSC</span>
+          </td>
+          <td class="text-end small">{{ imp.solicitations_matched }} SOL{{ imp.solicitations_matched|pluralize }}</td>
+          <td class="text-end">
+            {% if imp.is_undone %}
+              <span class="small">Undone {{ imp.undone_at|date:"M j" }}</span>
+            {% else %}
+              <button type="button" class="btn btn-link btn-sm text-danger p-0" data-undo-url="{% url 'quote:capability_import_undo' imp.pk %}"
+                      data-undo-label="{{ imp.nsns_added }} NSN and {{ imp.fscs_added }} FSC">Undo</button>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="small text-body-secondary mb-0">Nothing imported yet.</p>
+  {% endif %}
+</div>
+
+<div data-csrf="{{ csrf_token }}" id="capPageCsrf" class="d-none"></div>
+</div>{# #capPage #}
+{% endblock content %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'quote/js/capabilities.js' %}?v={{ cache_version }}"></script>
+<script>
+(function () {
+  const QC = window.QuoteCapabilities;
+  const page = document.getElementById('capPage');
+  let changed = false;
+
+  function openSupplier(url, name) {
+    QC.openDrawer({
+      url: url,
+      title: name + ' — capabilities',
+      onChange: () => { changed = true; },
+      onClose: () => { if (changed) window.location.href = window.location.pathname; },
+    });
+  }
+
+  // Row click / Enter opens that supplier's editor drawer.
+  document.querySelectorAll('.cap-row').forEach(row => {
+    const open = () => openSupplier(row.dataset.url, row.dataset.name);
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  });
+
+  // Filter the supplier table client-side.
+  const filter = document.getElementById('capFilter');
+  const rows = Array.from(document.querySelectorAll('.cap-row'));
+  const noMatch = document.getElementById('capNoMatch');
+  if (filter) filter.addEventListener('input', () => {
+    const q = filter.value.trim().toLowerCase();
+    let shown = 0;
+    rows.forEach(r => {
+      const hit = !q || r.dataset.search.indexOf(q) !== -1;
+      r.classList.toggle('d-none', !hit);
+      if (hit) shown++;
+    });
+    if (noMatch) noMatch.classList.toggle('d-none', shown > 0);
+  });
+
+  // "+ Add capabilities for a supplier": find any supplier, open its drawer.
+  QC.attachSupplierSearch(
+    document.getElementById('capAdder'),
+    document.getElementById('capAdderResults'),
+    '{% url "quote:supplier_search" %}',
+    s => {
+      document.getElementById('capAdder').value = '';
+      openSupplier('{% url "quote:capability_supplier" 0 %}'.replace('/0/', '/' + s.id + '/'), s.name);
+    }
+  );
+
+  // Undo an import.
+  document.querySelectorAll('[data-undo-url]').forEach(btn => btn.addEventListener('click', () => {
+    if (btn.dataset.armed !== '1') {
+      btn.dataset.armed = '1';
+      btn.textContent = 'Really undo?';
+      setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Undo'; }, 4000);
+      return;
+    }
+    btn.disabled = true;
+    QC.undoImport(btn.dataset.undoUrl, document.getElementById('capPageCsrf'))
+      .then(res => {
+        window.showToast('success', 'Undone: removed ' + res.nsns + ' NSN and ' + res.fscs + ' FSC pairings.' +
+          (res.returned_to_unmatched ? ' ' + res.returned_to_unmatched + ' solicitation(s) back to Unmatched.' : ''));
+        setTimeout(() => window.location.reload(), 900);
+      })
+      .catch(err => { btn.disabled = false; window.showToast('error', err.message); });
+  }));
+
+  // Deep link (?supplier=<id>, e.g. from a supplier page): open the drawer at once.
+  if (page.dataset.openUrl) openSupplier(page.dataset.openUrl, page.dataset.openName || 'Supplier');
+})();
+</script>
+{% endblock extra_js %}

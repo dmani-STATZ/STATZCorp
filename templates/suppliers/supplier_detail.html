@@ -1,5 +1,5 @@
 {% extends "contracts/contract_base.html" %}
-{% load humanize %}
+{% load humanize static %}
 {% block title %}Supplier Detail{% endblock %}
 {% block body_class %}supplier-detail-page{% endblock %}
 
@@ -69,6 +69,7 @@
       <a href="#section-aliases" class="supplier-nav-link" data-section="section-aliases"><span>Also Known As</span><span class="badge rounded-pill bg-light text-dark">{{ aliases|length }}</span></a>
       <a href="#section-compliance" class="supplier-nav-link" data-section="section-compliance">Compliance &amp; Status</a>
       <a href="#section-contacts" class="supplier-nav-link" data-section="section-contacts"><span>Contacts</span><span class="badge rounded-pill bg-light text-dark">{{ contacts|length }}</span></a>
+      <a href="#section-capabilities" class="supplier-nav-link" data-section="section-capabilities"><span>NSN &amp; FSC Capabilities</span><span class="badge rounded-pill bg-light text-dark">{{ capability_total }}</span></a>
       <a href="#section-addresses" class="supplier-nav-link" data-section="section-addresses">Addresses</a>
       <a href="#section-contracts" class="supplier-nav-link" data-section="section-contracts"><span>Contracts</span><span class="badge rounded-pill bg-light text-dark">{{ contracts|length }}</span></a>
       <a href="#section-certs" class="supplier-nav-link" data-section="section-certs"><span>Certifications &amp; Classifications</span><span class="badge rounded-pill bg-light text-dark">{{ certification_rows|length }}</span></a>
@@ -539,6 +540,33 @@
       </div>
     </div>
 
+</section>
+
+<section id="section-capabilities" class="supplier-section-anchor">
+  <div class="card card-padded shadow-sm">
+    <div class="row-between mb-3 flex-wrap gap-2">
+      <div>
+        <h2 class="text-lg font-semibold mb-0">NSN &amp; FSC Capabilities</h2>
+        <p class="small text-body-secondary mb-0">
+          What this supplier can supply. Every new solicitation is matched against this list.
+        </p>
+      </div>
+      {% if can_manage_capabilities %}
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'quote:capabilities' %}">All suppliers&rsquo; capabilities</a>
+      {% endif %}
+    </div>
+    {% if can_manage_capabilities %}
+      <div id="capabilities-mount" data-editor-url="{% url 'quote:capability_supplier' supplier.pk %}">
+        <div class="small text-body-secondary">Loading capabilities&hellip;</div>
+      </div>
+    {% else %}
+      <p class="mb-1">
+        <span class="badge quote-lineage quote-lineage-nsn">{{ capability_nsn_count }} NSN{{ capability_nsn_count|pluralize }}</span>
+        <span class="badge quote-lineage quote-lineage-fsc">{{ capability_fsc_count }} FSC{{ capability_fsc_count|pluralize }}</span>
+      </p>
+      <p class="small text-body-secondary mb-0">Editing these lists needs Quotes access. Ask an admin if you should have it.</p>
+    {% endif %}
+  </div>
 </section>
 
 <section id="section-addresses" class="supplier-section-anchor">
@@ -1012,6 +1040,17 @@
 
 {% block extra_scripts %}
 {{ block.super }}
+{% if can_manage_capabilities %}
+<script src="{% static 'quote/js/capabilities.js' %}?v={{ cache_version }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var mount = document.getElementById('capabilities-mount');
+  if (mount && window.QuoteCapabilities) {
+    window.QuoteCapabilities.mountEditor(mount, mount.dataset.editorUrl, {});
+  }
+});
+</script>
+{% endif %}
 {{ health_score|json_script:"health-score-primary" }}
 {{ health_score_alternate|json_script:"health-score-alternate" }}
 <script>
@@ -1954,7 +1993,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  var sectionIds = ['section-overview','section-aliases','section-compliance','section-contacts','section-addresses','section-contracts','section-certs','section-files','section-notes'];
+  var sectionIds = ['section-overview','section-aliases','section-compliance','section-contacts','section-capabilities','section-addresses','section-contracts','section-certs','section-files','section-notes'];
   var navLinks = document.querySelectorAll('.supplier-nav-link[data-section]');
   var sections = sectionIds.map(function(id) { return document.getElementById(id); }).filter(Boolean);
   if (!sections.length || !navLinks.length) return;

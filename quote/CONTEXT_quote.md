@@ -21,6 +21,9 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 ## 3. High-Level Responsibilities
 - Workflow state per solicitation (`QuoteSolicitation`) and supplier matching
   (`QuoteSupplierNSN`, `QuoteSupplierFSC`, `QuoteSolicitationMatch`).
+- Managing the supplier capability lists that feed that matching: view / edit per
+  supplier, paste or file import (one supplier or many), export, undo
+  (`QuoteCapabilityImport`, `services/capabilities.py`). See §6 "Capabilities".
 - RFQ ledger (`QuoteRFQ`), supplier quotes (`QuoteSupplierQuote`), staged bids
   (`QuoteBid`), inbound email (`QuoteEmail`, `QuoteEmailAttachment`,
   `QuoteEmailSolLink`), post-award reconciliation (`BidOutcome`).
@@ -42,7 +45,12 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `models/bids.py` | `QuoteBid` (`quote_bid`) — OneToOne on `dibbs.SolicitationLine`; the solicitation is reached via `line.solicitation` (no duplicate FK). Every BQ overlay column + `clin_group`. |
 | `models/email.py` | `QuoteEmail` (raw payload, headers, claim), `QuoteEmailAttachment` (bytes), `QuoteEmailSolLink` (many-to-many email ↔ line). |
 | `models/outcomes.py` | `BidOutcome` — OneToOne on `QuoteBid`, nullable FK to `dibbs.DibbsAward`, derived deltas, frozen bid snapshot. |
-| `services/matching.py` | `seed_solicitation_states`, `match_solicitations`, `process_import_batch`, `add_manual_match` (+ capability learning and sibling re-match), `remove_manual_match`, `rematch_open_solicitations`. |
+| `services/matching.py` | `seed_solicitation_states`, `match_solicitations`, `process_import_batch`, `add_manual_match` (+ capability learning and sibling re-match), `remove_manual_match`, `rematch_open_solicitations`. Also `preview_matches` (dry run: what would these capability pairs link?) and `prune_derived_matches` (drop NSN/FSC links no capability supports any more). `_index_lines` / `_wanted_matches` are shared by the real run and the dry run, so a preview can never disagree with the commit. |
+| `services/capabilities.py` | Everything a rep can do to capability lists: `find_items` (NSN/FSC extraction), `read_text` / `read_upload` (paste, CSV, TXT, XLSX -> `Table`), `SupplierResolver` (CAGE / name / alias -> supplier), `detect_mapping`, `build_plan` (dry run, never writes), `plan_to_preview`, `commit_plan`, `remove_capabilities`, `undo_import`, `capability_overview`, `export_rows`. |
+| `services/access.py` | `user_can_use_quote(user)`: mirrors the middleware's `quote` AppPermission rule for pages outside `/quote/` that embed Quotes features (supplier detail / dashboard). |
+| `views/capabilities.py` | Capabilities page, per-supplier editor fragment, import page, preview / commit / undo / remove JSON endpoints, CSV export. |
+| `static/quote/js/capabilities.js` | One script for the whole feature: importer, editor, drawer, supplier typeahead. Loaded by the Capabilities pages, the solicitation workspace and the supplier detail page. |
+| `templates/quote/capabilities/` | `index.html` (page), `import.html` (page), `_editor.html` (fragment: one supplier's lists), `_importer.html` (paste / drop / review widget shared by the editor and the import page). |
 | `services/queue.py` | Queue dataset (`build_queue_rows`), `status_counts`, `queue_delta` (poll), `latest_unit_costs`. |
 | `services/cost.py` | Decimal landed cost + markup-on-cost pricing (`build`, `price_from_markup`, `markup_from_price`). |
 | `services/mailbox.py` | Graph sync + ingest, SOL/NSN detection, supplier resolution, link/unlink, link-modal search. |
@@ -68,6 +76,11 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
   Anything a rep creates (RFQs, quotes, bids, email links) blocks that delete.
 - Matching is additive and idempotent; it only moves `UNMATCHED → MATCHED` and
   never rewinds a worked solicitation (`MATCHING_STATES`).
+- `QuoteCapabilityImport` (`quote_capability_import`) is the audit record of one
+  committed bulk add. `QuoteSupplierNSN.import_batch` / `QuoteSupplierFSC.import_batch`
+  (nullable, `SET_NULL`) point at it, which is what makes an import undoable and each
+  pairing explainable. Rows added another way (a solicitation's "Save NSN", the demo
+  seed) have no batch. Its `created_at` is `default=timezone.now`, not `auto_now_add`.
 - `QuoteBid.line` is OneToOne → Split-CLIN is native; Combined mode shares `clin_group`.
 - `BidOutcome.award_unit_price` is **derived** (`award_total_price / award_quantity`);
   DIBBS publishes neither quantity nor unit price. Always label it derived.
@@ -110,6 +123,48 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 
 Recipients: Sales-category contacts, else `rfq_email`, else `business_email`,
 else `primary_email` (`services/rfq.resolve_recipients`).
+
+**Capabilities (built) — `/quote/capabilities/`, feeds Phase 1 matching:**
+The NSN / FSC lists used to be write-only (a checkbox in a solicitation's Add supplier
+modal). They are now first-class, reachable from both directions:
+1. **Capabilities page** (`quote:capabilities`, sub-nav "Capabilities" + a dashboard
+   tile): suppliers that have a list with NSN / FSC counts, "Still unmatched" KPI,
+   export, **Import pairings**, recent imports with **Undo**. Clicking a supplier (or
+   "+ Add capabilities for a supplier...") opens the **editor** in a drawer.
+2. **Editor** (`capability_supplier`, an HTML fragment): counts + "open solicitations
+   linked", FSC chips, the paste / drop importer, and the NSN table (filter, page of
+   50, select + remove). The *same fragment* is mounted inline in the supplier detail
+   page (`#section-capabilities`, only for users with Quotes access; others see counts)
+   and opens in a drawer from each supplier card on a solicitation workspace. Change
+   it anywhere and it changed everywhere; the drawer hosts reload their page on close.
+3. **Importer**: one widget, two scopes. *One supplier* (fixed by the editor, or picked
+   on `/quote/capabilities/import/`): every NSN / FSC found is theirs. *Several
+   suppliers*: the file names its supplier per row (CAGE and / or name). Pastes and
+   CSV / TXT / XLSX all become a table; `detect_mapping` guesses the header row and each
+   column's role from the data (a column of directory CAGEs / names is the supplier, a
+   column of NSN/FSC-looking cells is items; header text is only a tie-breaker) and the
+   rep can change any column. NSNs are 13 digits in any hyphenation; a bare 4-digit token
+   is an FSC; NIINs, 12/14-digit numbers and Excel scientific notation are listed as
+   unreadable rather than guessed.
+4. **Review before anything is saved** (`capability_import_preview`, `build_plan`):
+   new vs already-on-file vs unreadable, per-supplier breakdown with FSC chips showing
+   how many open solicitations each class touches, suppliers it could not place (assign
+   with the typeahead or skip; unknown / ambiguous / archived), and the **impact**:
+   how many open solicitations would gain a supplier link and how many would move
+   Unmatched -> Matched (`preview_matches`).
+5. **Commit** (`capability_import_commit`) re-reads the same payload (the browser
+   re-posts the file), inserts only what is still new (chunked at 200, per-row fallback
+   on an `IntegrityError` from a teammate's simultaneous add), records the
+   `QuoteCapabilityImport`, then re-matches open solicitations with the new keys
+   (`open_matchable_ids` -> `match_solicitations`), exactly like a manual match that
+   ticks "Save NSN".
+6. **Remove / undo** delete the rows and call `prune_derived_matches`: NSN / FSC links no
+   remaining capability supports are dropped, and solicitations left with no supplier go
+   back to Unmatched. Only open solicitations still in a matching state are touched;
+   worked ones (RFQ sent, quoting...) and MANUAL links are never changed. Undo removes
+   exactly the rows that batch created.
+7. **Export** (`capability_export`) is a CSV (`Supplier, CAGE, Type, Code, ...`) that the
+   importer reads straight back.
 
 **Phase 2 (built) — `/quote/mailbox/`, Option B:**
 1. **Check for new mail** (`mailbox_sync`) pulls the newest 50 inbox messages via
@@ -250,6 +305,10 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
   as a sort hint, not a filter.
 
 ### Apps that depend on `quote`
+- `suppliers` supplier detail page + dashboard embed the capability editor
+  (`suppliers.views.capability_context`, lazy imports of `quote.services.access` /
+  `quote.models`). Capabilities stay Quotes data: editing needs Quotes access even from
+  a supplier page.
 - `core` global search (supplier ↔ solicitation hops via `QuoteSolicitationMatch`, `QuoteRFQ`).
 - `products` NSN / supplier pages (`QuoteSupplierQuote`, `QuoteBid`, `QuoteSupplierNSN`).
 
@@ -265,6 +324,13 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 | `quote:solicitation_workspace` | `/quote/solicitations/<sol>/` | takes the claim |
 | `quote:add_match` / `remove_match` / `queue_supplier_rfqs` / `set_status` / `claim` | `/quote/solicitations/<sol>/...` | POST |
 | `quote:supplier_search` | `/quote/suppliers/search/?q=` | JSON |
+| `quote:capabilities` | `/quote/capabilities/[?supplier=<id>]` | page; `?supplier=` opens that supplier's drawer |
+| `quote:capability_supplier` | `/quote/capabilities/supplier/<id>/?q=&page=` | editor fragment (XHR only; a direct visit redirects to the page with the drawer open) |
+| `quote:capability_remove` | `/quote/capabilities/supplier/<id>/remove/` | POST JSON `{nsns, fscs}` |
+| `quote:capability_import` | `/quote/capabilities/import/[?supplier=<id>]` | import page |
+| `quote:capability_import_preview` / `capability_import_commit` | `/quote/capabilities/import/preview/` / `commit/` | POST multipart: `file` or `text`, `supplier_id`, `mapping`, `assignments` → JSON |
+| `quote:capability_import_undo` | `/quote/capabilities/import/<id>/undo/` | POST, JSON (409 when already undone) |
+| `quote:capability_export` | `/quote/capabilities/export/[?supplier=<id>]` | CSV, streamed |
 | `quote:rfq_queue` / `rfq_send` / `rfq_send_all` / `rfq_remove` | `/quote/rfq/...` | POST except the queue page |
 | `quote:mailbox` | `/quote/mailbox/?email=<id>` | inbox page |
 | `quote:mailbox_sync` | `/quote/mailbox/sync/` | POST, JSON |
@@ -289,6 +355,10 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
   `AppPermission(has_access=True)`** — there is no auto-grant signal.
 - No `company` FK on quote data; scope by CAGE via `dibbs.CompanyCAGE`.
 - `QuoteEmail.body_html` is supplier HTML: render only in a sandboxed no-scripts iframe.
+- Capability endpoints are `quote:` URLs, so they are gated like everything else here.
+  The supplier detail page checks `user_can_use_quote` up front so it only offers the
+  editor to people who can reach it. Uploads are capped at 10 MB / 100,000 rows;
+  `.xls` is refused; the CSV export neutralises formula-looking cells.
 
 ## 14. Background Work
 - `import_completed` receiver (synchronous, inside the import request / WebJob).
@@ -315,6 +385,10 @@ DIBBS template / never pads / QUOTE_ALL + CRLF + 121 columns, export → snapsho
 `test_phase2.py` (cost math, SOL/NSN detection, ingest + supplier resolution,
 Graph sync (mocked — tests must never call Graph), drawer save combined/split,
 auto-select, NSN dimensions, sandboxed body + CSP, attachment headers),
+`test_capabilities.py` (NSN/FSC extraction, paste / CSV / XLSX reading, supplier
+resolution, column detection, dry-run plan + impact, commit / remove / undo and their
+effect on matching, every capability endpoint, supplier-page / workspace / dashboard
+integration, `user_can_use_quote`),
 `test_phase1.py` (queue dataset/estimate, claims + poll, manual match learning,
 RFQ queue/compose/send success + failure, recipients, archival), `test_matching.py` (import signal →
 state seeding, additive matching, idempotency, no rewind, receiver isolation,
@@ -331,6 +405,8 @@ Run `python manage.py test quote dibbs`.
 - `0005_seed_archive_task` — `ScheduledTask` row for `archive_stale_solicitations`.
 - `0006_email_supplier` — nullable `QuoteEmail.supplier` FK (resolved sender).
 - `0007_seed_reconcile_task` — `ScheduledTask` row for `reconcile_bid_outcomes`.
+- `0008_capability_imports` — `QuoteCapabilityImport` + nullable `import_batch` FK on
+  `QuoteSupplierNSN` / `QuoteSupplierFSC`. Additive only.
 - `products/migrations/0005` added the NSN dimension provenance fields.
 
 ## 17. Known Gaps
@@ -346,6 +422,18 @@ Run `python manage.py test quote dibbs`.
    currently-unmatched solicitation archives on the same day, 7 days after `0004` ran.
 7. Approved sources are not an automatic match source (spec lists NSN / FSC /
    Manual only); the workspace offers one-click **Link** instead.
+8. Capability import is add-only: there is no "replace this supplier's list with this
+   file". Bare 4-digit numbers in an items column are read as FSCs, so a quantity column
+   read as items shows up as odd FSCs in the review (each shows how many open SOLs it
+   touches). NIIN-only lists cannot be resolved to an NSN (no indexed NIIN column) and
+   are reported as unreadable.
+9. Capability inserts use `bulk_create` at 200 rows, as `match_solicitations` already does.
+   The `AGENTS_quote.md` note about `auto_now_add` and SQL Server error 8115 predates
+   this; the feature has only been exercised on SQLite. Smoke-test a ~1,000-pair paste on
+   the SQL Server dev database after deploying.
+10. Matching only runs on import, manual link and capability changes. Capabilities written
+   any other way (admin, a script, the demo seed) don't link existing solicitations until
+   **Re-run matching** on the queue.
 
 ## 20. CSS
 Three files repo-wide: `theme-vars.css`, `app-core.css` (shared `.app-shell` /

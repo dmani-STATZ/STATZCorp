@@ -7,6 +7,16 @@ from .bids import (
     compare_quotes,
     select_quote,
 )
+from .capabilities import (
+    capabilities,
+    capability_export,
+    capability_import_commit,
+    capability_import_page,
+    capability_import_preview,
+    capability_import_undo,
+    capability_remove,
+    capability_supplier,
+)
 from .dashboard import dashboard
 from .our_bids import our_bids, outcome_detail, reconcile_now
 from .mailbox import (
@@ -37,6 +47,14 @@ from .solicitations import (
 )
 
 __all__ = [
+    'capabilities',
+    'capability_export',
+    'capability_import_commit',
+    'capability_import_page',
+    'capability_import_preview',
+    'capability_import_undo',
+    'capability_remove',
+    'capability_supplier',
     'our_bids',
     'outcome_detail',
     'reconcile_now',

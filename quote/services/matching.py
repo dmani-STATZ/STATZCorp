@@ -69,10 +69,10 @@ def seed_solicitation_states(solicitation_ids) -> int:
     return created
 
 
-def match_solicitations(solicitation_ids) -> dict:
+def _index_lines(solicitation_ids):
     """
-    Link suppliers to the given solicitations by NSN and FSC capability, then
-    move UNMATCHED solicitations that gained a supplier to MATCHED.
+    Lines of the given solicitations, indexed for matching:
+    ``(lines, {nsn13: {sol_id}}, {fsc4: {sol_id}})``.
     """
     lines = []
     for chunk in _chunked(solicitation_ids, IN_CHUNK):
@@ -89,28 +89,86 @@ def match_solicitations(solicitation_ids) -> dict:
         fsc4 = (fsc or nsn13[:4] or '').strip()
         if len(fsc4) == 4:
             sols_by_fsc.setdefault(fsc4, set()).add(sol_id)
+    return lines, sols_by_nsn, sols_by_fsc
+
+
+def _wanted_matches(sols_by_nsn, sols_by_fsc, nsn_pairs=None, fsc_pairs=None):
+    """
+    The ``(sol_id, supplier_id, source)`` links the capability rows call for.
+
+    Reads the capability tables unless explicit ``(supplier_id, key)`` pairs are
+    passed -- that is what lets a dry run ask "what if these were added?"
+    through exactly the code that does the real matching.
+    """
+    if nsn_pairs is None:
+        nsn_pairs = set()
+        for chunk in _chunked(sols_by_nsn, IN_CHUNK):
+            nsn_pairs.update(
+                QuoteSupplierNSN.objects.filter(nsn__in=chunk).values_list('supplier_id', 'nsn')
+            )
+    if fsc_pairs is None:
+        fsc_pairs = set()
+        for chunk in _chunked(sols_by_fsc, IN_CHUNK):
+            fsc_pairs.update(
+                QuoteSupplierFSC.objects.filter(fsc__in=chunk).values_list('supplier_id', 'fsc')
+            )
 
     wanted = set()
-    for chunk in _chunked(sols_by_nsn, IN_CHUNK):
-        for supplier_id, nsn in QuoteSupplierNSN.objects.filter(nsn__in=chunk).values_list(
-            'supplier_id', 'nsn'
-        ):
-            for sol_id in sols_by_nsn[nsn]:
-                wanted.add((sol_id, supplier_id, QuoteSolicitationMatch.SOURCE_NSN))
-    for chunk in _chunked(sols_by_fsc, IN_CHUNK):
-        for supplier_id, fsc in QuoteSupplierFSC.objects.filter(fsc__in=chunk).values_list(
-            'supplier_id', 'fsc'
-        ):
-            for sol_id in sols_by_fsc[fsc]:
-                wanted.add((sol_id, supplier_id, QuoteSolicitationMatch.SOURCE_FSC))
+    for supplier_id, nsn in nsn_pairs:
+        for sol_id in sols_by_nsn.get(nsn, ()):
+            wanted.add((sol_id, supplier_id, QuoteSolicitationMatch.SOURCE_NSN))
+    for supplier_id, fsc in fsc_pairs:
+        for sol_id in sols_by_fsc.get(fsc, ()):
+            wanted.add((sol_id, supplier_id, QuoteSolicitationMatch.SOURCE_FSC))
+    return wanted
 
-    matched_sol_ids = {sol_id for sol_id, _, _ in wanted}
+
+def _existing_matches(solicitation_ids):
+    """``{(sol_id, supplier_id, source)}`` already recorded for these solicitations."""
     existing = set()
-    for chunk in _chunked(matched_sol_ids, IN_CHUNK):
+    for chunk in _chunked(solicitation_ids, IN_CHUNK):
         existing.update(
             QuoteSolicitationMatch.objects.filter(solicitation_id__in=chunk)
             .values_list('solicitation_id', 'supplier_id', 'source')
         )
+    return existing
+
+
+def preview_matches(solicitation_ids, nsn_pairs=(), fsc_pairs=()) -> dict:
+    """
+    Dry run: what would adding these ``(supplier_id, nsn13)`` / ``(supplier_id,
+    fsc4)`` capability pairs do to the given solicitations? Writes nothing.
+
+    ``new_links`` are supplier links that don't exist yet, ``solicitations`` the
+    distinct solicitations that would gain one, and ``newly_matched`` how many of
+    those are UNMATCHED today (they would move to MATCHED).
+    """
+    _, sols_by_nsn, sols_by_fsc = _index_lines(solicitation_ids)
+    wanted = _wanted_matches(sols_by_nsn, sols_by_fsc, set(nsn_pairs), set(fsc_pairs))
+    fresh = wanted - _existing_matches({sol_id for sol_id, _, _ in wanted})
+    fresh_sols = {sol_id for sol_id, _, _ in fresh}
+    newly_matched = 0
+    for chunk in _chunked(fresh_sols, IN_CHUNK):
+        newly_matched += QuoteSolicitation.objects.filter(
+            solicitation_id__in=chunk, status=QuoteSolicitation.STATUS_UNMATCHED,
+        ).count()
+    return {
+        'new_links': len(fresh),
+        'solicitations': len(fresh_sols),
+        'newly_matched': newly_matched,
+    }
+
+
+def match_solicitations(solicitation_ids) -> dict:
+    """
+    Link suppliers to the given solicitations by NSN and FSC capability, then
+    move UNMATCHED solicitations that gained a supplier to MATCHED.
+    """
+    lines, sols_by_nsn, sols_by_fsc = _index_lines(solicitation_ids)
+    wanted = _wanted_matches(sols_by_nsn, sols_by_fsc)
+
+    matched_sol_ids = {sol_id for sol_id, _, _ in wanted}
+    existing = _existing_matches(matched_sol_ids)
 
     new_rows = [
         QuoteSolicitationMatch(solicitation_id=s, supplier_id=sup, source=src)
@@ -256,6 +314,56 @@ def remove_manual_match(solicitation, supplier):
         ):
             state.set_status(QuoteSolicitation.STATUS_UNMATCHED)
             state.save(update_fields=['status', 'status_changed_at', 'modified_on'])
+
+
+def prune_derived_matches(removed) -> dict:
+    """
+    After capabilities are deleted, drop the NSN / FSC links nothing supports any
+    more, and send solicitations left with no supplier back to UNMATCHED.
+
+    ``removed`` is ``{supplier_id: (nsns, fscs)}`` -- what was just deleted.
+    Only open solicitations still in a matching state are touched, and only
+    links of the affected suppliers: a solicitation somebody already worked
+    (RFQ sent, quoting, bid...) keeps its history, and manual links always stay.
+    """
+    all_nsns = set().union(*(nsns for nsns, _ in removed.values())) if removed else set()
+    all_fscs = set().union(*(fscs for _, fscs in removed.values())) if removed else set()
+    sol_ids = open_matchable_ids(nsns=all_nsns, fscs=all_fscs)
+    if not sol_ids:
+        return {'matches_removed': 0, 'returned_to_unmatched': 0}
+
+    _, sols_by_nsn, sols_by_fsc = _index_lines(sorted(sol_ids))
+    wanted = _wanted_matches(sols_by_nsn, sols_by_fsc)   # what the tables still call for
+
+    stale_pks, touched = [], set()
+    for chunk in _chunked(sol_ids, IN_CHUNK):
+        for pk, sol_id, supplier_id, source in QuoteSolicitationMatch.objects.filter(
+            solicitation_id__in=chunk,
+            supplier_id__in=list(removed),
+            source__in=[QuoteSolicitationMatch.SOURCE_NSN, QuoteSolicitationMatch.SOURCE_FSC],
+        ).values_list('pk', 'solicitation_id', 'supplier_id', 'source'):
+            if (sol_id, supplier_id, source) not in wanted:
+                stale_pks.append(pk)
+                touched.add(sol_id)
+
+    returned = 0
+    with transaction.atomic():
+        for chunk in _chunked(stale_pks, IN_CHUNK):
+            QuoteSolicitationMatch.objects.filter(pk__in=chunk).delete()
+        for chunk in _chunked(touched, IN_CHUNK):
+            still_linked = set(
+                QuoteSolicitationMatch.objects.filter(solicitation_id__in=chunk)
+                .values_list('solicitation_id', flat=True)
+            )
+            orphaned = [sol_id for sol_id in chunk if sol_id not in still_linked]
+            if orphaned:
+                returned += QuoteSolicitation.objects.filter(
+                    solicitation_id__in=orphaned, status=QuoteSolicitation.STATUS_MATCHED,
+                ).update(
+                    status=QuoteSolicitation.STATUS_UNMATCHED,
+                    status_changed_at=timezone.now(),
+                )
+    return {'matches_removed': len(stale_pks), 'returned_to_unmatched': returned}
 
 
 def rematch_open_solicitations():

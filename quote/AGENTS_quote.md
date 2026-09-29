@@ -9,8 +9,9 @@ this file is not a repeat of it.
 
 ## 2. App Scope
 - **Owns:** all quoting workflow data — `QuoteSolicitation`, `QuoteSupplierNSN`,
-  `QuoteSupplierFSC`, `QuoteSolicitationMatch`, `QuoteRFQ`, `QuoteSupplierQuote`, `QuoteBid`,
-  `QuoteEmail`, `QuoteEmailAttachment`, `QuoteEmailSolLink`, `BidOutcome`. All `quote_*` tables.
+  `QuoteSupplierFSC`, `QuoteCapabilityImport`, `QuoteSolicitationMatch`, `QuoteRFQ`,
+  `QuoteSupplierQuote`, `QuoteBid`, `QuoteEmail`, `QuoteEmailAttachment`,
+  `QuoteEmailSolLink`, `BidOutcome`. All `quote_*` tables.
 - **Owns operationally:** solicitation pipeline state, supplier matching, RFQ dispatch,
   supplier quote entry and cost buildup, bid staging, BQ file generation, post-award
   reconciliation and the "Our Bids" analytics.
@@ -76,11 +77,37 @@ permission gating silently stops applying.
 - **Concurrency:** claim fields plus a self-scheduling `setTimeout` poll. There are no websockets in
   this repo; do not add Channels without an explicit architecture decision.
 
+### Supplier capabilities (NSN / FSC lists)
+- **All writes go through `services/capabilities.py`** (`commit_plan`, `remove_capabilities`,
+  `undo_import`) or `services/matching.add_manual_match`. Never `QuoteSupplierNSN.objects.create`
+  in a view or another app: the write must be followed by a re-match (add) or
+  `prune_derived_matches` (remove), or the queue silently drifts from the lists.
+- `build_plan` is a dry run and must never write. `preview_matches` and `match_solicitations`
+  share `_index_lines` / `_wanted_matches`; change matching semantics there, once.
+- `prune_derived_matches` only touches open solicitations in `MATCHING_STATES`, only
+  NSN / FSC links (never MANUAL), and only the affected suppliers. Keep it that way: a
+  worked solicitation's history is not the lists' to rewrite.
+- Parsing is server-side only. The browser posts the paste / file to the preview endpoint
+  and re-posts it to commit; do not add a second parser in JS.
+- The editor (`_editor.html`) is a fragment shared by the Capabilities drawer, the
+  workspace drawer and the supplier detail page. `live-top` / `live-bottom` are re-rendered
+  after each change; the importer between them keeps its state. Keep those `data-role`s
+  stable, and keep the fragment free of inline `<script>` (it is inserted via `innerHTML`).
+- Supplier-page users need Quotes access to edit: gate embeds with
+  `services.access.user_can_use_quote`, not by hiding the URL.
+
 ## 5. Files That Commonly Need to Change Together
 
 ### Adding a field to a quote model
 `quote/models/<module>.py` + migration + `quote/models/__init__.py` (if a new model) +
 the relevant form/service/template + `CONTEXT_quote.md` §5.
+
+### Changing the capability importer or editor
+`quote/services/capabilities.py` (rules) → `quote/views/capabilities.py` (payload / JSON shape) →
+`quote/static/quote/js/capabilities.js` (renders `plan_to_preview` output; keys are a contract) →
+`quote/templates/quote/capabilities/*` → `quote/tests/test_capabilities.py` → `CONTEXT_quote.md` §6.
+The supplier detail page (`templates/suppliers/supplier_detail.html`, `#section-capabilities` +
+the `sectionIds` scroll-spy list) and the workspace supplier cards consume the same fragment.
 
 ### Adding a page
 `quote/views/<module>.py` + `quote/views/__init__.py` + `quote/urls.py` +

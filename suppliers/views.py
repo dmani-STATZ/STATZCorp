@@ -405,6 +405,31 @@ def format_address_for_display(address) -> str:
 
 
 
+def capability_context(user, supplier=None):
+    """
+    Template context for the NSN / FSC capability entry points on supplier pages.
+
+    Capabilities are Quotes data: `quote` owns the tables and its deny-by-default
+    gate, so the editor is only offered to users who can reach it (everyone else
+    sees the counts). Lazy imports keep `suppliers` free of a module-level
+    dependency on `quote`.
+    """
+    from quote.services.access import user_can_use_quote
+
+    context = {'can_manage_capabilities': user_can_use_quote(user)}
+    if supplier is not None:
+        from quote.models import QuoteSupplierFSC, QuoteSupplierNSN
+
+        nsns = QuoteSupplierNSN.objects.filter(supplier=supplier).count()
+        fscs = QuoteSupplierFSC.objects.filter(supplier=supplier).count()
+        context.update(
+            capability_nsn_count=nsns,
+            capability_fsc_count=fscs,
+            capability_total=nsns + fscs,
+        )
+    return context
+
+
 class DashboardView(TemplateView):
     template_name = 'suppliers/dashboard.html'
 
@@ -504,6 +529,7 @@ class DashboardView(TemplateView):
             if len(recently_active) >= 10:
                 break
         context['recently_active_suppliers'] = recently_active
+        context.update(capability_context(self.request.user))
         return context
 
 
@@ -806,6 +832,7 @@ class SupplierDetailView(DetailView):
         context['health_score_windowed_contract_count'] = contracts_in_window
         # --- End Supplier Health Score ---
 
+        context.update(capability_context(self.request.user, supplier))
         return context
 
 

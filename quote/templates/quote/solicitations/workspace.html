@@ -1,5 +1,5 @@
 {% extends "quote/base.html" %}
-{% load dibbs_extras %}
+{% load dibbs_extras static %}
 
 {% block content %}
 <div id="workspace" data-sol="{{ solicitation.solicitation_number }}"
@@ -187,13 +187,21 @@
             <span class="fw-semibold">{{ entry.supplier.name|default:"(no name)" }}</span>
             <span class="font-monospace small text-body-secondary">{{ entry.supplier.cage_code|default:"" }}</span>
           </label>
-          {% if entry.manual and can_match %}
-          <form method="post" class="m-0"
-                action="{% url 'quote:remove_match' solicitation.solicitation_number entry.supplier.pk %}">
-            {% csrf_token %}
-            <button class="btn btn-link btn-sm text-danger p-0" title="Remove manual link">Remove</button>
-          </form>
-          {% endif %}
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-link btn-sm p-0" data-cap-open
+                    data-cap-url="{% url 'quote:capability_supplier' entry.supplier.pk %}"
+                    data-cap-name="{{ entry.supplier.name|default:'Supplier' }}"
+                    title="See or edit this supplier's NSN / FSC list">
+              <i class="bi bi-list-check" aria-hidden="true"></i> NSN/FSC
+            </button>
+            {% if entry.manual and can_match %}
+            <form method="post" class="m-0"
+                  action="{% url 'quote:remove_match' solicitation.solicitation_number entry.supplier.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-link btn-sm text-danger p-0" title="Remove manual link">Remove</button>
+            </form>
+            {% endif %}
+          </div>
         </div>
         <div class="mt-1 d-flex flex-wrap gap-1">
           {% for source in entry.sources %}
@@ -261,6 +269,20 @@
 
 {% block extra_js %}
 {{ block.super }}
+<script src="{% static 'quote/js/capabilities.js' %}?v={{ cache_version }}"></script>
+<script>
+(function () {
+  // A supplier's NSN / FSC list opens in a drawer without leaving the solicitation.
+  // If it changed, reload so the supplier cards reflect the new matches.
+  document.querySelectorAll('[data-cap-open]').forEach(btn => btn.addEventListener('click', () => {
+    window.QuoteCapabilities.openDrawer({
+      url: btn.dataset.capUrl,
+      title: btn.dataset.capName + ' — capabilities',
+      onClose: changed => { if (changed) window.location.reload(); },
+    });
+  }));
+})();
+</script>
 <script>
 (function () {
   const root = document.getElementById('workspace');

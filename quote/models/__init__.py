@@ -8,7 +8,12 @@ See AGENTS_quote.md.
 """
 from .base import AuditModel
 from .bids import QuoteBid
-from .matching import QuoteSolicitationMatch, QuoteSupplierFSC, QuoteSupplierNSN
+from .matching import (
+    QuoteCapabilityImport,
+    QuoteSolicitationMatch,
+    QuoteSupplierFSC,
+    QuoteSupplierNSN,
+)
 from .email import (
     CLAIM_DURATION,
     QuoteEmail,
@@ -25,6 +30,7 @@ __all__ = [
     'CLAIM_DURATION',
     'BidOutcome',
     'QuoteBid',
+    'QuoteCapabilityImport',
     'QuoteEmail',
     'QuoteEmailAttachment',
     'QuoteEmailSolLink',

@@ -12,9 +12,17 @@
         title="Open Probation &amp; Conditional Status Report">
         <i class="bi bi-file-earmark-text me-1"></i>Supplier No Fly List
       </button>
-      <a href="{% url 'suppliers:supplier_create' %}" class="inline-flex items-center px-4 py-2 rounded-lg text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 shadow">
-        + Add Supplier
-      </a>
+      <div class="d-flex align-items-center gap-2">
+        {% if can_manage_capabilities %}
+        <a href="{% url 'quote:capabilities' %}" class="btn btn-outline-secondary btn-sm"
+           title="Which NSNs and FSCs each supplier can supply; import lists from a spreadsheet">
+          <i class="bi bi-list-check me-1"></i>NSN &amp; FSC Capabilities
+        </a>
+        {% endif %}
+        <a href="{% url 'suppliers:supplier_create' %}" class="inline-flex items-center px-4 py-2 rounded-lg text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 shadow">
+          + Add Supplier
+        </a>
+      </div>
     </div>
     <div class="flex flex-col gap-3">
       <label class="text-medium font-medium text-gray-700 text-center">Search by Supplier Name, CAGE, or Contract #</label>

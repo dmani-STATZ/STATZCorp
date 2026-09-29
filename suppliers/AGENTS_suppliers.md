@@ -112,6 +112,9 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - **Payload shape is a contract:** changing `category_ids` to a multi-value field or altering the view's parse logic will silently break the picker.
 - CSRF is sent as `X-CSRFToken: getCookie('csrftoken')` header (matching the pattern used by other fetch calls in the template). Missing CSRF surfaces an inline error and reverts the checklist.
 
+### NSN & FSC Capabilities section change
+`templates/suppliers/supplier_detail.html` (`#section-capabilities`, sidebar link, `sectionIds`, the `extra_scripts` mount script) ↔ `suppliers/views.py` (`capability_context`, called from `SupplierDetailView` and `DashboardView`) ↔ `quote/templates/quote/capabilities/_editor.html` + `quote/static/quote/js/capabilities.js` + `quote/views/capabilities.py`. The data is `quote`-owned: never write `QuoteSupplierNSN` / `QuoteSupplierFSC` from this app, and keep the `quote` imports lazy inside `capability_context`. Editing needs Quotes access (`quote.services.access.user_can_use_quote`), not just supplier access.
+
 ### Copy Category button change
 `templates/suppliers/supplier_detail.html` (dropdown markup + standalone `<script>` block reading `.contact-category-pill` / `.edit-contact-btn[data-contact-email]`) — purely client-side, no propagation to `views.py`, `urls.py`, or models. If the contact card markup, pill container selector, or `data-contact-email` attribute name changes, this script must be updated in lockstep.
 

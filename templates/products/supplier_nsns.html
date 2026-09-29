@@ -163,7 +163,8 @@
 
     <section class="nsn-detail-panel mb-3">
         <header class="nsn-detail-panel__head">
-            <h2 class="nsn-detail-panel__title">Manual capabilities</h2>
+            <h2 class="nsn-detail-panel__title">NSN capabilities on file</h2>
+            <a class="small ms-auto" href="{% url 'suppliers:supplier_detail' supplier.pk %}#section-capabilities">Manage NSN &amp; FSC list &rarr;</a>
         </header>
         <div class="nsn-detail-panel__body--flush">
             {% if manual_page and manual_page.object_list %}

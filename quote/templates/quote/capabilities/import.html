@@ -1,0 +1,134 @@
+{% extends "quote/base.html" %}
+{% load static %}
+
+{% block content %}
+<div id="capImportPage">
+
+<div class="mb-2">
+  <a href="{% url 'quote:capabilities' %}" class="small">&larr; Supplier capabilities</a>
+</div>
+
+<div class="page-heading">
+  <div>
+    <h1 class="page-title">Import supplier capabilities</h1>
+    <p class="page-subtitle">
+      Paste a list or drop a spreadsheet. You review exactly what would be added, and which open
+      solicitations it would match, before anything is saved.
+    </p>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-8">
+    <div class="card card-padded">
+
+      <div class="cap-step"><span class="cap-step-n">1</span> Who are these for?</div>
+      <div class="cap-who" role="radiogroup" aria-label="Who are these capabilities for">
+        <label class="cap-who-option">
+          <input class="form-check-input" type="radio" name="who" value="many" {% if not preset_supplier %}checked{% endif %}>
+          <span>
+            <strong>Several suppliers</strong>
+            <span class="d-block small text-body-secondary">Each row names its supplier (CAGE or name), e.g. an export from another system.</span>
+          </span>
+        </label>
+        <label class="cap-who-option">
+          <input class="form-check-input" type="radio" name="who" value="one" {% if preset_supplier %}checked{% endif %}>
+          <span>
+            <strong>One supplier</strong>
+            <span class="d-block small text-body-secondary">Everything below belongs to a supplier you pick, e.g. the list they emailed us.</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="cap-picker {% if not preset_supplier %}d-none{% endif %}" id="capPicker">
+        <div class="cap-adder">
+          <input type="search" id="capPickerInput" class="form-control" autocomplete="off"
+                 placeholder="Search suppliers by name or CAGE" aria-label="Pick the supplier">
+          <div id="capPickerResults" class="list-group cap-adder-results d-none"></div>
+        </div>
+        <div class="cap-picked {% if not preset_supplier %}d-none{% endif %}" id="capPicked">
+          <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+          <span id="capPickedName">{{ preset_supplier.name }}</span>
+          <span class="font-monospace small text-body-secondary" id="capPickedCage">{{ preset_supplier.cage_code|default:"" }}</span>
+          <button type="button" class="btn btn-link btn-sm p-0 ms-auto" id="capPickedChange">Change</button>
+        </div>
+      </div>
+
+      <div class="cap-step mt-4"><span class="cap-step-n">2</span> Add the list</div>
+      {% include "quote/capabilities/_importer.html" with supplier=preset_supplier %}
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card card-padded cap-tips">
+      <h2 class="h6">What gets picked up</h2>
+      <ul class="small mb-3">
+        <li><span class="badge quote-lineage quote-lineage-nsn">NSN</span> 13 digits, any hyphenation:
+            <code>5340-01-234-5678</code>, <code>5340012345678</code></li>
+        <li><span class="badge quote-lineage quote-lineage-fsc">FSC</span> a bare 4-digit class:
+            <code>5340</code> matches every NSN in it</li>
+        <li>Anything else in an NSN column (a 9-digit NIIN, a number a digit short) is listed as unreadable so you can fix it.</li>
+      </ul>
+      <h2 class="h6">Several suppliers in one file</h2>
+      <p class="small mb-2">
+        We look for the supplier column by comparing your cells with the supplier directory: a column of CAGEs
+        or names we recognise. You can change any column before importing.
+      </p>
+      <pre class="cap-example small mb-3">CAGE     NSN
+0SKY9    5340-01-234-5678
+0SKY9    5305-00-111-2222
+72914    5310</pre>
+      <h2 class="h6">Made a mistake?</h2>
+      <p class="small mb-0">
+        Every import is logged on the <a href="{% url 'quote:capabilities' %}">Capabilities page</a> with an
+        <strong>Undo</strong> that removes exactly what it added and the solicitation links it created.
+      </p>
+    </div>
+  </div>
+</div>
+
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'quote/js/capabilities.js' %}?v={{ cache_version }}"></script>
+<script>
+(function () {
+  const QC = window.QuoteCapabilities;
+  const root = document.querySelector('#capImportPage [data-role="importer"]');
+  const importer = QC.initImporter(root, {});
+  const picker = document.getElementById('capPicker');
+  const input = document.getElementById('capPickerInput');
+  const picked = document.getElementById('capPicked');
+
+  function setSupplier(s) {
+    importer.setSupplier(s);
+    picked.classList.toggle('d-none', !s);
+    input.classList.toggle('d-none', !!s);
+    if (s) {
+      document.getElementById('capPickedName').textContent = s.name;
+      document.getElementById('capPickedCage').textContent = s.cage || '';
+    } else {
+      input.value = '';
+    }
+  }
+
+  document.querySelectorAll('input[name="who"]').forEach(radio => radio.addEventListener('change', () => {
+    const one = document.querySelector('input[name="who"]:checked').value === 'one';
+    picker.classList.toggle('d-none', !one);
+    if (!one) setSupplier(null);
+    else if (!root.dataset.supplierId) input.focus();
+  }));
+
+  QC.attachSupplierSearch(input, document.getElementById('capPickerResults'),
+    '{% url "quote:supplier_search" %}', s => { input.classList.add('d-none'); setSupplier(s); });
+  document.getElementById('capPickedChange').addEventListener('click', () => {
+    setSupplier(null);
+    input.classList.remove('d-none');
+    input.focus();
+  });
+  if (root.dataset.supplierId) input.classList.add('d-none');
+})();
+</script>
+{% endblock extra_js %}

@@ -11,7 +11,16 @@
   </div>
 </div>
 
-<div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 quote-pipeline">
+<div class="row row-cols-1 row-cols-sm-2 row-cols-xl-6 g-3 quote-pipeline">
+  <div class="col">
+    <a class="card kpi-tile h-100" href="{% url 'quote:capabilities' %}">
+      <span class="kpi-tile-step">Feeds matching</span>
+      <span class="icon-tile icon-tile-primary"><i class="bi bi-list-check" aria-hidden="true"></i></span>
+      <span class="kpi-tile-label">Capabilities</span>
+      <span class="kpi-tile-value">{{ capabilities.suppliers }}</span>
+      <span class="kpi-tile-help">supplier{{ capabilities.suppliers|pluralize }} &middot; {{ capabilities.nsns }} NSN &middot; {{ capabilities.fscs }} FSC</span>
+    </a>
+  </div>
   <div class="col">
     <a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=UNMATCHED">
       <span class="kpi-tile-step">Phase 1</span>
