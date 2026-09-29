@@ -21,6 +21,7 @@ from .email import (
     QuoteEmailSolLink,
 )
 from .outcomes import BidOutcome
+from .packhouse import QuotePackhouseRFQ
 from .quotes import QuoteSupplierQuote
 from .rfq import QuoteRFQ
 from .solicitation import QuoteSolicitation
@@ -34,6 +35,7 @@ __all__ = [
     'QuoteEmail',
     'QuoteEmailAttachment',
     'QuoteEmailSolLink',
+    'QuotePackhouseRFQ',
     'QuoteRFQ',
     'QuoteSolicitation',
     'QuoteSolicitationMatch',

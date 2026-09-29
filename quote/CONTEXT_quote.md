@@ -24,6 +24,8 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 - Managing the supplier capability lists that feed that matching: view / edit per
   supplier, paste or file import (one supplier or many), export, undo
   (`QuoteCapabilityImport`, `services/capabilities.py`). See §6 "Capabilities".
+- Packaging-quote requests emailed to packhouses from the Phase 2 quote drawer, and the
+  prices they answer with (`QuotePackhouseRFQ`, `services/packhouse.py`). See §6 Phase 2.
 - RFQ ledger (`QuoteRFQ`), supplier quotes (`QuoteSupplierQuote`), staged bids
   (`QuoteBid`), inbound email (`QuoteEmail`, `QuoteEmailAttachment`,
   `QuoteEmailSolLink`), post-award reconciliation (`BidOutcome`).
@@ -42,6 +44,7 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `models/matching.py` | `QuoteSupplierNSN` (`quote_supplier_nsn`, 13-digit NSN), `QuoteSupplierFSC` (`quote_supplier_fsc`), `QuoteSolicitationMatch` (`quote_solicitation_match`) — one row per (solicitation, supplier, source ∈ NSN/FSC/MANUAL). |
 | `models/rfq.py` | `QuoteRFQ` (`quote_rfq`) — one row per (line, supplier). `QUEUED → READY_TO_SEND → SENT → RESPONDED`, plus `NO_RESPONSE` / `DECLINED`. |
 | `models/quotes.py` | `QuoteSupplierQuote` (`quote_supplier_quote`) — cost, both adders, packhouse FK, markup, `final_government_unit_price`, `is_selected_for_bid`, `source_email` FK back to the reply it was typed from. `landed_unit_cost` is Decimal-only. |
+| `models/packhouse.py` | `QuotePackhouseRFQ` (`quote_packhouse_rfq`) — one row per packhouse per request. `SENT → RESPONDED`. `line` null = every line on the SOL (Combined). Snapshot of what was sent (qty, weight / L / W / H, subject, note, recipients) + what came back (`quoted_unit`, `quoted_total`, `quoted_lead_days`, `response_email`). Deliberately **not** `QuoteRFQ`: it never moves the solicitation status. |
 | `models/bids.py` | `QuoteBid` (`quote_bid`) — OneToOne on `dibbs.SolicitationLine`; the solicitation is reached via `line.solicitation` (no duplicate FK). Every BQ overlay column + `clin_group`. |
 | `models/email.py` | `QuoteEmail` (raw payload, headers, claim), `QuoteEmailAttachment` (bytes), `QuoteEmailSolLink` (many-to-many email ↔ line). |
 | `models/outcomes.py` | `BidOutcome` — OneToOne on `QuoteBid`, nullable FK to `dibbs.DibbsAward`, derived deltas, frozen bid snapshot. |
@@ -54,7 +57,9 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `services/queue.py` | Queue dataset (`build_queue_rows`), `status_counts`, `queue_delta` (poll), `latest_unit_costs`. |
 | `services/cost.py` | Decimal landed cost + markup-on-cost pricing (`build`, `price_from_markup`, `markup_from_price`). |
 | `services/mailbox.py` | Graph sync + ingest, SOL/NSN detection, supplier resolution, link/unlink, link-modal search. |
-| `services/quotes.py` | `save_supplier_quote` (drawer save), lowest-landed auto-select, NSN dimension write-back. |
+| `services/quotes.py` | `save_supplier_quote` (drawer save), lowest-landed auto-select, `save_dimensions` (NSN dimension write-back). |
+| `services/packhouse.py` | `parse_dims`, `packaging_requirements` (SolAnalysis, else Section D), `compose_message`, `preview_request` (dry run), `send_requests`, `record_reply`, plus screen data (`requests_payload`, `reply_candidates`, `history`). |
+| `views/packhouse.py`, `static/quote/js/packhouse.js` | Preview / send / record-reply endpoints; the drawer's packhouse panel and the message-pane reply banner. |
 | `views/mailbox.py` | Phase 2 mailbox + drawer endpoints. |
 | `services/bids.py` | Phase 3: bid defaults, `preflight`, `bq_row` / `render_bq` writer, `export_bids`, `reexport`, `reopen_bid`, `select_quote`. |
 | `views/bids.py` | Bid Board, compare drawer, builder, export. |
@@ -196,6 +201,29 @@ modal). They are now first-class, reachable from both directions:
    `RESPONDED`, moves the SOL to `QUOTING`, and auto-selects the lowest landed
    quote per line unless a rep already chose one.
 
+6. **Weight & dimensions** is one block in the drawer, above Packaging and Freight (inputs
+   `dim_weight/length/width/height/source_notes`, prefilled from `products.Nsn`). Both
+   sections just show a read-out of it (`[data-dims-readout]`, "edit" opens the block), so
+   there is one set of figures to keep right, not two mirrored ones. The "save to NSN"
+   box applies when a packhouse request is sent or the quote is saved.
+7. **Packhouse quotes** (Packaging → "Third-party packhouse" → *Packhouse quotes for this
+   SOL*). The rep picks one or more packhouses (typeahead, plus chips for packhouses used on
+   this NSN before), adds an optional note, **Preview**s and **Send**s
+   (`services/packhouse`). One email per packhouse from the shared mailbox, SOL number in
+   subject and body, containing the lines, quantity, the drawer's weight / dimensions, the
+   solicitation's packaging requirements (`SolAnalysis`, else `SolPackaging`) and the
+   solicitation PDF. Each success writes a `QuotePackhouseRFQ`; a failed send writes
+   nothing. A packhouse already asked for the same scope (SENT) is skipped, not re-sent.
+   The panel lists every request for the SOL without leaving the drawer.
+8. **Their reply** lands in the mailbox like any other. `mailbox.mark_rfqs_responded`
+   flips the packhouse request to `RESPONDED` (only if the reply came after it was sent). Opening
+   that message shows a **banner** where the rep types the total *or* per-unit price, days and
+   notes (`record_reply`; the other price is derived from the quantity asked about). Those
+   replies do not count as "Needs quote" in the inbox.
+9. Back in the part supplier's drawer, a recorded price gets a **Use** button: it selects the
+   packhouse and fills the per-unit packaging price (total follows from the normal
+   unit ⇄ total wiring). Saving the quote is unchanged (`packaging_vendor`, `packaging_adder_unit`).
+
 Pricing is **markup on cost**: `price = landed × (1 + pct)`, rounded to cents
 (the approved mockup's formula). In Combined mode packaging/freight totals are
 spread over the combined quantity of all lines.
@@ -289,7 +317,8 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 ### Reads (never writes)
 - `dibbs`: `Solicitation`, `SolicitationLine` (incl. `bq_raw_columns`),
   `ApprovedSource`, `DibbsAward`, `CompanyCAGE`, `SAMEntityCache`,
-  `NsnProcurementHistory`.
+  `NsnProcurementHistory`, `SolAnalysis` / `SolPackaging` (packaging requirements for
+  packhouse requests).
 - `suppliers`: `Supplier` (incl. `is_packhouse`), `Contact`.
 - `products.Nsn` — **one sanctioned write**: the freight sub-modal may update
   `unit_weight`, `unit_length`/`unit_width`/`unit_height`,
@@ -346,6 +375,8 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 | `quote:our_bids` | `/quote/our-bids/` | |
 | `quote:outcome_detail` | `/quote/our-bids/<id>/` | XHR fragment |
 | `quote:reconcile_now` | `/quote/our-bids/reconcile/` | POST |
+| `quote:packhouse_preview` / `packhouse_send` | `/quote/packhouse/<sol>/preview/` / `send/` | POST: `packhouse_ids` (repeat), `line_id` (Split only), `note`, `dim_*`, `save_dims` → JSON |
+| `quote:packhouse_record_reply` | `/quote/packhouse/reply/<rfq_id>/` | POST: `total` or `unit`, `lead_days`, `notes`, `email_id` → JSON |
 | `quote:attachment_download` | `/quote/mailbox/attachments/<id>/` | always `octet-stream` + `nosniff`, except verified PDFs inline |
 
 ## 13. Permissions / Security
@@ -376,6 +407,9 @@ notes marker, NSN `dimension_source_notes` marker) and it never modifies a
 pre-existing `contracts_nsn` row.
 
 ## 15. Testing
+`test_packhouse.py` (dimension parsing, requirements lookup, message, preview never sends,
+send / duplicate / failure / no-address, NSN write-back, record reply maths, mailbox reply hook,
+endpoints, banner + shared dimensions block),
 `test_scaffold.py` (wiring, table prefixes, FK targets, landed cost, auto-award
 gate, claims, RFQ uniqueness, templates), `test_phase4.py` (pending → won / lost, derived unit + deltas, within 5%, faux
 → real upgrade, purchase-request line matching, trends what-if, task, views),
@@ -407,6 +441,7 @@ Run `python manage.py test quote dibbs`.
 - `0007_seed_reconcile_task` — `ScheduledTask` row for `reconcile_bid_outcomes`.
 - `0008_capability_imports` — `QuoteCapabilityImport` + nullable `import_batch` FK on
   `QuoteSupplierNSN` / `QuoteSupplierFSC`. Additive only.
+- `0009_packhouse_rfq` — `QuotePackhouseRFQ`. Additive only.
 - `products/migrations/0005` added the NSN dimension provenance fields.
 
 ## 17. Known Gaps
@@ -434,6 +469,22 @@ Run `python manage.py test quote dibbs`.
 10. Matching only runs on import, manual link and capability changes. Capabilities written
    any other way (admin, a script, the demo seed) don't link existing solicitations until
    **Re-run matching** on the queue.
+
+11. Packhouse requests are one-shot: no follow-up / re-send while one is SENT for the same scope,
+   no "declined" state (a reply that names no price just stays `RESPONDED` with no price), and
+   no way to start one except the quote drawer (which needs a mailbox message with a linked SOL
+   and a known supplier). The reply is matched by sender → supplier, so a reply from an address
+   we don't know as that packhouse won't flip its request until the rep sets the supplier.
+12. One set of weight / dimensions serves packaging and freight, but they are really two
+   measurements: the packhouse needs the bare part, freight needs the packed carton.
+   `products.Nsn` only stores the part. A "packed" set would need new Nsn fields (a sanctioned
+   cross-app change) — not built.
+13. Combined mode with several *different* NSNs on one SOL shares one set of dimensions
+   (preview warns; the pre-existing NSN write-back also writes them to every NSN). Ask per line
+   with Split CLINs when the parts differ.
+14. Not yet exercised on SQL Server: the reply hook's `update()` filters through
+   `solicitation__lines__quote_email_links` (same shape as the `QuoteRFQ` one). Smoke-test after
+   deploying.
 
 ## 20. CSS
 Three files repo-wide: `theme-vars.css`, `app-core.css` (shared `.app-shell` /

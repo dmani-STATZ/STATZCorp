@@ -23,7 +23,7 @@ from quote.models import (
     QuoteEmailAttachment,
     QuoteSupplierQuote,
 )
-from quote.services import cost, graph_inbox, mailbox, mailbox_ai
+from quote.services import cost, graph_inbox, mailbox, mailbox_ai, packhouse
 from quote.services.matching import normalize_nsn
 from quote.services.quotes import QuoteInput, QuoteInputError, save_supplier_quote
 from suppliers.models import Supplier
@@ -58,6 +58,8 @@ def mailbox_page(request):
         .annotate(
             link_count=Count('sol_links__line__solicitation', distinct=True),
             quote_count=Count('supplier_quotes', distinct=True),
+            # A packhouse's packaging reply is not a supplier quote waiting to be logged.
+            packhouse_count=Count('packhouse_replies', distinct=True),
         )
         .only(
             'id', 'sender_email', 'sender_name', 'subject', 'received_at', 'body_preview',
@@ -127,11 +129,18 @@ def _drawer_payload(grouped):
     dims = {
         n.nsn_normalized: n for n in Nsn.objects.filter(nsn_normalized__in=nsns).order_by('-pk')
     }
+    asked = packhouse.requests_payload([entry['solicitation'].pk for entry in grouped.values()])
     out = {}
     for number, entry in grouped.items():
         out[number] = {
             'due': entry['solicitation'].return_by_date.isoformat() if entry['solicitation'].return_by_date else '',
             'lines': [],
+            # Packaging-quote requests already sent for this SOL, and packhouses that
+            # packed these NSNs before -- the drawer's packhouse panel renders both.
+            'packhouse_requests': asked.get(entry['solicitation'].pk, []),
+            'packhouse_history': packhouse.history(
+                {normalize_nsn(line.nsn) for line in entry['all_lines']} - {''}
+            ),
         }
         for line in entry['all_lines']:
             d = dims.get(normalize_nsn(line.nsn))
@@ -190,6 +199,11 @@ def email_detail(request, email_id):
         'suggestion': suggestion,
         'drawer_json': _drawer_payload(grouped),
         'quotes': quotes,
+        'packhouse_replies': [
+            packhouse.serialize(r) for r in packhouse.reply_candidates(
+                email, [entry['solicitation'].pk for entry in grouped.values()],
+            )
+        ],
         'markup_presets': [str(p) for p in cost.MARKUP_PRESETS],
         'packaging_choices': QuoteSupplierQuote.PACKAGING_SOURCE_CHOICES,
     })

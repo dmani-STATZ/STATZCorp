@@ -23,7 +23,13 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from dibbs.models import Solicitation, SolicitationLine
-from quote.models import QuoteEmail, QuoteEmailAttachment, QuoteEmailSolLink, QuoteRFQ
+from quote.models import (
+    QuoteEmail,
+    QuoteEmailAttachment,
+    QuoteEmailSolLink,
+    QuotePackhouseRFQ,
+    QuoteRFQ,
+)
 from quote.services import graph_inbox
 
 logger = logging.getLogger(__name__)
@@ -132,10 +138,14 @@ def unlink_solicitation(email, solicitation):
 
 
 def mark_rfqs_responded(email):
-    """A reply from the RFQ'd supplier flips that supplier's SENT RFQs to RESPONDED."""
+    """
+    A reply from the RFQ'd supplier flips that supplier's SENT RFQs to RESPONDED. The
+    same goes for packhouse packaging requests (only ones sent before the reply arrived,
+    so an older thread on the same SOL cannot answer them).
+    """
     if not email.supplier_id:
         return 0
-    return QuoteRFQ.objects.filter(
+    flipped = QuoteRFQ.objects.filter(
         supplier_id=email.supplier_id,
         line__quote_email_links__email=email,
         status=QuoteRFQ.STATUS_SENT,
@@ -144,6 +154,18 @@ def mark_rfqs_responded(email):
         response_received_at=email.received_at,
         modified_on=timezone.now(),
     )
+    flipped += QuotePackhouseRFQ.objects.filter(
+        packhouse_id=email.supplier_id,
+        solicitation__lines__quote_email_links__email=email,
+        status=QuotePackhouseRFQ.STATUS_SENT,
+        sent_at__lte=email.received_at,
+    ).update(
+        status=QuotePackhouseRFQ.STATUS_RESPONDED,
+        response_email=email,
+        response_received_at=email.received_at,
+        modified_on=timezone.now(),
+    )
+    return flipped
 
 
 def auto_link(email):

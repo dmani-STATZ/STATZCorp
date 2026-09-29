@@ -130,11 +130,20 @@ def compose_message(supplier, rfqs, user):
     return subject, body
 
 
+def default_reply_to():
+    """Reply-To for outbound quote mail: the default company CAGE's, if it has one."""
+    cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
+    return cage.smtp_reply_to if cage and cage.smtp_reply_to else None
+
+
 def _attachments(rfqs):
+    return solicitation_attachments(rfq.line.solicitation for rfq in rfqs)
+
+
+def solicitation_attachments(solicitations):
     """Stored solicitation PDFs, once each, within the Graph size budget."""
     out, used, seen = [], 0, set()
-    for rfq in rfqs:
-        sol = rfq.line.solicitation
+    for sol in solicitations:
         if sol.pk in seen or not sol.pdf_blob:
             continue
         seen.add(sol.pk)
@@ -193,13 +202,12 @@ def send_supplier_rfqs(supplier, user):
         return {'ok': False, 'error': 'No email address on file for this supplier.', 'sent': 0}
 
     subject, body = compose_message(supplier, rfqs, user)
-    cage = CompanyCAGE.objects.filter(is_default=True, is_active=True).first()
     ok = send_mail_via_graph(
         to_address=recipients[0],
         cc_addresses=recipients[1:] or None,
         subject=subject,
         body=body,
-        reply_to=(cage.smtp_reply_to if cage and cage.smtp_reply_to else None),
+        reply_to=default_reply_to(),
         attachments=_attachments(rfqs) or None,
     )
     if not ok:

@@ -9,7 +9,10 @@
      data-link-url="{% url 'quote:email_link' email.pk %}"
      data-unlink-url="{% url 'quote:email_unlink' email.pk %}"
      data-supplier-url="{% url 'quote:email_set_supplier' email.pk %}"
-     data-save-url="{% url 'quote:save_quote' email.pk %}">
+     data-save-url="{% url 'quote:save_quote' email.pk %}"
+     data-packhouse-preview-url="{% url 'quote:packhouse_preview' '_SOL_' %}"
+     data-packhouse-send-url="{% url 'quote:packhouse_send' '_SOL_' %}"
+     data-packhouse-reply-url="{% url 'quote:packhouse_record_reply' 0 %}">
 
   {% if claimed_by_other %}
   <div class="alert alert-warning py-2 mb-2 small">
@@ -69,6 +72,37 @@
     {% endif %}
     <button type="button" class="btn btn-outline-secondary btn-sm" data-action="open-link">+ Link SOL</button>
   </div>
+
+  {# We asked this sender to quote packaging: this is where their answer gets recorded. #}
+  {% if packhouse_replies %}
+  <div class="quote-ph-banner" id="qPhReplies">
+    <div class="fw-semibold small mb-1"><i class="bi bi-box-seam"></i> Packaging quote requested from {{ email.supplier.name }}</div>
+    {% for r in packhouse_replies %}
+    <form class="quote-ph-reply" data-rfq="{{ r.id }}" autocomplete="off" novalidate>
+      <div class="small text-body-secondary mb-1">
+        <span class="font-monospace">{{ r.sol }}</span> ({{ r.scope }}, qty {{ r.quantity }}) &middot; asked {{ r.sent }}
+        &middot; <span data-role="state">{% if r.unit %}price recorded{% else %}no price recorded yet{% endif %}</span>
+      </div>
+      <div class="row g-2">
+        <div class="col-4"><label class="form-label label" for="qPhTotal{{ r.id }}">Total ($)</label>
+          <input class="form-control form-control-sm" id="qPhTotal{{ r.id }}" name="total" inputmode="decimal" value="{{ r.total }}"></div>
+        <div class="col-4"><label class="form-label label" for="qPhUnit{{ r.id }}">Per unit ($)</label>
+          <input class="form-control form-control-sm" id="qPhUnit{{ r.id }}" name="unit" inputmode="decimal" value="{{ r.unit }}"></div>
+        <div class="col-4"><label class="form-label label" for="qPhDays{{ r.id }}">Days</label>
+          <input class="form-control form-control-sm" id="qPhDays{{ r.id }}" name="lead_days" inputmode="numeric" value="{{ r.lead_days }}"></div>
+        <div class="col-12">
+          <input class="form-control form-control-sm" name="notes" maxlength="1000" value="{{ r.notes }}"
+                 placeholder="Notes: minimums, spec exceptions, how long the price holds" aria-label="Notes"></div>
+      </div>
+      <div class="d-flex align-items-center gap-2 mt-2">
+        <button type="submit" class="btn btn-primary btn-sm">Save packaging quote</button>
+        <span class="small text-body-secondary">Enter the total <em>or</em> the per-unit price; the other is worked out.</span>
+      </div>
+      <div class="small text-danger mt-1 d-none" data-role="error" role="alert"></div>
+    </form>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   {% if attachments %}
   <div class="quote-msg-attachments">
@@ -173,6 +207,24 @@
           </div>
         </div>
 
+        {# One set of weight / dimensions for the part. Packaging (packhouse requests) and freight both read it. #}
+        <details class="quote-drawer-section" id="qDimsSection">
+          <summary>Weight &amp; dimensions <span class="quote-drawer-sum" data-dims-readout>not entered</span></summary>
+          <div class="small text-body-secondary mt-1">Used by packaging and freight below
+            <span id="qDimsNote"></span></div>
+          <div class="row g-2 mt-1">
+            <div class="col-3"><input class="form-control form-control-sm" name="dim_weight" id="qDimW" placeholder="lb" inputmode="decimal" aria-label="Weight (lb)"></div>
+            <div class="col-3"><input class="form-control form-control-sm" name="dim_length" id="qDimL" placeholder="L in" inputmode="decimal" aria-label="Length (in)"></div>
+            <div class="col-3"><input class="form-control form-control-sm" name="dim_width" id="qDimWd" placeholder="W in" inputmode="decimal" aria-label="Width (in)"></div>
+            <div class="col-3"><input class="form-control form-control-sm" name="dim_height" id="qDimH" placeholder="H in" inputmode="decimal" aria-label="Height (in)"></div>
+          </div>
+          <input class="form-control form-control-sm mt-2" name="dim_source_notes" id="qDimSource" placeholder="Source, e.g. vendor spec sheet">
+          <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" name="save_dims" id="qSaveDims">
+            <label class="form-check-label small" for="qSaveDims">Save / update these on the NSN record (when a packhouse request is sent or the quote is saved)</label>
+          </div>
+        </details>
+
         <details class="quote-drawer-section">
           <summary>Packaging <span class="quote-drawer-sum" id="qPackSum">$0.00 / unit</span></summary>
           <label class="form-label label mt-2" for="qPackSource">Who packages</label>
@@ -184,6 +236,34 @@
             <input class="form-control form-control-sm" id="qPackhouse" placeholder="Search packhouses by name or CAGE">
             <input type="hidden" name="packaging_vendor_id" id="qPackhouseId">
             <div class="list-group quote-supplier-results mt-1" id="qPackhouseResults"></div>
+
+            {# Ask packhouses for a price by email, then use their answer here. Wired by static/quote/js/packhouse.js. #}
+            <div class="quote-ph mt-3" id="qPh">
+              <div class="label">Packhouse quotes for this SOL</div>
+              <div id="qPhRequests"></div>
+              <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" id="qPhOpen">
+                <i class="bi bi-envelope-paper"></i> Email packhouses for a quote
+              </button>
+              <div class="d-none" id="qPhCompose">
+                <div class="label mt-3">Who to ask</div>
+                <div class="d-flex flex-wrap gap-1" id="qPhHistory"></div>
+                <input class="form-control form-control-sm mt-1" id="qPhSearch" placeholder="Add a packhouse to ask (name or CAGE)" autocomplete="off">
+                <div class="list-group quote-supplier-results mt-1" id="qPhResults"></div>
+                <div class="d-flex flex-wrap gap-1 mt-2" id="qPhChosen"></div>
+                <label class="form-label label mt-2" for="qPhNote">Note to the packhouse (optional)</label>
+                <textarea class="form-control form-control-sm" id="qPhNote" rows="2" maxlength="1000"
+                          placeholder="e.g. need your price by Friday"></textarea>
+                <div class="small text-body-secondary mt-1">Goes with: <span data-dims-readout>not entered</span>,
+                  the item and quantity, the packaging requirements and the solicitation PDF.
+                  <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-dims-edit>edit</button></div>
+                <div class="alert alert-danger py-1 px-2 small mt-2 mb-0 d-none" id="qPhError" role="alert"></div>
+                <div class="d-flex gap-2 mt-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="qPhPreviewBtn" disabled>Preview</button>
+                  <button type="button" class="btn btn-link btn-sm" id="qPhCancel">Cancel</button>
+                </div>
+                <div class="quote-ph-preview d-none mt-2" id="qPhPreview"></div>
+              </div>
+            </div>
           </div>
           <div class="row g-2 mt-1">
             <div class="col-6"><label class="form-label label" for="qPackUnit">Per unit ($)</label>
@@ -191,6 +271,8 @@
             <div class="col-6"><label class="form-label label" for="qPackTotal">Total ($)</label>
               <input class="form-control form-control-sm" name="packaging_total" id="qPackTotal" inputmode="decimal"></div>
           </div>
+          <div class="small text-body-secondary mt-2">Part: <span data-dims-readout>not entered</span>
+            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-dims-edit>edit</button></div>
         </details>
 
         <details class="quote-drawer-section">
@@ -201,18 +283,8 @@
             <div class="col-6"><label class="form-label label" for="qFreightTotal">Total ($)</label>
               <input class="form-control form-control-sm" name="freight_total" id="qFreightTotal" inputmode="decimal"></div>
           </div>
-          <div class="label mt-2">Part dimensions <span class="text-body-secondary text-lowercase fw-normal" id="qDimsNote"></span></div>
-          <div class="row g-2">
-            <div class="col-3"><input class="form-control form-control-sm" name="dim_weight" id="qDimW" placeholder="lb" inputmode="decimal" aria-label="Weight (lb)"></div>
-            <div class="col-3"><input class="form-control form-control-sm" name="dim_length" id="qDimL" placeholder="L in" inputmode="decimal" aria-label="Length (in)"></div>
-            <div class="col-3"><input class="form-control form-control-sm" name="dim_width" id="qDimWd" placeholder="W in" inputmode="decimal" aria-label="Width (in)"></div>
-            <div class="col-3"><input class="form-control form-control-sm" name="dim_height" id="qDimH" placeholder="H in" inputmode="decimal" aria-label="Height (in)"></div>
-          </div>
-          <input class="form-control form-control-sm mt-2" name="dim_source_notes" id="qDimSource" placeholder="Source, e.g. vendor spec sheet">
-          <div class="form-check mt-1">
-            <input class="form-check-input" type="checkbox" name="save_dims" id="qSaveDims">
-            <label class="form-check-label small" for="qSaveDims">Save / update dimensions on the NSN record</label>
-          </div>
+          <div class="small text-body-secondary mt-2">Part: <span data-dims-readout>not entered</span>
+            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-dims-edit>edit</button></div>
         </details>
 
         <label class="form-label label mt-3">Markup</label>

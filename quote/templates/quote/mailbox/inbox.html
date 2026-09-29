@@ -1,4 +1,5 @@
 {% extends "quote/base.html" %}
+{% load static %}
 
 {% block content %}
 <div class="row-between flex-wrap mb-2">
@@ -29,7 +30,7 @@
       <button type="button" class="quote-inbox-item {% if not email.is_read %}unread{% endif %}"
               data-id="{{ email.pk }}"
               data-orphan="{{ email.is_orphan|yesno:'1,0' }}"
-              data-quoted="{{ email.quote_count }}"
+              data-quoted="{{ email.quote_count|add:email.packhouse_count }}"
               data-read="{{ email.is_read|yesno:'1,0' }}"
               data-search="{{ email.sender_name|lower }} {{ email.sender_email|lower }} {{ email.subject|lower }} {{ email.body_preview|lower|truncatechars:400 }} {{ email.sol_numbers|join:' '|lower }} {{ email.supplier.name|default:''|lower }}">
         <span class="row-between">
@@ -64,6 +65,7 @@
 
 {% block extra_js %}
 {{ block.super }}
+<script src="{% static 'quote/js/packhouse.js' %}?v={{ cache_version }}"></script>
 <script>
 (function () {
   const DETAIL_URL = '{% url "quote:email_detail" 0 %}';
@@ -348,10 +350,19 @@
       }
     });
 
+    // The Packhouse helper serves two places: the banner where a packhouse's reply gets
+    // recorded (any message from a packhouse we asked) and the panel inside the drawer.
+    const phCtx = {
+      root: root, post: post, esc: esc, debounce: debounce, searchUrl: SUPPLIER_SEARCH_URL,
+      toast: (kind, text, ms) => window.showToast(kind, text, ms),
+    };
+    if (window.QuotePackhouse) window.QuotePackhouse.initReplies(root, phCtx);
+
     const form = container.querySelector('#quoteForm');
     if (!form) return;
     const $ = sel => form.querySelector(sel);
     let markupMode = 'pct';   // 'pct' | 'target'
+    let packhousePanel = null;
 
     function selectedSol() { return data[$('#qSol').value] || { lines: [] }; }
     function selectedLines() {
@@ -369,7 +380,29 @@
       $('#qLine').innerHTML = sol.lines.map(l =>
         '<option value="' + l.id + '">Line ' + esc(l.line || '?') + ' — ' + esc(l.nsn) + ' (qty ' + l.qty + ')</option>').join('');
       renderLines();
+      if (packhousePanel) packhousePanel.refresh();
     }
+    // The single weight / dimensions block feeds packaging and freight; every "Part: ..."
+    // line in those sections is just a read-out of it.
+    function dimsReadout() {
+      // Catalog values arrive as "1.250" / "6.00"; show them the way a person would say them.
+      const tidy = v => { const n = parseFloat(v); return Number.isFinite(n) ? String(n) : v.trim(); };
+      const w = tidy($('#qDimW').value), l = tidy($('#qDimL').value);
+      const wd = tidy($('#qDimWd').value), h = tidy($('#qDimH').value);
+      const parts = [];
+      if (w) parts.push(w + ' lb');
+      if (l && wd && h) parts.push(l + ' × ' + wd + ' × ' + h + ' in');
+      else [['L', l], ['W', wd], ['H', h]].forEach(p => { if (p[1]) parts.push(p[0] + ' ' + p[1] + ' in'); });
+      const text = parts.length ? parts.join(' · ') : 'not entered';
+      form.querySelectorAll('[data-dims-readout]').forEach(el => { el.textContent = text; });
+    }
+    ['#qDimW', '#qDimL', '#qDimWd', '#qDimH'].forEach(sel => $(sel).addEventListener('input', dimsReadout));
+    form.addEventListener('click', e => {
+      if (!e.target.closest('[data-dims-edit]')) return;
+      $('#qDimsSection').open = true;
+      $('#qDimsSection').scrollIntoView({ block: 'nearest' });
+      $('#qDimW').focus();
+    });
     function renderLines() {
       $('#qLine').classList.toggle('d-none', !$('#qModeSplit').checked);
       const lines = selectedLines();
@@ -390,6 +423,7 @@
           : d.verified ? '(last verified ' + d.verified + ')' : '(from catalog)';
         $('#qSaveDims').disabled = !d.known;
       }
+      dimsReadout();
       recalc();
     }
 
@@ -487,6 +521,26 @@
     $('#qSol').addEventListener('change', renderSol);
     form.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', renderLines));
     $('#qLine').addEventListener('change', renderLines);
+
+    // Packhouse quote requests (Packaging section). "Use" drops a recorded price into the
+    // packaging fields and lets the normal unit <-> total wiring do the rest.
+    if (window.QuotePackhouse) {
+      packhousePanel = window.QuotePackhouse.initDrawer(form, Object.assign({
+        solNumber: () => $('#qSol').value,
+        solData: () => data[$('#qSol').value],
+        lineId: () => ($('#qModeSplit').checked ? $('#qLine').value : null),
+        applyQuote: req => {
+          $('#qPackSource').value = 'THIRD_PARTY';
+          $('#qPackSource').dispatchEvent(new Event('change'));
+          $('#qPackhouseId').value = req.packhouse_id;
+          $('#qPackhouse').value = req.name;
+          $('#qPackhouseResults').innerHTML = '';
+          $('#qPackUnit').value = String(parseFloat(req.unit));
+          $('#qPackUnit').dispatchEvent(new Event('input'));
+          window.showToast('info', 'Using ' + req.name + '\'s packaging price.');
+        },
+      }, phCtx));
+    }
 
     form.addEventListener('submit', e => {
       e.preventDefault();

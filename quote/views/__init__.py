@@ -30,6 +30,7 @@ from .mailbox import (
     save_quote,
     solicitation_search,
 )
+from .packhouse import packhouse_preview, packhouse_record_reply, packhouse_send
 from .rfq import rfq_queue, rfq_remove, rfq_send, rfq_send_all
 from .solicitations import (
     add_match,
@@ -57,6 +58,9 @@ __all__ = [
     'capability_supplier',
     'our_bids',
     'outcome_detail',
+    'packhouse_preview',
+    'packhouse_record_reply',
+    'packhouse_send',
     'reconcile_now',
     'bid_board',
     'bid_builder',

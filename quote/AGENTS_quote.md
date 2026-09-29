@@ -10,7 +10,7 @@ this file is not a repeat of it.
 ## 2. App Scope
 - **Owns:** all quoting workflow data — `QuoteSolicitation`, `QuoteSupplierNSN`,
   `QuoteSupplierFSC`, `QuoteCapabilityImport`, `QuoteSolicitationMatch`, `QuoteRFQ`,
-  `QuoteSupplierQuote`, `QuoteBid`, `QuoteEmail`, `QuoteEmailAttachment`,
+  `QuoteSupplierQuote`, `QuotePackhouseRFQ`, `QuoteBid`, `QuoteEmail`, `QuoteEmailAttachment`,
   `QuoteEmailSolLink`, `BidOutcome`. All `quote_*` tables.
 - **Owns operationally:** solicitation pipeline state, supplier matching, RFQ dispatch,
   supplier quote entry and cost buildup, bid staging, BQ file generation, post-award
@@ -96,7 +96,32 @@ permission gating silently stops applying.
 - Supplier-page users need Quotes access to edit: gate embeds with
   `services.access.user_can_use_quote`, not by hiding the URL.
 
+### Packhouse quote requests
+- **Not `QuoteRFQ`.** `QuoteRFQ` is the part-supplier ledger and its send path moves the
+  solicitation to `RFQ_SENT`; a packhouse request must never do that. Packaging requests live in
+  `QuotePackhouseRFQ` only. Don't add a `kind` flag to `QuoteRFQ` to save a table.
+- **All sends go through `services/packhouse.send_requests`** (it owns the duplicate check, the
+  recipient rule and the write-only-on-success rule). A failed send must leave no row.
+- **One weight / dimensions block.** The drawer has a single set of `dim_*` inputs; Packaging and
+  Freight only read it out (`[data-dims-readout]`). Don't add a second set of inputs to either
+  section: two copies drift, and only one can be written to `products.Nsn`.
+- `record_reply` is the only writer of `quoted_*`. It derives the unit price from the total over the
+  quantity *asked about* (`QuotePackhouseRFQ.quantity`), not the drawer's current scope, and bounds both
+  values to their columns before saving.
+- The reply hook lives in `services/mailbox.mark_rfqs_responded` (needs `sent_at <= received_at`).
+  `mailbox.py` reads the model directly rather than importing `services/packhouse`, to keep the
+  import graph one-way.
+- The drawer JS keeps the request list in the fragment's `quoteDrawerData`; sends update it in place.
+  Don't call `window.quoteMailbox.reload()` after a send: it re-fetches the fragment and wipes the
+  rep's half-entered quote.
+
 ## 5. Files That Commonly Need to Change Together
+
+### Changing the packhouse request flow
+`quote/services/packhouse.py` (rules, message) → `quote/views/packhouse.py` (JSON shape) →
+`quote/static/quote/js/packhouse.js` (renders `preview_request` / `serialize` output; keys are a
+contract) → `templates/quote/mailbox/_detail.html` (panel + banner) and `inbox.html` (`applyQuote`,
+dims read-out) → `quote/tests/test_packhouse.py` → `CONTEXT_quote.md` §6 Phase 2.
 
 ### Adding a field to a quote model
 `quote/models/<module>.py` + migration + `quote/models/__init__.py` (if a new model) +

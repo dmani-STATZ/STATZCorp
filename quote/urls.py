@@ -48,6 +48,10 @@ urlpatterns = [
     path('mailbox/<int:email_id>/supplier/', views.email_set_supplier, name='email_set_supplier'),
     path('mailbox/<int:email_id>/quote/', views.save_quote, name='save_quote'),
     path('mailbox/attachments/<int:attachment_id>/', views.attachment_download, name='attachment_download'),
+    # Phase 2 -- packhouse packaging-quote requests (drawer packaging section + message pane)
+    path('packhouse/<str:sol_number>/preview/', views.packhouse_preview, name='packhouse_preview'),
+    path('packhouse/<str:sol_number>/send/', views.packhouse_send, name='packhouse_send'),
+    path('packhouse/reply/<int:rfq_id>/', views.packhouse_record_reply, name='packhouse_record_reply'),
     # Phase 3 -- bid staging + BQ export
     path('bids/', views.bid_board, name='bid_board'),
     path('bids/export/', views.bid_export, name='bid_export'),

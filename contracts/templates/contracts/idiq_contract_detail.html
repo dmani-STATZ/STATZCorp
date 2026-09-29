@@ -199,12 +199,22 @@
                     <thead class="idiq-table-header">
                         <tr>
                             <th class="px-4 py-2 text-left label">Contract ID</th>
+                            <th class="px-4 py-2 text-left label">Status</th>
                         </tr>
                     </thead>
                     <tbody class="idiq-table-body divide-y divide-gray-200">
                         {% for contract in contracts %}
                         <tr class="idiq-table-row">
                             <td class="px-4 py-2 text-sm"><a href="{% url 'contracts:contract_management' contract.id %}">{{ contract.contract_number }}</a></td>
+                            <td class="px-4 py-2 text-sm">
+                                <span class="status-pill status-pill--{{ contract.status.description|lower|default:'unknown' }}">
+                                    {{ contract.status.description|default:"—" }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="idiq-table-row">
+                            <td colspan="2" class="px-4 py-2 text-sm text-gray-500">No associated contracts</td>
                         </tr>
                         {% endfor %}
                     </tbody>

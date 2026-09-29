@@ -4293,6 +4293,50 @@ main {
 
 .quote-price-input { font-size: 1.125rem; font-weight: 700; }
 
+/* Quotes -- packhouse packaging-quote requests: the panel in the drawer's Packaging
+   section and the "record their price" banner in the message pane. */
+.quote-ph-row {
+  margin-top: 0.375rem;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.quote-ph-preview {
+  padding: 0.625rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.quote-ph-body {
+  max-height: 16rem;
+  overflow: auto;
+  padding: 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--bs-body-color);
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.quote-ph-banner {
+  margin: 0.5rem 0;
+  padding: 0.625rem 0.75rem;
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-left: 3px solid var(--company-primary, var(--bs-primary));
+  border-radius: var(--bs-border-radius);
+}
+
+.quote-ph-reply + .quote-ph-reply {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--bs-border-color);
+}
+
 /* Quotes — sub-nav grouped by phase: pipes between groups, a quiet serif
    caption under each ("Phase 1", "Phase 2", ...). */
 .app-subnav.quote-phase-nav { height: auto; }

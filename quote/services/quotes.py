@@ -81,7 +81,7 @@ def _reselect_lowest(line):
             q.save(update_fields=['is_selected_for_bid', 'selected_automatically', 'modified_on'])
 
 
-def _save_dimensions(lines, dims, user):
+def save_dimensions(lines, dims, user):
     """Update weight / L x W x H on existing products.Nsn rows. Returns NSNs updated."""
     from products.models import Nsn
 
@@ -196,7 +196,7 @@ def save_supplier_quote(*, solicitation, supplier, lines, data: QuoteInput, user
             state.set_status(QuoteSolicitation.STATUS_QUOTING)
             state.save(update_fields=['status', 'status_changed_at', 'modified_on'])
 
-        dims_saved = _save_dimensions(lines, data.dims, user) if data.save_dims else []
+        dims_saved = save_dimensions(lines, data.dims, user) if data.save_dims else []
 
     return {
         'quotes': created,
