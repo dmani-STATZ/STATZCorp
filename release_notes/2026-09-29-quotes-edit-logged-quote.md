@@ -1,7 +1,7 @@
 ---
 id: 2026-09-29-quotes-edit-logged-quote
 title: Reopen and edit a logged quote until it goes to DIBBS
-published: false
+published: true
 publish_date: 2026-09-29
 tags: [new, sales]
 critical: false

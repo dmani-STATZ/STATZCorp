@@ -1,7 +1,7 @@
 ---
 id: 2026-09-29-quotes-multi-sol-drafts
 title: Quote drawer keeps each solicitation's numbers separate
-published: false
+published: true
 publish_date: 2026-09-29
 tags: [fixed, sales]
 critical: false

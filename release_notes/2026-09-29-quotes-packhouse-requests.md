@@ -1,7 +1,7 @@
 ---
 id: 2026-09-29-quotes-packhouse-requests
 title: Email packhouses for packaging quotes from the quote drawer
-published: false
+published: true
 publish_date: 2026-09-29
 tags: [new, sales]
 critical: false

@@ -1,7 +1,7 @@
 ---
 id: 2026-09-29-quotes-attachment-viewer
 title: Open mailbox attachments beside the message
-published: false
+published: true
 publish_date: 2026-09-29
 tags: [new, sales]
 critical: false

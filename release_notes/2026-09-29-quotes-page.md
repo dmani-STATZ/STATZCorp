@@ -1,7 +1,7 @@
 ---
 id: 2026-09-29-quotes-page
 title: New Quotes page: chase suppliers, and enter phone and fax quotes
-published: false
+published: true
 publish_date: 2026-09-29
 tags: [new, sales]
 critical: false

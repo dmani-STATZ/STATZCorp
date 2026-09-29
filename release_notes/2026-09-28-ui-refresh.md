@@ -1,6 +1,6 @@
 id: 2026-09-28-ui-refresh
 title: A fresh look across STATZ
-published: false
+published: true
 publish_date: 2026-09-28
 tags: [improved, system]
 critical: false
