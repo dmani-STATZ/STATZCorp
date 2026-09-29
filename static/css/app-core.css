@@ -603,6 +603,30 @@ button.bg-transparent.border-none:focus {
     }
 }
 
+/* Window Controls Overlay (Desktop PWA / Installed App mode)
+   Pushes header actions away from native window controls (close/min/max/search/menu)
+   and makes the blank titlebar area draggable. */
+@media (display-mode: window-controls-overlay) {
+    #header {
+        padding-left: calc(env(titlebar-area-x, 0px) + 0.5rem);
+        padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.75rem);
+        -webkit-app-region: drag;
+        app-region: drag;
+    }
+
+    #header a,
+    #header button,
+    #header input,
+    #header select,
+    #header form,
+    #header .dropdown,
+    .hdr-cluster,
+    .hdr-logo {
+        -webkit-app-region: no-drag;
+        app-region: no-drag;
+    }
+}
+
 /* ===== Section 4: Floating Menu ===== */
 .floating-menu-btn {
     position: fixed;

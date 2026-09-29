@@ -137,6 +137,16 @@ Read `CONTEXT_intake.md` first for app purpose, model shape, and lock semantics.
 - Templates intentionally mirror `processing/` visually so analysts learning
   the new system see familiar UI. Don't introduce styling primitives that
   diverge from the processing app without a deliberate reason.
+- **Dark mode: no hard-coded colours in editor templates (2026-09-29).**
+  `draft_edit.html`, `_clin_card.html` and `_match_modal.html` must take text
+  and surface colours from theme tokens (`var(--bs-body-color)`,
+  `var(--bs-emphasis-color)`, `var(--bs-secondary-color)`,
+  `var(--statz-surface-2)`), never hex. A hex `color: #1a1a1a` made labels and
+  field values ~1:1 contrast (invisible) on the dark slate inputs. Don't use
+  `bg-light` for panels or headers — Bootstrap marks it `!important` and it
+  stays light in dark mode while text inherits light. Use `bg-body-tertiary`
+  (or the default `.card-header`). Display-only placeholder inputs use
+  `.intake-readonly-field`, not an inline `style="background:..."`.
 - The queue is a worklist. The award date column is intentional and
   approved (added 2026-06). Adding contract value or buyer columns is
   still out of scope — those belong on the draft detail page. The pipeline

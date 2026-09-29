@@ -12,30 +12,41 @@
 {% block content %}
 
 <style>
-  /* --- Intake editor text contrast improvements --- */
+  /* --- Intake editor text contrast improvements ---
+     Colours come from the theme tokens in theme-vars.css (not hex) so they
+     flip with data-bs-theme. Hard-coded #1a1a1a here was invisible on the
+     dark-mode input/card surfaces. */
 
   /* Field labels */
   .label {
-    color: #1a1a1a;
+    color: var(--bs-emphasis-color);
     font-weight: 600;
   }
 
   /* Editable input / select / textarea values */
   .form-control:not(:disabled):not([readonly]),
   .form-select:not(:disabled) {
-    color: #1a1a1a;
+    color: var(--bs-body-color);
   }
 
   /* Section subheadings (e.g. "Contract Data", "Supplier / Quote") */
   h6.text-uppercase.text-muted {
-    color: #4b5563 !important;
+    color: var(--bs-secondary-color) !important;
   }
 
   /* Disabled / read-only fields — keep visually distinct but not as
      washed-out as Bootstrap's default #6c757d */
   .form-control:disabled,
   .form-control[readonly] {
-    color: #4b5563;
+    color: var(--bs-secondary-color);
+  }
+
+  /* Display-only placeholders ("Assigned at finalization"). Replaces the
+     old inline background:#f8f9fa, which stayed near-white in dark mode. */
+  .intake-readonly-field {
+    background-color: var(--statz-surface-2) !important;
+    color: var(--bs-secondary-color) !important;
+    cursor: not-allowed;
   }
 </style>
 
@@ -153,10 +164,9 @@
                 <div>
                     <label class="label block mb-1">PO NUMBER</label>
                     <input type="text"
-                           class="form-control form-control-sm"
+                           class="form-control form-control-sm intake-readonly-field"
                            value="Assigned at finalization"
-                           disabled
-                           style="background:#f8f9fa; color:#4b5563; cursor:not-allowed;">
+                           disabled>
                 </div>
                 <div>
                     <label class="label block mb-1">PR NUMBER</label>
@@ -201,10 +211,9 @@
                 <div>
                     <label class="label block mb-1">INTAKE TYPE</label>
                     <input type="text"
-                           class="form-control form-control-sm bg-gray-50"
+                           class="form-control form-control-sm intake-readonly-field"
                            value="{{ draft.get_contract_type_display }}"
-                           disabled
-                           style="background:#f8f9fa; color:#4b5563; cursor:not-allowed;">
+                           disabled>
                     <label class="label block mb-1 mt-2">CONTRACT TYPE</label>
                     <select name="f_canonical_contract_type_id" class="form-select form-select-sm">
                         <option value="">——</option>
@@ -743,7 +752,7 @@
 {# Off-DOM templates. JS substitutes __CLINIDX__, __FINIDX__ as needed. #}
 <template id="tpl-clin-card">
     <div class="card mb-3 clin-card" data-clin-idx="__CLINIDX__">
-        <div class="card-header d-flex justify-content-between align-items-center bg-light">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center gap-2 flex-grow-1">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-clin-toggle>
                     <span class="clin-toggle-label">▼ Expand</span>
@@ -778,8 +787,7 @@
                         <option value="D">PQDR (D)</option>
                     </select></div>
                 <div><label class="label block mb-1">CLIN PO Number</label>
-                    <input type="text" class="form-control form-control-sm" value="Assigned at finalization" disabled
-                           style="background:#f8f9fa; color:#4b5563; cursor:not-allowed;"></div>
+                    <input type="text" class="form-control form-control-sm intake-readonly-field" value="Assigned at finalization" disabled></div>
                 <div><label class="label block mb-1">IA</label>
                     <select data-name="clin-__CLINIDX__-ia" class="form-select form-select-sm">
                         <option value="">—</option><option value="O">Origin (O)</option><option value="D">Destination (D)</option>
@@ -854,7 +862,7 @@
 </template>
 
 <template id="tpl-clin-fin">
-    <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-light" data-fin-idx="__FINIDX__">
+    <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-body-tertiary" data-fin-idx="__FINIDX__">
         <div style="flex: 2;">
             <label class="label small mb-1">Line Type</label>
             <input type="text" data-name="clin-__CLINIDX__-fin-__FINIDX__-line_type"

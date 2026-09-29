@@ -1,7 +1,7 @@
 {% load intake_extras %}
 {# One CLIN card. Expects `clin` (dict), `idx` (int), and `clins` (list) in context. #}
 <div class="card mb-3 clin-card" data-clin-idx="{{ idx }}">
-    <div class="card-header d-flex justify-content-between align-items-center bg-light">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-2 flex-grow-1">
             <button type="button" class="btn btn-sm btn-outline-secondary" data-clin-toggle>
                 <span class="clin-toggle-label">{% if clins|length == 1 and not clin|get_item:'item_value' and not clin|get_item:'nsn_text' %}▲ Collapse{% else %}▼ Expand{% endif %}</span>
@@ -76,10 +76,9 @@
             <div>
                 <label class="label block mb-1">CLIN PO Number</label>
                 <input type="text"
-                       class="form-control form-control-sm"
+                       class="form-control form-control-sm intake-readonly-field"
                        value="Assigned at finalization"
-                       disabled
-                       style="background:#f8f9fa; color:#4b5563; cursor:not-allowed;">
+                       disabled>
             </div>
             <div>
                 
@@ -245,7 +244,7 @@
         </div>
         <div class="clin-fin-tbody mb-2">
         {% for fl in clin|get_item:'finance_lines'|default_if_none:'' %}
-            <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-light" data-fin-idx="{{ forloop.counter0 }}">
+            <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border bg-body-tertiary" data-fin-idx="{{ forloop.counter0 }}">
                 <div style="flex: 2;">
                     <label class="label small mb-1">Line Type</label>
                     <input type="text" name="clin-{{ idx }}-fin-{{ forloop.counter0 }}-line_type"
