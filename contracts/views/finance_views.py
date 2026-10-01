@@ -15,6 +15,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import JsonResponse
 from django.urls import reverse
 from ..models import Clin, ClinShipment, ClinSplit, Contract, ContractFinanceLine, ContractPackaging, PaymentHistory, ContractLevelCharge
+from contracts.services.sharepoint_paths import (
+    build_explorer_uri,
+    resolve_contract_folder_path,
+)
 from contracts.services.split_breakdown import build_split_breakdown_context
 from .mixins import ActiveCompanyQuerysetMixin
 import logging
@@ -193,9 +197,15 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
         context['grand_cpay'] = zero
         context['grand_ag'] = zero
         context['main_supplier'] = None
+        context['explorer_uri'] = ''
 
         try:
             if self.object:
+                resolved_folder = resolve_contract_folder_path(self.object)["path"]
+                context['explorer_uri'] = build_explorer_uri(
+                    resolved_folder or ''
+                )
+
                 clins_qs = Clin.objects.filter(
                     contract=self.object
                 ).select_related(
