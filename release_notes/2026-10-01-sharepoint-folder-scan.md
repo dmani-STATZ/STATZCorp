@@ -13,3 +13,5 @@ Superusers can monitor SharePoint contract folder inventory from **Contracts →
 - **`fix_folder_paths`** applies `files_url` corrections from the latest completed scan (`--all` or `--contract-id`, optional `--dry-run`).
 - New field **`Contract.sharepoint_drive_item_id`** records the Graph item id when a contract matches exactly one scanned folder.
 - Status page at `/contracts/folder-scan/` with SSH instructions and live log polling.
+
+- **Incremental Scans**: The scanner now uses Microsoft Graph delta enumeration instead of a BFS walk. The first run is a bulk pass; every later run fetches only what changed using a saved delta bookmark.

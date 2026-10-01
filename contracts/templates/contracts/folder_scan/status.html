@@ -16,6 +16,9 @@
             <pre class="mb-0 small" id="ssh-instructions"># Azure Portal → App Service → SSH, then:
 cd {{ ssh_app_dir }}
 nohup {{ ssh_python }} manage.py scan_folders &gt; /home/LogFiles/scan_folders.log 2&gt;&amp;1 &amp;
+# First run is a full pass automatically; later runs only fetch changes.
+# Force a full pass (ignore the saved bookmark):
+nohup {{ ssh_python }} manage.py scan_folders --full &gt; /home/LogFiles/scan_folders.log 2&gt;&amp;1 &amp;
 # Scan AND fix misplaced paths in one go:
 nohup {{ ssh_python }} manage.py scan_folders --apply &gt; /home/LogFiles/scan_folders.log 2&gt;&amp;1 &amp;
 # Fix paths later, from the last completed scan:

@@ -61,6 +61,16 @@ class ScanLogger:
     def _run_update_fields(self) -> dict[str, Any]:
         return {
             'folders_saved': self.run.folders_saved,
+            'delta_pages': self.run.delta_pages,
+            'items_seen': self.run.items_seen,
+            'files_skipped': self.run.files_skipped,
+            'deleted_seen': self.run.deleted_seen,
+            'folders_in_scope': self.run.folders_in_scope,
+            'folders_added': self.run.folders_added,
+            'folders_changed': self.run.folders_changed,
+            'folders_removed': self.run.folders_removed,
+            'graph_seconds': self.run.graph_seconds,
+            'db_seconds': self.run.db_seconds,
             'graph_calls': self.run.graph_calls,
             'graph_retries': self.run.graph_retries,
             'contract_folders': self.run.contract_folders,

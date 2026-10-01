@@ -26,6 +26,7 @@ class GraphClient:
     def __init__(self) -> None:
         self.graph_calls = 0
         self.graph_retries = 0
+        self.graph_seconds = 0.0
         self._token = ''
         self._token_at: datetime | None = None
 
@@ -43,7 +44,11 @@ class GraphClient:
 
     def get(self, url: str) -> requests.Response:
         """GET with 401 re-auth and throttling retries."""
-        return self._request(url)
+        t0 = time.monotonic()
+        try:
+            return self._request(url)
+        finally:
+            self.graph_seconds += time.monotonic() - t0
 
     def _request(self, url: str, *, retried_401: bool = False) -> requests.Response:
         self.graph_calls += 1
@@ -52,6 +57,9 @@ class GraphClient:
             headers=_auth_headers(self.token()),
             timeout=60,
         )
+        if response.status_code == 410:
+            raise GraphScanError(f'Graph HTTP 410: Delta bookmark expired', status_code=410)
+
         if response.status_code == 401 and not retried_401:
             self._token = ''
             self._token_at = None
@@ -63,7 +71,8 @@ class GraphClient:
         if response.status_code < 200 or response.status_code >= 300:
             body = (response.text or '')[:500]
             raise GraphScanError(
-                f'Graph HTTP {response.status_code}: {body}'
+                f'Graph HTTP {response.status_code}: {body}',
+                status_code=response.status_code,
             )
         return response
 
@@ -77,7 +86,8 @@ class GraphClient:
         if attempt > 8:
             body = (response.text or '')[:500]
             raise GraphScanError(
-                f'Graph throttling failed after retries: HTTP {response.status_code}: {body}'
+                f'Graph throttling failed after retries: HTTP {response.status_code}: {body}',
+                status_code=response.status_code,
             )
         self.graph_retries += 1
         retry_after = response.headers.get('Retry-After')
@@ -92,35 +102,17 @@ class GraphClient:
             headers=_auth_headers(self.token()),
             timeout=60,
         )
+        if next_response.status_code == 410:
+            raise GraphScanError(f'Graph HTTP 410: Delta bookmark expired', status_code=410)
         if next_response.status_code in (429, 503, 504):
             return self._retry_throttled(url, next_response, attempt=attempt + 1)
         if next_response.status_code < 200 or next_response.status_code >= 300:
             body = (next_response.text or '')[:500]
             raise GraphScanError(
-                f'Graph HTTP {next_response.status_code}: {body}'
+                f'Graph HTTP {next_response.status_code}: {body}',
+                status_code=next_response.status_code,
             )
         return next_response
-
-
-def iter_child_folders(
-    drive_id: str,
-    item_id: str,
-    client: GraphClient,
-) -> Iterator[dict[str, Any]]:
-    """Yield folder child items for a drive item, following pagination."""
-    drive_enc = quote(drive_id, safe='!_')
-    item_enc = quote(item_id, safe='')
-    url = (
-        f'{GRAPH_BASE}/drives/{drive_enc}/items/{item_enc}/children'
-        f'?$select={_CHILDREN_SELECT}&$top=200'
-    )
-    while url:
-        response = client.get(url)
-        data = response.json()
-        for item in data.get('value', []):
-            if 'folder' in item:
-                yield item
-        url = data.get('@odata.nextLink') or ''
 
 
 def resolve_root_item(

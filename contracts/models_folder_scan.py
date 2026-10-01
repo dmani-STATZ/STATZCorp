@@ -41,6 +41,28 @@ class FolderScanRun(models.Model):
     drive_ids_written = models.PositiveIntegerField(default=0)
     paths_fixed = models.PositiveIntegerField(default=0)
 
+    class ScanMode(models.TextChoices):
+        FULL = 'full', 'Full'
+        INCREMENTAL = 'incremental', 'Incremental'
+
+    scan_mode = models.CharField(
+        max_length=20,
+        choices=ScanMode.choices,
+        default=ScanMode.FULL,
+        blank=True,
+    )
+    delta_link = models.TextField(blank=True, default='')
+    delta_pages = models.PositiveIntegerField(default=0)
+    items_seen = models.PositiveIntegerField(default=0)
+    files_skipped = models.PositiveIntegerField(default=0)
+    deleted_seen = models.PositiveIntegerField(default=0)
+    folders_in_scope = models.PositiveIntegerField(default=0)
+    folders_added = models.PositiveIntegerField(default=0)
+    folders_changed = models.PositiveIntegerField(default=0)
+    folders_removed = models.PositiveIntegerField(default=0)
+    graph_seconds = models.FloatField(default=0.0)
+    db_seconds = models.FloatField(default=0.0)
+
     error_message = models.TextField(blank=True, default='')
 
     class Meta:
@@ -116,6 +138,7 @@ class ScannedFolder(models.Model):
         choices=DoParentStatus.choices,
         default=DoParentStatus.NOT_APPLICABLE,
     )
+    in_scope = models.BooleanField(default=True)
 
     class Meta:
         indexes = [

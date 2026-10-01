@@ -28,6 +28,11 @@ class Command(BaseCommand):
             action='store_true',
             help='Abandon a running or stale scan and start a new one.',
         )
+        parser.add_argument(
+            '--full',
+            action='store_true',
+            help='Ignore the saved delta bookmark and enumerate the whole library.',
+        )
 
     def handle(self, *args, **options):
         root_map = roots_to_company_ids()
@@ -55,6 +60,7 @@ class Command(BaseCommand):
                 root,
                 apply=bool(options.get('apply')),
                 force=bool(options.get('force')),
+                full=bool(options.get('full')),
                 stdout=self.stdout,
             )
         except Exception:

@@ -491,3 +491,4 @@ The Supplier Payment Forecast page provides a read-derived forecast of outstandi
 - **Reused API Endpoints**:
   - `update_clin_field` updates the CLIN's payment terms dropdown inline and registers in the audit log.
   - `payment_history_api` ledger manages payments via the `partial-value-cell` component.
+- **Folder Scan**: Superusers monitor SharePoint contract folder inventory via scan_folders. The scan uses Microsoft Graph delta queries (drive root delta) for efficient incremental passes instead of BFS walks.

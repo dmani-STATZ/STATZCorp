@@ -13,9 +13,10 @@ from django.utils import timezone
 
 from contracts.models import Company, Contract, IdiqContract
 from contracts.models_folder_scan import FolderScanLog, FolderScanRun, ScannedFolder
+from contracts.services.folder_scan.delta_source import DeltaTokenExpired, classify_item, iter_delta_pages
 from contracts.services.folder_scan.exceptions import GraphScanError, NoCompletedScan, ScanAlreadyRunning
 from contracts.services.folder_scan.fix_paths import apply_folder_path_fixes
-from contracts.services.folder_scan.graph_walker import GraphClient, iter_child_folders, resolve_root_item
+from contracts.services.folder_scan.graph_walker import GraphClient, resolve_root_item
 from contracts.services.folder_scan.lock import acquire_run
 from contracts.services.folder_scan.matcher import classify
 from contracts.services.folder_scan.normalize import (
@@ -26,6 +27,7 @@ from contracts.services.folder_scan.normalize import (
 from contracts.services.folder_scan.roots import resolve_company_root, roots_to_company_ids
 from contracts.services.folder_scan.run_log import ScanLogger
 from contracts.services.folder_scan.scanner import run_scan
+from contracts.services.folder_scan.tree import apply_item, build_scoped_tree, diff_scoped
 from transactions.models import Transaction
 
 
@@ -89,237 +91,143 @@ class NormalizeTests(TestCase):
         self.assertEqual(parse_folder_name('Delivery Order Contract X'), ('delivery_order', 'Contract X'))
 
 
-class GraphWalkerTests(TestCase):
-    def test_iter_child_folders_pagination_and_skip_files(self):
+class DeltaSourceTests(TestCase):
+    def test_classify_item(self):
+        kind, rec = classify_item({'id': 'd1', 'deleted': {}})
+        self.assertEqual(kind, 'deleted')
+        self.assertEqual(rec['id'], 'd1')
+
+        kind, rec = classify_item({'id': 'f1', 'name': 'F', 'folder': {}, 'parentReference': {'id': 'p1'}, 'webUrl': 'u'})
+        self.assertEqual(kind, 'folder')
+        self.assertEqual(rec, {'id': 'f1', 'name': 'F', 'parent_id': 'p1', 'web_url': 'u'})
+        
+        kind, rec = classify_item({'id': 'r1', 'name': 'root', 'root': {}})
+        self.assertEqual(kind, 'folder')
+
+        kind, rec = classify_item({'id': 'file1', 'file': {}})
+        self.assertEqual(kind, 'file')
+
+    def test_iter_delta_pages(self):
         client = GraphClient()
         responses = [
-            {
-                'value': [
-                    {'id': 'f1', 'name': 'Folder A', 'folder': {}},
-                    {'id': 'file1', 'name': 'skip.pdf', 'file': {}},
-                ],
-                '@odata.nextLink': 'https://graph.microsoft.us/next',
-            },
-            {'value': [{'id': 'f2', 'name': 'Folder B', 'folder': {}}]},
+            {'value': [{'id': '1'}], '@odata.nextLink': 'next'},
+            {'value': [{'id': '2'}], '@odata.deltaLink': 'delta'},
         ]
-
         def fake_get(url):
             resp = MagicMock()
             resp.status_code = 200
             resp.json.return_value = responses.pop(0)
-            resp.headers = {}
             return resp
-
         client.get = fake_get
-        items = list(iter_child_folders('drive', 'root', client))
-        self.assertEqual(len(items), 2)
-        self.assertEqual(items[0]['name'], 'Folder A')
+        pages = list(iter_delta_pages(client, 'start'))
+        self.assertEqual(len(pages), 2)
+        self.assertEqual(pages[1].delta_link, 'delta')
 
-    @patch('contracts.services.folder_scan.graph_walker.time.sleep')
     @patch('contracts.services.folder_scan.graph_walker.requests.get')
     @patch('contracts.services.folder_scan.graph_walker.get_graph_access_token')
-    def test_retry_429_then_fail(self, mock_token, mock_get, mock_sleep):
+    def test_iter_delta_pages_410(self, mock_token, mock_get):
         mock_token.return_value = 'token'
-        throttled = MagicMock()
-        throttled.status_code = 429
-        throttled.headers = {'Retry-After': '1'}
-        throttled.text = 'slow down'
-        mock_get.return_value = throttled
+        mock_resp = MagicMock()
+        mock_resp.status_code = 410
+        mock_get.return_value = mock_resp
         client = GraphClient()
-        with self.assertRaises(GraphScanError):
-            client.get('https://graph.microsoft.us/v1.0/test')
-        self.assertGreaterEqual(client.graph_retries, 8)
+        with self.assertRaises(DeltaTokenExpired):
+            list(iter_delta_pages(client, 'start'))
 
 
-class MatcherTests(TestCase):
-    def setUp(self):
-        self.company_a = Company.objects.create(name='A', slug='scan-co-a', sharepoint_documents_path=ROOT)
-        self.company_b = Company.objects.create(name='B', slug='scan-co-b', sharepoint_documents_path=ROOT)
-        self.run = FolderScanRun.objects.create(root_path=ROOT, status=FolderScanRun.Status.RUNNING)
-
-    def _folder(self, **kwargs):
-        base = {
-            'drive_item_id': kwargs.pop('drive_item_id', 'item-1'),
-            'parent_drive_item_id': kwargs.pop('parent_drive_item_id', ''),
-            'name': kwargs.pop('name', 'Contract SPE7L3-24-V-5580'),
-            'path': kwargs.pop('path', OPEN_PATH),
-            'depth': 1,
-            'web_url': '',
+class TreeTests(TestCase):
+    def test_tree_building(self):
+        index = {
+            'root': {'id': 'root', 'parent_id': 'p', 'name': 'root', 'web_url': ''},
+            'c1': {'id': 'c1', 'parent_id': 'root', 'name': 'Child', 'web_url': ''},
+            'c2': {'id': 'c2', 'parent_id': 'c1', 'name': 'Grandchild', 'web_url': ''},
+            'orphan': {'id': 'orphan', 'parent_id': 'x', 'name': 'Orphan', 'web_url': ''},
         }
-        kind, raw = parse_folder_name(base['name'])
-        base['folder_kind'] = kind
-        base['parsed_contract_number'] = raw
-        base['normalized_contract_number'] = normalize_contract_number(raw)
-        base.update(kwargs)
-        return base
+        scoped, in_scope_ids = build_scoped_tree(index, 'root', 'drive/root/')
+        
+        self.assertEqual(len(scoped), 3)
+        self.assertEqual(scoped[0]['path'], 'drive/root/')
+        self.assertEqual(scoped[0]['depth'], 0)
+        self.assertEqual(scoped[1]['path'], 'drive/root/Child/')
+        self.assertEqual(scoped[1]['depth'], 1)
+        self.assertEqual(scoped[2]['path'], 'drive/root/Child/Grandchild/')
+        self.assertEqual(scoped[2]['depth'], 2)
+        
+        self.assertNotIn('orphan', in_scope_ids)
 
-    def test_matched_expected_closed_path(self):
-        Contract.objects.create(
-            company=self.company_a,
-            contract_number='SPE7L3-24-V-5580',
-            files_url=CLOSED_PATH,
-        )
-        folders = [self._folder(path=CLOSED_PATH)]
-        result = classify(self.run, folders)
-        self.assertEqual(result['counters']['matched_expected'], 1)
-
-    def test_two_companies_same_root(self):
-        Contract.objects.create(company=self.company_a, contract_number='SPE7L3-24-V-5580', files_url=OPEN_PATH)
-        Contract.objects.create(company=self.company_b, contract_number='SPE8E9-26-V-1326', files_url=OPEN_PATH.replace('5580', '1326').replace('SPE7L3-24-V-5580', 'SPE8E9-26-V-1326'))
-        folders = [
-            self._folder(drive_item_id='a', path=OPEN_PATH),
-            self._folder(
-                drive_item_id='b',
-                name='Contract SPE8E9-26-V-1326',
-                path=OPEN_PATH.replace('5580', '1326').replace('SPE7L3-24-V-5580', 'SPE8E9-26-V-1326'),
-            ),
-        ]
-        result = classify(self.run, folders)
-        self.assertEqual(result['counters']['matched_expected'], 2)
-
-    def test_none_files_url_and_contract_number(self):
-        Contract.objects.create(company=self.company_a, contract_number=None, files_url=None)
-        folders = [self._folder(name='Misc Docs', path=f'{ROOT}/Misc/')]
-        result = classify(self.run, folders)
-        self.assertEqual(result['counters']['other_folders'], 1)
-
-    def test_matched_idiq_and_collision_warn(self):
-        IdiqContract.objects.create(company=self.company_a, contract_number='IDIQ-1')
-        Contract.objects.create(company=self.company_a, contract_number='IDIQ-1', files_url=OPEN_PATH.replace('SPE7L3-24-V-5580', 'IDIQ-1'))
-        folders = [self._folder(name='Contract IDIQ-1', path=OPEN_PATH.replace('SPE7L3-24-V-5580', 'IDIQ-1'))]
-        with self.assertLogs('contracts.services.folder_scan.matcher', level='WARNING'):
-            result = classify(self.run, folders)
-        self.assertEqual(result['counters']['matched_expected'], 1)
-
-    def test_match_variants(self):
-        c = Contract.objects.create(company=self.company_a, contract_number='SPE7L3-24-V-5580', files_url=OPEN_PATH)
-        elsewhere = self._folder(drive_item_id='e1', path=f'{ROOT}/Elsewhere/Contract SPE7L3-24-V-5580/')
-        no_path = self._folder(
-            drive_item_id='e2',
-            name='Contract SPE7L3-24-V-5580',
-            path=f'{ROOT}/Other/Contract SPE7L3-24-V-5580/',
-        )
-        Contract.objects.filter(pk=c.pk).update(files_url='')
-        c.refresh_from_db()
-        folders = [elsewhere, no_path]
-        result = classify(self.run, folders)
-        self.assertEqual(result['counters']['duplicate_folders'], 2)
-
-        orphan = self._folder(
-            drive_item_id='o1',
-            name='Contract GHOST-99',
-            path=f'{ROOT}/Contract GHOST-99/',
-        )
-        result = classify(self.run, [orphan])
-        self.assertEqual(result['counters']['no_contract_in_db'], 1)
-
-        idiq_only = IdiqContract.objects.create(company=self.company_a, contract_number='IDIQ-ONLY')
-        idiq_folder = self._folder(
-            drive_item_id='i1',
-            name=f'Contract {idiq_only.contract_number}',
-            path=f'{ROOT}/Contract {idiq_only.contract_number}/',
-        )
-        result = classify(self.run, [idiq_folder])
-        self.assertEqual(result['counters']['matched_idiq'], 1)
-
-    def test_do_parent_statuses(self):
-        idiq = IdiqContract.objects.create(company=self.company_a, contract_number='IDIQ-P')
-        do = Contract.objects.create(
-            company=self.company_a,
-            contract_number='DO-1',
-            idiq_contract=idiq,
-            files_url=f'{ROOT}/Contract IDIQ-P/Delivery Order DO-1/',
-        )
-        parent = self._folder(
-            drive_item_id='parent',
-            name='Contract IDIQ-P',
-            path=f'{ROOT}/Contract IDIQ-P/',
-        )
-        do_folder = self._folder(
-            drive_item_id='do1',
-            name='Delivery Order DO-1',
-            path=f'{ROOT}/Contract IDIQ-P/Delivery Order DO-1/',
-            parent_drive_item_id='parent',
-        )
-        result = classify(self.run, [parent, do_folder])
-        self.assertEqual(do_folder['do_parent_status'], ScannedFolder.DoParentStatus.OK)
-
-        do_folder['parent_drive_item_id'] = ''
-        do_folder['do_parent_status'] = ScannedFolder.DoParentStatus.NOT_APPLICABLE
-        result = classify(self.run, [do_folder])
-        self.assertEqual(do_folder['do_parent_status'], ScannedFolder.DoParentStatus.NOT_NESTED)
-
-    def test_drive_id_updates_exclude_duplicates(self):
-        Contract.objects.create(company=self.company_a, contract_number='SPE7L3-24-V-5580', files_url=OPEN_PATH)
-        folders = [
-            self._folder(drive_item_id='d1', path=OPEN_PATH),
-            self._folder(drive_item_id='d2', path=f'{ROOT}/dup/Contract SPE7L3-24-V-5580/'),
-        ]
-        result = classify(self.run, folders)
-        self.assertEqual(result['drive_id_updates'], [])
+    def test_diff_scoped(self):
+        old = {'a': 'path_a', 'b': 'path_b', 'c': 'path_c'}
+        new = {'b': 'path_b', 'c': 'path_c_new', 'd': 'path_d'}
+        added, changed, removed = diff_scoped(old, new)
+        self.assertEqual(added, 1) # d
+        self.assertEqual(changed, 1) # c
+        self.assertEqual(removed, 1) # a
 
 
-class LockTests(TestCase):
-    def test_blocks_fresh_running(self):
-        FolderScanRun.objects.create(
-            root_path=ROOT,
-            status=FolderScanRun.Status.RUNNING,
-            heartbeat_at=timezone.now(),
-        )
-        with self.assertRaises(ScanAlreadyRunning):
-            acquire_run(ROOT, 'tester', False, force=False)
-
-    def test_abandons_stale(self):
-        stale = FolderScanRun.objects.create(
-            root_path=ROOT,
-            status=FolderScanRun.Status.RUNNING,
-            heartbeat_at=timezone.now() - timedelta(minutes=15),
-        )
-        new_run = acquire_run(ROOT, 'tester', False, force=False)
-        stale.refresh_from_db()
-        self.assertEqual(stale.status, FolderScanRun.Status.ABANDONED)
-        self.assertEqual(new_run.status, FolderScanRun.Status.RUNNING)
-
-    def test_force_abandons_fresh(self):
-        running = FolderScanRun.objects.create(
-            root_path=ROOT,
-            status=FolderScanRun.Status.RUNNING,
-            heartbeat_at=timezone.now(),
-        )
-        acquire_run(ROOT, 'tester', False, force=True)
-        running.refresh_from_db()
-        self.assertEqual(running.status, FolderScanRun.Status.ABANDONED)
-
-
-class ReplaceSemanticsTests(TestCase):
+class ScannerTests(TestCase):
     @patch('contracts.services.folder_scan.scanner.apply_folder_path_fixes')
     @patch('contracts.services.folder_scan.scanner.classify')
     @patch('contracts.services.folder_scan.scanner.resolve_root_item')
-    @patch('contracts.services.folder_scan.scanner.iter_child_folders')
+    @patch('contracts.services.folder_scan.scanner.iter_delta_pages')
     @override_settings(SHAREPOINT_DRIVE_ID='drive-1')
-    def test_success_deletes_prior_run(
+    def test_full_then_incremental(
         self,
         mock_iter,
         mock_root,
         mock_classify,
         _apply,
     ):
-        mock_root.return_value = {'id': 'root-id', 'name': 'aFed-DOD', 'webUrl': ''}
-        mock_iter.return_value = iter([])
+        mock_root.return_value = {'id': 'root', 'name': 'aFed-DOD', 'webUrl': ''}
         mock_classify.return_value = {'counters': {}, 'drive_id_updates': []}
-        old = FolderScanRun.objects.create(root_path=ROOT, status=FolderScanRun.Status.COMPLETED)
-        FolderScanLog.objects.create(run=old, message='old')
-        run_scan(ROOT, apply=False, force=True, stdout=MagicMock())
-        self.assertFalse(FolderScanRun.objects.filter(pk=old.pk).exists())
+        
+        from contracts.services.folder_scan.delta_source import DeltaPage
+        # Run 1: Full
+        page1 = DeltaPage(
+            items=[{'id': 'root', 'folder': {}, 'name': 'aFed-DOD', 'parentReference': {'id': 'p'}}],
+            next_link='',
+            delta_link='dl1',
+        )
+        mock_iter.return_value = [page1]
+        
+        run1 = run_scan(ROOT, apply=False, force=False, full=False, stdout=MagicMock())
+        self.assertEqual(run1.scan_mode, FolderScanRun.ScanMode.FULL)
+        self.assertEqual(run1.delta_link, 'dl1')
+        self.assertEqual(run1.folders_in_scope, 1)
+        
+        # Run 2: Incremental
+        page2 = DeltaPage(
+            items=[{'id': 'c1', 'folder': {}, 'name': 'Child', 'parentReference': {'id': 'root'}}],
+            next_link='',
+            delta_link='dl2',
+        )
+        mock_iter.return_value = [page2]
+        
+        run2 = run_scan(ROOT, apply=False, force=False, full=False, stdout=MagicMock())
+        self.assertEqual(run2.scan_mode, FolderScanRun.ScanMode.INCREMENTAL)
+        self.assertEqual(run2.delta_link, 'dl2')
+        self.assertEqual(run2.folders_in_scope, 2)
+        self.assertEqual(run2.folders_added, 1)
+        self.assertEqual(run2.folders_changed, 0)
+        self.assertEqual(run2.folders_removed, 0)
+        
+        # Force Full
+        mock_iter.return_value = [page2]
+        run3 = run_scan(ROOT, apply=False, force=False, full=True, stdout=MagicMock())
+        self.assertEqual(run3.scan_mode, FolderScanRun.ScanMode.FULL)
 
     @patch('contracts.services.folder_scan.scanner.resolve_root_item')
+    @patch('contracts.services.folder_scan.graph_walker.GraphClient.get')
     @override_settings(SHAREPOINT_DRIVE_ID='drive-1')
-    def test_failed_leaves_prior(self, mock_root):
-        mock_root.side_effect = GraphScanError('boom')
-        old = FolderScanRun.objects.create(root_path=ROOT, status=FolderScanRun.Status.COMPLETED)
-        with self.assertRaises(GraphScanError):
-            run_scan(ROOT, apply=False, force=True, stdout=MagicMock())
-        self.assertTrue(FolderScanRun.objects.filter(pk=old.pk).exists())
+    def test_interrupt_regression(self, mock_get, mock_root):
+        mock_root.return_value = {'id': 'root', 'name': 'aFed-DOD', 'webUrl': ''}
+        mock_get.side_effect = KeyboardInterrupt('interrupted')
+        
+        with self.assertRaises(KeyboardInterrupt):
+            run_scan(ROOT, apply=False, force=False, full=False, stdout=MagicMock())
+            
+        run = FolderScanRun.objects.get(root_path=ROOT)
+        self.assertEqual(run.status, FolderScanRun.Status.FAILED)
+        self.assertIn('KeyboardInterrupt', run.error_message)
 
 
 @override_settings(

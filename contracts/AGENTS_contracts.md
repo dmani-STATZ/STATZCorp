@@ -685,3 +685,7 @@ The `tags` array will fail validation if it does not contain exactly two items:
 
 
 ```
+
+- **Folder Scan constraints:**
+  - Never run the BFS walk over the `list-items` flat list.
+  - The `folder_scan` service only uses `drive root delta` iteration for efficient incremental scans.

@@ -2,6 +2,16 @@
     'use strict';
 
     var COUNTER_FIELDS = [
+        ['delta_pages', 'Delta pages'],
+        ['items_seen', 'Items seen'],
+        ['files_skipped', 'Files skipped'],
+        ['deleted_seen', 'Deleted seen'],
+        ['folders_in_scope', 'Folders in scope'],
+        ['folders_added', 'Folders added'],
+        ['folders_changed', 'Folders changed'],
+        ['folders_removed', 'Folders removed'],
+        ['graph_seconds', 'Graph seconds'],
+        ['db_seconds', 'DB seconds'],
         ['folders_saved', 'Folders saved'],
         ['graph_calls', 'Graph calls'],
         ['graph_retries', 'Graph retries'],
@@ -75,9 +85,17 @@
         statusBox.textContent = '';
         var badge = document.createElement('span');
         badge.id = 'scan-status-badge';
-        badge.className = 'badge mb-2 ' + badgeClass(run.status);
+        badge.className = 'badge mb-2 me-2 ' + badgeClass(run.status);
         badge.textContent = run.status;
         statusBox.appendChild(badge);
+
+        if (run.scan_mode) {
+            var modeBadge = document.createElement('span');
+            modeBadge.id = 'scan-mode-badge';
+            modeBadge.className = 'badge mb-2 ' + (run.scan_mode === 'full' ? 'bg-info' : 'bg-secondary');
+            modeBadge.textContent = run.scan_mode;
+            statusBox.appendChild(modeBadge);
+        }
 
         var dl = document.createElement('dl');
         dl.className = 'row small mb-3';
@@ -108,7 +126,7 @@
             var label = entry[1];
             var col = document.createElement('div');
             col.className = 'col-6 col-md-4 col-lg-3';
-            if (field === 'folders_saved') {
+            if (field === 'folders_in_scope') {
                 col.className += ' fs-5 fw-semibold';
             }
             var box = document.createElement('div');
@@ -119,7 +137,13 @@
             var val = document.createElement('div');
             val.className = 'scan-counter';
             val.dataset.field = field;
-            val.textContent = run[field] != null ? run[field] : 0;
+            
+            var displayVal = run[field] != null ? run[field] : 0;
+            if ((field === 'db_seconds' || field === 'graph_seconds') && typeof displayVal === 'number') {
+                displayVal = displayVal.toFixed(1);
+            }
+            val.textContent = displayVal;
+            
             box.appendChild(lbl);
             box.appendChild(val);
             col.appendChild(box);

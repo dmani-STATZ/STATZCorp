@@ -16,6 +16,16 @@ SSH_APP_DIR = '/home/site/wwwroot'
 SSH_PYTHON = '/tmp/antenv/bin/python'
 
 _COUNTER_FIELDS = [
+    ('delta_pages', 'Delta pages'),
+    ('items_seen', 'Items seen'),
+    ('files_skipped', 'Files skipped'),
+    ('deleted_seen', 'Deleted seen'),
+    ('folders_in_scope', 'Folders in scope'),
+    ('folders_added', 'Folders added'),
+    ('folders_changed', 'Folders changed'),
+    ('folders_removed', 'Folders removed'),
+    ('graph_seconds', 'Graph seconds'),
+    ('db_seconds', 'DB seconds'),
     ('folders_saved', 'Folders saved'),
     ('graph_calls', 'Graph calls'),
     ('graph_retries', 'Graph retries'),
@@ -70,6 +80,7 @@ def _run_payload(run: FolderScanRun | None) -> dict:
             'root_path': run.root_path,
             'company_ids': run.company_ids,
             'status': run.status,
+            'scan_mode': run.scan_mode,
             'started_at': run.started_at.isoformat() if run.started_at else '',
             'finished_at': run.finished_at.isoformat() if run.finished_at else '',
             'heartbeat_at': run.heartbeat_at.isoformat() if run.heartbeat_at else '',
