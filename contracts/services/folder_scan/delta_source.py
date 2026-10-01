@@ -8,7 +8,7 @@ from contracts.services.folder_scan.graph_walker import GraphClient
 from contracts.services.sharepoint_service import GRAPH_BASE
 
 DELTA_SELECT = "id,name,folder,file,deleted,root,parentReference,webUrl"
-DELTA_PAGE_SIZE = 200
+DELTA_PAGE_SIZE = 1000
 
 
 def initial_delta_url(drive_id: str) -> str:
