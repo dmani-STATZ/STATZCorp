@@ -1,0 +1,57 @@
+{% extends "contracts/contract_base.html" %}
+{% load static %}
+
+{% block title %}SharePoint Folder Scan{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="h3 mb-3">SharePoint Folder Scan</h1>
+
+    <div class="card mb-4">
+        <div class="card-header">SSH commands</div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">
+                Use <code>nohup ... &amp;</code> so the scan keeps running if your SSH session closes.
+            </p>
+            <pre class="mb-0 small" id="ssh-instructions"># Azure Portal → App Service → SSH, then:
+cd {{ ssh_app_dir }}
+nohup {{ ssh_python }} manage.py scan_folders &gt; /home/LogFiles/scan_folders.log 2&gt;&amp;1 &amp;
+# Scan AND fix misplaced paths in one go:
+nohup {{ ssh_python }} manage.py scan_folders --apply &gt; /home/LogFiles/scan_folders.log 2&gt;&amp;1 &amp;
+# Fix paths later, from the last completed scan:
+{{ ssh_python }} manage.py fix_folder_paths --all --dry-run
+{{ ssh_python }} manage.py fix_folder_paths --all
+{{ ssh_python }} manage.py fix_folder_paths --contract-id 1234
+# A scan stuck as "running" after a dropped session:
+{{ ssh_python }} manage.py scan_folders --force</pre>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>Status</span>
+            <div class="d-flex align-items-center gap-3">
+                <span class="small text-muted" id="last-refreshed-label">Last refreshed —</span>
+                <button type="button" class="btn btn-secondary btn-sm" id="folder-scan-refresh">Refresh</button>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="folder-scan-auto" checked>
+                    <label class="form-check-label" for="folder-scan-auto">Auto-refresh (3s)</label>
+                </div>
+            </div>
+        </div>
+        <div class="card-body" id="folder-scan-status-box">
+            {% include "contracts/folder_scan/_status_inner.html" with counter_rows=counter_rows %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Log (last 300 lines)</div>
+        <div class="card-body p-0">
+            <div id="folder-scan-log-box" class="font-monospace small p-3" style="max-height: 480px; overflow-y: auto;"></div>
+        </div>
+    </div>
+</div>
+
+<script id="folder-scan-initial-data" type="application/json">{{ run_json|safe }}</script>
+<script src="{% static 'contracts/js/folder_scan_status.js' %}?v={{ cache_version }}"></script>
+{% endblock %}

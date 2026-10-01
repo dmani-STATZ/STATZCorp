@@ -174,6 +174,10 @@ from .shipment_views import (
 from .code_table_views import (
     code_table_admin,
 )
+from .folder_scan_views import (
+    folder_scan_status,
+    folder_scan_status_json,
+)
 from .admin_tools import supplier_admin_tools
 
 from .dynamic_tracker_views import (
@@ -208,6 +212,8 @@ __all__ = [
     'get_acknowledgment_letter',
     'update_acknowledgment_letter',
     'code_table_admin',
+    'folder_scan_status',
+    'folder_scan_status_json',
     'supplier_admin_tools',
     'PaymentForecastView',
     'upsert_payment_plan',

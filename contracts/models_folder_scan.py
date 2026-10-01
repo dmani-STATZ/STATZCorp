@@ -1,0 +1,153 @@
+"""SharePoint contract folder scan snapshot models."""
+
+from django.db import models
+
+
+class FolderScanRun(models.Model):
+    class Status(models.TextChoices):
+        RUNNING = 'running', 'Running'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+        ABANDONED = 'abandoned', 'Abandoned'
+
+    root_path = models.CharField(max_length=500, blank=True, default='', db_index=True)
+    company_ids = models.CharField(max_length=200, blank=True, default='')
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.RUNNING,
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    started_by = models.CharField(max_length=150, blank=True, default='')
+    apply_requested = models.BooleanField(default=False)
+    current_path = models.CharField(max_length=1000, blank=True, default='')
+
+    folders_saved = models.PositiveIntegerField(default=0)
+    graph_calls = models.PositiveIntegerField(default=0)
+    graph_retries = models.PositiveIntegerField(default=0)
+    contract_folders = models.PositiveIntegerField(default=0)
+    delivery_order_folders = models.PositiveIntegerField(default=0)
+    other_folders = models.PositiveIntegerField(default=0)
+    matched_expected = models.PositiveIntegerField(default=0)
+    matched_elsewhere = models.PositiveIntegerField(default=0)
+    matched_no_db_path = models.PositiveIntegerField(default=0)
+    matched_idiq = models.PositiveIntegerField(default=0)
+    no_contract_in_db = models.PositiveIntegerField(default=0)
+    duplicate_folders = models.PositiveIntegerField(default=0)
+    contracts_without_folder = models.PositiveIntegerField(default=0)
+    do_parent_mismatch = models.PositiveIntegerField(default=0)
+    drive_ids_written = models.PositiveIntegerField(default=0)
+    paths_fixed = models.PositiveIntegerField(default=0)
+
+    error_message = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self) -> str:
+        return f'FolderScanRun({self.root_path!r}, {self.status})'
+
+
+class ScannedFolder(models.Model):
+    class FolderKind(models.TextChoices):
+        CONTRACT = 'contract', 'Contract'
+        DELIVERY_ORDER = 'delivery_order', 'Delivery order'
+        OTHER = 'other', 'Other'
+
+    class MatchStatus(models.TextChoices):
+        MATCHED_EXPECTED = 'matched_expected', 'Matched expected'
+        MATCHED_ELSEWHERE = 'matched_elsewhere', 'Matched elsewhere'
+        MATCHED_NO_DB_PATH = 'matched_no_db_path', 'Matched no DB path'
+        MATCHED_IDIQ = 'matched_idiq', 'Matched IDIQ'
+        NO_CONTRACT_IN_DB = 'no_contract_in_db', 'No contract in DB'
+        DUPLICATE = 'duplicate', 'Duplicate'
+        NOT_CONTRACT_FOLDER = 'not_contract_folder', 'Not contract folder'
+
+    class DoParentStatus(models.TextChoices):
+        OK = 'ok', 'OK'
+        MISMATCH = 'mismatch', 'Mismatch'
+        NO_IDIQ_IN_DB = 'no_idiq_in_db', 'No IDIQ in DB'
+        NOT_NESTED = 'not_nested', 'Not nested'
+        NOT_APPLICABLE = 'not_applicable', 'Not applicable'
+
+    run = models.ForeignKey(
+        FolderScanRun,
+        on_delete=models.CASCADE,
+        related_name='folders',
+    )
+    drive_item_id = models.CharField(max_length=128, blank=True, default='')
+    parent_drive_item_id = models.CharField(max_length=128, blank=True, default='')
+    name = models.CharField(max_length=400, blank=True, default='')
+    path = models.CharField(max_length=1000, blank=True, default='')
+    depth = models.PositiveSmallIntegerField(default=0)
+    web_url = models.CharField(max_length=1000, blank=True, default='')
+    folder_kind = models.CharField(
+        max_length=20,
+        choices=FolderKind.choices,
+        default=FolderKind.OTHER,
+    )
+    parsed_contract_number = models.CharField(max_length=100, blank=True, default='')
+    normalized_contract_number = models.CharField(max_length=100, blank=True, default='')
+    contract = models.ForeignKey(
+        'Contract',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='scanned_folders',
+    )
+    idiq_contract = models.ForeignKey(
+        'IdiqContract',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='scanned_folders',
+    )
+    match_status = models.CharField(
+        max_length=30,
+        choices=MatchStatus.choices,
+        default=MatchStatus.NOT_CONTRACT_FOLDER,
+    )
+    files_url_at_scan = models.CharField(max_length=1000, blank=True, default='')
+    parent_contract_number = models.CharField(max_length=100, blank=True, default='')
+    do_parent_status = models.CharField(
+        max_length=20,
+        choices=DoParentStatus.choices,
+        default=DoParentStatus.NOT_APPLICABLE,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['run', 'normalized_contract_number']),
+            models.Index(fields=['run', 'drive_item_id']),
+        ]
+
+    def __str__(self) -> str:
+        return self.path or self.name
+
+
+class FolderScanLog(models.Model):
+    class Level(models.TextChoices):
+        INFO = 'INFO', 'Info'
+        WARN = 'WARN', 'Warn'
+        ERROR = 'ERROR', 'Error'
+
+    run = models.ForeignKey(
+        FolderScanRun,
+        on_delete=models.CASCADE,
+        related_name='logs',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    level = models.CharField(
+        max_length=10,
+        choices=Level.choices,
+        default=Level.INFO,
+    )
+    message = models.CharField(max_length=2000, blank=True, default='')
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self) -> str:
+        return f'{self.level}: {self.message[:80]}'

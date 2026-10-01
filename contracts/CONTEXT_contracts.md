@@ -233,6 +233,14 @@ use the shipment-completion definition instead.
   - URLs: `api/download-file/`, `api/delete-file/`, `api/folder-weburl/`.
   - UI: multi-select checkboxes on files and folders, single **Actions** dropdown menu (Save Path, Open in SharePoint, Download, staff-gated Delete with confirmation modal). Selection clears on folder navigation. Breadcrumb position is unchanged.
 - **Superuser admin:** `/contracts/companies/`, `/contracts/code-tables/`, `/contracts/admin-tools/` for bulk supplier SharePoint URLs.
+- **SharePoint Contract Folder Scanner** (Stage 1 — CLI + status page):
+  - On-demand Graph walk of the company SharePoint root (`Company.sharepoint_documents_path` or `SHAREPOINT_PATH_PREFIX`). Scans are keyed by **root path** (not company PK); all companies sharing a root are matched in one walk.
+  - Models: `FolderScanRun` (progress, counters, status), `ScannedFolder` (folder tree snapshot + match metadata), `FolderScanLog` (command log lines).
+  - `Contract.sharepoint_drive_item_id` stores the Graph drive item id when exactly one folder matches a contract (bulk-updated by the scan; not audited).
+  - Commands: `python manage.py scan_folders [--root] [--apply] [--force]`; `python manage.py fix_folder_paths [--root] (--all | --contract-id …) [--dry-run]`.
+  - Replace-on-success: when a scan completes, older runs for the same `root_path` (and their folders/logs) are deleted. Failed runs leave the last good snapshot.
+  - The scan **never** writes `files_url`. All path corrections go through `contracts.services.folder_scan.fix_paths.apply_folder_path_fixes` (same code path as `scan_folders --apply` and the future Stage 2 UI).
+  - Superuser status page: `/contracts/folder-scan/` and JSON poll `/contracts/folder-scan/status.json` (latest run for `request.active_company` root).
 - **Supporting APIs:** `/contracts/search/`, `/contracts/clin/<id>/notes/`, `/contracts/clin/<id>/details/`, `/contracts/api/options/<field>/`, `/contracts/api/clin/<id>/update-field/`, `/contracts/clin/<clin_pk>/splits/`, `/contracts/api/shipments/*`, `/contracts/api/nsn/create`, `/contracts/api/buyers/create`, `/contracts/api/suppliers/create`, `/contracts/api/day-counts/`, `/contracts/api/payment-history/*`.
   - `contract_search` (`/contracts/search/`) supports dash-free contract-number input by normalizing dashes at query time with a `Replace` annotation on `contract_number`; this is runtime-only behavior and does not require model or migration changes.
 

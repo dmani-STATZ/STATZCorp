@@ -85,4 +85,11 @@
     </svg>
     Code Tables
 </a>
+<a href="{% url 'contracts:folder_scan_status' %}"
+   class="menu-item {% if request.resolver_match.url_name == 'folder_scan_status' %}active{% endif %}">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M7 17h10" />
+    </svg>
+    Folder Scan
+</a>
 {% endif %}

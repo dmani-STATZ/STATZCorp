@@ -140,6 +140,8 @@ from .views import (
     complete_clin_shipping,
     # Code table views
     code_table_admin,
+    folder_scan_status,
+    folder_scan_status_json,
 )
 
 from .views.contract_views import check_contract_number
@@ -919,6 +921,12 @@ urlpatterns = [
     ),
     # Code table management (superuser-only)
     path("code-tables/", code_table_admin, name="code_table_admin"),
+    path("folder-scan/", folder_scan_status, name="folder_scan_status"),
+    path(
+        "folder-scan/status.json",
+        folder_scan_status_json,
+        name="folder_scan_status_json",
+    ),
     # Admin tools
     path("admin-tools/", supplier_admin_tools, name="admin_tools"),
     # Dynamic Contract Tracking Module

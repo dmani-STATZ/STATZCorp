@@ -137,6 +137,9 @@ class Contract(AuditModel):
     cmmc_l2_c3pao = models.BooleanField(default=False)
     cmmc_l3 = models.BooleanField(default=False)
     files_url = models.CharField(max_length=400, null=True, blank=True)
+    sharepoint_drive_item_id = models.CharField(
+        max_length=128, blank=True, default='', db_index=True
+    )
     reviewed = models.BooleanField(null=True, blank=True)
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='contract_reviewed_by')
     reviewed_on = models.DateTimeField(null=True, blank=True)
@@ -2242,4 +2245,10 @@ class PartnerReconciliationRow(models.Model):
     def __str__(self):
         return f"{self.partner_contract_number} — {self.get_status_display()}"
 
+
+from contracts.models_folder_scan import (  # noqa: E402, F401
+    FolderScanLog,
+    FolderScanRun,
+    ScannedFolder,
+)
 

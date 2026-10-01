@@ -1,0 +1,27 @@
+{% if run %}
+<span class="badge {% if run.status == 'running' %}bg-primary{% elif run.status == 'completed' %}bg-success{% elif run.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %} mb-2" id="scan-status-badge">{{ run.get_status_display }}</span>
+<dl class="row small mb-3">
+    <dt class="col-sm-3">Root</dt><dd class="col-sm-9" id="scan-root-path">{{ run.root_path }}</dd>
+    <dt class="col-sm-3">Started</dt><dd class="col-sm-9" id="scan-started">{{ run.started_at }}</dd>
+    <dt class="col-sm-3">Finished</dt><dd class="col-sm-9" id="scan-finished">{{ run.finished_at|default:"—" }}</dd>
+    <dt class="col-sm-3">Heartbeat</dt><dd class="col-sm-9" id="scan-heartbeat">{{ run.heartbeat_at|default:"—" }}</dd>
+    <dt class="col-sm-3">Current path</dt><dd class="col-sm-9 text-break" id="scan-current-path">{{ run.current_path|default:"—" }}</dd>
+</dl>
+<div class="row g-2" id="scan-counters">
+    {% for field, label, value in counter_rows %}
+    <div class="col-6 col-md-4 col-lg-3 {% if field == 'folders_saved' %}fs-5 fw-semibold{% endif %}">
+        <div class="border rounded p-2 h-100">
+            <div class="text-muted small">{{ label }}</div>
+            <div class="scan-counter" data-field="{{ field }}">{{ value }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% if run.error_message %}
+<div class="alert alert-danger mt-3 mb-0 small" id="scan-error">{{ run.error_message }}</div>
+{% else %}
+<div class="alert alert-danger mt-3 mb-0 small d-none" id="scan-error"></div>
+{% endif %}
+{% else %}
+<p class="text-muted mb-0" id="scan-empty">No folder scan runs yet for this company's root path.</p>
+{% endif %}

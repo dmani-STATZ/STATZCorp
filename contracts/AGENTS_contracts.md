@@ -282,6 +282,12 @@ This pattern (popup_base + popup view + popup_add + popup_edit) is the approved 
 - `SHAREPOINT_PATH_PREFIX` setting defines the global canonical root when `Company.sharepoint_documents_path` is unset. **`EXPLORER_SHAREPOINT_STRIP_PREFIX`** and **`EXPLORER_LOCAL_MOUNT`** map SharePoint paths to local OneDrive for Explorer opens. The **V87** library version token is duplicated across all three settings and must be bumped together. `get_contract_documents_root()` in `sharepoint_service.py` remains the documents-root helper for browser config and legacy path normalization.
 - When the path naming convention changes, update `Contract.get_sharepoint_relative_path()` (and IDIQ helpers in `sharepoint_paths.py` if IDIQ parent folders change). Validation is prefix-based and stays the same.
 - Contract field for stored folder path is `files_url` (NOT `file_url`). Status values that trigger the Closed Contracts segment: `Closed`, `Canceled` (canonical `ContractStatus.description` spelling, one L).
+
+### SharePoint folder scanner
+- All `files_url` corrections must go through `apply_folder_path_fixes` in `contracts/services/folder_scan/fix_paths.py` — no duplicate fix logic in views or commands.
+- The scan is **CLI-only** (`scan_folders`); do not add WebJobs, `ScheduledTask` rows, or heartbeat `TASK_FUNCTIONS` entries for it.
+- `normalize_path_for_compare` in `contracts/services/folder_scan/normalize.py` is for equality checks only; never persist its output as `files_url`.
+- Do **not** modify `contracts/services/sharepoint_service.py` or `sharepoint_paths.py` for scanner work; extend `contracts/services/folder_scan/` instead.
 - `intake_draft_documents_browser_view`, `intake_draft_details_api`, and `set_draft_file_path_api` are intake-facing views that live in `documents_views.py` because they reuse the shared browser template and SharePoint service layer. They import from `intake.*` internally (lazy imports inside the function body) to avoid circular imports at module level.
 - All file API endpoints now support dual-gate authorization: `contract_id` for canonical contracts, `draft_id` for intake drafts. Add this same dual-gate to any new file API endpoints added in the future.
 
