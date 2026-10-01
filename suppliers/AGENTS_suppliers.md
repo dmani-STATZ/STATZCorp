@@ -165,6 +165,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - `AuditModel.save` stamps `modified_by`/`created_by` — do not bypass `super().save()` in subclass overrides.
 - OpenRouter API key and fallback model list come from environment settings. Never commit these to VCS.
 - **Supplier portal API** (`/api/supplier-portal/`): public to session auth (middleware allow-list) but requires `X-API-Key` + HMAC (`X-Timestamp` / `X-Signature`). Secrets: `SUPPLIER_PORTAL_API_KEY`, `SUPPLIER_PORTAL_HMAC_SECRET`. Never expand the Phase 2 field allowlist without review. Excluded Supplier fields (probation, notes, cage_code, etc.) must stay unreadable/unwritable. Archived suppliers always `404`. Write audit goes to `SupplierPortalChangeLog` + optional `SUPPLIER_PORTAL_NOTIFY_EMAIL` — do not rely on `transactions.Transaction` for portal history. `POST …/send-email/` accepts only `{to, subject, body}` and always sends HTML via Graph from `GRAPH_MAIL_SENDER_CONTRACT` (caller cannot set From).
+- `supplier_contracts_export` (`GET /suppliers/<pk>/contracts/export/`) requires `@login_required` and `@require_GET`.
 
 ---
 
@@ -189,6 +190,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - `supplier_enrich.html` contains a large inline `<script>` block that POSTs to `apply-enrichment/` and `ai-model/config/`. Changes to the JSON payload shape in `SupplierApplyEnrichmentView` or `GlobalAIModelConfigView` must be mirrored here and in `static/suppliers/js/supplier_enrich.js`.
 - `supplier_detail.html` references `{% url 'contracts:contact_list' %}`, `{% url 'contracts:supplier_add_certification' %}`, `{% url 'contracts:supplier_add_classification' %}`, and `{% url 'contracts:contract_management' %}`. Verify these `contracts` URL names exist before deploying template changes.
 - `supplier_edit.js` tracks form field changes using DOM selectors tied to `supplier_edit.html` field IDs. If field IDs change in the template, update the JS selectors.
+- **Supplier contracts Excel export:** the 17 column headers and order in `SUPPLIER_CONTRACTS_EXPORT_HEADERS` (`suppliers/views.py`) are a user-facing contract (suppliers receive this file) — change only with sign-off. Preserve `_xlsx_safe_set` on every cell write (formula-injection guard for strings starting with `=`, `+`, `-`, `@`).
 
 ---
 
@@ -241,6 +243,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 14. **`SupplierContactCategory` is global** — do not add a supplier FK; scope is implicit through `Contact.supplier`.
 15. **RFQ dispatch (implemented 2026-06-30):** RFQ emails target all contacts with the **Sales** category (`SALES_CATEGORY_NAME` in `suppliers/contact_categories.py`). Migration `0013_migrate_rfq_email_to_sales_contacts` backfilled Sales contacts from legacy `rfq_email` values. `Supplier.rfq_email` is deprecated/dormant — dispatch falls back to it only when no Sales contacts exist; see `sales/services/email.py::resolve_supplier_rfq_recipients`. On the supplier detail page, **Sales** category pills on contact cards are the canonical RFQ-recipient signal; the standalone RFQ Email section was removed.
 16. **`SupplierAlias` is manual-entry only.** Cori/Barb add and remove aliases on the supplier detail page (`save_supplier_alias` / `delete_supplier_alias`). The DIBBS scraper, SAM stub helpers (`sales/services/suppliers.py`), enrichment pipeline, and supplier portal API must never write `SupplierAlias`. Case-insensitive duplicate prevention lives in the view (`name__iexact`); the `UniqueConstraint` on `(supplier, name)` is a DB backstop only — do not rely on it for the user-facing error.
+17. **openpyxl rejects tz-aware datetimes** — convert `DateTimeField` values via `timezone.localtime(value).date()` before writing Excel date cells (`supplier_contracts_export`).
 
 ---
 

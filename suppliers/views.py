@@ -1,7 +1,8 @@
 import json
 import os
 import re
-from datetime import timedelta
+from datetime import date, datetime, timedelta
+from io import BytesIO
 
 from django.conf import settings
 from django.db import models
@@ -17,8 +18,9 @@ from django.db.models import (
     Prefetch,
 )
 from django.db.models.functions import Coalesce
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.generic import TemplateView, DetailView, View, ListView
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -28,6 +30,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import urlparse
+
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
 
 from contracts.models import (
     Contract,
@@ -1182,6 +1187,158 @@ class SuppliersInfoByType(LoginRequiredMixin, ListView):
 
         context['type_label'] = label_map.get(slug, 'Suppliers')
         return context
+
+
+SUPPLIER_CONTRACTS_EXPORT_HEADERS = (
+    "Status",
+    "PO #",
+    "IDIQ #",
+    "Contract #",
+    "Buyer",
+    "Type of Contract",
+    "CLIN",
+    "Supplier",
+    "Award Date",
+    "Contract Status",
+    "NSN",
+    "NSN Description",
+    "Target Ship Date",
+    "CLIN Due Date",
+    "QTY",
+    "Ship Date",
+    "Ship QTY",
+)
+
+
+def _xlsx_safe_set(cell, value, *, date_format=None):
+    if value is None or value == "":
+        cell.value = None
+        return
+    if isinstance(value, datetime):
+        value = timezone.localtime(value).date()
+    if isinstance(value, date):
+        cell.value = value
+        if date_format:
+            cell.number_format = date_format
+        return
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        cell.value = value
+        return
+    text = str(value)
+    cell.value = text
+    if text and text[0] in ("=", "+", "-", "@"):
+        cell.data_type = "s"
+
+
+def _contract_export_open_status(contract):
+    status = contract.status
+    if status and status.description:
+        desc = status.description.strip().casefold()
+        if desc in ("closed", "cancelled", "canceled"):
+            return "Closed"
+    return "Open"
+
+
+@login_required
+@require_GET
+def supplier_contracts_export(request, pk):
+    supplier = get_object_or_404(Supplier, pk=pk)
+
+    clins = list(
+        Clin.objects.filter(supplier=supplier, contract__isnull=False)
+        .select_related(
+            "supplier",
+            "nsn",
+            "contract",
+            "contract__status",
+            "contract__idiq_contract",
+            "contract__buyer",
+            "contract__contract_type",
+        )
+        .order_by(
+            "-contract__award_date",
+            "contract__contract_number",
+            "item_number",
+            "id",
+        )
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Contracts"
+
+    header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    col_max_len = [len(h) for h in SUPPLIER_CONTRACTS_EXPORT_HEADERS]
+
+    for col_idx, header in enumerate(SUPPLIER_CONTRACTS_EXPORT_HEADERS, start=1):
+        cell = ws.cell(row=1, column=col_idx)
+        _xlsx_safe_set(cell, header)
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+
+    date_fmt = "mm/dd/yyyy"
+    for row_idx, clin in enumerate(clins, start=2):
+        contract = clin.contract
+        nsn = clin.nsn
+        row_values = [
+            _contract_export_open_status(contract),
+            contract.po_number,
+            contract.idiq_contract.contract_number if contract.idiq_contract else None,
+            contract.contract_number,
+            contract.buyer.description if contract.buyer else None,
+            contract.contract_type.description if contract.contract_type else None,
+            clin.item_number,
+            supplier.name,
+            contract.award_date,
+            contract.status.description if contract.status else None,
+            nsn.nsn_code if nsn else None,
+            nsn.description if nsn else None,
+            clin.supplier_due_date,
+            clin.due_date,
+            clin.order_qty,
+            clin.ship_date,
+            clin.ship_qty,
+        ]
+        for col_idx, value in enumerate(row_values, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            is_date_col = col_idx in (9, 13, 14, 16)
+            _xlsx_safe_set(
+                cell,
+                value,
+                date_format=date_fmt if is_date_col else None,
+            )
+            if value is not None and value != "":
+                if isinstance(value, (date, datetime)):
+                    display_len = 10
+                elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                    display_len = len(str(value))
+                else:
+                    display_len = len(str(value))
+                col_max_len[col_idx - 1] = max(col_max_len[col_idx - 1], display_len)
+
+    ws.freeze_panes = "A2"
+    if ws.max_row >= 1 and ws.max_column >= 1:
+        ws.auto_filter.ref = ws.dimensions
+
+    for col_idx, width in enumerate(col_max_len, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = min(
+            width + 2, 50
+        )
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = (
+        f"{slugify(supplier.name) or 'supplier'}-{supplier.pk}-contracts-"
+        f"{timezone.localdate():%Y%m%d}.xlsx"
+    )
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 # Contact model note: Contact.name is a single TextField (not first_name/last_name).

@@ -607,7 +607,15 @@
 <section id="section-contracts" class="supplier-section-anchor">
   <div class="card card-padded shadow-sm">
   <div class="row-between mb-3">
-      <h2 class="text-lg font-semibold">Contracts</h2>
+      <div class="d-flex align-items-center gap-2">
+        <h2 class="text-lg font-semibold">Contracts</h2>
+        <a href="{% url 'suppliers:supplier_contracts_export' supplier.pk %}"
+           class="btn btn-sm btn-outline-success py-0 px-1"
+           title="Export this supplier's contracts to Excel"
+           aria-label="Export contracts to Excel">
+          <i class="bi bi-file-earmark-excel"></i>
+        </a>
+      </div>
       {% if clin_summary.total_clins %}
         <p class="text-sm text-gray-500">CLINs: {{ clin_summary.total_clins }} | Value: ${{ clin_summary.total_value|floatformat:0|intcomma }}</p>
       {% endif %}

@@ -17,6 +17,7 @@ from suppliers.views import (
     SuppliersInfoByType,
     GlobalAIModelConfigView,
     status_report,
+    supplier_contracts_export,
 )
 
 app_name = 'suppliers'
@@ -32,6 +33,7 @@ urlpatterns = [
     path('create/', SupplierCreateView.as_view(), name='supplier_create'),
     path('<int:pk>/', SupplierDetailView.as_view(), name='supplier_detail'),
     path('<int:pk>/detail/', SupplierDetailView.as_view(), name='supplier_detail_page'),
+    path('<int:pk>/contracts/export/', supplier_contracts_export, name='supplier_contracts_export'),
     path(
         '<int:pk>/contact/<int:contact_id>/categories/',
         supplier_contact_set_categories,
