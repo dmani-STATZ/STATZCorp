@@ -32,6 +32,9 @@
     .delete-btn { cursor: pointer; background: none; border: none; color: #ef4444; font-size: 1.1rem; opacity: 0.4; }
     .delete-btn:hover { opacity: 1; }
     .empty-msg { text-align: center; color: #9ca3af; padding: 2rem; }
+    .dt-po-link { color: #2563eb; text-decoration: none; }
+    .dt-po-link:hover { text-decoration: underline; }
+    [data-bs-theme="dark"] .dt-po-link { color: #93c5fd; }
 
     .dt-modal { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); }
     .dt-modal.is-open { display: flex; }
@@ -366,7 +369,18 @@ function buildSystemCell(rec, col) {
     if (kind === 'contract') {
         td.textContent = rec.contract_number || '—';
     } else if (kind === 'po') {
-        td.textContent = rec.po_number || '—';
+        const po = rec.po_number || '';
+        if (rec.contract_id && po) {
+            const a = document.createElement('a');
+            a.href = `/contracts/${rec.contract_id}/`;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = po;
+            a.className = 'dt-po-link';
+            td.appendChild(a);
+        } else {
+            td.textContent = po || '—';
+        }
     } else if (kind === 'close') {
         td.style.textAlign = 'center';
         const btn = document.createElement('button');
@@ -388,6 +402,7 @@ function slugifyContract(num) {
 function buildRow(rec) {
     const tr = document.createElement('tr');
     tr.dataset.id = rec.id;
+    if (rec.contract_id) tr.dataset.contractId = rec.contract_id;
     if (rec.contract_number) tr.id = slugifyContract(rec.contract_number);
     if (rec.is_highlighted) tr.classList.add('highlighted');
 
@@ -601,6 +616,7 @@ function snapshotRows() {
             id,
             data,
             is_highlighted: tr.classList.contains('highlighted'),
+            contract_id: tr.dataset.contractId ? parseInt(tr.dataset.contractId, 10) : null,
             contract_number: getSys('contract'),
             po_number: getSys('po'),
         });
@@ -896,6 +912,7 @@ async function submitAddRecord() {
         const tbody = document.getElementById('dt-tbody');
         const newRow = buildRow({
             id: data.record_id,
+            contract_id: data.contract_id,
             contract_number: data.contract_number,
             po_number: data.po_number,
             data: {},

@@ -84,6 +84,7 @@ def tracker_detail(request, schema_id):
     records_data = [
         {
             'id': r.pk,
+            'contract_id': r.contract_id,
             'contract_number': r.contract.contract_number if r.contract else '',
             'po_number': (r.contract.po_number if r.contract and r.contract.po_number else ''),
             'data': r.data or {},
@@ -220,6 +221,7 @@ def api_add_record(request, schema_id):
     return JsonResponse({
         'status': 'success',
         'record_id': record.pk,
+        'contract_id': contract.pk if contract else None,
         'contract_number': contract.contract_number if contract else '',
         'po_number': contract.po_number if contract else '',
     })
