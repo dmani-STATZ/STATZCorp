@@ -116,6 +116,16 @@ permission gating silently stops applying.
   failure (`fetch_error=True`) is not "no record", and its retry must go through
   `get_or_fetch_cage(force_refresh=True)`. Do not edit `dibbs/services/sam_entity.py` for this.
 - Panel JS must not inject a response that was redirected or non-OK (login page in a card).
+- **`get_open_solicitations` (the `sols` panel) is read-only.** It reads `QuoteSupplierNSN` and
+  never writes it, and calls no write path in `services/capabilities.py` / `matching.py`. NSNs are
+  compared via `nsn_query_variants()`; `__in` lookups run in chunks of `NSN_IN_CHUNK` (500) because
+  SQL Server rejects > 2,100 parameters. Use `.values()` on lines, not `select_related` on the
+  solicitation (that drags `pdf_blob`). Est. Value: call `queue.latest_unit_costs`; don't add a
+  second price lookup. "Open" = `return_by_date >= today`, deliberately with no status filter.
+- `get_sam_entity` returns `fields` (dict), not `rows`. Empty fields and empty groups are omitted
+  by the template; `registration_expiry` is a `date` or, if unparseable, the raw string (no badges).
+- Chip styling in dark mode: `text-bg-light` stays bright white, so classification chips use
+  `bg-body-secondary text-body border`.
 
 ### The Phase 2 drawer form (`templates/quote/mailbox/inbox.html`)
 - **It is one form shared by every SOL in the message.** All per-SOL state goes through

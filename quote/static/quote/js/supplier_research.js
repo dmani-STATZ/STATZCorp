@@ -8,7 +8,31 @@
     '<div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>' +
     'Loading…</div>';
 
+  var INLINE_SPINNER_HTML =
+    '<span class="spinner-border spinner-border-sm text-body-secondary" role="status" aria-label="Loading"></span>';
+
+  // Header badge: a small muted note instead of the full alert block.
+  function showInlineError(container, url) {
+    container.textContent = '';
+    var note = document.createElement('span');
+    note.className = 'text-danger small';
+    note.textContent = 'status unavailable';
+    container.appendChild(note);
+    if (url) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-link btn-sm p-0 ms-2 align-baseline';
+      btn.setAttribute('data-panel-reload', url);
+      btn.textContent = 'retry';
+      container.appendChild(btn);
+    }
+  }
+
   function showAlert(container, message, url) {
+    if (container.hasAttribute('data-panel-inline')) {
+      showInlineError(container, url);
+      return;
+    }
     container.textContent = '';
     var box = document.createElement('div');
     box.className = 'alert alert-danger d-flex flex-wrap align-items-center gap-3 mb-0';
@@ -28,7 +52,7 @@
   }
 
   function loadPanel(container, url) {
-    container.innerHTML = SPINNER_HTML;
+    container.innerHTML = container.hasAttribute('data-panel-inline') ? INLINE_SPINNER_HTML : SPINNER_HTML;
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, TIMEOUT_MS);
 

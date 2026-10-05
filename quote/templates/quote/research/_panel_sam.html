@@ -1,10 +1,94 @@
 {% if sam.state == 'ok' %}
-  <dl class="row mb-0">
-    {% for label, value in sam.rows %}
-      <dt class="col-sm-3 text-body-secondary">{{ label }}</dt>
-      <dd class="col-sm-9 mb-2">{{ value }}</dd>
-    {% endfor %}
-  </dl>
+{% with f=sam.fields %}
+  {% if f.legal_name or f.cage or f.uei or f.website or f.sam_url %}
+  <h6 class="text-body-secondary mb-2">Identity</h6>
+  <div class="row g-3 mb-4">
+    {% if f.legal_name %}<div class="col-12 col-md-6 col-xl-4"><div class="small text-body-secondary text-uppercase">Legal Name</div><div class="fw-semibold">{{ f.legal_name }}</div></div>{% endif %}
+    {% if f.cage %}<div class="col-12 col-md-6 col-xl-4"><div class="small text-body-secondary text-uppercase">CAGE</div><div class="fw-semibold">{{ f.cage }}</div></div>{% endif %}
+    {% if f.uei %}<div class="col-12 col-md-6 col-xl-4"><div class="small text-body-secondary text-uppercase">UEI</div><div class="fw-semibold">{{ f.uei }}</div></div>{% endif %}
+    {% if f.website %}
+      <div class="col-12 col-md-6 col-xl-4">
+        <div class="small text-body-secondary text-uppercase">Website</div>
+        <div class="fw-semibold">{% if f.website_href %}<a href="{{ f.website_href }}" target="_blank" rel="noopener noreferrer">{{ f.website }}</a>{% else %}{{ f.website }}{% endif %}</div>
+      </div>
+    {% endif %}
+    {% if f.sam_url %}
+      <div class="col-12 col-md-6 col-xl-4">
+        <div class="small text-body-secondary text-uppercase">SAM.gov Profile</div>
+        <div class="fw-semibold"><a href="{{ f.sam_url }}" target="_blank" rel="noopener noreferrer">View on SAM.gov</a></div>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if f.registration_status or f.registration_expiry or f.excluded is not None or f.last_fetched %}
+  <h6 class="text-body-secondary mb-2">Registration</h6>
+  <div class="row g-3 mb-4">
+    {% if f.registration_status %}
+      <div class="col-6 col-md-3">
+        <div class="small text-body-secondary text-uppercase">Status</div>
+        <div class="fw-semibold"><span class="badge {% if f.registration_status|lower == 'active' %}text-bg-success{% else %}text-bg-warning{% endif %}">{{ f.registration_status }}</span></div>
+      </div>
+    {% endif %}
+    {% if f.registration_expiry %}
+      <div class="col-6 col-md-3">
+        <div class="small text-body-secondary text-uppercase">Expires</div>
+        <div class="fw-semibold">
+          {% if f.expires_in_days is not None %}{{ f.registration_expiry|date:"Y-m-d" }}{% else %}{{ f.registration_expiry }}{% endif %}
+          {% if f.expires_in_days is not None %}
+            {% if f.expires_in_days < 0 %}<span class="badge text-bg-danger">expired</span>
+            {% elif f.expires_in_days <= 60 %}<span class="badge text-bg-warning">expires in {{ f.expires_in_days }} day{{ f.expires_in_days|pluralize }}</span>{% endif %}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+    {% if f.excluded is not None %}
+      <div class="col-6 col-md-3">
+        <div class="small text-body-secondary text-uppercase">Excluded</div>
+        <div class="fw-semibold">{% if f.excluded %}<span class="badge text-bg-danger">EXCLUDED</span>{% else %}<span class="badge text-bg-success">No</span>{% endif %}</div>
+      </div>
+    {% endif %}
+    {% if f.last_fetched %}
+      <div class="col-6 col-md-3">
+        <div class="small text-body-secondary text-uppercase">Last Fetched</div>
+        <div class="fw-semibold">{{ f.last_fetched|date:"Y-m-d H:i" }}</div>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if f.physical_address or f.mailing_address %}
+  <h6 class="text-body-secondary mb-2">Addresses</h6>
+  <div class="row g-3 mb-4">
+    {% if f.physical_address %}<div class="col-12 col-md-6"><div class="small text-body-secondary text-uppercase">Physical</div><div class="fw-semibold">{{ f.physical_address|linebreaksbr }}</div></div>{% endif %}
+    {% if f.mailing_address %}<div class="col-12 col-md-6"><div class="small text-body-secondary text-uppercase">Mailing</div><div class="fw-semibold">{{ f.mailing_address|linebreaksbr }}</div></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if f.sba_flags or f.naics or f.psc %}
+  <h6 class="text-body-secondary mb-2">Classifications</h6>
+  <div class="row g-3">
+    {% if f.sba_flags %}
+      <div class="col-12">
+        <div class="small text-body-secondary text-uppercase mb-1">SBA Flags</div>
+        <div class="d-flex flex-wrap gap-1">{% for item in f.sba_flags %}<span class="badge bg-body-secondary text-body border">{{ item }}</span>{% endfor %}</div>
+      </div>
+    {% endif %}
+    {% if f.naics %}
+      <div class="col-12">
+        <div class="small text-body-secondary text-uppercase mb-1">NAICS</div>
+        <div class="d-flex flex-wrap gap-1">{% for item in f.naics %}<span class="badge bg-body-secondary text-body border">{{ item }}</span>{% endfor %}</div>
+      </div>
+    {% endif %}
+    {% if f.psc %}
+      <div class="col-12">
+        <div class="small text-body-secondary text-uppercase mb-1">PSC</div>
+        <div class="d-flex flex-wrap gap-1">{% for item in f.psc %}<span class="badge bg-body-secondary text-body border">{{ item }}</span>{% endfor %}</div>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+{% endwith %}
 {% elif sam.state == 'error' %}
   <div class="alert alert-warning d-flex flex-wrap align-items-center gap-3 mb-0" role="alert">
     <span>

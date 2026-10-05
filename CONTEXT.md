@@ -43,14 +43,23 @@ approved-source rows, and full DLA award history, plus a three-tab Excel downloa
 **URLs (namespace `quote:`):**
 - `GET /quote/research/?cage=XXXXX` — `supplier_research` (shell only: validates the CAGE, renders
   four spinner cards, runs **no** queries)
-- `GET /quote/research/<cage>/panel/<status|sam|awards|approved>/` — `supplier_research_panel`
-  (server-rendered HTML fragment; 400 bad CAGE, 404 unknown panel)
+- `GET /quote/research/<cage>/panel/<status|sam|sols|awards|approved>/` — `supplier_research_panel`
+  (server-rendered HTML fragment; 400 bad CAGE, 404 unknown panel). `status` is the small badge in
+  the page header; the cards are SAM.gov Entity → Open Solicitations → Award History → Approved Sources.
 - `GET /quote/research/<cage>/export/` — `supplier_research_export`
 
 **Panel architecture:** `static/quote/js/supplier_research.js` fetches all four panels in parallel,
 so each card fills in on its own (a slow SAM lookup no longer blocks the rest). 60 s abort,
 per-panel Retry, and a redirect/non-OK guard so a login page is never injected into a card.
 `?refresh=1` is honored on the `sam` panel only (`get_or_fetch_cage(force_refresh=True)`).
+
+**Open Solicitations panel (`sols`):** open DIBBS solicitation lines (`return_by_date >= today`,
+no workflow-status filter) whose NSN is an approved-source NSN for the CAGE, an NSN it has won
+before (non-faux `DibbsAward`), or a `QuoteSupplierNSN` capability of a STATZ `Supplier` with that
+CAGE. NSNs go through `nsn_query_variants()` and are looked up in chunks of `NSN_IN_CHUNK = 500`.
+Est. Value reuses `quote.services.queue.latest_unit_costs` (qty × latest DLA unit price). Strictly
+read-only; surfacing approved-source matches here does not make them an automatic match source in
+the queue (Known Gap #7 stands). Excel adds an `Open Solicitations` sheet built at export time.
 
 **Data sources (read-only):**
 - Existing supplier — `suppliers.Supplier.cage_code` via `find_existing_supplier()`

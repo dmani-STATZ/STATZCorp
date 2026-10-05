@@ -458,7 +458,7 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 | `quote:outcome_detail` | `/quote/our-bids/<id>/` | XHR fragment |
 | `quote:reconcile_now` | `/quote/our-bids/reconcile/` | POST |
 | `quote:supplier_research` | `/quote/research/?cage=` | GET — CAGE research (SAM, approved sources, awards) |
-| `quote:supplier_research_panel` | `/quote/research/<cage>/panel/<panel>/` | GET — HTML fragment for `status` / `sam` / `awards` / `approved`; `?refresh=1` on `sam` only |
+| `quote:supplier_research_panel` | `/quote/research/<cage>/panel/<panel>/` | GET — HTML fragment for `status` / `sam` / `sols` / `awards` / `approved`; `?refresh=1` on `sam` only |
 | `quote:supplier_research_export` | `/quote/research/<cage>/export/` | GET — three-tab Excel workbook |
 | `quote:quotes` | `/quote/quotes/?tab=waiting\|logged&closed=1&sent=1&past=1` | the Quotes page |
 | `quote:quote_tray` | `/quote/quotes/tray/?sol=&supplier=` | tray fragment for a chosen SOL + supplier (XHR) |
@@ -484,15 +484,32 @@ One server-rendered page for sales reps to research any CAGE: STATZ supplier mat
 | `GET /quote/research/<cage>/panel/<panel>/` | `research_views.supplier_research_panel` |
 | `GET /quote/research/<cage>/export/` | `research_views.supplier_research_export` |
 
-**Panels.** The shell renders four cards (STATZ Status, SAM.gov Entity, Award History, Approved
-Sources), each with `data-panel-url`. `static/quote/js/supplier_research.js` fetches all four in
+**Panels.** The shell renders a header row (CAGE, an inline STATZ-status badge, Download Excel)
+and four cards in this order: SAM.gov Entity, Open Solicitations (`sols`), Award History,
+Approved Sources. Each has `data-panel-url`; the status badge is `data-panel-inline` and uses a
+small spinner / "status unavailable" retry instead of the alert block.
+`static/quote/js/supplier_research.js` fetches all five in
 parallel (60 s abort, per-panel Retry, no injection when `response.redirected` or not `ok`).
 Fragments live in `templates/quote/research/_panel_<panel>.html`; each logs
 `supplier_research panel=… cage=… ms=…`. Awards and Approved Sources show 25 rows, rest behind
 "Show all" (`d-none` + `data-extra-row`, handled by the JS via event delegation).
 
 **Data rules.**
-- *SAM:* `get_sam_entity(cage, force_refresh=False)` returns `{state, rows, last_fetched}`.
+- *Open Solicitations (`get_open_solicitations`):* one row per open `dibbs.SolicitationLine`
+  whose NSN is in the union of (a) `ApprovedSource` for the CAGE, (b) non-faux `DibbsAward` NSNs
+  for the CAGE, (c) `QuoteSupplierNSN` of every `Supplier` with that CAGE. NSNs are expanded with
+  `nsn_query_variants()` (line NSNs are stored hyphenated) and looked up in chunks of
+  `NSN_IN_CHUNK = 500` (MSSQL 2,100-parameter limit), merged by line pk. "Open" is
+  `Solicitation.return_by_date >= today` and nothing else: no `QuoteSolicitation.status` filter, so
+  worked / bid / no-bid / auto-archived solicitations still show (the queue's own definition also
+  filters status, so this panel is intentionally broader). Est. Value = qty × the queue's
+  `latest_unit_costs()` price (the multiply is the only logic duplicated from `build_queue_rows`).
+  The "Imported" column is `Solicitation.import_date`; DIBBS issue date isn't stored. Read-only:
+  it never writes quote, dibbs or supplier tables. Excel gets a 4th sheet, `Open Solicitations`,
+  built at export time with a snapshot note in A1.
+- *SAM:* `get_sam_entity(cage, force_refresh=False)` returns `{state, fields, last_fetched}`
+  (`fields` is a dict of named values, populated only for `ok`; rendered as a grouped grid:
+  Identity / Registration / Addresses / Classifications).
   `lookup_cage()` always writes `found` (True / False); a failed call is cached by
   `get_or_fetch_cage` as `fetch_error=True` (cached 30 days), so `error` shows a **Retry SAM
   lookup** button that reloads the panel with `?refresh=1` (`force_refresh=True`).
@@ -601,7 +618,9 @@ Run `python manage.py test quote dibbs`.
 6. Backfilled rows all carry the migration time as `status_changed_at`, so every
    currently-unmatched solicitation archives on the same day, 7 days after `0004` ran.
 7. Approved sources are not an automatic match source (spec lists NSN / FSC /
-   Manual only); the workspace offers one-click **Link** instead.
+   Manual only); the workspace offers one-click **Link** instead. (The Supplier Research
+   **Open Solicitations** panel surfaces approved-source matches read-only; it does not change
+   this: the queue still does not match on them.)
 8. Capability import is add-only: there is no "replace this supplier's list with this
    file". Bare 4-digit numbers in an items column are read as FSCs, so a quantity column
    read as items shows up as odd FSCs in the review (each shows how many open SOLs it

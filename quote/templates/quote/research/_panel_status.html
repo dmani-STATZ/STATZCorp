@@ -1,7 +1,1 @@
-{% if existing_supplier %}
-  <a href="{{ existing_supplier.detail_url }}" class="badge text-bg-success text-decoration-none fs-6">
-    Existing STATZ Supplier — {{ existing_supplier.name }}
-  </a>
-{% else %}
-  <span class="text-body-secondary">Not a current STATZ supplier</span>
-{% endif %}
+{% if existing_supplier %}<a class="badge text-bg-success text-decoration-none fs-6" href="{{ existing_supplier.detail_url }}" title="{{ existing_supplier.name }}">Existing STATZ supplier →</a>{% else %}<span class="badge text-bg-secondary fs-6">Not a STATZ supplier</span>{% endif %}

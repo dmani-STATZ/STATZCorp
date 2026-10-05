@@ -15,21 +15,22 @@ from quote.services import supplier_research as sr
 
 logger = logging.getLogger(__name__)
 
-# (key, card title) in on-page order.
+# (key, card title) in on-page order. ``status`` is not a card: it fills the
+# inline badge in the page header, but it is still a valid panel endpoint.
 PANELS = (
-    ('status', 'STATZ Status'),
     ('sam', 'SAM.gov Entity'),
+    ('sols', 'Open Solicitations'),
     ('awards', 'Award History'),
     ('approved', 'Approved Sources'),
 )
-PANEL_KEYS = {key for key, _title in PANELS}
+PANEL_KEYS = {key for key, _title in PANELS} | {'status'}
 COLLAPSE_AFTER = 25  # table rows visible before the "Show all" toggle
 
 
 @login_required
 @require_GET
 def supplier_research(request):
-    """Shell only: validates the CAGE and renders four empty panel cards.
+    """Shell only: validates the CAGE and renders the header badge + four empty cards.
 
     No data queries here -- every panel loads from supplier_research_panel.
     """
@@ -39,6 +40,7 @@ def supplier_research(request):
     if cage_raw and form.is_valid():
         cage = form.cleaned_data['cage']
         context['cage'] = cage
+        context['status_url'] = reverse('quote:supplier_research_panel', args=[cage, 'status'])
         context['panels'] = [
             (key, title, reverse('quote:supplier_research_panel', args=[cage, key]))
             for key, title in PANELS
@@ -56,6 +58,8 @@ def _panel_context(request, cage, panel):
             'sam': sr.get_sam_entity(cage, force_refresh=force),
             'refresh_url': reverse('quote:supplier_research_panel', args=[cage, 'sam']) + '?refresh=1',
         }
+    if panel == 'sols':
+        return {'sols': sr.get_open_solicitations(cage), 'collapse_after': COLLAPSE_AFTER}
     if panel == 'awards':
         summary = sr.get_award_summary(cage)
         awards = sr.get_awards(cage, limit=sr.AWARD_DISPLAY_LIMIT)

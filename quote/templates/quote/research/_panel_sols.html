@@ -1,0 +1,53 @@
+{% load humanize %}
+{% if sols.lines %}
+  <p class="text-body-secondary mb-2">
+    {{ sols.line_count|intcomma }} open line{{ sols.line_count|pluralize }} across {{ sols.sol_count|intcomma }} solicitation{{ sols.sol_count|pluralize }}
+    · est. {% if sols.est_total is not None %}${{ sols.est_total|floatformat:2|intcomma }}{% else %}—{% endif %}
+    · as of {{ sols.as_of|date:"H:i" }}
+  </p>
+  <div class="table-responsive">
+    <table class="table table-sm table-striped table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Sol #</th>
+          <th>Imported</th>
+          <th>Return By</th>
+          <th>Days Left</th>
+          <th>Set-Aside</th>
+          <th>NSN</th>
+          <th>Nomenclature</th>
+          <th class="text-end">Qty</th>
+          <th class="text-end">Est. Value</th>
+          <th>Why Matched</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in sols.lines %}
+          <tr{% if forloop.counter > collapse_after %} class="d-none" data-extra-row{% endif %}>
+            <td><a href="{{ row.sol_url }}">{{ row.sol_number }}</a></td>
+            <td>{% if row.imported %}{{ row.imported|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+            <td>{{ row.return_by|date:"Y-m-d" }}</td>
+            <td>
+              {% if row.days_left <= 3 %}<span class="badge text-bg-danger">{{ row.days_left }}</span>
+              {% elif row.days_left <= 7 %}<span class="badge text-bg-warning">{{ row.days_left }}</span>
+              {% else %}{{ row.days_left }}{% endif %}
+            </td>
+            <td>{{ row.set_aside|default:"—" }}</td>
+            <td>{{ row.nsn }}</td>
+            <td>{{ row.nomenclature|default:"" }}</td>
+            <td class="text-end">{% if row.quantity is not None %}{{ row.quantity|intcomma }}{% else %}—{% endif %}</td>
+            <td class="text-end">{% if row.est_value is not None %}${{ row.est_value|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+            <td>
+              {% for reason in row.reasons %}<span class="badge {% if reason == 'Approved source' %}text-bg-primary{% elif reason == 'Won before' %}text-bg-success{% else %}text-bg-secondary{% endif %}">{{ reason }}</span> {% endfor %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if sols.lines|length > collapse_after %}
+    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" data-show-all>Show all {{ sols.lines|length }}</button>
+  {% endif %}
+{% else %}
+  <p class="mb-0 text-body-secondary">No open solicitations match this supplier's NSNs right now.</p>
+{% endif %}

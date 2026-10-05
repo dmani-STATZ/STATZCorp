@@ -28,5 +28,12 @@
   `.values(*AWARD_DEDUPE_FIELDS).distinct()`; never count or sum raw rows.
 - Freshness is `Max(posted_date)` with `posted_date <= today` — never `award_date`.
 - MSSQL: every `order_by` field on a `.distinct()` query must also be in its `.values()` list.
+- **MSSQL 2,100-parameter limit:** never pass an unbounded list to `__in`. Chunk it (see
+  `NSN_IN_CHUNK = 500` in `supplier_research.py`, `IN_CHUNK` in `matching.py`), materialize each
+  chunk, and merge in Python.
+- `get_open_solicitations` is read-only: no writes to quote / dibbs / supplier tables, and no calls
+  into `matching.py` / `capabilities.py` functions that write. NSN comparison goes through
+  `nsn_query_variants()`. Est. Value comes from `queue.latest_unit_costs`, never a new price lookup.
+  "Open" is `return_by_date >= today` only.
 - `get_sam_entity` has three states (`ok` / `not_found` / `error`); a failed lookup must never
   render as "no record found".

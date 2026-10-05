@@ -5,7 +5,7 @@
 <div class="page-heading mb-4">
   <div>
     <h1 class="page-title">Supplier Research</h1>
-    <p class="page-subtitle">Look up a CAGE code to see STATZ status, SAM.gov data, approved sources, and DLA award history.</p>
+    <p class="page-subtitle">Look up a CAGE code to see SAM.gov data, open solicitations we could offer them on, award history, and approved sources.</p>
   </div>
 </div>
 
@@ -29,6 +29,9 @@
 {% if cage %}
 <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
   <h2 class="h3 mb-0">{{ cage }}</h2>
+  <span data-panel-url="{{ status_url }}" data-panel-key="status" data-panel-inline>
+    <span class="spinner-border spinner-border-sm text-body-secondary" role="status" aria-label="Loading status"></span>
+  </span>
   <a href="{% url 'quote:supplier_research_export' cage %}" class="btn btn-success ms-auto">
     Download Excel
   </a>
