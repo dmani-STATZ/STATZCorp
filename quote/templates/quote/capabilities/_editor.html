@@ -94,10 +94,10 @@
 
       {% if nsn_page.has_other_pages %}
       <nav class="cap-pager" aria-label="NSN pages">
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-page="{{ nsn_page.previous_page_number|default:'' }}"
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-page="{% if nsn_page.has_previous %}{{ nsn_page.previous_page_number }}{% endif %}"
                 {% if not nsn_page.has_previous %}disabled{% endif %}>&larr; Prev</button>
         <span class="small text-body-secondary">Page {{ nsn_page.number }} of {{ nsn_page.paginator.num_pages }}</span>
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-page="{{ nsn_page.next_page_number|default:'' }}"
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-page="{% if nsn_page.has_next %}{{ nsn_page.next_page_number }}{% endif %}"
                 {% if not nsn_page.has_next %}disabled{% endif %}>Next &rarr;</button>
       </nav>
       {% endif %}

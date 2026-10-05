@@ -513,6 +513,30 @@ class ScreenTests(CapabilityBase):
         self.assertContains(filtered, 'data-nsn="5305001112222"')
         self.assertNotContains(filtered, 'data-nsn="5340012345678"')
 
+    def test_editor_pages_past_fifty_nsns(self):
+        # 51 NSNs is the first time the pager renders; page 1 has no "previous",
+        # the last page has no "next" -- neither may raise.
+        QuoteSupplierNSN.objects.bulk_create([
+            QuoteSupplierNSN(supplier=self.vortex, nsn=f'5340{i:09d}', added_by=self.user)
+            for i in range(51)
+        ])
+        url = reverse('quote:capability_supplier', args=[self.vortex.pk])
+        ajax = {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}
+
+        first = self.client.get(url, **ajax)
+        self.assertEqual(first.status_code, 200)
+        self.assertContains(first, 'Page 1 of 2')
+        self.assertContains(first, 'data-page="2"')
+
+        last = self.client.get(url, {'page': 2}, **ajax)
+        self.assertEqual(last.status_code, 200)
+        self.assertContains(last, 'Page 2 of 2')
+        self.assertContains(last, 'data-page="1"')
+
+        filtered = self.client.get(url, {'q': '000000007'}, **ajax)
+        self.assertEqual(filtered.status_code, 200)
+        self.assertNotContains(filtered, 'Page 1 of')
+
     def test_preview_of_a_paste(self):
         resp = self.post_preview(text='5340-01-234-5678\n5340\n', supplier_id=self.vortex.pk)
         self.assertEqual(resp.status_code, 200)
