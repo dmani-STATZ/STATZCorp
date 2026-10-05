@@ -67,6 +67,7 @@ python manage.py import_release_notes --verbose   # extra logging
 
 ## Recent release notes
 
+- [2026-10-05-quotes-supplier-research](2026-10-05-quotes-supplier-research.md) — New: Supplier Research page (Quotes → Supplier Research). Enter a CAGE code to see SAM.gov data, approved-source capabilities, and DLA award history, and download it all as a three-tab Excel workbook.
 - [2026-09-14-pdf-intake-parse-error-swallowing-fix](2026-09-14-pdf-intake-parse-error-swallowing-fix.md) — Fixed award PDFs being rejected with a misleading "could not extract a contract number" error after a successful parse.
 - [2026-08-28-link-contract-folder](2026-08-28-link-contract-folder.md) — Link a contract to an existing synced SharePoint folder from its Options menu.
 - [2026-08-14-nsn-inline-create](2026-08-14-nsn-inline-create.md) — Create NSNs from the Observatory and the New CLIN form; dash-agnostic duplicate check.

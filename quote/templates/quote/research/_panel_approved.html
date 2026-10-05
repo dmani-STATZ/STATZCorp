@@ -1,0 +1,30 @@
+{% if approved_sources %}
+  <div class="mb-2">
+    <span class="badge text-bg-secondary">{{ approved_sources|length }} record{{ approved_sources|length|pluralize }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-striped table-hover mb-0">
+      <thead>
+        <tr>
+          <th>NSN</th>
+          <th>Part Number</th>
+          {% if has_company_name %}<th>Company Name</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in approved_sources %}
+          <tr{% if forloop.counter > collapse_after %} class="d-none" data-extra-row{% endif %}>
+            <td>{{ row.nsn|default:"" }}</td>
+            <td>{{ row.part_number|default:"" }}</td>
+            {% if has_company_name %}<td>{{ row.company_name|default:"" }}</td>{% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if approved_sources|length > collapse_after %}
+    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" data-show-all>Show all {{ approved_sources|length }}</button>
+  {% endif %}
+{% else %}
+  <p class="mb-0 text-body-secondary">No approved-source records for this CAGE.</p>
+{% endif %}

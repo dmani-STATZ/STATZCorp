@@ -32,3 +32,40 @@ missing service module, salt isolation, unique seed, director ramp).
 
 **Phase 2 outstanding:** replay-guard wiring in `views_marauder.py`,
 `IntegrityError` → 409, rate limiting on `run_start`.
+
+---
+
+## Supplier Research (`quote` app)
+
+**Purpose:** One-page CAGE lookup for sales: STATZ supplier match, cached SAM.gov entity,
+approved-source rows, and full DLA award history, plus a three-tab Excel download.
+
+**URLs (namespace `quote:`):**
+- `GET /quote/research/?cage=XXXXX` — `supplier_research` (shell only: validates the CAGE, renders
+  four spinner cards, runs **no** queries)
+- `GET /quote/research/<cage>/panel/<status|sam|awards|approved>/` — `supplier_research_panel`
+  (server-rendered HTML fragment; 400 bad CAGE, 404 unknown panel)
+- `GET /quote/research/<cage>/export/` — `supplier_research_export`
+
+**Panel architecture:** `static/quote/js/supplier_research.js` fetches all four panels in parallel,
+so each card fills in on its own (a slow SAM lookup no longer blocks the rest). 60 s abort,
+per-panel Retry, and a redirect/non-OK guard so a login page is never injected into a card.
+`?refresh=1` is honored on the `sam` panel only (`get_or_fetch_cage(force_refresh=True)`).
+
+**Data sources (read-only):**
+- Existing supplier — `suppliers.Supplier.cage_code` via `find_existing_supplier()`
+- SAM.gov — `dibbs.services.sam_entity.get_or_fetch_cage()` only (`get_sam_entity()`), returning
+  `state` = `ok` / `not_found` (`raw_json['found']` is not True) / `error` (`fetch_error=True` or
+  an exception). Errors are never shown as "not found" and can be retried.
+- Approved sources — `dibbs.ApprovedSource` / `tbl_ApprovedSource` by `approved_cage`,
+  de-duplicated on (nsn, part_number, company_name); no CAGE column (`get_approved_sources()`)
+- Awards — `dibbs.DibbsAward` by `awardee_cage`, not `dibbs_we_won_awards`
+  (`get_award_summary()`, `get_awards()`). `is_faux=True` rows (placeholders made when a MOD
+  arrives before its award; invented `YYYY-09-30` dates, no price) are excluded everywhere.
+  Rows identical on `AWARD_DEDUPE_FIELDS` collapse to one. "Award data current through" is
+  `Max(posted_date)` where `posted_date <= today`, never `award_date`.
+
+**Access:** Same as the rest of Quotes — `@login_required` on views plus
+`LoginRequiredMiddleware` / `users.AppPermission` for the `quote` app registry row.
+
+**Stage 4 status:** Live DIBBS lookup deferred; page uses local tables and SAM cache only.

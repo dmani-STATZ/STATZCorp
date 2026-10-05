@@ -1,0 +1,56 @@
+{% extends "quote/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="page-heading mb-4">
+  <div>
+    <h1 class="page-title">Supplier Research</h1>
+    <p class="page-subtitle">Look up a CAGE code to see STATZ status, SAM.gov data, approved sources, and DLA award history.</p>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" action="{% url 'quote:supplier_research' %}" class="row g-3 align-items-end">
+      <div class="col-12 col-sm-6 col-lg-3">
+        <label for="{{ form.cage.id_for_label }}" class="form-label">{{ form.cage.label }}</label>
+        <div class="input-group">
+          {{ form.cage }}
+          <button type="submit" class="btn btn-primary">Research</button>
+        </div>
+        {% if form.cage.errors %}
+          <div class="invalid-feedback d-block">{{ form.cage.errors.0 }}</div>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if cage %}
+<div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+  <h2 class="h3 mb-0">{{ cage }}</h2>
+  <a href="{% url 'quote:supplier_research_export' cage %}" class="btn btn-success ms-auto">
+    Download Excel
+  </a>
+</div>
+
+{% for key, title, url in panels %}
+<div class="card mb-4">
+  <div class="card-header"><strong>{{ title }}</strong></div>
+  <div class="card-body">
+    <div data-panel-url="{{ url }}" data-panel-key="{{ key }}">
+      <div class="text-center text-body-secondary py-3">
+        <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+        Loading…
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock content %}
+
+{% block extra_js %}
+{{ block.super }}
+{% if cage %}<script src="{% static 'quote/js/supplier_research.js' %}"></script>{% endif %}
+{% endblock extra_js %}

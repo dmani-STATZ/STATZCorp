@@ -1,0 +1,73 @@
+{% load humanize %}
+{% if award_summary.total_awards %}
+<div class="row g-3 text-center mb-2">
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="fs-3 fw-semibold">{{ award_summary.total_awards|intcomma }}</div>
+    <div class="text-body-secondary">Total Awards</div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="fs-3 fw-semibold">{{ award_summary.distinct_nsns|intcomma }}</div>
+    <div class="text-body-secondary">Distinct NSNs</div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="fs-3 fw-semibold">{% if award_summary.total_value is not None %}${{ award_summary.total_value|floatformat:2|intcomma }}{% else %}—{% endif %}</div>
+    <div class="text-body-secondary">Total Value (where reported)</div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="fs-3 fw-semibold">{% if award_summary.first_award %}{{ award_summary.first_award|date:"Y-m-d" }}{% else %}—{% endif %}</div>
+    <div class="text-body-secondary">First Award</div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="fs-3 fw-semibold">{% if award_summary.last_award %}{{ award_summary.last_award|date:"Y-m-d" }}{% else %}—{% endif %}</div>
+    <div class="text-body-secondary">Last Award</div>
+  </div>
+</div>
+{% endif %}
+{% if award_summary.data_current_through %}
+  <p class="text-body-secondary small mb-3">
+    Award data current through {{ award_summary.data_current_through|date:"Y-m-d" }}.
+  </p>
+{% endif %}
+
+{% if awards %}
+  {% if awards_truncated %}
+    <p class="text-body-secondary mb-2">
+      Showing {{ awards|length }} of {{ award_summary.total_awards|intcomma }} awards — download Excel for the full list.
+    </p>
+  {% endif %}
+  <div class="table-responsive">
+    <table class="table table-sm table-striped table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Award Date</th>
+          <th>Posted</th>
+          <th>Contract / Award #</th>
+          <th>Delivery Order</th>
+          <th>NSN</th>
+          <th>Nomenclature</th>
+          <th>Source</th>
+          <th class="text-end">Total Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in awards %}
+          <tr{% if forloop.counter > collapse_after %} class="d-none" data-extra-row{% endif %}>
+            <td>{{ row.award_date|date:"Y-m-d" }}</td>
+            <td>{% if row.posted_date %}{{ row.posted_date|date:"Y-m-d" }}{% endif %}</td>
+            <td>{{ row.award_basic_number|default:"" }}</td>
+            <td>{{ row.delivery_order_number|default:"" }}</td>
+            <td>{{ row.nsn|default:"" }}</td>
+            <td>{{ row.nomenclature|default:"" }}</td>
+            <td>{{ row.source }}</td>
+            <td class="text-end">{% if row.total_contract_price is not None %}${{ row.total_contract_price|floatformat:2|intcomma }}{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if awards|length > collapse_after %}
+    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" data-show-all>Show all {{ awards|length }}</button>
+  {% endif %}
+{% else %}
+  <p class="mb-0 text-body-secondary">No award records for this CAGE.</p>
+{% endif %}

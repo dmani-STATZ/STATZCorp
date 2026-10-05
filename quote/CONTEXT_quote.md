@@ -457,6 +457,9 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 | `quote:our_bids` | `/quote/our-bids/` | |
 | `quote:outcome_detail` | `/quote/our-bids/<id>/` | XHR fragment |
 | `quote:reconcile_now` | `/quote/our-bids/reconcile/` | POST |
+| `quote:supplier_research` | `/quote/research/?cage=` | GET — CAGE research (SAM, approved sources, awards) |
+| `quote:supplier_research_panel` | `/quote/research/<cage>/panel/<panel>/` | GET — HTML fragment for `status` / `sam` / `awards` / `approved`; `?refresh=1` on `sam` only |
+| `quote:supplier_research_export` | `/quote/research/<cage>/export/` | GET — three-tab Excel workbook |
 | `quote:quotes` | `/quote/quotes/?tab=waiting\|logged&closed=1&sent=1&past=1` | the Quotes page |
 | `quote:quote_tray` | `/quote/quotes/tray/?sol=&supplier=` | tray fragment for a chosen SOL + supplier (XHR) |
 | `quote:quote_save` | `/quote/quotes/<sol>/save/` | POST: the tray's fields + `supplier_id`, `source_channel` (required), `received_on`, `contact_name`, optional `entry` / `line_ids` |
@@ -467,6 +470,44 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 | `quote:packhouse_record_reply` | `/quote/packhouse/reply/<rfq_id>/` | POST: `total` or `unit`, `lead_days`, `notes`, `email_id` → JSON |
 | `quote:attachment_view` | `/quote/mailbox/attachments/<id>/view/` | inline PDF / PNG / JPEG / GIF / WebP for the viewer; type from the bytes, else 415; `X-Frame-Options: SAMEORIGIN` (site default is DENY) |
 | `quote:attachment_download` | `/quote/mailbox/attachments/<id>/` | always `octet-stream` + `nosniff`, except verified PDFs inline |
+
+## 12a. Supplier Research
+One server-rendered page for sales reps to research any CAGE: STATZ supplier match (link to
+`suppliers:supplier_detail`), cached SAM.gov entity (`get_or_fetch_cage` via
+`services/supplier_research.get_sam_entity`), approved-source rows (`dibbs.ApprovedSource` /
+`tbl_ApprovedSource` by `approved_cage`), and DLA award history (`dibbs.DibbsAward` by
+`awardee_cage`, never `dibbs_we_won_awards`). On-page awards cap at 500; Excel export is uncapped.
+
+| URL | View |
+|---|---|
+| `GET /quote/research/?cage=` | `research_views.supplier_research` (shell, zero queries) |
+| `GET /quote/research/<cage>/panel/<panel>/` | `research_views.supplier_research_panel` |
+| `GET /quote/research/<cage>/export/` | `research_views.supplier_research_export` |
+
+**Panels.** The shell renders four cards (STATZ Status, SAM.gov Entity, Award History, Approved
+Sources), each with `data-panel-url`. `static/quote/js/supplier_research.js` fetches all four in
+parallel (60 s abort, per-panel Retry, no injection when `response.redirected` or not `ok`).
+Fragments live in `templates/quote/research/_panel_<panel>.html`; each logs
+`supplier_research panel=… cage=… ms=…`. Awards and Approved Sources show 25 rows, rest behind
+"Show all" (`d-none` + `data-extra-row`, handled by the JS via event delegation).
+
+**Data rules.**
+- *SAM:* `get_sam_entity(cage, force_refresh=False)` returns `{state, rows, last_fetched}`.
+  `lookup_cage()` always writes `found` (True / False); a failed call is cached by
+  `get_or_fetch_cage` as `fetch_error=True` (cached 30 days), so `error` shows a **Retry SAM
+  lookup** button that reloads the panel with `?refresh=1` (`force_refresh=True`).
+- *Awards:* built on `_award_queryset()`, which excludes `is_faux=True` (MOD-before-award
+  placeholders with invented dates, no posted date or price). Identical rows on
+  `AWARD_DEDUPE_FIELDS` collapse; counts, summary, table and Excel all use the deduped set. Total
+  value is summed in Python over deduped rows and labelled "(where reported)".
+- *Freshness:* "Award data current through" = `Max(posted_date)` over non-faux rows with
+  `posted_date <= today`. `award_date` can be far in the future and is never used for it.
+- *Approved sources:* deduped on (nsn, part_number, company_name); no CAGE column; Company Name
+  shown only when some row has one.
+- *MSSQL:* on every `.distinct()` query each `order_by` field must be in `.values()`.
+
+Access matches the rest of Quotes: `@login_required` plus middleware `AppPermission` on the
+`quote` registry row. **Stage 4:** live DIBBS lookup deferred — local tables + SAM cache only.
 
 ## 13. Permissions / Security
 - `@login_required` on every view.

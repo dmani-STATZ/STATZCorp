@@ -7,7 +7,7 @@ permission gating silently no-op.
 """
 from django.urls import path
 
-from . import views
+from . import research_views, views
 
 app_name = 'quote'
 
@@ -77,4 +77,15 @@ urlpatterns = [
     path('rfq/send-all/', views.rfq_send_all, name='rfq_send_all'),
     path('rfq/send/<int:supplier_id>/', views.rfq_send, name='rfq_send'),
     path('rfq/<int:rfq_id>/remove/', views.rfq_remove, name='rfq_remove'),
+    path('research/', research_views.supplier_research, name='supplier_research'),
+    path(
+        'research/<str:cage>/export/',
+        research_views.supplier_research_export,
+        name='supplier_research_export',
+    ),
+    path(
+        'research/<str:cage>/panel/<str:panel>/',
+        research_views.supplier_research_panel,
+        name='supplier_research_panel',
+    ),
 ]

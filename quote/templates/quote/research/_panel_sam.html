@@ -1,0 +1,19 @@
+{% if sam.state == 'ok' %}
+  <dl class="row mb-0">
+    {% for label, value in sam.rows %}
+      <dt class="col-sm-3 text-body-secondary">{{ label }}</dt>
+      <dd class="col-sm-9 mb-2">{{ value }}</dd>
+    {% endfor %}
+  </dl>
+{% elif sam.state == 'error' %}
+  <div class="alert alert-warning d-flex flex-wrap align-items-center gap-3 mb-0" role="alert">
+    <span>
+      SAM.gov lookup failed{% if sam.last_fetched %} (last attempt {{ sam.last_fetched|date:"Y-m-d H:i" }}){% endif %}.
+    </span>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-panel-reload="{{ refresh_url }}">Retry SAM lookup</button>
+  </div>
+{% else %}
+  <p class="mb-0 text-body-secondary">
+    No SAM.gov record found for this CAGE{% if sam.last_fetched %} (checked {{ sam.last_fetched|date:"Y-m-d" }}){% endif %}.
+  </p>
+{% endif %}

@@ -96,6 +96,27 @@ permission gating silently stops applying.
 - Supplier-page users need Quotes access to edit: gate embeds with
   `services.access.user_can_use_quote`, not by hiding the URL.
 
+### Supplier Research (`services/supplier_research.py`)
+- Reads **`dibbs.DibbsAward`** filtered by `awardee_cage` for **any** CAGE. Never query
+  **`dibbs_we_won_awards`** / **`WeWonAward`** for this feature.
+- **`SupplierNSNCapability`** / **`supplier_nsn_capability`** are off-limits — use
+  **`dibbs.ApprovedSource`** (`tbl_ApprovedSource`) only.
+- Excel exports must write NSN, part number, CAGE, and contract/award number cells as **text**
+  (`data_type = 's'`, `number_format = '@'`) so Excel does not corrupt undashed NSNs.
+- Service functions return **materialized** `list` / `dict` data — no querysets, no `.iterator()`.
+- **`supplier_research` (the page view) is a shell: no service calls.** Data comes from
+  `supplier_research_panel`, one fragment per panel. `?refresh=1` only means something on `sam`.
+- Every award read goes through **`_award_queryset()`**, which excludes `is_faux=True` (placeholder
+  rows from MODs that arrived before their award). Don't add a path that bypasses it.
+- Dedupe awards with `.values(*AWARD_DEDUPE_FIELDS).distinct()`; compute counts and totals from
+  that set. Notice ID / sol number are unique per row, so they must not be added to the values.
+- **MSSQL:** on a `.distinct()` query, every `order_by` field must also be in `.values()`.
+- "Award data current through" = `Max(posted_date)` with `posted_date <= today`. Never `award_date`.
+- `get_sam_entity` returns `state` = `ok` / `not_found` / `error`. Keep them distinct: a lookup
+  failure (`fetch_error=True`) is not "no record", and its retry must go through
+  `get_or_fetch_cage(force_refresh=True)`. Do not edit `dibbs/services/sam_entity.py` for this.
+- Panel JS must not inject a response that was redirected or non-OK (login page in a card).
+
 ### The Phase 2 drawer form (`templates/quote/mailbox/inbox.html`)
 - **It is one form shared by every SOL in the message.** All per-SOL state goes through
   `snapshot()` / `applyDraft()` / `resetForm()` (field list: `TEXT_FIELDS`). Add a drawer input

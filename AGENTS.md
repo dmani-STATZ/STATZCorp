@@ -16,3 +16,17 @@
   migration unless `0004` has already been applied in the target environment.
 - Nothing in the Marauder subsystem may import from the puzzle framework.
   The only allowed coupling is `lobby()` importing `get_global_top`.
+
+## Quote — Supplier Research (when touching `quote/services/supplier_research.py`)
+- Use `dibbs_award` by CAGE only; do not use `dibbs_we_won_awards`.
+- Do not read `SupplierNSNCapability` / `supplier_nsn_capability`.
+- Excel NSN / CAGE / contract cells must be text (`'@'`).
+- Service layer returns materialized lists, not querysets.
+- The page view is a shell and must not call service functions; data loads via
+  `supplier_research_panel`. Honor `?refresh=1` on the `sam` panel only.
+- All award reads go through `_award_queryset()` (excludes `is_faux=True`). Dedupe with
+  `.values(*AWARD_DEDUPE_FIELDS).distinct()`; never count or sum raw rows.
+- Freshness is `Max(posted_date)` with `posted_date <= today` — never `award_date`.
+- MSSQL: every `order_by` field on a `.distinct()` query must also be in its `.values()` list.
+- `get_sam_entity` has three states (`ok` / `not_found` / `error`); a failed lookup must never
+  render as "no record found".
