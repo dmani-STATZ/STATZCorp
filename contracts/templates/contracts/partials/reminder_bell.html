@@ -1,0 +1,13 @@
+{% load contract_tags %}
+{% reminder_bell_tooltip state pending overdue as bell_tooltip %}
+<button type="button"
+        class="btn btn-link p-0 reminder-bell reminder-bell--{{ state|default:'none' }}{% if size == 'sm' %} reminder-bell--sm{% endif %}"
+        data-target-type="{{ target_type }}"
+        data-target-id="{{ target_id }}"
+        title="{{ bell_tooltip }}"
+        aria-label="{{ bell_tooltip }}">
+  <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true">
+    <path class="reminder-bell__body" d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zm.256-14c.666.416 1.736.416 2.256 0l.233-2H7.977l.279 2zm3.398-.785-.742-.128C10.278 1.293 9.526 1 8 1s-2.278.293-3.656.887-.743.128-.743 2.63V6c0 .627-.18 2.003-.459 3.742-.277 1.694-.399 2.956-.459 3.742h11.459c-.06-.786-.182-2.048-.459-3.742-.279-1.741-.459-3.115-.459-3.742V2.845z"/>
+    <path class="reminder-bell__outline" d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h9.244c-.287-.692-.502-1.49-.663-2.258C11.134 8.197 11 6.628 11 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5.002 5.002 0 0 1 13 6c0 .88.32 4.2 1.22 6z"/>
+  </svg>
+</button>

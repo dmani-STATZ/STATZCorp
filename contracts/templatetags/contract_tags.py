@@ -10,10 +10,25 @@ def content_type_id(obj):
         return ContentType.objects.get_for_model(obj).id
     return None
 
+@register.simple_tag
+def reminder_bell_tooltip(state, pending, overdue):
+    pending = int(pending or 0)
+    overdue = int(overdue or 0)
+    if state == 'none':
+        return 'No reminders — click to add'
+    if state == 'overdue':
+        return f'{overdue} overdue of {pending} reminder(s)'
+    return f'{pending} reminder(s)'
+
+
 @register.filter
 def get_item(dictionary, key):
     if isinstance(dictionary, dict):
-        return dictionary.get(key)
+        if key in dictionary:
+            return dictionary[key]
+        str_key = str(key)
+        if str_key in dictionary:
+            return dictionary[str_key]
     return None
 
 

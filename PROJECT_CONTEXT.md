@@ -442,7 +442,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
 | User settings | `users.UserSettings` | `contracts` (reminder window), `reports` (AI model) |
 | Company membership | `users.UserCompanyMembership` | `contracts.CompanyForm` |
 | Global AI model config | `suppliers.OpenRouterModelSetting` | `suppliers` enrichment, `reports` AI stream |
-| Reminder sidebar context | `contracts/context_processors.py` | All templates extending `contract_base.html` |
+| Reminder footer pill / popup counts | `contracts/context_processors.py` | All templates extending `contract_base.html` |
 | PO/TAB sequence numbers | `intake.SequenceNumber` | `intake` finalization into `contracts.Contract`; `initialize_sequence_numbers` management command |
 | Field-change audit | `transactions/signals.py` | `contracts.Contract`, `contracts.Clin`, `contracts.ClinShipment` (`pod_date`), `suppliers.Supplier` |
 | Background task registry | `core.ScheduledTask` + `core/management/commands/run_background_tasks.py` | `dibbs/tasks/`, other app task modules |

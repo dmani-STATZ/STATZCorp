@@ -1585,7 +1585,10 @@ class Reminder(models.Model):
     reminder_completed_user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='completed_reminders')
     note = models.ForeignKey('Note', on_delete=models.CASCADE, null=True, blank=True, related_name='note_reminders')
     company = models.ForeignKey('Company', on_delete=models.PROTECT, null=True, blank=True, related_name='reminders')
-    
+    original_reminder_date = models.DateField(null=True, blank=True)
+    extension_count = models.PositiveSmallIntegerField(default=0)
+    preset_key = models.CharField(max_length=20, blank=True, default='')
+
     class Meta:
         indexes = [
             models.Index(fields=["note"]),

@@ -11,8 +11,6 @@ from django.contrib.contenttypes.models import ContentType
 from datetime import timedelta, datetime, time
 import json
 import logging
-from collections import defaultdict
-
 logger = logging.getLogger(__name__)
 
 from STATZWeb.decorators import conditional_login_required
@@ -451,16 +449,21 @@ def toggle_contract_acknowledgment(request, contract_id):
                 'success': True,
                 'status': True,
                 'message': f'{field} is already set',
+                'prompt_set_reminders': False,
             })
 
         new_value = not current_value
         setattr(acknowledgment, field, new_value)
 
         current_time = timezone.now()
-        today = current_time.date()
         response_data = {
             'success': True,
             'status': new_value,
+            'prompt_set_reminders': (
+                field == 'po_to_supplier_bool'
+                and new_value
+                and not current_value
+            ),
         }
 
         field_base = field.replace('_bool', '')
@@ -474,118 +477,6 @@ def toggle_contract_acknowledgment(request, contract_id):
                 'username': request.user.username,
                 'date': current_time.strftime('%m/%d/%Y %H:%M %p'),
             }
-
-            if field == 'po_to_supplier_bool':
-                clin_content_type = ContentType.objects.get_for_model(Clin)
-                notes_created = 0
-                reminders_created = 0
-                checkin_reminder_errors = []
-
-                def make_note(clin, note_text):
-                    return Note.objects.create(
-                        content_type=clin_content_type,
-                        object_id=clin.id,
-                        note=note_text,
-                        created_by=request.user,
-                        company=request.active_company,
-                    )
-
-                def make_reminder(title, text, reminder_date, note):
-                    dt = datetime.combine(reminder_date, time(9, 0))
-                    aware_dt = timezone.make_aware(dt)
-                    return Reminder.objects.create(
-                        reminder_title=title,
-                        reminder_text=text,
-                        reminder_date=aware_dt,
-                        reminder_user=request.user,
-                        reminder_completed=False,
-                        company=request.active_company,
-                        note=note,
-                    )
-
-                try:
-                    note_text = (
-                        f"PO ACKNOWLEDGMENT LETTER Followup - {request.user.username} "
-                        f"on {current_time.strftime('%m/%d/%Y %H:%M %p')}"
-                    )
-                    note = make_note(first_p_clin, note_text)
-                    notes_created += 1
-                    po_ack_reminder_date = today + timedelta(days=10)
-                    make_reminder(
-                        "PO ACKNOWLEDGEMENT",
-                        (
-                            f"Send PO Acknowledgement Letter for {contract.contract_number} "
-                            f"CLIN {first_p_clin.item_number}"
-                        ),
-                        po_ack_reminder_date,
-                        note,
-                    )
-                    reminders_created += 1
-                except Exception as e:
-                    logger.warning(
-                        "Failed to create PO ack reminder for contract %s: %s",
-                        contract.id,
-                        e,
-                    )
-                    response_data['po_ack_reminder_error'] = str(e)
-
-                production_clins = [c for c in clins if c.item_type == 'P']
-                non_production_clins = [c for c in clins if c.item_type != 'P']
-
-                by_supplier_due_date = defaultdict(list)
-                for clin in production_clins:
-                    by_supplier_due_date[clin.supplier_due_date].append(clin)
-
-                checkin_clins = []
-                for group in by_supplier_due_date.values():
-                    checkin_clins.append(
-                        min(group, key=lambda c: (c.item_number or '', c.pk))
-                    )
-                checkin_clins.extend(non_production_clins)
-
-                for clin in checkin_clins:
-                    try:
-                        if clin.supplier_due_date:
-                            note_text = (
-                                f"FIRST SUPPLIER CHECK IN - {clin.contract.contract_number} "
-                                f"CLIN {clin.item_number} - {request.user.username} "
-                                f"on {current_time.strftime('%m/%d/%Y %H:%M %p')}"
-                            )
-                            note = make_note(clin, note_text)
-                            notes_created += 1
-                            checkin_reminder_date = clin.supplier_due_date - timedelta(days=60)
-                            make_reminder(
-                                "FIRST SUPPLIER CHECK IN",
-                                (
-                                    f"First check-in for {contract.contract_number} "
-                                    f"CLIN {clin.item_number} — supplier due "
-                                    f"{clin.supplier_due_date.strftime('%m/%d/%Y')}"
-                                ),
-                                checkin_reminder_date,
-                                note,
-                            )
-                            reminders_created += 1
-                        else:
-                            note_text = (
-                                "FIRST SUPPLIER CHECK IN — No supplier_due_date set, "
-                                "reminder not created - "
-                                f"{clin.contract.contract_number} CLIN {clin.item_number} - "
-                                f"{request.user.username} "
-                                f"on {current_time.strftime('%m/%d/%Y %H:%M %p')}"
-                            )
-                            make_note(clin, note_text)
-                            notes_created += 1
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to create check-in reminder for CLIN %s: %s",
-                            clin.id,
-                            e,
-                        )
-                        checkin_reminder_errors.append(str(e))
-
-                response_data['notes_created'] = notes_created
-                response_data['reminders_created'] = reminders_created
-                response_data['checkin_reminder_errors'] = checkin_reminder_errors
         else:
             setattr(acknowledgment, date_field, None)
             setattr(acknowledgment, user_field, None)

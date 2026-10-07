@@ -98,6 +98,12 @@ from .reminder_views import (
     reminders_popup_add,
     reminders_popup_edit,
     reminder_counts_api,
+    reminder_presets_api,
+    reminder_bulk_create_api,
+    reminder_quick_create_api,
+    reminder_status_api,
+    reminder_target_list_api,
+    reminder_extend_api,
 )
 
 from .dashboard_views import (

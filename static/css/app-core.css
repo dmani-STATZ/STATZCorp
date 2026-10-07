@@ -4944,6 +4944,56 @@ main {
   border-radius: var(--bs-border-radius);
 }
 
+/* === Reminder Bells === */
+.reminder-bell { line-height: 1; vertical-align: middle; cursor: pointer; transition: transform .12s ease; }
+.reminder-bell svg { display: block; transition: transform .12s ease; }
+.reminder-bell:hover svg { transform: scale(1.12); }
+.reminder-bell:active svg { transform: scale(0.95); }
+.reminder-bell--sm svg { width: 16px; height: 16px; }
+.reminder-bell--none    .reminder-bell__body    { fill: transparent; }
+.reminder-bell--none    .reminder-bell__outline { fill: var(--bs-success); }
+.reminder-bell--pending .reminder-bell__body,
+.reminder-bell--pending .reminder-bell__outline { fill: var(--bs-success); }
+.reminder-bell--overdue .reminder-bell__body,
+.reminder-bell--overdue .reminder-bell__outline { fill: var(--bs-danger); }
+.reminder-bell:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: 2px; }
+
+/* Bell modal: only the list scrolls; Add section stays pinned below it. */
+.reminder-bell-list-wrap { position: relative; }
+.reminder-bell-list {
+  max-height: min(340px, 45vh);   /* ~3 items visible */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+.reminder-bell-more {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: .35rem;
+  border-radius: 999px; padding: .2rem .75rem;
+  background: var(--bs-body-bg); color: var(--bs-body-color);
+  border: 1px solid var(--bs-border-color);
+  box-shadow: 0 2px 6px rgba(0,0,0,.15); font-size: .8rem; font-weight: 400; z-index: 2;
+}
+.reminder-bell-more:hover { background: var(--bs-tertiary-bg); color: var(--bs-body-color); }
+.reminder-bell-list-wrap.has-more::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 48px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent,
+              var(--bs-modal-bg, var(--bs-body-bg)));
+}
+/* The global date-input rule adds a second calendar icon and a fixed 2.25rem height;
+   drop both here so the native picker is the only icon and -sm heights match. */
+#reminderBellModal input[type="date"] {
+  background-image: none;
+  padding-right: .5rem;
+  height: auto;
+}
+/* Global .form-select forces 2.5rem height; restore Bootstrap's -sm sizing. */
+#reminderBellModal .form-select-sm {
+  height: auto;
+  padding: .25rem 2.25rem .25rem .5rem;
+}
+
 /* ===== Late responsive overrides (must follow the app-shell rules above) ===== */
 @media (max-width: 767.98px) {
     .app-shell {

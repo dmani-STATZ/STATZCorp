@@ -262,6 +262,32 @@ This pattern (popup_base + popup view + popup_add + popup_edit) is the approved 
 - **Live AJAX footer count (2026-05):** `window.patchReminderFooterPill()` in `contract_base.html` GETs `contracts:reminder_counts_api` and updates the pill badge and red/green button classes without reload. Call it after AJAX reminder actions from `#noteFullViewModal` / notes partials (`notes_list.html` / `notes_popup_tab_panel.html`), and from `reminders_popup.html` on each load when opened via `window.open` so the parent pill stays in sync after form POSTs in the popout. `toggle_reminder_completion` and `mark_reminder_complete` return JSON for `X-Requested-With: XMLHttpRequest`. Completed reminder pills on note cards use `.reminder-pill-completed` in `contracts/static/contracts/css/components.css`.
 - `contracts/views/reminder_views.py` — popup flows use `toggle_reminder`, `delete_reminder`, `reminders_popup_add`, `reminders_popup_edit`, and referer redirects; standalone edit/complete URLs remain for non-popup callers.
 
+### Reminders upgrade — Stage 2B guardrails (bells)
+- Bell state comes only from `reminder_status_for_contract()` (server context + `reminder_status_api` refresh). Never compute overdue/pending in templates or with per-CLIN reminder queries on Contract Management.
+- Bell markup has exactly two sources: `partials/reminder_bell.html` and `buildBell()` in `reminder_bell_modal.js` — keep SVG paths and classes identical.
+- No `bi bi-*` in bell or bell-modal markup; inline SVG only.
+- Due today is **pending** (green); only `reminder_date < today` is overdue (red).
+- Bells must never be placed inside `<a>` or other interactive elements.
+- The bell click listener in `reminder_bell_modal.js` is capture-phase with `stopPropagation`; don't convert it to bubble phase.
+- The none state uses `fill: transparent` on the body path; don't reintroduce a solid fill.
+- Bell modal: only `.reminder-bell-list` scrolls; the Add section sits outside it. Don't re-add `modal-dialog-scrollable`.
+- The spinner, error and empty-state nodes live inside `#reminderBellList`. Clear rows with `clearListItems()`, never `listEl.innerHTML = ''`.
+- Call `updateMoreIndicator()` after anything that changes list height (render, mutation, pick-date toggle).
+- `#reminderBellModal` overrides the global `input[type="date"]` icon/height and the `.form-select` height. Keep those overrides scoped to the modal rather than editing the global rules.
+
+### Reminders upgrade — Stage 2A guardrails (Set Reminders modal)
+- Never reintroduce silent note/reminder creation inside `toggle_contract_acknowledgment`. PO-to-supplier uses `prompt_set_reminders` + the Set Reminders modal only.
+- The Set Reminders modal must not show remove controls for `protected` preset rows (`ack_followup`, `first_checkin`).
+- **`window.SetReminders`** (`open`, `promptAfterToggle`) is the only public JS API for this flow; keep logic in `set_reminders_modal.js`.
+- New reminders created through `create_note_reminder` / bulk APIs must set **`reminder_completed=False`** explicitly.
+
+### Reminders upgrade — Stage 1 guardrails (backend)
+- Reminders stay **Note-anchored**. Stage 1 services in `contracts/services/reminders.py` always create a `Note` on the target `Contract` or `Clin` before creating a `Reminder` with `note=<that note>`. Do not create bare `Reminder` rows from these APIs.
+- **Bell / rollup status** must use `reminder_status_for_contract()` — do not compute bell state in templates or with per-CLIN reminder queries in views.
+- **`PROTECTED_PRESETS`** (`ack_followup`, `first_checkin`): backend exposes `protected` on preset rows; Stage 2 UI must not offer row-delete for those presets in the Set Reminders modal.
+- **`preset_key`** is the dedupe key for `already_set` / bulk skip logic. Do not add a DB index on `preset_key` (low cardinality).
+- Contract JSON endpoints for presets/bulk/status/list scope via `_contract_for_request()` in `contracts/views/documents_views.py`. Extend uses the same owner-or-staff rule as `toggle_reminder_completion`.
+
 ### CLIN detail page layout (2026-04-24)
 - `contracts/templates/contracts/clin_detail.html` — section markup. New sections must follow the `<section id="clin-*"> > .card.clin-section-card.clin-card-* > .card-header.clin-section-header + .card-body` pattern, and ship with a matching `<a class="nav-link" href="#clin-*">` entry inside `#clin-page-nav`.
 - `contracts/static/contracts/css/components.css` (under `/* === CLIN Detail Page === */`) — sidebar, content, card, header, label, and value styles. Colour tokens use `var(--bs-*)`; new `.clin-card-*` accent rules belong here next to the existing ones. The sidebar is `position: fixed` at `left: 0`, `top: 4rem`; if the top navbar height changes, update `top` and `height: calc(100vh - 4rem - 3.5rem)`. The 200px width is set in two places (`.clin-detail-sidebar { width }` and `.clin-detail-content { margin-left }`) — both must match if changed. The full-width override targets `.clin-detail-page main > div.mx-auto` with `!important` so it can beat the inline `style="width: 75%"` on `contract_base.html`'s container; do not weaken that selector or the layout reverts to 75 %.

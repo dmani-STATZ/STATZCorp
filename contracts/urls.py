@@ -105,6 +105,12 @@ from .views import (
     reminders_popup_add,
     reminders_popup_edit,
     reminder_counts_api,
+    reminder_presets_api,
+    reminder_bulk_create_api,
+    reminder_quick_create_api,
+    reminder_status_api,
+    reminder_target_list_api,
+    reminder_extend_api,
     # Dashboard views
     ContractLifecycleDashboardView,
     DashboardMetricDetailView,
@@ -546,6 +552,36 @@ urlpatterns = [
         "api/reminder-counts/",
         reminder_counts_api,
         name="reminder_counts_api",
+    ),
+    path(
+        "api/contract/<int:contract_id>/reminder-presets/",
+        reminder_presets_api,
+        name="reminder_presets_api",
+    ),
+    path(
+        "api/contract/<int:contract_id>/reminders/bulk-create/",
+        reminder_bulk_create_api,
+        name="reminder_bulk_create_api",
+    ),
+    path(
+        "api/reminders/quick-create/",
+        reminder_quick_create_api,
+        name="reminder_quick_create_api",
+    ),
+    path(
+        "api/contract/<int:contract_id>/reminder-status/",
+        reminder_status_api,
+        name="reminder_status_api",
+    ),
+    path(
+        "api/contract/<int:contract_id>/reminders/",
+        reminder_target_list_api,
+        name="reminder_target_list_api",
+    ),
+    path(
+        "api/reminder/<int:pk>/extend/",
+        reminder_extend_api,
+        name="reminder_extend_api",
     ),
     path("reminder/<int:reminder_id>/edit/", edit_reminder, name="edit_reminder"),
     # Reminders popup window

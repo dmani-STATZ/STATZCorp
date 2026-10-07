@@ -21,6 +21,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from STATZWeb.decorators import conditional_login_required
+from contracts.services import reminders as reminder_service
 from ..models import (
     Contract,
     ContractPackaging,
@@ -67,12 +68,18 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
             'contracts:get_supplier_info', args=[0]
         ).replace('0/info/', '')
         contract = self.get_object()
-        clins = contract.clin_set.all().select_related(
-            'clin_type', 'supplier', 'nsn'
-        ).prefetch_related(
-            late_status_shipment_prefetch()
-        ).order_by('item_number')
+        clins = list(
+            contract.clin_set.all().select_related(
+                'clin_type', 'supplier', 'nsn'
+            ).prefetch_related(
+                late_status_shipment_prefetch()
+            ).order_by('item_number')
+        )
         context['clins'] = clins
+        context['reminder_status'] = reminder_service.reminder_status_for_contract(
+            contract,
+            timezone.localdate(),
+        )
 
         # CORRECT - default Django reverse accessor
         first_p_clin = contract.clin_set.filter(item_type='P').order_by('item_number').first()
@@ -114,7 +121,10 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
             context['expedite'] = None
         
         # Get the default selected CLIN (type=1) or first CLIN if no type 1 exists
-        context['selected_clin'] = clins.filter(clin_type_id=1).first() or clins.first()
+        context['selected_clin'] = next(
+            (c for c in clins if c.clin_type_id == 1),
+            clins[0] if clins else None,
+        )
         context['pod_status'] = 'none'
         if context['selected_clin']:
             sc = context['selected_clin'].shipments.aggregate(

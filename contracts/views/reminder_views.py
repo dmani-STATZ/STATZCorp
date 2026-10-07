@@ -1,3 +1,5 @@
+import json
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import ListView
 from django.contrib import messages
@@ -6,9 +8,12 @@ from django.http import JsonResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.db.models import Q
 from django.core.paginator import Paginator
-from datetime import timedelta
+from django.views.decorators.http import require_GET, require_POST
+from datetime import date, timedelta
 
 from STATZWeb.decorators import conditional_login_required
+from contracts.services import reminders as reminder_service
+from contracts.views.documents_views import _contract_for_request
 from ..models import Reminder, Note
 from ..forms import ReminderForm
 
@@ -98,7 +103,7 @@ class ReminderListView(ListView):
         if status_filter == 'completed':
             queryset = queryset.filter(reminder_completed=True)
         elif status_filter == 'pending':
-            queryset = queryset.filter(Q(reminder_completed=False) | Q(reminder_completed__isnull=True))
+            queryset = queryset.exclude(reminder_completed=True)
 
         # Filter by due date. 'all' is the sentinel value that means "no due filter".
         today = timezone.now().date()
@@ -108,21 +113,18 @@ class ReminderListView(ListView):
             # Overdue: reminder_date <= today-7days
             queryset = queryset.filter(
                 reminder_date__lte=seven_days_ago,
-                reminder_completed=False
-            )
+            ).exclude(reminder_completed=True)
         elif due_filter == 'due':
             # Due: reminder_date <= today AND reminder_date > today-7days
             queryset = queryset.filter(
                 reminder_date__lte=today,
                 reminder_date__gt=seven_days_ago,
-                reminder_completed=False
-            )
+            ).exclude(reminder_completed=True)
         elif due_filter == 'upcoming':
             # Future/Pending: reminder_date > today
             queryset = queryset.filter(
                 reminder_date__gt=today,
-                reminder_completed=False
-            )
+            ).exclude(reminder_completed=True)
 
         return queryset
     
@@ -149,9 +151,7 @@ class ReminderListView(ListView):
         context['completed_count'] = all_reminders.filter(reminder_completed=True).count()
         
         # Get non-completed reminders
-        active_reminders = all_reminders.filter(
-            Q(reminder_completed=False) | Q(reminder_completed__isnull=True)
-        )
+        active_reminders = all_reminders.exclude(reminder_completed=True)
         context['pending_count'] = active_reminders.count()
         
         # Overdue: reminder_date <= today-7days
@@ -182,7 +182,7 @@ class ReminderListView(ListView):
 
 
 def _pending_reminder_q():
-    return Q(reminder_completed=False) | Q(reminder_completed__isnull=True)
+    return ~Q(reminder_completed=True)
 
 
 def _annotate_popup_reminder(reminder, today):
@@ -486,8 +486,7 @@ def reminder_counts_api(request):
     today = timezone.now().date()
     qs = Reminder.objects.filter(
         reminder_user=request.user,
-        reminder_completed=False,
-    )
+    ).exclude(reminder_completed=True)
     if getattr(request, 'active_company', None):
         qs = qs.filter(company=request.active_company)
 
@@ -499,4 +498,218 @@ def reminder_counts_api(request):
         'footer_overdue_count': footer_overdue_count,
         'footer_due_today_count': footer_due_today_count,
         'total': footer_overdue_count + footer_due_today_count,
+    })
+
+
+def _parse_json_body(request):
+    try:
+        if not request.body:
+            return None, 'Request body is required.'
+        return json.loads(request.body.decode('utf-8')), None
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None, 'Invalid JSON.'
+
+
+def _reminder_owner_or_staff(request, reminder: Reminder) -> bool:
+    return reminder.reminder_user == request.user or request.user.is_staff
+
+
+@conditional_login_required
+@require_GET
+def reminder_presets_api(request, contract_id):
+    contract = _contract_for_request(request, contract_id)
+    today = timezone.localdate()
+    rows = reminder_service.compute_reminder_presets(contract, today)
+    targets = reminder_service.preset_targets(contract)
+    return JsonResponse({'ok': True, 'rows': rows, 'targets': targets})
+
+
+@conditional_login_required
+@require_POST
+def reminder_bulk_create_api(request, contract_id):
+    contract = _contract_for_request(request, contract_id)
+    payload, err = _parse_json_body(request)
+    if err:
+        return JsonResponse({'ok': False, 'error': err}, status=400)
+    rows = payload.get('rows') if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return JsonResponse({'ok': False, 'error': 'rows must be a list.'}, status=400)
+
+    result = reminder_service.bulk_create_note_reminders(
+        user=request.user,
+        contract=contract,
+        rows=rows,
+    )
+    if not result['ok']:
+        return JsonResponse(result, status=400)
+    return JsonResponse(result)
+
+
+@conditional_login_required
+@require_POST
+def reminder_quick_create_api(request):
+    payload, err = _parse_json_body(request)
+    if err:
+        return JsonResponse({'ok': False, 'error': err}, status=400)
+    if not isinstance(payload, dict):
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON object.'}, status=400)
+
+    contract_id = payload.get('contract_id')
+    try:
+        contract_id = int(contract_id)
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False, 'error': 'Invalid contract_id.'}, status=400)
+
+    contract = _contract_for_request(request, contract_id)
+    target_type = (payload.get('target_type') or '').strip()
+    label = (payload.get('label') or '').strip()
+    reminder_date_raw = payload.get('reminder_date')
+    try:
+        target_id = int(payload.get('target_id'))
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False, 'error': 'Invalid target_id.'}, status=400)
+
+    try:
+        reminder_date = date.fromisoformat(str(reminder_date_raw))
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False, 'error': 'Invalid reminder_date.'}, status=400)
+
+    if not label:
+        return JsonResponse({'ok': False, 'error': 'Label is required.'}, status=400)
+    if len(label) > reminder_service.LABEL_MAX_LENGTH:
+        return JsonResponse(
+            {'ok': False, 'error': 'Label must be 200 characters or fewer.'},
+            status=400,
+        )
+
+    try:
+        target = reminder_service._resolve_target(contract, target_type, target_id)
+    except ValueError as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+    reminder = reminder_service.create_note_reminder(
+        user=request.user,
+        target=target,
+        label=label,
+        reminder_date=reminder_date,
+        preset_key=reminder_service.CUSTOM,
+        company=contract.company,
+    )
+    return JsonResponse({'ok': True, 'reminder_id': reminder.pk})
+
+
+@conditional_login_required
+@require_GET
+def reminder_status_api(request, contract_id):
+    contract = _contract_for_request(request, contract_id)
+    today = timezone.localdate()
+    status = reminder_service.reminder_status_for_contract(contract, today)
+    return JsonResponse({'ok': True, **status})
+
+
+@conditional_login_required
+@require_GET
+def reminder_target_list_api(request, contract_id):
+    contract = _contract_for_request(request, contract_id)
+    today = timezone.localdate()
+    target_type = (request.GET.get('target_type') or '').strip()
+    target_id_raw = request.GET.get('target_id')
+    target_id = None
+    if target_id_raw not in (None, ''):
+        try:
+            target_id = int(target_id_raw)
+        except (TypeError, ValueError):
+            return JsonResponse({'ok': False, 'error': 'Invalid target_id.'}, status=400)
+
+    reminders = reminder_service.pending_reminders_for_target(
+        contract,
+        target_type=target_type,
+        target_id=target_id,
+        today=today,
+    )
+    clins = list(
+        contract.clin_set.order_by('item_number', 'pk')
+    )
+    clin_by_id = {c.pk: c for c in clins}
+    items = [
+        reminder_service.serialize_target_reminder(
+            r,
+            contract=contract,
+            clin_by_id=clin_by_id,
+            today=today,
+            user=request.user,
+        )
+        for r in reminders
+    ]
+    targets = reminder_service.preset_targets(contract)
+    if target_type == 'contract':
+        title_label = f'Contract {contract.contract_number}'
+    elif target_type == 'clin' and target_id is not None:
+        clin = clin_by_id.get(target_id)
+        item_num = clin.item_number if clin else target_id
+        title_label = f'CLIN {item_num}'
+    else:
+        title_label = contract.contract_number
+    return JsonResponse({
+        'ok': True,
+        'items': items,
+        'targets': targets,
+        'title_label': title_label,
+    })
+
+
+@conditional_login_required
+@require_POST
+def reminder_extend_api(request, pk):
+    qs = Reminder.objects.select_related('note', 'note__content_type', 'company')
+    if getattr(request, 'active_company', None):
+        qs = qs.filter(company=request.active_company)
+    reminder = get_object_or_404(qs, pk=pk)
+
+    if not _reminder_owner_or_staff(request, reminder):
+        return JsonResponse({'ok': False, 'error': 'Permission denied.'}, status=403)
+
+    payload, err = _parse_json_body(request)
+    if err:
+        return JsonResponse({'ok': False, 'error': err}, status=400)
+    if not isinstance(payload, dict):
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON object.'}, status=400)
+
+    days = payload.get('days')
+    new_date_raw = payload.get('new_date')
+    today = timezone.localdate()
+
+    new_date = None
+    if new_date_raw is not None:
+        try:
+            new_date = date.fromisoformat(str(new_date_raw))
+        except (TypeError, ValueError):
+            return JsonResponse({'ok': False, 'error': 'Invalid new_date.'}, status=400)
+
+    if days is not None:
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            return JsonResponse({'ok': False, 'error': 'Invalid days.'}, status=400)
+
+    try:
+        reminder_service.extend_reminder(
+            reminder,
+            days=days,
+            new_date=new_date,
+            today=today,
+        )
+    except ValueError as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+    return JsonResponse({
+        'ok': True,
+        'reminder_id': reminder.pk,
+        'reminder_date': reminder.reminder_date.isoformat(),
+        'extension_count': reminder.extension_count,
+        'original_reminder_date': (
+            reminder.original_reminder_date.isoformat()
+            if reminder.original_reminder_date
+            else None
+        ),
     })

@@ -1,5 +1,5 @@
 {% extends "contracts/contract_base.html" %}
-{% load static %}
+{% load static contract_tags %}
 
 {% block extra_head %}
 {{ block.super }}
@@ -104,11 +104,10 @@
         <div class="col-span-2 card card-padded !p-2">
             {% with s=contract.status.description|default:'' %}
                 <div class="d-flex justify-content-between align-items-center mb-2 p-1">
-                    <a href="{% url 'contracts:contract_detail' contract.id %}">
-                        <h1 class="{% if s == 'Open' %}text-2xl{% else %}text-xl{% endif %} font-bold mb-0 d-flex align-items-center">
-                            Contract {{ contract.contract_number }}
-                        </h1>
-                    </a>
+                    <h1 class="{% if s == 'Open' %}text-2xl{% else %}text-xl{% endif %} font-bold mb-0 d-flex align-items-center gap-2">
+                        {% include "contracts/partials/reminder_bell.html" with target_type="contract" target_id=contract.id state=reminder_status.contract.state pending=reminder_status.contract.pending overdue=reminder_status.contract.overdue %}
+                        <a href="{% url 'contracts:contract_detail' contract.id %}">Contract {{ contract.contract_number }}</a>
+                    </h1>
                     <div class="flex items-center space-x-3">
                         <div class="relative inline-block text-left">
                             <button type="button" onclick="toggleOptionsMenu()"
@@ -506,7 +505,12 @@
                                     data-clin-id="{{ clin.id }}"
                                     class="{% if selected_clin and clin.id == selected_clin.id %}selected-row{% endif %} hover:bg-gray-50 transition-colors duration-150 cursor-pointer clin-row">
                                     <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
-                                        {{ clin.item_number|default:"0000" }}
+                                        <div class="d-flex align-items-center gap-1">
+                                            {% with cs=reminder_status.clins|get_item:clin.id %}
+                                            {% include "contracts/partials/reminder_bell.html" with target_type="clin" target_id=clin.id state=cs.state|default:"none" pending=cs.pending|default:0 overdue=cs.overdue|default:0 size="sm" %}
+                                            {% endwith %}
+                                            <span>{{ clin.item_number|default:"0000" }}</span>
+                                        </div>
                                     </td>
                                     <td class="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
                                         {{ clin.get_item_type_display|default:"—" }}
@@ -564,6 +568,12 @@
             <div class="col-span-8 border border-gray-200 rounded bg-gray-50 p-2 min-h-[200px]" id="clin-details-panel">
                 <div id="clin-details-content" class="text-sm">
                     {% if selected_clin %}
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        {% with cs=reminder_status.clins|get_item:selected_clin.id %}
+                        {% include "contracts/partials/reminder_bell.html" with target_type="clin" target_id=selected_clin.id state=cs.state|default:"none" pending=cs.pending|default:0 overdue=cs.overdue|default:0 %}
+                        {% endwith %}
+                        <span class="fw-semibold">CLIN {{ selected_clin.item_number|default:"—" }}</span>
+                    </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 28px;">
                         <!-- Left column: Identity & Terms -->
                         <div>
@@ -1210,11 +1220,17 @@
 </div>
 <!-- ===== /PO Snippet Library ===== -->
 
+{% include "contracts/partials/set_reminders_modal.html" %}
+{% include "contracts/partials/reminder_bell_modal.html" %}
+{{ reminder_status|json_script:"reminder-status-data" }}
+
 {% endblock %}
 {% block extra_js %}
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script src="{% static 'contracts/js/po_snippets.js' %}?v={{ cache_version }}-po-snippets-3"></script>
 <script src="{% static 'contracts/js/note_modal.js' %}"></script>
+<script src="{% static 'contracts/js/set_reminders_modal.js' %}?v={{ cache_version }}-set-reminders-1"></script>
+<script src="{% static 'contracts/js/reminder_bell_modal.js' %}?v={{ cache_version }}-reminder-bell-3"></script>
 <script>
 // Initialize Bootstrap tooltips on this page (for the Fix Legacy CLINs icon
 // button and any other [data-bs-toggle="tooltip"] elements). Safe no-op if
@@ -2194,7 +2210,11 @@ function fetchClinDetails(clinId) {
             const shipQtyCheck = d.is_shipping_complete
                 ? ' <i class="bi bi-check-circle-fill ms-1"></i>'
                 : '';
-            panel.innerHTML = `
+            const clinStatus = (window.__reminderBellStatusMap && window.__reminderBellStatusMap.clins && window.__reminderBellStatusMap.clins[String(d.id)]) || { state: 'none', pending: 0, overdue: 0 };
+            const bellHeader = (typeof buildBell === 'function')
+                ? '<div class="d-flex align-items-center gap-2 mb-2">' + buildBell('clin', d.id, clinStatus) + '<span class="fw-semibold">CLIN ' + fmt(d.item_number) + '</span></div>'
+                : '';
+            panel.innerHTML = bellHeader + `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 28px;">
                     <div>
                         <div style="font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:var(--bs-secondary-color); padding-bottom:4px; border-bottom:0.5px solid var(--bs-border-color); margin-bottom:4px;">Identity &amp; Terms</div>
@@ -2351,7 +2371,7 @@ function switchNotesTab(tab, clinId) {
     if (panel) panel.classList.remove('hidden');
 }
 
-function fetchContractNotes() {
+window.fetchContractNotes = function fetchContractNotes() {
     const container = document.getElementById('notes-panel-contract');
     if (!container) return;
 
@@ -2385,9 +2405,9 @@ function fetchContractNotes() {
             console.error('Error fetching contract notes:', error);
             container.innerHTML = '<div class="text-red-600 text-center py-4">' + (error.message || 'Error loading notes. Please try again.') + '</div>';
         });
-}
+};
 
-function fetchClinNotes(clinId) {
+window.fetchClinNotes = function fetchClinNotes(clinId) {
     const container = document.getElementById('notes-panel-clin');
     if (!container) return;
     if (!clinId) {
@@ -2425,16 +2445,16 @@ function fetchClinNotes(clinId) {
             console.error('Error fetching CLIN notes:', error);
             container.innerHTML = '<div class="text-red-600 text-center py-4">' + (error.message || 'Error loading notes. Please try again.') + '</div>';
         });
-}
+};
 
-function refreshCurrentNotesPanel() {
+window.refreshCurrentNotesPanel = function refreshCurrentNotesPanel() {
     const activeClinTab = document.querySelector('[aria-label="Notes tabs"] .app-tab-btn.type-clin.active');
     if (activeClinTab && activeClinTab.dataset.clinId) {
         fetchClinNotes(activeClinTab.dataset.clinId);
         return;
     }
     fetchContractNotes();
-}
+};
 
 function setupEditButtons(container) {
     // Setup edit buttons functionality
@@ -2491,20 +2511,9 @@ function toggleAcknowledgment(field) {
             }
         }
 
-        if (field === 'po_to_supplier_bool' && data.status) {
-            const reminderCount = data.reminders_created || 0;
-            const noteCount = data.notes_created || 0;
-            if (window.notify) {
-                window.notify(
-                    'success',
-                    `PO marked as Sent. ${noteCount} note(s) and ${reminderCount} reminder(s) created.`
-                );
-            }
-            if (data.po_ack_reminder_error && window.notify) {
-                window.notify('warning', `PO Ack reminder error: ${data.po_ack_reminder_error}`);
-            }
-            if (data.checkin_reminder_errors && data.checkin_reminder_errors.length && window.notify) {
-                window.notify('warning', `Some check-in reminders failed: ${data.checkin_reminder_errors.join('; ')}`);
+        if (field === 'po_to_supplier_bool' && data.status && data.prompt_set_reminders) {
+            if (window.SetReminders && typeof window.SetReminders.promptAfterToggle === 'function') {
+                window.SetReminders.promptAfterToggle(parseInt(contractId, 10));
             }
         }
     })

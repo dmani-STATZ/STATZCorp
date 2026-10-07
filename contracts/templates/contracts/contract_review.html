@@ -62,9 +62,21 @@ window.onTransactionSaved = function(data) {
           <span class="review-status-badge bg-warning-subtle text-warning-emphasis">Not Reviewed</span>
         {% endif %}
       </div>
-      <a href="{% url 'contracts:contract_management' contract.id %}" class="btn btn-sm btn-outline-secondary">
-        ← Back to Contract
-      </a>
+      <div class="d-flex align-items-center gap-2">
+        <button type="button"
+                class="btn btn-outline-brand btn-sm"
+                data-action="open-set-reminders"
+                data-contract-id="{{ contract.id }}"
+                data-contract-number="{{ contract.contract_number }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="me-1" aria-hidden="true">
+            <path d="M8 1a2 2 0 0 1 2 2v1h1a2 2 0 0 1 2 2v1H1V6a2 2 0 0 1 2-2h1V3a2 2 0 0 1 2-2zm7 6v5a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7zm-9 3a1 1 0 1 0 0 2 1 1 0 0 0 0-2m3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2"/>
+          </svg>
+          Set Reminders
+        </button>
+        <a href="{% url 'contracts:contract_management' contract.id %}" class="btn btn-sm btn-outline-secondary">
+          ← Back to Contract
+        </a>
+      </div>
     </div>
 
     {# SECTION: IDIQ Info — conditional #}
@@ -646,10 +658,13 @@ window.onTransactionSaved = function(data) {
   </div>{# end .review-detail-content #}
 </div>{# end .clin-detail-layout #}
 
+{% include "contracts/partials/set_reminders_modal.html" %}
+
 {% endblock content %}
 
 {% block extra_scripts %}
 {{ block.super }}
+<script src="{% static 'contracts/js/set_reminders_modal.js' %}?v={{ cache_version }}-set-reminders-1"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     new bootstrap.ScrollSpy(document.body, {

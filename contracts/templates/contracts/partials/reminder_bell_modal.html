@@ -1,0 +1,66 @@
+<div id="reminderBellRoot"
+     class="d-none"
+     data-list-url="{% url 'contracts:reminder_target_list_api' contract_id=contract.id %}"
+     data-status-url="{% url 'contracts:reminder_status_api' contract_id=contract.id %}"
+     data-quick-create-url="{% url 'contracts:reminder_quick_create_api' %}"
+     data-extend-url-template="{% url 'contracts:reminder_extend_api' pk=0 %}"
+     data-complete-url-template="{% url 'contracts:mark_reminder_complete' reminder_id=0 %}"
+     data-delete-url-template="{% url 'contracts:delete_reminder' reminder_id=0 %}"
+     data-contract-id="{{ contract.id }}"></div>
+
+<div class="modal fade" id="reminderBellModal" tabindex="-1" aria-labelledby="reminderBellModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reminderBellModalLabel">Reminders</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body d-flex flex-column">
+        <div class="reminder-bell-list-wrap" id="reminderBellListWrap">
+          <div class="reminder-bell-list list-group list-group-flush" id="reminderBellList">
+            <div id="reminderBellLoadError" class="alert alert-danger d-none mb-0" role="alert">
+              Could not load reminders.
+            </div>
+            <div id="reminderBellLoading" class="text-center py-4 d-none">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading…</span>
+              </div>
+            </div>
+            <div id="reminderBellEmpty" class="text-center text-body-secondary py-3 d-none">No pending reminders.</div>
+          </div>
+          <button type="button" class="reminder-bell-more btn btn-sm" id="reminderBellMore" hidden aria-live="polite">
+            <span class="reminder-bell-more__text"></span>
+            <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true">
+              <path fill="currentColor" fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+            </svg>
+          </button>
+        </div>
+        <hr>
+        <div class="reminder-bell-add">
+          <h6 class="fw-semibold">Add reminder</h6>
+          <div class="row g-2 align-items-end">
+            <div class="col-md-5">
+              <label class="form-label small mb-1" for="reminderBellAddLabel">Label</label>
+              <input type="text" class="form-control form-control-sm" id="reminderBellAddLabel" maxlength="200" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small mb-1" for="reminderBellAddDate">Date</label>
+              <input type="date" class="form-control form-control-sm" id="reminderBellAddDate" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1" for="reminderBellAddTarget">Applies to</label>
+              <select class="form-select form-select-sm" id="reminderBellAddTarget"></select>
+            </div>
+          </div>
+          <div class="small text-danger mt-1 d-none" id="reminderBellAddError">Label (200 characters max) and date are required.</div>
+          <div class="mt-2">
+            <button type="button" class="btn btn-success btn-sm" id="reminderBellAddBtn" disabled>Add Reminder</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
