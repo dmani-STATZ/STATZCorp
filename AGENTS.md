@@ -37,3 +37,8 @@
   "Open" is `return_by_date >= today` only.
 - `get_sam_entity` has three states (`ok` / `not_found` / `error`); a failed lookup must never
   render as "no record found".
+
+## CSS (when touching `static/css/app-core.css` or any date field)
+- Date inputs use the native browser calendar indicator only. Never add a
+  background-image calendar icon or an `input-group-text` calendar icon next to a
+  `type="date"` input.
