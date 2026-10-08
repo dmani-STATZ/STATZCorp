@@ -379,6 +379,16 @@ GRAPH_MAIL_ENABLED = (
     os.environ.get("GRAPH_MAIL_ENABLED", "False").strip().lower() == "true"
 )
 
+# Scan Inbox probe / future filing (Graph mailbox read; GCC High)
+SCAN_INBOX_MAILBOX = os.environ.get("SCAN_INBOX_MAILBOX", "").strip()
+_SCAN_INBOX_ALLOWED_SENDERS_RAW = os.environ.get("SCAN_INBOX_ALLOWED_SENDERS", "")
+SCAN_INBOX_ALLOWED_SENDERS = _SCAN_INBOX_ALLOWED_SENDERS_RAW
+SCAN_INBOX_ALLOWED_SENDERS_LIST = [
+    part.strip().lower()
+    for part in _SCAN_INBOX_ALLOWED_SENDERS_RAW.split(",")
+    if part.strip()
+]
+
 # ---------------------------------------------------------------------------
 # SharePoint / Graph API — Service Principal (STATZ Web App Mail registration)
 # Used for app-only (client credentials) access to SharePoint calendar

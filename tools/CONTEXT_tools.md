@@ -23,7 +23,10 @@
 - `urls.py`: exposes `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, and `tools:split_pdf`; all endpoints live at `/tools/` after the project-level include.
 - `views.py`: contains the UI view plus three POST-only helpers that call `pypdf` 6.7.1 (per `requirements.txt`), enforce `MAX_FILES`/`MAX_FILE_SIZE_BYTES`/`MAX_TOTAL_SIZE_BYTES`, decrypt encrypted files, parse range strings via `_parse_page_ranges`, build `PdfWriter` output, and emit `HttpResponse` downloads or `JsonResponse` errors.
 - `templates/tools/pdf_merger.html`: server-rendered page with drag-and-drop file input, file list with reorder/delete controls, preview iframe, range input, action buttons, status banner, and the inline script that talks to the view endpoints.
-- `models.py`, `admin.py`, `tests.py`, and `migrations/__init__.py`: all stubs; no models, admin registrations, or automated tests are defined yet, so all runtime behavior comes from the views/template combo.
+- `services/scan_inbox_graph.py`: Microsoft Graph client for the scan mailbox probe (and future Scan Inbox filing).
+- `management/commands/scan_inbox_probe.py`: management command wrapper for mailbox forensics and optional write probe.
+- `tests/test_scan_inbox_probe.py`: unit tests for the probe command and graph helpers (HTTP mocked).
+- `models.py`, `admin.py`, and `migrations/__init__.py`: no models or admin; PDF UI behavior remains in views/template.
 
 ## 5. Data Model / Domain Objects
 - No models exist in this app (`models.py` is empty, migrations only include `__init__.py`), so the app does not own persistent data and all state is transient per request/session.
@@ -78,10 +81,13 @@
 - The app handles user-submitted binary files, so any change must keep the size/range constraints intact to avoid denial-of-service via oversized uploads.
 
 ## 14. Background Processing / Scheduled Work
-- None. There are no Celery tasks, management commands, or scheduled jobs defined in this app.
+- **`python manage.py scan_inbox_probe`** — Stage 0 diagnostic for the future Scan Inbox feature. **Read-only by default** (Graph GET only). Optional **`--test-write`** (requires **`--message-id`**) creates root mail folders `Scans - Filed` and `Scans - Skipped` and moves one message out and back. No UI, models, or database access.
+- Graph mailbox I/O lives in **`tools/services/scan_inbox_graph.py`** (GCC High: `graph.microsoft.us`, immutable message IDs via `Prefer: IdType="ImmutableId"`). Reused by later Scan Inbox stages.
+- Settings (in `STATZWeb/settings.py`): **`SCAN_INBOX_MAILBOX`**, **`SCAN_INBOX_ALLOWED_SENDERS`** (comma-separated; parsed to **`SCAN_INBOX_ALLOWED_SENDERS_LIST`**). Token acquisition uses the same **`GRAPH_MAIL_*`** app registration as RFQ Graph mail.
 
 ## 15. Testing Coverage
-- `tests.py` is empty, so there are currently no automated tests covering any of the view logic or template interactions.
+- **`tools/tests/test_scan_inbox_probe.py`** covers `scan_inbox_probe` and `scan_inbox_graph` helpers with mocked HTTP.
+- PDF merge/split/delete views still have no automated tests.
 
 ## 16. Migrations / Schema Notes
 - There are no migrations (only `migrations/__init__.py`), confirming the app never introduced models or schema changes.

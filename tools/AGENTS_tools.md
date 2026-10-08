@@ -19,6 +19,7 @@ This file tells a coding agent how to modify the `tools` app safely. It identifi
 - The single-page UI in `templates/tools/pdf_merger.html` with all its inline JavaScript
 
 **Does not own:**
+- Scan Inbox Graph credentials — uses project-wide **`GRAPH_MAIL_*`** settings (same app registration as RFQ mail); do not duplicate token logic in the command.
 - Authentication — delegates entirely to `@login_required` from Django's `auth` framework
 - Global navigation — the "PDF Merger" nav link lives in `templates/base_template.html:317`, outside this app
 - No models, no persistent data, no admin, no migrations, no signals, no tasks
@@ -130,15 +131,20 @@ Rules:
 
 ## 11. Background Tasks / Signals / Automation Rules
 
-**None.** There are no Celery tasks, signals, management commands, scheduled jobs, or async processing in this app. All behavior is synchronous and request-scoped.
+**Management command only:** `scan_inbox_probe` (see `CONTEXT_tools.md` §14). No Celery, signals, or schedules.
+
+### `scan_inbox_graph.py` rules
+- **Never add Graph `DELETE` or `PATCH`** to `tools/services/scan_inbox_graph.py` without an explicit product decision documented in this file.
+- **Every Graph message request** must send **`Prefer: IdType="ImmutableId"`** (combine with body text preference when fetching `body`).
+- **Mailbox writes** (create folder, move message) are allowed only from **`scan_inbox_probe --test-write`** today, or from a future explicit user action / flag — not from default code paths.
 
 ---
 
 ## 12. Testing and Verification Expectations
 
-`tools/tests.py` is empty. There are no automated tests.
+Run **`python manage.py test tools`** after changes to `scan_inbox_graph.py` or `scan_inbox_probe`.
 
-After any edit, manually verify:
+After PDF view edits, manually verify:
 
 1. **Upload and merge**: upload 2–3 PDFs, click "Export file", confirm a valid merged PDF downloads
 2. **Delete pages**: upload a multi-page PDF, enter a valid range, click "Delete pages", confirm modified PDF downloads with correct pages removed
