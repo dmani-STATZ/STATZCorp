@@ -388,6 +388,9 @@ SCAN_INBOX_ALLOWED_SENDERS_LIST = [
     for part in _SCAN_INBOX_ALLOWED_SENDERS_RAW.split(",")
     if part.strip()
 ]
+SCAN_INBOX_SHAREPOINT_WRITES = (
+    os.environ.get("SCAN_INBOX_SHAREPOINT_WRITES", "False").strip().lower() == "true"
+)
 
 # ---------------------------------------------------------------------------
 # SharePoint / Graph API — Service Principal (STATZ Web App Mail registration)

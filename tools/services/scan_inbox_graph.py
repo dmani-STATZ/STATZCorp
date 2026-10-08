@@ -201,6 +201,75 @@ def list_sender_messages(
     return messages, filter_mode, filter_error
 
 
+def list_sender_messages_with_attachments(
+    mailbox: str,
+    senders: list[str],
+    max_pages: int,
+) -> tuple[list[dict], str, str]:
+    """Like list_sender_messages but expands attachments when Graph allows."""
+    allowed = {s.strip().lower() for s in senders if s.strip()}
+    normalized_senders = [s.strip() for s in senders if s.strip()]
+    if not normalized_senders:
+        return [], "expand", ""
+
+    expand_error = ""
+    combined: dict[str, dict] = {}
+
+    for sender in normalized_senders:
+        mbx = _mailbox_segment(mailbox)
+        addr = sender.replace("'", "''")
+        url = (
+            f"{GRAPH_BASE}/users/{mbx}/mailFolders/inbox/messages"
+            f"?$select={MESSAGE_SELECT}&$top=50"
+            f"&$filter=from/emailAddress/address eq '{addr}'"
+            f"&$expand=attachments($select=id,name,contentType,size,isInline)"
+        )
+        pages = 0
+        expand_failed = False
+        while url and pages < max_pages:
+            resp = requests.get(url, headers=_graph_headers(), timeout=HTTP_TIMEOUT)
+            if resp.status_code == 400 and pages == 0:
+                expand_failed = True
+                if not expand_error:
+                    expand_error = (resp.text or "")[:500]
+                break
+            if resp.status_code >= 400:
+                raise ScanInboxGraphError(resp.status_code, (resp.text or "")[:500])
+            payload = resp.json()
+            for msg in payload.get("value") or []:
+                mid = msg.get("id")
+                if mid:
+                    combined[mid] = msg
+            url = payload.get("@odata.nextLink")
+            pages += 1
+        if expand_failed:
+            break
+
+    if expand_error:
+        messages, _filter_mode, filter_error = list_sender_messages(
+            mailbox, senders, max_pages
+        )
+        for msg in messages:
+            mid = msg.get("id")
+            if not mid:
+                continue
+            try:
+                msg["attachments"] = list_attachments(mailbox, mid)
+            except ScanInboxGraphError:
+                msg["attachments"] = []
+        messages.sort(
+            key=lambda m: m.get("receivedDateTime") or "",
+        )
+        err = expand_error or filter_error
+        return messages, "per_message", err
+
+    messages = list(combined.values())
+    messages.sort(
+        key=lambda m: m.get("receivedDateTime") or "",
+    )
+    return messages, "expand", ""
+
+
 def get_message(mailbox: str, message_id: str) -> dict:
     mbx = _mailbox_segment(mailbox)
     mid = quote(message_id, safe="")

@@ -396,7 +396,7 @@ File format and validation rules are in `release_notes/README-rn.md`.
 ### `tools` — PDF Utilities
 **Purpose:** Staff-facing PDF merge, split, page-delete operations via web UI. No persistent models.
 
-**Owns:** Stateless PDF operations (pypdf); Scan Inbox Stage 0 reads the scan mailbox via Graph in `tools/services/scan_inbox_graph.py` (`scan_inbox_probe` management command).
+**Owns:** Stateless PDF operations (pypdf); Scan Inbox backend — Graph mailbox I/O (`scan_inbox_graph.py`), append-only **`ScanFilingLog`**, contract search and read-only destination resolution, SharePoint filing via `scan_inbox_sharepoint.py` (CLI: `scan_inbox`; probe: `scan_inbox_probe`).
 
 **Consumes from other apps:** None
 

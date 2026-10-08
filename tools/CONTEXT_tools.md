@@ -21,15 +21,22 @@
 ## 4. Key Files and What They Do
 - `apps.py`: declares `ToolsConfig`; used on `INSTALLED_APPS` (see `STATZWeb/settings.py` line 85) so Django recognizes the module.
 - `urls.py`: exposes `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, and `tools:split_pdf`; all endpoints live at `/tools/` after the project-level include.
-- `views.py`: contains the UI view plus three POST-only helpers that call `pypdf` 6.7.1 (per `requirements.txt`), enforce `MAX_FILES`/`MAX_FILE_SIZE_BYTES`/`MAX_TOTAL_SIZE_BYTES`, decrypt encrypted files, parse range strings via `_parse_page_ranges`, build `PdfWriter` output, and emit `HttpResponse` downloads or `JsonResponse` errors.
+- `views.py`: contains the UI view plus three POST-only helpers that call `pypdf` (see `requirements.txt`), enforce `MAX_FILES`/`MAX_FILE_SIZE_BYTES`/`MAX_TOTAL_SIZE_BYTES`, decrypt encrypted files, parse range strings via `_parse_page_ranges`, build `PdfWriter` output, and emit `HttpResponse` downloads or `JsonResponse` errors.
 - `templates/tools/pdf_merger.html`: server-rendered page with drag-and-drop file input, file list with reorder/delete controls, preview iframe, range input, action buttons, status banner, and the inline script that talks to the view endpoints.
-- `services/scan_inbox_graph.py`: Microsoft Graph client for the scan mailbox probe (and future Scan Inbox filing).
-- `management/commands/scan_inbox_probe.py`: management command wrapper for mailbox forensics and optional write probe.
-- `tests/test_scan_inbox_probe.py`: unit tests for the probe command and graph helpers (HTTP mocked).
-- `models.py`, `admin.py`, and `migrations/__init__.py`: no models or admin; PDF UI behavior remains in views/template.
+- `services/scan_inbox_graph.py`: Microsoft Graph client for the scan mailbox (GCC High, immutable message IDs).
+- `services/scan_inbox_queue.py`: pending PDF queue and mail-folder sweep.
+- `services/scan_inbox_search.py`: dash-insensitive contract search (company-scoped).
+- `services/scan_inbox_destination.py`: read-only SharePoint folder resolution (strict Graph GETs; no `drive_item_lookup`).
+- `services/scan_inbox_sharepoint.py`: **only** SharePoint writer for Scan Inbox (`conflictBehavior=fail`).
+- `services/scan_inbox_filing.py`: file/skip orchestration and append-only audit rows.
+- `models.py`: `ScanFilingLog` (`tools_scan_filing_log`), append-only filing audit.
+- `management/commands/scan_inbox_probe.py`: Stage 0 mailbox probe (optional `--test-write`).
+- `management/commands/scan_inbox.py`: Stage 1 CLI (`list`, `search`, `destination`, `file`, `skip`, `sweep`, `log`).
+- `tests/test_scan_inbox_probe.py`, `tests/test_scan_inbox_stage1.py`: mocked Graph/SharePoint tests.
 
 ## 5. Data Model / Domain Objects
-- No models exist in this app (`models.py` is empty, migrations only include `__init__.py`), so the app does not own persistent data and all state is transient per request/session.
+- **`ScanFilingLog`** (`tools_scan_filing_log`): append-only audit of filed, skipped, and failed scan PDFs. Application code only calls `ScanFilingLog.objects.create()`. Read-only in Django admin.
+- PDF merge/split/delete remains stateless (no models for that UI).
 
 ## 6. Request / User Flow
 - Entry point: `/tools/` (via `STATZWeb/urls.py`) calls `tools.views.pdf_merger`, which renders `templates/tools/pdf_merger.html`.
@@ -64,7 +71,7 @@
 ## 11. Integrations and Cross-App Dependencies
 - Project URL wiring (`STATZWeb/urls.py`) mounts this app at `/tools/`, so any navigation/menu that exposes `/tools/` relies on that include.
 - Template extends the shared `base_template.html`, which supplies styling, navigation, and global scripts; there are no app-specific templates outside `templates/tools/pdf_merger.html`.
-- External dependency: `pypdf==6.7.1` (listed in `requirements.txt`) supplies the PDF reader/writer functionality, so upgrades must keep the view logic in sync with `pypdf`’s API.
+- External dependency: `pypdf` (see `requirements.txt`, currently `pypdf>=6.13.3`) supplies the PDF reader/writer functionality; keep merge views and inspect_pdf in sync with `pypdf`’s API.
 - No other apps import `tools.views` or refer to `tools:` namespace in the repo, which implies the app is self-contained; no services or signals cross-link with other apps.
 
 ## 12. URL Surface / API Surface
@@ -81,16 +88,20 @@
 - The app handles user-submitted binary files, so any change must keep the size/range constraints intact to avoid denial-of-service via oversized uploads.
 
 ## 14. Background Processing / Scheduled Work
-- **`python manage.py scan_inbox_probe`** — Stage 0 diagnostic for the future Scan Inbox feature. **Read-only by default** (Graph GET only). Optional **`--test-write`** (requires **`--message-id`**) creates root mail folders `Scans - Filed` and `Scans - Skipped` and moves one message out and back. No UI, models, or database access.
-- Graph mailbox I/O lives in **`tools/services/scan_inbox_graph.py`** (GCC High: `graph.microsoft.us`, immutable message IDs via `Prefer: IdType="ImmutableId"`). Reused by later Scan Inbox stages.
-- Settings (in `STATZWeb/settings.py`): **`SCAN_INBOX_MAILBOX`**, **`SCAN_INBOX_ALLOWED_SENDERS`** (comma-separated; parsed to **`SCAN_INBOX_ALLOWED_SENDERS_LIST`**). Token acquisition uses the same **`GRAPH_MAIL_*`** app registration as RFQ Graph mail.
+- **`python manage.py scan_inbox_probe`** — Stage 0 diagnostic. Read-only by default; optional **`--test-write`** with **`--message-id`** exercises mail-folder create/move.
+- **`python manage.py scan_inbox <subcommand>`** — Stage 1 backend CLI: `list`, `search`, `destination`, `file`, `skip`, `sweep`, `log`. Prints **full** Graph message IDs on `list`. `file` without **`--dry-run`** requires **`SCAN_INBOX_SHAREPOINT_WRITES=true`**.
+- **Done rule:** a PDF is done when a `ScanFilingLog` row exists with the same `message_id` and `attachment_name` and `action` in (`FILED`, `SKIPPED`). `FAILED` does not mark done.
+- **Destination ladder** (`scan_inbox_destination.resolve_destination`, read-only): confirmed contract drive ID → modern `files_url` → latest completed folder-scan snapshot (single in-scope row) → create path (IDIQ parent via Graph, else `Contract.get_sharepoint_relative_path()`). Never calls `resolve_contract_folder_path` or `contracts.services.drive_item_lookup`. Network errors → `kind=error`.
+- **Never-overwrite:** SharePoint uploads use `@microsoft.graph.conflictBehavior=fail`; equal-size conflict treats existing file as already present; otherwise one retry with ` (2)` before `.pdf`.
+- Settings: **`SCAN_INBOX_MAILBOX`**, **`SCAN_INBOX_ALLOWED_SENDERS`**, **`SCAN_INBOX_ALLOWED_SENDERS_LIST`**, **`SCAN_INBOX_SHAREPOINT_WRITES`**. Graph token via **`GRAPH_MAIL_*`**; drive via **`SHAREPOINT_DRIVE_ID`**.
 
 ## 15. Testing Coverage
-- **`tools/tests/test_scan_inbox_probe.py`** covers `scan_inbox_probe` and `scan_inbox_graph` helpers with mocked HTTP.
+- **`tools/tests/test_scan_inbox_probe.py`** — Stage 0 probe.
+- **`tools/tests/test_scan_inbox_stage1.py`** — Stage 1 queue, destination, filing, sweep, search, CLI (HTTP mocked).
 - PDF merge/split/delete views still have no automated tests.
 
 ## 16. Migrations / Schema Notes
-- There are no migrations (only `migrations/__init__.py`), confirming the app never introduced models or schema changes.
+- **`tools/migrations/0001_initial.py`** creates **`ScanFilingLog`** only.
 
 ## 17. Known Gaps / Ambiguities
 - No automated tests exist, so you cannot rely on regression coverage when modifying parsing or upload logic.
@@ -108,7 +119,7 @@
 - Primary models: None (no Django models defined in `tools/models.py`).
 - Main URLs: `/tools/` → `pdf_merger`, `/tools/merge/` → `merge_pdfs`, `/tools/delete-pages/` → `delete_pages`, `/tools/split/` → `split_pdf`.
 - Key template: `templates/tools/pdf_merger.html` (single-page UI with inline JS).
-- Key dependency: `pypdf==6.7.1` from `requirements.txt`.
+- Key dependency: `pypdf` from `requirements.txt`.
 - Risky files: `tools/views.py` (encapsulates all PDF handling logic) and `templates/tools/pdf_merger.html` (contains the JavaScript glue that triggers the views and enforces front-end state).
 
 

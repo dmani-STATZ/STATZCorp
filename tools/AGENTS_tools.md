@@ -20,9 +20,10 @@ This file tells a coding agent how to modify the `tools` app safely. It identifi
 
 **Does not own:**
 - Scan Inbox Graph credentials — uses project-wide **`GRAPH_MAIL_*`** settings (same app registration as RFQ mail); do not duplicate token logic in the command.
+- Contract folder persistence — Scan Inbox **never** writes `Contract.files_url`, `sharepoint_drive_item_id`, or any other contracts data.
 - Authentication — delegates entirely to `@login_required` from Django's `auth` framework
 - Global navigation — the "PDF Merger" nav link lives in `templates/base_template.html:317`, outside this app
-- No models, no persistent data, no admin, no migrations, no signals, no tasks
+- **`ScanFilingLog`** only (append-only audit); PDF merge UI has no models
 
 This is a **self-contained utility app**. It is thin in structure but non-trivial in its inline JavaScript and binary-handling logic.
 
@@ -133,16 +134,21 @@ Rules:
 
 **Management command only:** `scan_inbox_probe` (see `CONTEXT_tools.md` §14). No Celery, signals, or schedules.
 
-### `scan_inbox_graph.py` rules
-- **Never add Graph `DELETE` or `PATCH`** to `tools/services/scan_inbox_graph.py` without an explicit product decision documented in this file.
-- **Every Graph message request** must send **`Prefer: IdType="ImmutableId"`** (combine with body text preference when fetching `body`).
-- **Mailbox writes** (create folder, move message) are allowed only from **`scan_inbox_probe --test-write`** today, or from a future explicit user action / flag — not from default code paths.
+### Scan Inbox rules (Stage 0–1)
+- **`scan_inbox_sharepoint.py`** is the **only** SharePoint document-library writer for Scan Inbox. No **`DELETE`** or **`PATCH`** anywhere under `tools/services/`.
+- **Never** call **`resolve_contract_folder_path`** or **`contracts.services.drive_item_lookup`** from `tools/` — destination uses strict Graph GET helpers in **`scan_inbox_destination.py`** only.
+- **`ScanFilingLog`** is append-only: only **`ScanFilingLog.objects.create()`** in services; no `.save()` / `.update()` on other models.
+- **No ORM queries inside per-message Graph loops** — batch `message_id__in` for done lookups (`scan_inbox_queue.list_pending`).
+- Uploads: **`@microsoft.graph.conflictBehavior=fail`** only (never replace).
+- **`scan_inbox_graph.py`:** **`Prefer: IdType="ImmutableId"`** on message requests; no Graph DELETE/PATCH without product sign-off.
+- **SharePoint writes** require **`SCAN_INBOX_SHAREPOINT_WRITES=true`** (except destination lookups and dry-run).
+- Cross-app **`contracts.*`** imports must be **lazy** (inside functions), never module top-level.
 
 ---
 
 ## 12. Testing and Verification Expectations
 
-Run **`python manage.py test tools`** after changes to `scan_inbox_graph.py` or `scan_inbox_probe`.
+Run **`python manage.py test tools`** after Scan Inbox or PDF view changes.
 
 After PDF view edits, manually verify:
 
