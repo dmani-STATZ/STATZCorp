@@ -1,7 +1,7 @@
 # STATZWeb/middleware.py
 from django.shortcuts import redirect
 from django.conf import settings
-from django.urls import reverse, resolve
+from django.urls import reverse, resolve, Resolver404
 from users.models import AppPermission, AppRegistry, ReleaseNote
 import logging
 
@@ -98,6 +98,7 @@ class LoginRequiredMiddleware:
                 #logger.debug(f"Path {path} is {'public' if is_public else 'not public'}")
                 
                 if not is_public:
+                    app_name = None
                     try:
                         resolved = resolve(request.path_info)
                         # Extract app_name from the namespace if available
@@ -138,12 +139,25 @@ class LoginRequiredMiddleware:
                                 pass
                         else:
                             #logger.info(f"App {app_name} is exempt from permission checks")
-                            pass    
-                    except Exception as e:
-                        #logger.error(f"Error in middleware: {e}", exc_info=True)
-                        # Consider whether to deny access on errors
-                        # return redirect('permission_denied')
+                            pass
+                    except Resolver404:
                         pass
+                    except (AppRegistry.MultipleObjectsReturned, AppPermission.MultipleObjectsReturned):
+                        logger.exception(
+                            "App permission check failed (duplicate registry rows): user=%s path=%s app=%s",
+                            request.user.pk,
+                            request.path_info,
+                            app_name,
+                        )
+                        return redirect('permission_denied')
+                    except Exception:
+                        logger.exception(
+                            "App permission check failed: user=%s path=%s app=%s",
+                            request.user.pk,
+                            request.path_info,
+                            app_name,
+                        )
+                        return redirect('permission_denied')
                 else:
                     #logger.info(f"Path {path} is in public_urls, skipping permission check")
                     pass

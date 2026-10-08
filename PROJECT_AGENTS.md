@@ -176,6 +176,7 @@ Run repo-wide search before any of these changes:
 
 ## 8. Security / Permissions / Sensitive Data Rules
 - Keep `STATZWeb.middleware.LoginRequiredMiddleware` behavior intact unless explicitly changing auth policy.
+- `LoginRequiredMiddleware` fails closed: unexpected errors during the AppRegistry/AppPermission check are logged and denied. No AppRegistry row = allow (by design). Never reintroduce a broad `except Exception: pass` in this middleware.
 - Preserve `AppRegistry`/`AppPermission` checks and superuser/staff gates in views/admin actions.
 - Preserve `request.active_company` enforcement when querying company-scoped models.
 - Preserve object-level ownership checks where present (`reports` run/export, organizer-bound portal event edits).

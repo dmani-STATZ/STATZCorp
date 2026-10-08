@@ -236,7 +236,7 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 11. **`UserOAuthToken.is_expired` uses `timezone.now()`.** If the system clock is wrong or tokens have unusual expiry times, token refresh logic can misbehave silently.
 
-12. **`STATZWeb/middleware.py` also imports `AppPermission` and `AppRegistry`** — separate from `users/middleware.py`. Two middleware files manage related concerns; a change to the permission model must be reflected in both.
+12. **`STATZWeb/middleware.py` also imports `AppPermission` and `AppRegistry`** — separate from `users/middleware.py`. Two middleware files manage related concerns; a change to the permission model must be reflected in both. `LoginRequiredMiddleware` fails closed: unexpected errors during the AppRegistry/AppPermission check are logged and denied. No AppRegistry row = allow (by design). Never reintroduce a broad `except Exception: pass` in this middleware.
 
 13. **`sharepoint_services.get_graph_service_token()`** uses the client credentials flow against `login.microsoftonline.us` — not the user OAuth flow. Do not mix these two token flows. Do not pass a service token to `UserOAuthToken` or `azure_auth` helpers. The calendar list and the document library are on different SharePoint sites. Always use `SHAREPOINT_CALENDAR_SITE_ID` for calendar Graph calls and `SHAREPOINT_SITE_ID` for document library Graph calls. Never substitute one for the other.
 
