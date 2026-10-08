@@ -212,6 +212,184 @@ class QueueTests(TestCase):
     EXPLORER_SHAREPOINT_STRIP_PREFIX='Statz-Public/data/V87',
     SHAREPOINT_PATH_PREFIX=ROOT,
 )
+class LinkedDriveItemQueueTests(TestCase):
+    """Queues respect Contract.sharepoint_drive_item_id after rescan."""
+
+    def setUp(self):
+        user_model = get_user_model()
+        self.actor = user_model.objects.create_superuser('su', 'su@test.com', 'pass')
+        self.company = Company.objects.create(
+            name='Link Co',
+            slug='link-co',
+            sharepoint_documents_path=ROOT,
+        )
+        self.run1 = FolderScanRun.objects.create(
+            root_path=ROOT,
+            status=FolderScanRun.Status.COMPLETED,
+            finished_at=timezone.now(),
+        )
+
+    def _assert_not_in_link_queues(self, ctx, contract_id, drive_item_id):
+        folderless_ids = {row['contract_id'] for row in ctx._queues['folderless']}
+        self.assertNotIn(contract_id, folderless_ids)
+        misnamed_ids = {row['drive_item_id'] for row in ctx._queues['misnamed']}
+        orphan_ids = {row['drive_item_id'] for row in ctx._queues['orphans']}
+        pair_folder_ids = {row['drive_item_id'] for row in ctx._queues['pairs']}
+        pair_contract_ids = {row['contract_id'] for row in ctx._queues['pairs']}
+        self.assertNotIn(drive_item_id, misnamed_ids)
+        self.assertNotIn(drive_item_id, orphan_ids)
+        self.assertNotIn(drive_item_id, pair_folder_ids)
+        self.assertNotIn(contract_id, pair_contract_ids)
+
+    def _rescan_with_folder(self, **folder_kwargs):
+        run2 = FolderScanRun.objects.create(
+            root_path=ROOT,
+            status=FolderScanRun.Status.COMPLETED,
+            finished_at=timezone.now(),
+        )
+        ScannedFolder.objects.create(run=run2, in_scope=True, **folder_kwargs)
+        return run2
+
+    @patch('contracts.services.folder_review.actions.get_folder_path_by_item_id')
+    def test_misnamed_link_survives_rescan(self, mock_live):
+        mock_live.return_value = OPEN_PATH.rstrip('/')
+        contract = Contract.objects.create(
+            company=self.company,
+            contract_number='SPE7M5-19-V-1384',
+        )
+        ScannedFolder.objects.create(
+            run=self.run1,
+            in_scope=True,
+            drive_item_id='misnamed-drive',
+            folder_kind=ScannedFolder.FolderKind.OTHER,
+            name='Conract SPE7M5-19-V-1384',
+            path=f'{ROOT}/Conract SPE7M5-19-V-1384',
+            match_status=ScannedFolder.MatchStatus.NO_CONTRACT_IN_DB,
+        )
+        review_actions.link_contract_to_folder(
+            contract.id,
+            'misnamed-drive',
+            ROOT,
+            self.actor,
+            FolderRepairLog.Action.LINK_MISNAMED,
+        )
+        self._rescan_with_folder(
+            drive_item_id='misnamed-drive',
+            folder_kind=ScannedFolder.FolderKind.OTHER,
+            name='Conract SPE7M5-19-V-1384',
+            path=f'{ROOT}/Conract SPE7M5-19-V-1384',
+            match_status=ScannedFolder.MatchStatus.NO_CONTRACT_IN_DB,
+            contract_id=None,
+        )
+        ctx = load_review_context(ROOT)
+        self._assert_not_in_link_queues(ctx, contract.id, 'misnamed-drive')
+
+    @patch('contracts.services.folder_review.actions.get_folder_path_by_item_id')
+    def test_typo_orphan_link_survives_rescan(self, mock_live):
+        mock_live.return_value = OPEN_PATH.rstrip('/')
+        contract = Contract.objects.create(
+            company=self.company,
+            contract_number='SPE7L3-24-V-5580',
+        )
+        ScannedFolder.objects.create(
+            run=self.run1,
+            in_scope=True,
+            drive_item_id='typo-drive',
+            name='Contract SPE7L3-24-V-5581',
+            path=f'{ROOT}/Contract SPE7L3-24-V-5581',
+            normalized_contract_number='SPE7L324V5581',
+            match_status=ScannedFolder.MatchStatus.NO_CONTRACT_IN_DB,
+        )
+        review_actions.link_contract_to_folder(
+            contract.id,
+            'typo-drive',
+            ROOT,
+            self.actor,
+            FolderRepairLog.Action.LINK_PAIR,
+        )
+        self._rescan_with_folder(
+            drive_item_id='typo-drive',
+            name='Contract SPE7L3-24-V-5581',
+            path=f'{ROOT}/Contract SPE7L3-24-V-5581',
+            normalized_contract_number='SPE7L324V5581',
+            match_status=ScannedFolder.MatchStatus.NO_CONTRACT_IN_DB,
+            contract_id=None,
+        )
+        ctx = load_review_context(ROOT)
+        self._assert_not_in_link_queues(ctx, contract.id, 'typo-drive')
+
+    def test_folderless_when_linked_drive_not_in_run(self):
+        contract = Contract.objects.create(
+            company=self.company,
+            contract_number='SPE7L3-24-V-ABSE',
+            sharepoint_drive_item_id='absent-drive-id',
+            files_url=OPEN_PATH,
+        )
+        ScannedFolder.objects.create(
+            run=self.run1,
+            in_scope=True,
+            drive_item_id='some-other-folder',
+            match_status=ScannedFolder.MatchStatus.NO_CONTRACT_IN_DB,
+            name='Unrelated',
+            path=f'{ROOT}/Unrelated',
+        )
+        ctx = load_review_context(ROOT)
+        folderless_ids = {row['contract_id'] for row in ctx._queues['folderless']}
+        self.assertIn(contract.id, folderless_ids)
+
+    @patch('contracts.services.folder_review.actions.get_folder_path_by_item_id')
+    def test_linked_contract_excludes_bare_number_misnamed_substructure(self, mock_live):
+        mock_live.return_value = OPEN_PATH.rstrip('/')
+        contract = Contract.objects.create(
+            company=self.company,
+            contract_number='SPE4AX-21-D-0009',
+        )
+        ScannedFolder.objects.create(
+            run=self.run1,
+            in_scope=True,
+            drive_item_id='linked-main',
+            folder_kind=ScannedFolder.FolderKind.CONTRACT,
+            name='Contract SPE4AX-21-D-0009',
+            path=f'{ROOT}/Contract SPE4AX-21-D-0009',
+            normalized_contract_number='SPE4AX21D0009',
+            match_status=ScannedFolder.MatchStatus.MATCHED_EXPECTED,
+        )
+        review_actions.link_contract_to_folder(
+            contract.id,
+            'linked-main',
+            ROOT,
+            self.actor,
+            FolderRepairLog.Action.LINK_PAIR,
+        )
+        self._rescan_with_folder(
+            drive_item_id='linked-main',
+            folder_kind=ScannedFolder.FolderKind.CONTRACT,
+            name='Contract SPE4AX-21-D-0009',
+            path=f'{ROOT}/Contract SPE4AX-21-D-0009',
+            normalized_contract_number='SPE4AX21D0009',
+            match_status=ScannedFolder.MatchStatus.MATCHED_EXPECTED,
+            contract_id=None,
+        )
+        run2 = FolderScanRun.objects.filter(root_path=ROOT).order_by('-finished_at').first()
+        ScannedFolder.objects.create(
+            run=run2,
+            in_scope=True,
+            drive_item_id='bare-sub',
+            folder_kind=ScannedFolder.FolderKind.OTHER,
+            name='SPE4AX-21-D-0009',
+            path=f'{ROOT}/nested/SPE4AX-21-D-0009',
+            match_status=ScannedFolder.MatchStatus.NOT_CONTRACT_FOLDER,
+        )
+        ctx = load_review_context(ROOT)
+        self.assertEqual(len(ctx._queues['misnamed']), 0)
+        self.assertGreaterEqual(ctx.misnamed_excluded_substructure, 1)
+        self._assert_not_in_link_queues(ctx, contract.id, 'linked-main')
+
+
+@override_settings(
+    EXPLORER_SHAREPOINT_STRIP_PREFIX='Statz-Public/data/V87',
+    SHAREPOINT_PATH_PREFIX=ROOT,
+)
 class ActionTests(TestCase):
     def setUp(self):
         user_model = get_user_model()

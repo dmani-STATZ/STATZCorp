@@ -156,6 +156,21 @@ def load_review_context(root_path: str) -> ReviewContext:
         if row['normalized']:
             idiq_by_norm[row['normalized']] = row
 
+    run_folder_ids = {
+        _str(row.get('drive_item_id'))
+        for row in folders
+        if _str(row.get('drive_item_id'))
+    }
+    linked_folder_ids = {
+        c['sharepoint_drive_item_id']
+        for c in contracts
+        if c['sharepoint_drive_item_id']
+    } | {
+        i['sharepoint_drive_item_id']
+        for i in idiqs
+        if i['sharepoint_drive_item_id']
+    }
+
     ignores = list(
         FolderReviewIgnore.objects.values(
             'id',
@@ -193,6 +208,23 @@ def load_review_context(root_path: str) -> ReviewContext:
         for r in folders
         if r.get('contract_id')
     }
+    referenced_idiq_ids = {
+        int(r['idiq_contract_id'])
+        for r in folders
+        if r.get('idiq_contract_id')
+    }
+
+    def contract_has_folder(c: dict) -> bool:
+        if c['id'] in referenced_contract_ids:
+            return True
+        did = c.get('sharepoint_drive_item_id') or ''
+        return bool(did and did in run_folder_ids)
+
+    def idiq_has_folder(i: dict) -> bool:
+        if i['id'] in referenced_idiq_ids:
+            return True
+        did = i.get('sharepoint_drive_item_id') or ''
+        return bool(did and did in run_folder_ids)
 
     matched_norms: set[str] = set()
     for row in folders:
@@ -207,6 +239,12 @@ def load_review_context(root_path: str) -> ReviewContext:
         iid = row.get('idiq_contract_id')
         if iid and idiq_by_id.get(iid):
             matched_norms.add(idiq_by_id[iid]['normalized'])
+    for c in contracts:
+        if contract_has_folder(c) and c.get('normalized'):
+            matched_norms.add(c['normalized'])
+    for i in idiqs:
+        if idiq_has_folder(i) and i.get('normalized'):
+            matched_norms.add(i['normalized'])
 
     misnamed_rows: list[dict] = []
     misnamed_unmatched_folders: list[dict] = []
@@ -221,11 +259,14 @@ def load_review_context(root_path: str) -> ReviewContext:
         if token in matched_norms:
             misnamed_excluded += 1
             continue
-        if folder_ignored('misnamed', row.get('drive_item_id') or ''):
+        folder_did = _str(row.get('drive_item_id'))
+        if folder_did and folder_did in linked_folder_ids:
+            continue
+        if folder_ignored('misnamed', folder_did):
             continue
         folderless_match = None
         for c in contract_by_norm.get(token, []):
-            if c['id'] not in referenced_contract_ids:
+            if not contract_has_folder(c):
                 folderless_match = c['id']
                 break
         entry = {
@@ -254,7 +295,10 @@ def load_review_context(root_path: str) -> ReviewContext:
     for row in folders:
         if row.get('match_status') != ScannedFolder.MatchStatus.NO_CONTRACT_IN_DB:
             continue
-        if folder_ignored('orphans', row.get('drive_item_id') or ''):
+        folder_did = _str(row.get('drive_item_id'))
+        if folder_did and folder_did in linked_folder_ids:
+            continue
+        if folder_ignored('orphans', folder_did):
             continue
         norm = _str(row.get('normalized_contract_number')) or _misnamed_token(
             row.get('name') or ''
@@ -271,7 +315,7 @@ def load_review_context(root_path: str) -> ReviewContext:
 
     folderless_contracts: list[dict] = []
     for c in contracts:
-        if c['id'] in referenced_contract_ids:
+        if contract_has_folder(c):
             continue
         if contract_ignored('folderless', c['id']):
             continue
@@ -305,6 +349,12 @@ def load_review_context(root_path: str) -> ReviewContext:
 
     pairs: list[dict] = []
     for edge in pairs_raw:
+        if edge['drive_item_id'] in linked_folder_ids:
+            continue
+        if contract_by_id.get(edge['contract_id']) and contract_has_folder(
+            contract_by_id[edge['contract_id']]
+        ):
+            continue
         if folder_ignored('pairs', edge['drive_item_id']):
             continue
         if contract_ignored('pairs', edge['contract_id']):
