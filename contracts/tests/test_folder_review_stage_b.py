@@ -82,6 +82,16 @@ class StageBKillSwitchTests(TestCase):
     FOLDER_REVIEW_SHAREPOINT_WRITES=True,
 )
 class SharepointWritesUnitTests(TestCase):
+    def setUp(self):
+        self._token_patch = patch(
+            'contracts.services.folder_review.sharepoint_writes._cached_token',
+            return_value='ci-test-token',
+        )
+        self._token_patch.start()
+
+    def tearDown(self):
+        self._token_patch.stop()
+
     def test_invalid_name_rejected_before_http(self):
         with patch('contracts.services.folder_review.sharepoint_writes.requests.patch') as p:
             with self.assertRaises(sharepoint_writes.WriteFailed):
