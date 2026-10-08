@@ -502,10 +502,16 @@ def set_file_path_api(request):
             status=400,
         )
 
+    from contracts.services.drive_item_lookup import get_folder_item_id_by_path
+
     contract = _contract_for_request(request, contract_pk)
     contract.files_url = file_path
+    contract.sharepoint_drive_item_id = get_folder_item_id_by_path(file_path)
+    contract._drive_item_id_confirmed = True
     contract.modified_by = request.user
-    contract.save(update_fields=["files_url", "modified_by", "modified_on"])
+    contract.save(
+        update_fields=["files_url", "sharepoint_drive_item_id", "modified_by", "modified_on"]
+    )
     return JsonResponse({"success": True, "message": "Path saved successfully"})
 
 
@@ -546,8 +552,12 @@ def link_contract_folder_api(request):
     except SharePointError as error:
         return _error_response(error)
 
+    from contracts.services.drive_item_lookup import get_folder_item_id_by_path
+
     contract.files_url = resolved_path
-    contract.save(update_fields=["files_url"])
+    contract.sharepoint_drive_item_id = get_folder_item_id_by_path(resolved_path)
+    contract._drive_item_id_confirmed = True
+    contract.save(update_fields=["files_url", "sharepoint_drive_item_id"])
     return JsonResponse({"success": True, "files_url": resolved_path})
 
 
@@ -610,10 +620,14 @@ def set_idiq_file_path_api(request):
             status=400,
         )
 
+    from contracts.services.drive_item_lookup import get_folder_item_id_by_path
+
     idiq = _idiq_for_request(request, idiq_pk)
     idiq.files_url = file_path
+    idiq.sharepoint_drive_item_id = get_folder_item_id_by_path(file_path)
+    idiq._drive_item_id_confirmed = True
     idiq.modified_by = request.user
-    idiq.save()
+    idiq.save(update_fields=["files_url", "sharepoint_drive_item_id", "modified_by", "modified_on"])
     return JsonResponse({"success": True, "message": "Path saved successfully"})
 
 

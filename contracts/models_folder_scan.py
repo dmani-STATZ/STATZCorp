@@ -39,6 +39,7 @@ class FolderScanRun(models.Model):
     contracts_without_folder = models.PositiveIntegerField(default=0)
     do_parent_mismatch = models.PositiveIntegerField(default=0)
     drive_ids_written = models.PositiveIntegerField(default=0)
+    idiq_drive_ids_written = models.PositiveIntegerField(default=0)
     paths_fixed = models.PositiveIntegerField(default=0)
 
     class ScanMode(models.TextChoices):

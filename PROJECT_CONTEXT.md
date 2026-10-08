@@ -86,7 +86,7 @@ Path patterns:
 
 Status check uses `ContractStatus.description` in `('Closed', 'Cancelled')`.
 
-`contracts/services/sharepoint_paths.py` validates `Contract.files_url` and delegates pattern paths to the model. **`resolve_contract_folder_path`** order: use `files_url` when modern (`source='files_url'`); otherwise `get_sharepoint_relative_path()` (`source='pattern'`); root prefix when the resolved path 404s in Graph.
+`contracts/services/sharepoint_paths.py` validates `Contract.files_url` and delegates pattern paths to the model. **`resolve_contract_folder_path`** / **`resolve_idiq_folder_path`** order: Graph **`sharepoint_drive_item_id`** when lookup succeeds (`source='drive_item'`); then modern `files_url` (`source='files_url'`); then pattern (`source='pattern'`). Lookups are read-only via `contracts/services/drive_item_lookup.py` (5s timeout, cached paths/tokens). Root prefix when the resolved path 404s in Graph.
 
 Legacy `files_url` detection in `sharepoint_paths.resolve_contract_folder_path()`:
 

@@ -10,7 +10,7 @@ import traceback
 from django.conf import settings
 from django.utils import timezone
 
-from contracts.models import Contract
+from contracts.models import Contract, IdiqContract
 from contracts.models_folder_scan import FolderScanRun, ScannedFolder
 from contracts.services.folder_scan.delta_source import DeltaTokenExpired, initial_delta_url, iter_delta_pages, classify_item
 from contracts.services.folder_scan.exceptions import GraphScanError
@@ -221,6 +221,20 @@ def run_scan(
             )
             run.drive_ids_written = len(contracts)
 
+        idiq_drive_updates = result.get('idiq_drive_id_updates') or []
+        if idiq_drive_updates:
+            idiq_id_map = {iid: did for iid, did in idiq_drive_updates}
+            idiq_objs = [
+                IdiqContract(pk=iid, sharepoint_drive_item_id=did)
+                for iid, did in idiq_id_map.items()
+            ]
+            IdiqContract.objects.bulk_update(
+                idiq_objs,
+                ['sharepoint_drive_item_id'],
+                batch_size=_BULK_FOLDER_SIZE,
+            )
+            run.idiq_drive_ids_written = len(idiq_objs)
+
         run.delta_link = final_delta_link
         run.scan_mode = mode
         run.delta_pages = delta_pages
@@ -305,6 +319,7 @@ def _log_summary(logger: ScanLogger, run: FolderScanRun) -> None:
         f'contracts_without_folder: {run.contracts_without_folder}',
         f'do_parent_mismatch: {run.do_parent_mismatch}',
         f'drive_ids_written: {run.drive_ids_written}',
+        f'idiq_drive_ids_written: {run.idiq_drive_ids_written}',
         f'paths_fixed: {run.paths_fixed}',
     ]
     for line in lines:

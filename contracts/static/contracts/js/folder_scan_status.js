@@ -27,6 +27,7 @@
         ['contracts_without_folder', 'Contracts without folder'],
         ['do_parent_mismatch', 'DO parent mismatch'],
         ['drive_ids_written', 'Drive IDs written'],
+        ['idiq_drive_ids_written', 'IDIQ drive IDs written'],
         ['paths_fixed', 'Paths fixed'],
     ];
 

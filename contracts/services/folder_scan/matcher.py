@@ -57,6 +57,7 @@ def classify(run: FolderScanRun, folders: list[dict]) -> dict:
         IdiqContract.objects.filter(company_id__in=company_ids).values(
             'id',
             'contract_number',
+            'sharepoint_drive_item_id',
         )
     )
 
@@ -240,9 +241,25 @@ def classify(run: FolderScanRun, folders: list[dict]) -> dict:
         if _str_field(row.get('sharepoint_drive_item_id')) != drive_item_id:
             drive_id_updates.append((contract_id, drive_item_id))
 
+    idiq_drive_id_updates: list[tuple[int, str]] = []
+    for num, items in occurrences.items():
+        if len(items) != 1:
+            continue
+        folder = items[0]
+        if folder.get('match_status') != ScannedFolder.MatchStatus.MATCHED_IDIQ:
+            continue
+        idiq_id = folder.get('idiq_contract_id')
+        if not idiq_id:
+            continue
+        drive_item_id = folder.get('drive_item_id') or ''
+        row = next(r for r in idiq_rows if r['id'] == idiq_id)
+        if _str_field(row.get('sharepoint_drive_item_id')) != drive_item_id:
+            idiq_drive_id_updates.append((idiq_id, drive_item_id))
+
     return {
         'counters': counters,
         'drive_id_updates': drive_id_updates,
+        'idiq_drive_id_updates': idiq_drive_id_updates,
     }
 
 

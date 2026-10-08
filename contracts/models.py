@@ -91,6 +91,37 @@ class AuditModel(models.Model):
         self.modified_on = timezone.now()
         super().save(*args, **kwargs)
 
+
+_DRIVE_GUARD_UNLOADED = object()
+
+
+def _snapshot_drive_item_state(instance):
+    """Record files_url / sharepoint_drive_item_id as loaded or last saved."""
+    instance._loaded_files_url = instance.__dict__.get('files_url', _DRIVE_GUARD_UNLOADED)
+    instance._loaded_drive_item_id = instance.__dict__.get(
+        'sharepoint_drive_item_id', _DRIVE_GUARD_UNLOADED
+    )
+    instance._drive_item_id_confirmed = False
+
+
+def _apply_drive_item_guard(instance, save_kwargs):
+    """Clear a stale drive item id when files_url changed without a confirmed id."""
+    if instance._state.adding or getattr(instance, '_drive_item_id_confirmed', False):
+        return
+    loaded_url = getattr(instance, '_loaded_files_url', _DRIVE_GUARD_UNLOADED)
+    loaded_id = getattr(instance, '_loaded_drive_item_id', _DRIVE_GUARD_UNLOADED)
+    if loaded_url is _DRIVE_GUARD_UNLOADED or loaded_id is _DRIVE_GUARD_UNLOADED:
+        return
+    current_id = instance.sharepoint_drive_item_id or ''
+    if not current_id:
+        return
+    if (instance.files_url or '') != (loaded_url or '') and current_id == (loaded_id or ''):
+        instance.sharepoint_drive_item_id = ''
+        update_fields = save_kwargs.get('update_fields')
+        if update_fields is not None and 'sharepoint_drive_item_id' not in update_fields:
+            save_kwargs['update_fields'] = list(update_fields) + ['sharepoint_drive_item_id']
+
+
 class Contract(AuditModel):
     company = models.ForeignKey('Company', on_delete=models.PROTECT, related_name='contracts', null=False, blank=True)
     idiq_contract = models.ForeignKey('IdiqContract', on_delete=models.CASCADE, null=True, blank=True)
@@ -180,10 +211,18 @@ class Contract(AuditModel):
     def __str__(self):
         return f"Contract {self.contract_number}"
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        _snapshot_drive_item_state(instance)
+        return instance
+
     def save(self, *args, **kwargs):
         if not self.company_id:
             self.company = Company.get_default_company()
+        _apply_drive_item_guard(self, kwargs)
         super().save(*args, **kwargs)
+        _snapshot_drive_item_state(self)
     
     @property
     def cmmc_any(self) -> bool:
@@ -1227,10 +1266,6 @@ class IdiqContract(AuditModel):
     buyer = models.ForeignKey('Buyer', on_delete=models.CASCADE, null=True, blank=True)
     award_date = models.DateField(null=True, blank=True)
 
-    def save(self, *args, **kwargs):
-        if not self.company_id:
-            self.company = Company.get_default_company()
-        super().save(*args, **kwargs)
     term_length = models.IntegerField(null=True, blank=True)
     option_length = models.IntegerField(
         null=True,
@@ -1243,6 +1278,7 @@ class IdiqContract(AuditModel):
     min_guarantee = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     alert_note = models.TextField(null=True, blank=True)
     files_url = models.CharField(max_length=200, null=True, blank=True)
+    sharepoint_drive_item_id = models.CharField(max_length=128, blank=True, default='')
     notes = GenericRelation('Note', related_query_name='idiq_contract')
 
     class Meta:
@@ -1259,6 +1295,19 @@ class IdiqContract(AuditModel):
 
     def __str__(self):
         return f"IDIQ Contract {self.contract_number}"
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        _snapshot_drive_item_state(instance)
+        return instance
+
+    def save(self, *args, **kwargs):
+        if not self.company_id:
+            self.company = Company.get_default_company()
+        _apply_drive_item_guard(self, kwargs)
+        super().save(*args, **kwargs)
+        _snapshot_drive_item_state(self)
 
     def get_sharepoint_documents_url(self):
         """

@@ -46,8 +46,11 @@ class LinkContractFolderApiTests(TestCase):
             r"\aFed-DOD\Contract SPE3SE-26-V-0530"
         )
 
+    @patch("contracts.services.drive_item_lookup.get_folder_item_id_by_path", return_value="graph-item-1")
     @patch("contracts.views.documents_views.sharepoint_service.list_folder_contents")
-    def test_success_saves_path_and_creates_transaction(self, list_folder_contents):
+    def test_success_saves_path_and_creates_transaction(
+        self, list_folder_contents, _mock_item_id
+    ):
         list_folder_contents.return_value = {
             "folders": [],
             "files": [],
@@ -77,6 +80,7 @@ class LinkContractFolderApiTests(TestCase):
         )
         self.contract.refresh_from_db()
         self.assertEqual(self.contract.files_url, expected_path)
+        self.assertEqual(self.contract.sharepoint_drive_item_id, "graph-item-1")
         list_folder_contents.assert_called_once_with(expected_path)
 
         contract_type = ContentType.objects.get_for_model(Contract)
@@ -106,6 +110,29 @@ class LinkContractFolderApiTests(TestCase):
         self.assertFalse(body["success"])
         self.assertEqual(body["error"], body["message"])
         self.assertIn("STATZ OneDrive folder", body["error"])
+
+    @patch("contracts.services.drive_item_lookup.get_folder_item_id_by_path", return_value="")
+    @patch("contracts.views.documents_views.sharepoint_service.list_folder_contents")
+    def test_lookup_failure_still_saves_empty_drive_id(self, list_folder_contents, _mock_item_id):
+        list_folder_contents.return_value = {
+            "folders": [],
+            "files": [],
+            "currentPath": "",
+            "error": None,
+        }
+        response = self.client.post(
+            self.url,
+            data=json.dumps(
+                {
+                    "contract_id": self.contract.pk,
+                    "pasted_path": self.local_path,
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.contract.refresh_from_db()
+        self.assertEqual(self.contract.sharepoint_drive_item_id, "")
 
     @patch("contracts.views.documents_views.sharepoint_service.list_folder_contents")
     def test_missing_sharepoint_folder_does_not_save(self, list_folder_contents):

@@ -58,6 +58,7 @@ def apply_folder_path_fixes(
             'path',
             'files_url_at_scan',
             'match_status',
+            'drive_item_id',
         )
     )
     eligible = len(rows)
@@ -110,6 +111,7 @@ def apply_folder_path_fixes(
             company=contract.company,
             contract_number=contract.contract_number,
             files_url=new_value,
+            sharepoint_drive_item_id='',
         )
         resolution = resolve_contract_folder_path(probe)
         if resolution.get('source') != 'files_url':
@@ -141,7 +143,9 @@ def apply_folder_path_fixes(
             continue
 
         contract.files_url = new_value
-        contract.save(update_fields=['files_url'])
+        contract.sharepoint_drive_item_id = row.get('drive_item_id') or ''
+        contract._drive_item_id_confirmed = True
+        contract.save(update_fields=['files_url', 'sharepoint_drive_item_id'])
         ScannedFolder.objects.filter(pk=row['id']).update(
             match_status=ScannedFolder.MatchStatus.MATCHED_EXPECTED,
             files_url_at_scan=new_value,

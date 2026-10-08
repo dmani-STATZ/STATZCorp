@@ -178,7 +178,11 @@ class ScannerTests(TestCase):
         _apply,
     ):
         mock_root.return_value = {'id': 'root', 'name': 'aFed-DOD', 'webUrl': ''}
-        mock_classify.return_value = {'counters': {}, 'drive_id_updates': []}
+        mock_classify.return_value = {
+            'counters': {},
+            'drive_id_updates': [],
+            'idiq_drive_id_updates': [],
+        }
         
         from contracts.services.folder_scan.delta_source import DeltaPage
         # Run 1: Full
@@ -300,6 +304,80 @@ class FixPathsTests(TestCase):
         )
         result = apply_folder_path_fixes(ROOT, None, dry_run=False, actor='test', logger=None)
         self.assertEqual(result['skipped_invalid'], 1)
+
+    def test_fix_with_existing_drive_item_id_on_contract(self):
+        self.contract.sharepoint_drive_item_id = 'stale-drive-id'
+        self.contract.save(update_fields=['sharepoint_drive_item_id'])
+        ScannedFolder.objects.create(
+            run=self.run,
+            contract=self.contract,
+            match_status=ScannedFolder.MatchStatus.MATCHED_ELSEWHERE,
+            path=OPEN_PATH,
+            files_url_at_scan='',
+            drive_item_id='scan-drive-id',
+        )
+        result = apply_folder_path_fixes(ROOT, None, dry_run=False, actor='test', logger=None)
+        self.assertEqual(result['fixed'], 1)
+        self.assertEqual(result['skipped_invalid'], 0)
+        self.contract.refresh_from_db()
+        self.assertEqual(self.contract.files_url, OPEN_PATH)
+        self.assertEqual(self.contract.sharepoint_drive_item_id, 'scan-drive-id')
+        self.assertTrue(
+            Transaction.objects.filter(
+                field_name='files_url',
+                object_id=self.contract.pk,
+            ).exists()
+        )
+
+
+class MatcherDriveIdTests(TestCase):
+    def setUp(self):
+        self.company = Company.objects.create(
+            name='Matcher Co',
+            slug='matcher-co',
+            sharepoint_documents_path=ROOT,
+        )
+        self.run = FolderScanRun.objects.create(root_path=ROOT)
+
+    def test_idiq_drive_id_updates_single_folder(self):
+        idiq = IdiqContract.objects.create(
+            company=self.company,
+            contract_number='SPE7L1-23-D-ONLY',
+            sharepoint_drive_item_id='',
+        )
+        folders = [
+            {
+                'name': 'Contract SPE7L1-23-D-ONLY',
+                'path': f'{ROOT}/Contract SPE7L1-23-D-ONLY/',
+                'drive_item_id': 'idiq-folder-id',
+                'parent_drive_item_id': 'root',
+            },
+        ]
+        result = classify(self.run, folders)
+        self.assertEqual(result['idiq_drive_id_updates'], [(idiq.pk, 'idiq-folder-id')])
+        self.assertEqual(result['drive_id_updates'], [])
+
+    def test_duplicate_idiq_folders_excluded(self):
+        IdiqContract.objects.create(
+            company=self.company,
+            contract_number='SPE7L1-23-D-DUP',
+        )
+        folders = [
+            {
+                'name': 'Contract SPE7L1-23-D-DUP',
+                'path': f'{ROOT}/Contract SPE7L1-23-D-DUP/',
+                'drive_item_id': 'idiq-a',
+                'parent_drive_item_id': 'root',
+            },
+            {
+                'name': 'Contract SPE7L1-23-D-DUP',
+                'path': f'{ROOT}/Closed Contracts/Contract SPE7L1-23-D-DUP/',
+                'drive_item_id': 'idiq-b',
+                'parent_drive_item_id': 'root',
+            },
+        ]
+        result = classify(self.run, folders)
+        self.assertEqual(result['idiq_drive_id_updates'], [])
 
 
 class FolderScanViewTests(TestCase):

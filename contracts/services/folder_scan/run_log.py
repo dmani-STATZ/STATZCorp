@@ -85,6 +85,7 @@ class ScanLogger:
             'contracts_without_folder': self.run.contracts_without_folder,
             'do_parent_mismatch': self.run.do_parent_mismatch,
             'drive_ids_written': self.run.drive_ids_written,
+            'idiq_drive_ids_written': self.run.idiq_drive_ids_written,
             'paths_fixed': self.run.paths_fixed,
             'current_path': self.run.current_path or '',
             'heartbeat_at': timezone.now(),

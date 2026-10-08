@@ -116,6 +116,18 @@ def resolve_contract_folder_path(contract):
     NOTE: This function does NOT call SharePoint to verify the path exists.
     The API endpoint handles 404 fallback to root after calling this.
     """
+    drive_item_id = getattr(contract, "sharepoint_drive_item_id", "") or ""
+    if drive_item_id:
+        from contracts.services.drive_item_lookup import get_folder_path_by_item_id
+
+        found = get_folder_path_by_item_id(drive_item_id)
+        if found:
+            return {
+                "path": found,
+                "source": "drive_item",
+                "legacy_detected": False,
+            }
+
     company = getattr(contract, "company", None)
     legacy_detected = False
 
@@ -176,7 +188,18 @@ def build_idiq_pattern_path(idiq) -> str:
 
 def resolve_idiq_folder_path(idiq) -> Dict[str, Any]:
     """Determine the correct SharePoint folder path for an IDIQ contract."""
+    from contracts.services.drive_item_lookup import get_folder_path_by_item_id
     from contracts.services.sharepoint_service import normalize_folder_path
+
+    drive_item_id = getattr(idiq, "sharepoint_drive_item_id", "") or ""
+    if drive_item_id:
+        found = get_folder_path_by_item_id(drive_item_id)
+        if found:
+            return {
+                "path": normalize_folder_path(found),
+                "source": "drive_item",
+                "legacy_detected": False,
+            }
 
     files_url = getattr(idiq, "files_url", "") or ""
 
