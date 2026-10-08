@@ -16,6 +16,19 @@
     var matchModal = matchModalEl && window.bootstrap ? new bootstrap.Modal(matchModalEl) : null;
     var fixModalEl = document.getElementById('folderReviewFixModal');
     var fixModal = fixModalEl && window.bootstrap ? new bootstrap.Modal(fixModalEl) : null;
+    var renameModalEl = document.getElementById('folderReviewRenameModal');
+    var renameModal = renameModalEl && window.bootstrap ? new bootstrap.Modal(renameModalEl) : null;
+    var moveClosedModalEl = document.getElementById('folderReviewMoveClosedModal');
+    var moveClosedModal = moveClosedModalEl && window.bootstrap ? new bootstrap.Modal(moveClosedModalEl) : null;
+    var moveDoModalEl = document.getElementById('folderReviewMoveDoModal');
+    var moveDoModal = moveDoModalEl && window.bootstrap ? new bootstrap.Modal(moveDoModalEl) : null;
+    var mergeModalEl = document.getElementById('folderReviewMergeModal');
+    var mergeModal = mergeModalEl && window.bootstrap ? new bootstrap.Modal(mergeModalEl) : null;
+
+    var pendingRename = null;
+    var pendingMoveClosedIds = [];
+    var pendingMoveDoId = null;
+    var pendingMerge = null;
 
     var matchState = {
         mode: 'folder-to-contract',
@@ -122,9 +135,37 @@
                 onOkRemove();
             }
             showAlert('success', data.message || 'Done.');
+            if (data.skipped && data.skipped.length) {
+                showSkippedList(data.skipped);
+            }
         } else {
             showAlert('warning', (data && data.message) || 'Request failed.');
         }
+    }
+
+    function showSkippedList(skipped) {
+        var box = document.getElementById('folder-review-alerts');
+        if (!box) {
+            return;
+        }
+        var div = document.createElement('div');
+        div.className = 'alert alert-warning';
+        var title = document.createElement('div');
+        title.textContent = 'Skipped:';
+        div.appendChild(title);
+        var ul = document.createElement('ul');
+        ul.className = 'mb-0 small';
+        skipped.forEach(function (row) {
+            var li = document.createElement('li');
+            li.textContent = (row.item || '') + ': ' + (row.reason || '');
+            ul.appendChild(li);
+        });
+        div.appendChild(ul);
+        box.appendChild(div);
+    }
+
+    function contractMgmtUrl(contractId) {
+        return '/contracts/' + String(contractId) + '/';
     }
 
     function linkContract(contractId, driveItemId, action, btn) {
@@ -326,6 +367,132 @@
         /* bound above */
     }
 
+    if (document.getElementById('folder-review-rename-confirm')) {
+        document.getElementById('folder-review-rename-confirm').addEventListener('click', function () {
+            var btn = this;
+            if (!pendingRename) {
+                return;
+            }
+            setBusy(btn, true);
+            postJson(urls.rename, {
+                record_type: pendingRename.recordType,
+                record_id: pendingRename.recordId,
+            }).then(function (data) {
+                handleApiResult(btn, data, function () {
+                    if (renameModal) {
+                        renameModal.hide();
+                    }
+                    var row = document.querySelector(
+                        '[data-row="name-mismatch"][data-record-id="' + pendingRename.recordId + '"]'
+                    );
+                    if (row) {
+                        row.remove();
+                    }
+                    decCount('name_mismatch');
+                });
+            }).finally(function () {
+                setBusy(btn, false);
+            });
+        });
+    }
+
+    if (document.getElementById('folder-review-move-closed-confirm')) {
+        document.getElementById('folder-review-move-closed-confirm').addEventListener('click', function () {
+            var btn = this;
+            if (!pendingMoveClosedIds.length) {
+                return;
+            }
+            setBusy(btn, true);
+            postJson(urls.moveClosed, { contract_ids: pendingMoveClosedIds }).then(function (data) {
+                handleApiResult(btn, data, function () {
+                    if (moveClosedModal) {
+                        moveClosedModal.hide();
+                    }
+                    pendingMoveClosedIds.forEach(function (cid) {
+                        var row = document.querySelector('[data-row="move-closed"][data-contract-id="' + cid + '"]');
+                        if (row) {
+                            row.remove();
+                        }
+                        decCount('move_closed');
+                    });
+                });
+            }).finally(function () {
+                setBusy(btn, false);
+            });
+        });
+    }
+
+    if (document.getElementById('folder-review-move-do-confirm')) {
+        document.getElementById('folder-review-move-do-confirm').addEventListener('click', function () {
+            var btn = this;
+            if (!pendingMoveDoId) {
+                return;
+            }
+            setBusy(btn, true);
+            postJson(urls.moveDo, { contract_id: pendingMoveDoId }).then(function (data) {
+                handleApiResult(btn, data, function () {
+                    if (moveDoModal) {
+                        moveDoModal.hide();
+                    }
+                    var row = document.querySelector('[data-row="do-mismatch"][data-contract-id="' + pendingMoveDoId + '"]');
+                    if (row) {
+                        row.remove();
+                    }
+                    decCount('do_mismatch');
+                });
+            }).finally(function () {
+                setBusy(btn, false);
+            });
+        });
+    }
+
+    if (document.getElementById('folder-review-merge-confirm')) {
+        document.getElementById('folder-review-merge-confirm').addEventListener('click', function () {
+            var btn = this;
+            if (!pendingMerge) {
+                return;
+            }
+            setBusy(btn, true);
+            function runMergeLoop() {
+                return postJson(urls.merge, {
+                    record_type: pendingMerge.recordType,
+                    record_id: pendingMerge.recordId,
+                }).then(function (data) {
+                    if (!data || !data.ok) {
+                        showAlert('warning', (data && data.message) || 'Merge failed.');
+                        throw new Error('merge failed');
+                    }
+                    var prog = document.querySelector('[data-progress-for="' + pendingMerge.recordId + '"]');
+                    if (prog) {
+                        prog.classList.remove('d-none');
+                        prog.textContent = 'Moved ' + (data.done ? data.done.length : 0)
+                            + ', remaining ' + (data.remaining != null ? data.remaining : 0);
+                    }
+                    if (data.skipped && data.skipped.length) {
+                        showSkippedList(data.skipped);
+                    }
+                    if (data.remaining > 0) {
+                        return runMergeLoop();
+                    }
+                    if (mergeModal) {
+                        mergeModal.hide();
+                    }
+                    var card = document.querySelector(
+                        '[data-row="merge-group"][data-record-id="' + pendingMerge.recordId + '"]'
+                    );
+                    if (card) {
+                        card.remove();
+                    }
+                    decCount('ready_to_merge');
+                    showAlert('success', data.message || 'Merge complete.');
+                });
+            }
+            runMergeLoop().finally(function () {
+                setBusy(btn, false);
+            });
+        });
+    }
+
     document.getElementById('folder-review-fix-confirm').addEventListener('click', function () {
         var btn = this;
         if (fixModal) {
@@ -478,6 +645,149 @@
             }).finally(function () {
                 setBusy(btn, false);
             });
+        } else if (action === 'ignore-name-mismatch') {
+            ignoreItem('name_mismatch', { drive_item_id: btn.getAttribute('data-drive-item-id') }, btn, 'name_mismatch');
+        } else if (action === 'rename-expected') {
+            pendingRename = {
+                recordType: btn.getAttribute('data-record-type'),
+                recordId: parseInt(btn.getAttribute('data-record-id'), 10),
+            };
+            var current = btn.getAttribute('data-current-name') || '';
+            var expected = btn.getAttribute('data-expected-name') || '';
+            var kind = btn.getAttribute('data-mismatch-kind') || '';
+            var idiqNum = btn.getAttribute('data-idiq-number') || '';
+            var msgEl = document.getElementById('folder-review-rename-message');
+            var linkEl = document.getElementById('folder-review-rename-contract-link');
+            if (msgEl) {
+                if (kind === 'kind') {
+                    msgEl.textContent = "Rename '" + current + "' to '" + expected
+                        + "' because the DB links this contract to IDIQ "
+                        + (idiqNum === 'none' ? '(none)' : idiqNum) + '.';
+                } else {
+                    msgEl.textContent = "Rename '" + current + "' to '" + expected + "'?';
+                }
+            }
+            if (linkEl) {
+                while (linkEl.firstChild) {
+                    linkEl.removeChild(linkEl.firstChild);
+                }
+                if (pendingRename.recordType === 'contract') {
+                    var a = document.createElement('a');
+                    a.href = contractMgmtUrl(pendingRename.recordId);
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    a.textContent = 'Open contract in ERP';
+                    linkEl.appendChild(a);
+                }
+            }
+            if (renameModal) {
+                renameModal.show();
+            }
+        } else if (action === 'move-closed-selected' || action === 'move-closed-page') {
+            var ids = [];
+            if (action === 'move-closed-page') {
+                document.querySelectorAll('[data-row="move-closed"]').forEach(function (row) {
+                    ids.push(parseInt(row.getAttribute('data-contract-id'), 10));
+                });
+            } else {
+                document.querySelectorAll('.move-closed-cb:checked').forEach(function (cb) {
+                    ids.push(parseInt(cb.value, 10));
+                });
+            }
+            if (!ids.length) {
+                showAlert('warning', 'No contracts selected.');
+                return;
+            }
+            if (ids.length > 50) {
+                showAlert('warning', 'Select at most 50 contracts.');
+                return;
+            }
+            pendingMoveClosedIds = ids;
+            var lines = [];
+            ids.forEach(function (cid) {
+                var row = document.querySelector('[data-row="move-closed"][data-contract-id="' + cid + '"]');
+                if (row) {
+                    lines.push((row.getAttribute('data-old-path') || '') + ' → '
+                        + (row.getAttribute('data-new-path') || ''));
+                }
+            });
+            var countEl = document.getElementById('folder-review-move-closed-count');
+            if (countEl) {
+                countEl.textContent = 'Move ' + ids.length + ' folder(s) to Closed Contracts?';
+            }
+            var pre = document.getElementById('folder-review-move-closed-lines');
+            if (pre) {
+                pre.textContent = lines.slice(0, 10).join('\n');
+                if (lines.length > 10) {
+                    pre.textContent += '\n… and ' + (lines.length - 10) + ' more';
+                }
+            }
+            if (moveClosedModal) {
+                moveClosedModal.show();
+            }
+        } else if (action === 'move-do') {
+            pendingMoveDoId = parseInt(btn.getAttribute('data-contract-id'), 10);
+            var oldP = btn.getAttribute('data-old-path') || '';
+            var parent = btn.getAttribute('data-new-parent') || '';
+            var doMsg = document.getElementById('folder-review-move-do-message');
+            if (doMsg) {
+                doMsg.textContent = oldP + ' → under IDIQ folder for ' + parent;
+            }
+            if (moveDoModal) {
+                moveDoModal.show();
+            }
+        } else if (action === 'preview-merge') {
+            var rt = btn.getAttribute('data-record-type');
+            var rid = btn.getAttribute('data-record-id');
+            setBusy(btn, true);
+            fetch(urls.mergePreview + '?record_type=' + encodeURIComponent(rt)
+                + '&record_id=' + encodeURIComponent(rid), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.ok) {
+                        showAlert('warning', data.message || 'Preview failed.');
+                        return;
+                    }
+                    var panel = document.querySelector('[data-preview-for="' + rid + '"]');
+                    if (!panel) {
+                        return;
+                    }
+                    panel.classList.remove('d-none');
+                    while (panel.firstChild) {
+                        panel.removeChild(panel.firstChild);
+                    }
+                    (data.losers || []).forEach(function (loser) {
+                        var head = document.createElement('div');
+                        head.textContent = 'From ' + (loser.loser_path || '');
+                        panel.appendChild(head);
+                        (loser.children || []).forEach(function (child) {
+                            var line = document.createElement('div');
+                            line.textContent = (child.name || '') + ' → ' + (child.destination_name || '');
+                            if (child.conflict) {
+                                line.className = 'text-warning';
+                            }
+                            panel.appendChild(line);
+                        });
+                    });
+                    var mergeBtn = document.createElement('button');
+                    mergeBtn.type = 'button';
+                    mergeBtn.className = 'btn btn-secondary btn-sm mt-2';
+                    mergeBtn.setAttribute('data-action', 'start-merge');
+                    mergeBtn.setAttribute('data-record-type', rt);
+                    mergeBtn.setAttribute('data-record-id', rid);
+                    mergeBtn.textContent = 'Merge…';
+                    panel.appendChild(mergeBtn);
+                }).finally(function () {
+                    setBusy(btn, false);
+                });
+        } else if (action === 'start-merge') {
+            pendingMerge = {
+                recordType: btn.getAttribute('data-record-type'),
+                recordId: parseInt(btn.getAttribute('data-record-id'), 10),
+            };
+            if (mergeModal) {
+                mergeModal.show();
+            }
         }
     });
 })();

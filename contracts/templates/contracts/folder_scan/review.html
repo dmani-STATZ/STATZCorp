@@ -20,9 +20,17 @@
         <a href="{% url 'contracts:folder_scan_status' %}" class="btn btn-secondary btn-sm">← Folder Scan status</a>
     </div>
 
-    <p class="small text-muted">
-        Changes here update the database only. Nothing in SharePoint is moved or renamed.
-    </p>
+    {% if sharepoint_writes_enabled %}
+    <div class="alert alert-warning small mb-3">
+        Actions marked <span class="badge bg-secondary">SharePoint</span> move or rename real folders.
+        Synced desktops will update. Nothing is ever deleted.
+    </div>
+    {% else %}
+    <div class="alert alert-secondary small mb-3">
+        SharePoint actions are disabled (<code>FOLDER_REVIEW_SHAREPOINT_WRITES</code>).
+        Stage A database actions still work below.
+    </div>
+    {% endif %}
 
     <div id="folder-review-alerts" class="mb-3"></div>
 
@@ -233,22 +241,164 @@
         </div>
         {% elif active_tab == 'do_mismatch' %}
         <div class="table-responsive">
-            <table class="table table-sm">
-                <thead><tr><th>DO</th><th>Folder</th><th>Parent folder #</th><th>DB IDIQ</th></tr></thead>
+            <table class="table table-sm align-middle">
+                <thead><tr><th>DO</th><th>Folder</th><th>Parent folder #</th><th>DB IDIQ</th>{% if sharepoint_writes_enabled %}<th></th>{% endif %}</tr></thead>
                 <tbody>
                 {% for row in rows %}
-                <tr>
+                <tr data-row="do-mismatch" data-contract-id="{{ row.contract_id }}">
                     <td>{{ row.do_number }}</td>
                     <td><a href="{{ row.folder_web_url }}" target="_blank" rel="noopener">{{ row.folder_path }}</a></td>
                     <td>{{ row.parent_folder_number }}</td>
                     <td>{{ row.db_idiq_number }}</td>
+                    {% if sharepoint_writes_enabled %}
+                    <td class="text-nowrap">
+                        <button type="button" class="btn btn-secondary btn-sm" data-action="move-do"
+                                data-contract-id="{{ row.contract_id }}"
+                                data-old-path="{{ row.folder_path }}"
+                                data-new-parent="{{ row.db_idiq_number }}">
+                            Move under DB IDIQ <span class="badge bg-light text-dark ms-1">SharePoint</span>
+                        </button>
+                    </td>
+                    {% endif %}
                 </tr>
                 {% empty %}
-                <tr><td colspan="4" class="text-muted">None on this page.</td></tr>
+                <tr><td colspan="{% if sharepoint_writes_enabled %}5{% else %}4{% endif %}" class="text-muted">None on this page.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% elif active_tab == 'name_mismatch' %}
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <span class="small text-muted">Show:</span>
+            <a class="btn btn-sm {% if name_mismatch_filter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+               href="?tab=name_mismatch&page=1&name_filter=all">All</a>
+            <a class="btn btn-sm {% if name_mismatch_filter == 'kind' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+               href="?tab=name_mismatch&page=1&name_filter=kind">Kind only</a>
+            <a class="btn btn-sm {% if name_mismatch_filter == 'text' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+               href="?tab=name_mismatch&page=1&name_filter=text">Text only</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                <tr>
+                    <th>Current → expected</th>
+                    <th>Path</th>
+                    <th>Details</th>
+                    {% if sharepoint_writes_enabled %}<th></th>{% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                <tr data-row="name-mismatch"
+                    data-record-type="{{ row.record_type }}"
+                    data-record-id="{{ row.record_id }}"
+                    data-mismatch-kind="{{ row.mismatch_kind }}">
+                    <td>
+                        <span class="d-block">{{ row.current_name }} → {{ row.expected_name }}</span>
+                        {% if row.mismatch_kind == 'kind' %}
+                        <span class="badge bg-warning text-dark mt-1">Contract ↔ Delivery Order</span>
+                        {% endif %}
+                    </td>
+                    <td><a href="{{ row.web_url }}" target="_blank" rel="noopener">{{ row.path }}</a></td>
+                    <td class="small">
+                        {% if row.mismatch_kind == 'kind' %}
+                        <div>DB IDIQ: {{ row.idiq_number }}</div>
+                        <div>Parent: {{ row.parent_folder_name }}</div>
+                        <div class="text-muted">{{ row.parent_folder_path }}</div>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    {% if sharepoint_writes_enabled %}
+                    <td class="text-nowrap">
+                        <button type="button" class="btn btn-secondary btn-sm" data-action="rename-expected"
+                                data-record-type="{{ row.record_type }}"
+                                data-record-id="{{ row.record_id }}"
+                                data-current-name="{{ row.current_name }}"
+                                data-expected-name="{{ row.expected_name }}"
+                                data-mismatch-kind="{{ row.mismatch_kind }}"
+                                data-idiq-number="{{ row.idiq_number }}"
+                                data-contract-id="{{ row.record_id }}"
+                                data-contract-number="{{ row.contract_number }}">
+                            Rename <span class="badge bg-light text-dark ms-1">SharePoint</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-action="ignore-name-mismatch"
+                                data-drive-item-id="{{ row.drive_item_id }}">Ignore</button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr><td colspan="{% if sharepoint_writes_enabled %}4{% else %}3{% endif %}" class="text-muted">No name mismatches on this page.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif active_tab == 'move_closed' %}
+        {% if sharepoint_writes_enabled %}
+        <div class="mb-2 d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-action="move-closed-selected">
+                Move selected (≤50) <span class="badge bg-light text-dark ms-1">SharePoint</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" data-action="move-closed-page">
+                Move this page (≤50) <span class="badge bg-light text-dark ms-1">SharePoint</span>
+            </button>
+        </div>
+        {% endif %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead>
+                <tr>
+                    {% if sharepoint_writes_enabled %}<th style="width:2rem"></th>{% endif %}
+                    <th>Contract</th><th>Status</th><th>Folder</th><th>Target path</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                <tr data-row="move-closed" data-contract-id="{{ row.contract_id }}"
+                    data-old-path="{{ row.folder_path }}" data-new-path="{{ row.new_path_preview }}">
+                    {% if sharepoint_writes_enabled %}
+                    <td><input type="checkbox" class="form-check-input move-closed-cb" value="{{ row.contract_id }}"></td>
+                    {% endif %}
+                    <td><a href="{% url 'contracts:contract_management' row.contract_id %}">{{ row.contract_number }}</a></td>
+                    <td>{{ row.status }}</td>
+                    <td><a href="{{ row.folder_web_url }}" target="_blank" rel="noopener">{{ row.folder_path }}</a></td>
+                    <td class="small text-muted">{{ row.new_path_preview }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="{% if sharepoint_writes_enabled %}5{% else %}4{% endif %}" class="text-muted">None on this page.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif active_tab == 'ready_to_merge' %}
+        {% for group in rows %}
+        <div class="card mb-3" data-row="merge-group"
+             data-record-type="{{ group.record_type }}" data-record-id="{{ group.record_id }}">
+            <div class="card-header">
+                <strong>{{ group.display_number }}</strong>
+                <span class="text-muted small ms-2">Winner: {{ group.winner_path }}</span>
+            </div>
+            <div class="card-body small">
+                <div class="mb-2">Duplicate folders to merge away:</div>
+                <ul class="mb-3">
+                {% for loser in group.losers %}
+                    <li><a href="{{ loser.web_url }}" target="_blank" rel="noopener">{{ loser.path }}</a></li>
+                {% endfor %}
+                </ul>
+                {% if sharepoint_writes_enabled %}
+                <button type="button" class="btn btn-secondary btn-sm" data-action="preview-merge"
+                        data-record-type="{{ group.record_type }}"
+                        data-record-id="{{ group.record_id }}">
+                    Preview merge <span class="badge bg-light text-dark ms-1">SharePoint</span>
+                </button>
+                <div class="merge-preview-panel d-none mt-3 small" data-preview-for="{{ group.record_id }}"></div>
+                <div class="merge-progress small text-muted mt-2 d-none" data-progress-for="{{ group.record_id }}"></div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-muted">No merge-ready groups on this page.</p>
+        {% endfor %}
         {% elif active_tab == 'ignored' %}
         <div class="table-responsive">
             <table class="table table-sm align-middle">
@@ -277,11 +427,11 @@
     <nav aria-label="Review pagination" class="mt-3">
         <ul class="pagination pagination-sm">
             {% if page > 1 %}
-            <li class="page-item"><a class="page-link" href="?tab={{ active_tab }}&page={{ page|add:'-1' }}">Previous</a></li>
+            <li class="page-item"><a class="page-link" href="?tab={{ active_tab }}&page={{ page|add:'-1' }}{% if active_tab == 'name_mismatch' %}&name_filter={{ name_mismatch_filter }}{% endif %}">Previous</a></li>
             {% endif %}
             <li class="page-item disabled"><span class="page-link">Page {{ page }} of {{ page_count }}</span></li>
             {% if page < page_count %}
-            <li class="page-item"><a class="page-link" href="?tab={{ active_tab }}&page={{ page|add:'1' }}">Next</a></li>
+            <li class="page-item"><a class="page-link" href="?tab={{ active_tab }}&page={{ page|add:'1' }}{% if active_tab == 'name_mismatch' %}&name_filter={{ name_mismatch_filter }}{% endif %}">Next</a></li>
             {% endif %}
         </ul>
     </nav>
@@ -334,6 +484,80 @@
     </div>
 </div>
 
+<div class="modal fade" id="folderReviewRenameModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm SharePoint rename</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="folder-review-rename-message" class="small mb-2"></p>
+                <p id="folder-review-rename-contract-link" class="small mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="folder-review-rename-confirm">Rename</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="folderReviewMoveClosedModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Move to Closed Contracts</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="folder-review-move-closed-count" class="mb-2"></p>
+                <pre id="folder-review-move-closed-lines" class="small bg-light p-2 mb-0" style="white-space: pre-wrap;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="folder-review-move-closed-confirm">Move</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="folderReviewMoveDoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Move DO under DB IDIQ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="folder-review-move-do-message" class="small"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="folder-review-move-do-confirm">Move</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="folderReviewMergeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm merge</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small">Move children from duplicate folders into the winner. Losers are renamed, never deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="folder-review-merge-confirm">Merge</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script id="folder-review-config" type="application/json">
 {
   "urls": {
@@ -344,10 +568,16 @@
     "unignore": "{% url 'contracts:folder_review_api_unignore' %}",
     "contentsBase": "{% url 'contracts:folder_review_api_contents' '__ID__' %}",
     "searchContracts": "{% url 'contracts:folder_review_api_search_contracts' %}",
-    "searchFolders": "{% url 'contracts:folder_review_api_search_folders' %}"
+    "searchFolders": "{% url 'contracts:folder_review_api_search_folders' %}",
+    "rename": "{% url 'contracts:folder_review_api_rename' %}",
+    "moveClosed": "{% url 'contracts:folder_review_api_move_closed' %}",
+    "mergePreview": "{% url 'contracts:folder_review_api_merge_preview' %}",
+    "merge": "{% url 'contracts:folder_review_api_merge' %}",
+    "moveDo": "{% url 'contracts:folder_review_api_move_do' %}"
   },
   "activeTab": "{{ active_tab|default:'pairs' }}",
-  "counts": {{ counts_json|safe }}
+  "counts": {{ counts_json|safe }},
+  "sharepointWritesEnabled": {% if sharepoint_writes_enabled %}true{% else %}false{% endif %}
 }
 </script>
 <script src="{% static 'contracts/js/folder_review.js' %}?v={{ cache_version }}"></script>

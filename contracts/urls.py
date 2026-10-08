@@ -159,6 +159,11 @@ from .views.folder_review_views import (
     folder_review_api_contents,
     folder_review_api_search_contracts,
     folder_review_api_search_folders,
+    folder_review_api_rename,
+    folder_review_api_move_closed,
+    folder_review_api_merge_preview,
+    folder_review_api_merge,
+    folder_review_api_move_do,
 )
 
 from .views.contract_views import check_contract_number
@@ -1014,6 +1019,31 @@ urlpatterns = [
         "folder-scan/review/api/search-folders/",
         folder_review_api_search_folders,
         name="folder_review_api_search_folders",
+    ),
+    path(
+        "folder-scan/review/api/rename/",
+        folder_review_api_rename,
+        name="folder_review_api_rename",
+    ),
+    path(
+        "folder-scan/review/api/move-closed/",
+        folder_review_api_move_closed,
+        name="folder_review_api_move_closed",
+    ),
+    path(
+        "folder-scan/review/api/merge-preview/",
+        folder_review_api_merge_preview,
+        name="folder_review_api_merge_preview",
+    ),
+    path(
+        "folder-scan/review/api/merge/",
+        folder_review_api_merge,
+        name="folder_review_api_merge",
+    ),
+    path(
+        "folder-scan/review/api/move-do/",
+        folder_review_api_move_do,
+        name="folder_review_api_move_do",
     ),
     # Admin tools
     path("admin-tools/", supplier_admin_tools, name="admin_tools"),

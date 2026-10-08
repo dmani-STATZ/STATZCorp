@@ -188,6 +188,9 @@ class FolderReviewIgnore(models.Model):
         MOVER = 'mover', 'Waiting to move'
         DO_MISMATCH = 'do_mismatch', 'DO under wrong IDIQ'
         QUICK_FIX = 'quick_fix', 'Quick fixes'
+        NAME_MISMATCH = 'name_mismatch', "Name doesn't match"
+        MOVE_CLOSED = 'move_closed', 'Move to Closed'
+        READY_TO_MERGE = 'ready_to_merge', 'Ready to merge'
 
     queue = models.CharField(
         max_length=30,
@@ -226,6 +229,11 @@ class FolderRepairLog(models.Model):
         QUICK_FIX = 'quick_fix', 'Quick fix'
         IGNORE = 'ignore', 'Ignore'
         UNIGNORE = 'unignore', 'Unignore'
+        RENAME = 'rename', 'Rename'
+        MOVE_CLOSED = 'move_closed', 'Move closed'
+        MERGE_MOVE = 'merge_move', 'Merge move child'
+        MERGE_COMPLETE = 'merge_complete', 'Merge complete loser'
+        MOVE_DO = 'move_do', 'Move DO under IDIQ'
 
     action = models.CharField(
         max_length=30,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.db.models.functions import Replace
@@ -16,6 +17,7 @@ from contracts.models import Contract
 from contracts.models_folder_scan import FolderReviewIgnore, ScannedFolder
 from contracts.services.folder_scan.roots import resolve_company_root
 from contracts.services.folder_review import actions as review_actions
+from contracts.services.folder_review import repairs as review_repairs
 from contracts.services.folder_review.contents import folder_contents
 from contracts.services.folder_review.queues import (
     PAGE_SIZE,
@@ -52,6 +54,17 @@ def _bad(message: str) -> JsonResponse:
     return JsonResponse({'ok': False, 'message': message}, status=400)
 
 
+def _writes_disabled_response() -> JsonResponse:
+    return JsonResponse(
+        {'ok': False, 'message': review_repairs.WRITES_DISABLED},
+        status=403,
+    )
+
+
+def _sharepoint_writes_enabled() -> bool:
+    return bool(getattr(settings, 'FOLDER_REVIEW_SHAREPOINT_WRITES', False))
+
+
 @login_required
 @require_GET
 def folder_scan_review(request):
@@ -68,7 +81,11 @@ def folder_scan_review(request):
     except (TypeError, ValueError):
         page = 1
 
-    ctx = load_review_context(root_path)
+    name_filter = (request.GET.get('name_filter') or 'all').strip().lower()
+    if name_filter not in ('all', 'kind', 'text'):
+        name_filter = 'all'
+
+    ctx = load_review_context(root_path, name_mismatch_filter=name_filter)
     if ctx.run is None:
         return render(
             request,
@@ -77,6 +94,7 @@ def folder_scan_review(request):
                 'no_scan': True,
                 'root_path': root_path,
                 'queue_tabs': QUEUE_TABS,
+                'sharepoint_writes_enabled': _sharepoint_writes_enabled(),
             },
         )
 
@@ -99,6 +117,8 @@ def folder_scan_review(request):
             'page_count': ctx.page_count(tab),
             'misnamed_excluded_substructure': ctx.misnamed_excluded_substructure,
             'page_size': PAGE_SIZE,
+            'sharepoint_writes_enabled': _sharepoint_writes_enabled(),
+            'name_mismatch_filter': name_filter,
         },
     )
 
@@ -326,3 +346,245 @@ def folder_review_api_search_folders(request):
         for row in rows
     ]
     return JsonResponse({'ok': True, 'results': results})
+
+
+@login_required
+@require_http_methods(['POST'])
+def folder_review_api_rename(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    payload, err = _parse_json(request)
+    if err:
+        return err
+    record_type = str(payload.get('record_type') or '').strip().lower()
+    try:
+        record_id = int(payload.get('record_id'))
+    except (TypeError, ValueError):
+        return _bad('record_id must be an integer.')
+    result = review_repairs.rename_to_expected(
+        record_type,
+        record_id,
+        _root_for_request(request),
+        request.user,
+    )
+    return JsonResponse(result)
+
+
+@login_required
+@require_http_methods(['POST'])
+def folder_review_api_move_closed(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    payload, err = _parse_json(request)
+    if err:
+        return err
+    raw_ids = payload.get('contract_ids')
+    if not isinstance(raw_ids, list):
+        return _bad('contract_ids must be a list.')
+    try:
+        contract_ids = [int(x) for x in raw_ids]
+    except (TypeError, ValueError):
+        return _bad('contract_ids must contain integers.')
+    result = review_repairs.move_to_closed(
+        contract_ids,
+        _root_for_request(request),
+        request.user,
+    )
+    return JsonResponse(result)
+
+
+@login_required
+@require_GET
+def folder_review_api_merge_preview(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    record_type = str(request.GET.get('record_type') or '').strip().lower()
+    try:
+        record_id = int(request.GET.get('record_id') or '')
+    except (TypeError, ValueError):
+        return _bad('record_id must be an integer.')
+    result = review_repairs.preview_merge(
+        record_type,
+        record_id,
+        _root_for_request(request),
+    )
+    status = 200 if result.get('ok') else 400
+    return JsonResponse(result, status=status)
+
+
+@login_required
+@require_http_methods(['POST'])
+def folder_review_api_merge(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    payload, err = _parse_json(request)
+    if err:
+        return err
+    record_type = str(payload.get('record_type') or '').strip().lower()
+    try:
+        record_id = int(payload.get('record_id'))
+    except (TypeError, ValueError):
+        return _bad('record_id must be an integer.')
+    result = review_repairs.merge_duplicates(
+        record_type,
+        record_id,
+        _root_for_request(request),
+        request.user,
+    )
+    return JsonResponse(result)
+
+
+@login_required
+@require_http_methods(['POST'])
+def folder_review_api_move_do(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    payload, err = _parse_json(request)
+    if err:
+        return err
+    try:
+        contract_id = int(payload.get('contract_id'))
+    except (TypeError, ValueError):
+        return _bad('contract_id must be an integer.')
+    result = review_repairs.move_do_to_idiq(
+        contract_id,
+        _root_for_request(request),
+        request.user,
+    )
+    return JsonResponse(result)
+
+
+@login_required
+@require_http_methods(['POST'])
+def folder_review_api_rename(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    payload, err = _parse_json(request)
+    if err:
+        return err
+    record_type = str(payload.get('record_type') or '').strip().lower()
+    try:
+        record_id = int(payload.get('record_id'))
+    except (TypeError, ValueError):
+        return _bad('record_id must be an integer.')
+    result = review_repairs.rename_to_expected(
+        record_type,
+        record_id,
+        _root_for_request(request),
+        request.user,
+    )
+    return JsonResponse(result)
+
+
+@login_required
+@require_http_methods(['POST'])
+def folder_review_api_move_closed(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    payload, err = _parse_json(request)
+    if err:
+        return err
+    raw_ids = payload.get('contract_ids')
+    if not isinstance(raw_ids, list):
+        return _bad('contract_ids must be a list.')
+    try:
+        contract_ids = [int(x) for x in raw_ids]
+    except (TypeError, ValueError):
+        return _bad('contract_ids must contain integers.')
+    result = review_repairs.move_to_closed(
+        contract_ids,
+        _root_for_request(request),
+        request.user,
+    )
+    return JsonResponse(result)
+
+
+@login_required
+@require_GET
+def folder_review_api_merge_preview(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    record_type = str(request.GET.get('record_type') or '').strip().lower()
+    try:
+        record_id = int(request.GET.get('record_id') or '')
+    except (TypeError, ValueError):
+        return _bad('record_id must be an integer.')
+    result = review_repairs.preview_merge(
+        record_type,
+        record_id,
+        _root_for_request(request),
+    )
+    status = 200 if result.get('ok') else 400
+    return JsonResponse(result, status=status)
+
+
+@login_required
+@require_http_methods(['POST'])
+def folder_review_api_merge(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    payload, err = _parse_json(request)
+    if err:
+        return err
+    record_type = str(payload.get('record_type') or '').strip().lower()
+    try:
+        record_id = int(payload.get('record_id'))
+    except (TypeError, ValueError):
+        return _bad('record_id must be an integer.')
+    result = review_repairs.merge_duplicates(
+        record_type,
+        record_id,
+        _root_for_request(request),
+        request.user,
+    )
+    return JsonResponse(result)
+
+
+@login_required
+@require_http_methods(['POST'])
+def folder_review_api_move_do(request):
+    denied = _require_superuser(request)
+    if denied:
+        return denied
+    if not _sharepoint_writes_enabled():
+        return _writes_disabled_response()
+    payload, err = _parse_json(request)
+    if err:
+        return err
+    try:
+        contract_id = int(payload.get('contract_id'))
+    except (TypeError, ValueError):
+        return _bad('contract_id must be an integer.')
+    result = review_repairs.move_do_to_idiq(
+        contract_id,
+        _root_for_request(request),
+        request.user,
+    )
+    return JsonResponse(result)

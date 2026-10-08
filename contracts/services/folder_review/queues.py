@@ -26,8 +26,14 @@ QUEUE_TABS = [
     ('quick_fix', 'Quick fixes'),
     ('mover', 'Waiting to move'),
     ('do_mismatch', 'DO under wrong IDIQ'),
+    ('name_mismatch', "Name doesn't match"),
+    ('move_closed', 'Move to Closed'),
+    ('ready_to_merge', 'Ready to merge'),
     ('ignored', 'Ignored'),
 ]
+
+CLOSED_MOVE_STATUSES = ('Closed', 'Canceled')
+MERGED_PREFIX = 'MERGED - '
 
 
 def _str(value) -> str:
@@ -55,6 +61,35 @@ def _misnamed_token(name: str) -> str:
     if not match:
         return ''
     return normalize_contract_number(match.group(0))
+
+
+def _normalize_display_name(name: str) -> str:
+    return re.sub(r'\s+', ' ', (name or '').casefold()).strip()
+
+
+def _expected_name_for_contract_row(c: dict) -> str:
+    if c.get('idiq_contract_id'):
+        return f"Delivery Order {c.get('contract_number') or ''}"
+    return f"Contract {c.get('contract_number') or ''}"
+
+
+def _mismatch_kind(current_name: str, expected_name: str) -> str:
+    current = _normalize_display_name(current_name)
+    expected = _normalize_display_name(expected_name)
+    if current == expected:
+        return ''
+    c_contract = current.startswith('contract ')
+    c_do = current.startswith('delivery order ')
+    e_contract = expected.startswith('contract ')
+    e_do = expected.startswith('delivery order ')
+    if (c_contract and e_do) or (c_do and e_contract):
+        return 'kind'
+    return 'text'
+
+
+def build_move_closed_candidates(root_path: str) -> list[dict]:
+    ctx = load_review_context(root_path)
+    return list(ctx._queues.get('move_closed') or [])
 
 
 def _is_mover_row(row: dict) -> bool:
@@ -85,7 +120,11 @@ class ReviewContext:
         return (total + PAGE_SIZE - 1) // PAGE_SIZE
 
 
-def load_review_context(root_path: str) -> ReviewContext:
+def load_review_context(
+    root_path: str,
+    *,
+    name_mismatch_filter: str = 'all',
+) -> ReviewContext:
     run = _latest_completed_run(root_path)
     if run is None:
         empty = ReviewContext(run=None, counts={key: 0 for key, _ in QUEUE_TABS})
@@ -124,6 +163,7 @@ def load_review_context(root_path: str) -> ReviewContext:
             'files_url',
             'sharepoint_drive_item_id',
             'status__description',
+            'idiq_contract_id',
             'idiq_contract__contract_number',
         )
     )
@@ -523,6 +563,8 @@ def load_review_context(root_path: str) -> ReviewContext:
             db_idiq = idiq_by_norm[parent_norm].get('contract_number') or parent_norm
         do_mismatch.append(
             {
+                'contract_id': row.get('contract_id') or '',
+                'drive_item_id': _str(row.get('drive_item_id')),
                 'do_number': _str(row.get('normalized_contract_number'))
                 or _str(row.get('name')),
                 'folder_path': _str(row.get('path')),
@@ -533,7 +575,198 @@ def load_review_context(root_path: str) -> ReviewContext:
         )
     do_mismatch.sort(key=lambda r: (r.get('do_number') or '').lower())
 
-    folder_name_by_id = { _str(r.get('drive_item_id')): _str(r.get('name')) for r in folders }
+    folder_name_by_id = {_str(r.get('drive_item_id')): _str(r.get('name')) for r in folders}
+    folder_path_by_id = {_str(r.get('drive_item_id')): _str(r.get('path')) for r in folders}
+    folder_parent_by_id = {
+        _str(r.get('drive_item_id')): _str(r.get('parent_drive_item_id')) for r in folders
+    }
+
+    name_mismatch: list[dict] = []
+    for c in contracts:
+        did = c.get('sharepoint_drive_item_id') or ''
+        if not did or did not in run_folder_ids:
+            continue
+        if folder_ignored('name_mismatch', did):
+            continue
+        folder_row = next((r for r in folders if _str(r.get('drive_item_id')) == did), None)
+        if not folder_row:
+            continue
+        expected = _expected_name_for_contract_row(c)
+        current = _str(folder_row.get('name'))
+        if _normalize_display_name(current) == _normalize_display_name(expected):
+            continue
+        kind = _mismatch_kind(current, expected)
+        parent_id = _str(folder_row.get('parent_drive_item_id'))
+        idiq_num = c.get('idiq_number') or ''
+        name_mismatch.append(
+            {
+                'record_type': 'contract',
+                'record_id': c['id'],
+                'contract_number': c.get('contract_number') or '',
+                'current_name': current,
+                'expected_name': expected,
+                'path': _str(folder_row.get('path')),
+                'web_url': _str(folder_row.get('web_url')),
+                'drive_item_id': did,
+                'mismatch_kind': kind,
+                'idiq_number': idiq_num if idiq_num else 'none',
+                'parent_folder_name': folder_name_by_id.get(parent_id, ''),
+                'parent_folder_path': folder_path_by_id.get(parent_id, ''),
+            }
+        )
+    for i in idiqs:
+        did = i.get('sharepoint_drive_item_id') or ''
+        if not did or did not in run_folder_ids:
+            continue
+        if folder_ignored('name_mismatch', did):
+            continue
+        folder_row = next((r for r in folders if _str(r.get('drive_item_id')) == did), None)
+        if not folder_row:
+            continue
+        expected = f"Contract {i.get('contract_number') or ''}"
+        current = _str(folder_row.get('name'))
+        if _normalize_display_name(current) == _normalize_display_name(expected):
+            continue
+        kind = _mismatch_kind(current, expected)
+        parent_id = _str(folder_row.get('parent_drive_item_id'))
+        name_mismatch.append(
+            {
+                'record_type': 'idiq',
+                'record_id': i['id'],
+                'contract_number': i.get('contract_number') or '',
+                'current_name': current,
+                'expected_name': expected,
+                'path': _str(folder_row.get('path')),
+                'web_url': _str(folder_row.get('web_url')),
+                'drive_item_id': did,
+                'mismatch_kind': kind,
+                'idiq_number': 'none',
+                'parent_folder_name': folder_name_by_id.get(parent_id, ''),
+                'parent_folder_path': folder_path_by_id.get(parent_id, ''),
+            }
+        )
+    name_mismatch.sort(key=lambda r: (r.get('contract_number') or '').lower())
+    nmf = (name_mismatch_filter or 'all').strip().lower()
+    if nmf == 'kind':
+        name_mismatch = [r for r in name_mismatch if r.get('mismatch_kind') == 'kind']
+    elif nmf == 'text':
+        name_mismatch = [r for r in name_mismatch if r.get('mismatch_kind') == 'text']
+
+    move_closed: list[dict] = []
+    for c in contracts:
+        st = c.get('status') or ''
+        if st not in CLOSED_MOVE_STATUSES:
+            continue
+        if c.get('idiq_contract_id'):
+            continue
+        did = c.get('sharepoint_drive_item_id') or ''
+        if not did or did not in run_folder_ids:
+            continue
+        folder_row = next((r for r in folders if _str(r.get('drive_item_id')) == did), None)
+        if not folder_row:
+            continue
+        if folder_row.get('folder_kind') != ScannedFolder.FolderKind.CONTRACT:
+            continue
+        if folder_row.get('depth') != 1:
+            continue
+        if folder_ignored('move_closed', did):
+            continue
+        if contract_ignored('move_closed', c['id']):
+            continue
+        closed_target = f"{root_path.strip().strip('/')}/Closed Contracts/{folder_row.get('name') or ''}"
+        move_closed.append(
+            {
+                'contract_id': c['id'],
+                'contract_number': c.get('contract_number') or '',
+                'status': st,
+                'folder_path': _str(folder_row.get('path')),
+                'folder_web_url': _str(folder_row.get('web_url')),
+                'drive_item_id': did,
+                'new_path_preview': closed_target.rstrip('/') + '/',
+            }
+        )
+    move_closed.sort(key=lambda r: (r.get('contract_number') or '').lower())
+
+    ready_to_merge: list[dict] = []
+    for num, group_rows in dup_groups.items():
+        target_contract_id = next(
+            (r['contract_id'] for r in group_rows if r.get('contract_id')),
+            None,
+        )
+        target_idiq_id = next(
+            (r['idiq_contract_id'] for r in group_rows if r.get('idiq_contract_id')),
+            None,
+        )
+        record_type = ''
+        record_id = None
+        db_drive_id = ''
+        record_number = ''
+        if target_contract_id and contract_by_id.get(target_contract_id):
+            c = contract_by_id[target_contract_id]
+            record_type = 'contract'
+            record_id = c['id']
+            record_number = c.get('contract_number') or ''
+            db_drive_id = c.get('sharepoint_drive_item_id') or ''
+        elif target_idiq_id and idiq_by_id.get(target_idiq_id):
+            i = idiq_by_id[target_idiq_id]
+            record_type = 'idiq'
+            record_id = i['id']
+            record_number = i.get('contract_number') or ''
+            db_drive_id = i.get('sharepoint_drive_item_id') or ''
+        else:
+            if contract_by_norm.get(num):
+                c = contract_by_norm[num][0]
+                record_type = 'contract'
+                record_id = c['id']
+                record_number = c.get('contract_number') or ''
+                db_drive_id = c.get('sharepoint_drive_item_id') or ''
+            elif idiq_by_norm.get(num):
+                i = idiq_by_norm[num]
+                record_type = 'idiq'
+                record_id = i['id']
+                record_number = i.get('contract_number') or ''
+                db_drive_id = i.get('sharepoint_drive_item_id') or ''
+
+        group_ids = {_str(r.get('drive_item_id')) for r in group_rows}
+        if not db_drive_id or db_drive_id not in group_ids:
+            continue
+
+        losers = []
+        for r in group_rows:
+            lid = _str(r.get('drive_item_id'))
+            if lid == db_drive_id:
+                continue
+            lname = _str(r.get('name'))
+            if lname.startswith(MERGED_PREFIX):
+                continue
+            losers.append(
+                {
+                    'drive_item_id': lid,
+                    'path': _str(r.get('path')),
+                    'name': lname,
+                    'web_url': _str(r.get('web_url')),
+                }
+            )
+        if not losers:
+            continue
+        if all((_str(l.get('name')).startswith(MERGED_PREFIX) for l in losers)):
+            continue
+        if folder_ignored('ready_to_merge', db_drive_id):
+            continue
+
+        winner_path = folder_path_by_id.get(db_drive_id, '')
+        ready_to_merge.append(
+            {
+                'normalized_number': num,
+                'display_number': record_number or num,
+                'record_type': record_type,
+                'record_id': record_id,
+                'winner_drive_item_id': db_drive_id,
+                'winner_path': winner_path,
+                'losers': losers,
+            }
+        )
+    ready_to_merge.sort(key=lambda g: (g.get('display_number') or '').lower())
     ignored_display: list[dict] = []
     for ig in ignores:
         q = _str(ig.get('queue'))
@@ -567,6 +800,9 @@ def load_review_context(root_path: str) -> ReviewContext:
         'quick_fix': quick_fix,
         'mover': mover,
         'do_mismatch': do_mismatch,
+        'name_mismatch': name_mismatch,
+        'move_closed': move_closed,
+        'ready_to_merge': ready_to_merge,
         'ignored': ignored_display,
     }
     counts = {key: len(queues[key]) for key, _ in QUEUE_TABS}

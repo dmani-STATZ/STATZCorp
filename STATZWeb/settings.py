@@ -391,6 +391,9 @@ GRAPH_MAIL_ENABLED = (
 # ---------------------------------------------------------------------------
 SHAREPOINT_SITE_ID = os.environ.get("SHAREPOINT_SITE_ID", "")
 SHAREPOINT_DRIVE_ID = os.environ.get("SHAREPOINT_DRIVE_ID", "")
+FOLDER_REVIEW_SHAREPOINT_WRITES = (
+    os.environ.get("FOLDER_REVIEW_SHAREPOINT_WRITES", "false").strip().lower() == "true"
+)
 SHAREPOINT_CALENDAR_SITE_ID = os.environ.get("SHAREPOINT_CALENDAR_SITE_ID", "")
 SHAREPOINT_CALENDAR_LIST_ID = os.environ.get(
     "SHAREPOINT_CALENDAR_LIST_ID",

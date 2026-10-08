@@ -37,6 +37,12 @@ def _invalidate_token_cache() -> None:
     cache.delete(_TOKEN_CACHE_KEY)
 
 
+def invalidate_item_path_cache(item_id: str) -> None:
+    """Drop the cached path for one item (this worker's LocMem only)."""
+    if item_id:
+        cache.delete(f"sp_item_path:v1:{item_id}")
+
+
 def _drive_id() -> str:
     return (getattr(settings, "SHAREPOINT_DRIVE_ID", None) or "").strip()
 
