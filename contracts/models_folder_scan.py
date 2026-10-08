@@ -1,5 +1,6 @@
 """SharePoint contract folder scan snapshot models."""
 
+from django.conf import settings
 from django.db import models
 
 
@@ -175,3 +176,94 @@ class FolderScanLog(models.Model):
 
     def __str__(self) -> str:
         return f'{self.level}: {self.message[:80]}'
+
+
+class FolderReviewIgnore(models.Model):
+    class Queue(models.TextChoices):
+        PAIRS = 'pairs', 'Pair up'
+        MISNAMED = 'misnamed', 'Misnamed'
+        DUPLICATES = 'duplicates', 'Duplicates'
+        ORPHANS = 'orphans', 'Orphan folders'
+        FOLDERLESS = 'folderless', 'Contracts without folder'
+        MOVER = 'mover', 'Waiting to move'
+        DO_MISMATCH = 'do_mismatch', 'DO under wrong IDIQ'
+        QUICK_FIX = 'quick_fix', 'Quick fixes'
+
+    queue = models.CharField(
+        max_length=30,
+        choices=Queue.choices,
+        blank=True,
+        default='',
+    )
+    drive_item_id = models.CharField(max_length=128, blank=True, default='', db_index=True)
+    contract = models.ForeignKey(
+        'Contract',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='+',
+    )
+    note = models.CharField(max_length=500, blank=True, default='')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f'FolderReviewIgnore({self.queue}, {self.drive_item_id or self.contract_id})'
+
+
+class FolderRepairLog(models.Model):
+    class Action(models.TextChoices):
+        LINK_PAIR = 'link_pair', 'Link pair'
+        LINK_MISNAMED = 'link_misnamed', 'Link misnamed'
+        MANUAL_MATCH = 'manual_match', 'Manual match'
+        PICK_DUPLICATE = 'pick_duplicate', 'Pick duplicate'
+        QUICK_FIX = 'quick_fix', 'Quick fix'
+        IGNORE = 'ignore', 'Ignore'
+        UNIGNORE = 'unignore', 'Unignore'
+
+    action = models.CharField(
+        max_length=30,
+        choices=Action.choices,
+        blank=True,
+        default='',
+    )
+    contract = models.ForeignKey(
+        'Contract',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    idiq_contract = models.ForeignKey(
+        'IdiqContract',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    drive_item_id = models.CharField(max_length=128, blank=True, default='')
+    old_files_url = models.CharField(max_length=1000, blank=True, default='')
+    new_files_url = models.CharField(max_length=1000, blank=True, default='')
+    old_drive_item_id = models.CharField(max_length=128, blank=True, default='')
+    new_drive_item_id = models.CharField(max_length=128, blank=True, default='')
+    detail = models.CharField(max_length=1000, blank=True, default='')
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+    performed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-id']
+
+    def __str__(self) -> str:
+        return f'FolderRepairLog({self.action}, {self.pk})'

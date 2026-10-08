@@ -149,6 +149,17 @@ from .views import (
     folder_scan_status,
     folder_scan_status_json,
 )
+from .views.folder_review_views import (
+    folder_scan_review,
+    folder_review_api_link,
+    folder_review_api_duplicate,
+    folder_review_api_quick_fix,
+    folder_review_api_ignore,
+    folder_review_api_unignore,
+    folder_review_api_contents,
+    folder_review_api_search_contracts,
+    folder_review_api_search_folders,
+)
 
 from .views.contract_views import check_contract_number
 from .views.api_views import (
@@ -962,6 +973,47 @@ urlpatterns = [
         "folder-scan/status.json",
         folder_scan_status_json,
         name="folder_scan_status_json",
+    ),
+    path("folder-scan/review/", folder_scan_review, name="folder_scan_review"),
+    path(
+        "folder-scan/review/api/link/",
+        folder_review_api_link,
+        name="folder_review_api_link",
+    ),
+    path(
+        "folder-scan/review/api/duplicate/",
+        folder_review_api_duplicate,
+        name="folder_review_api_duplicate",
+    ),
+    path(
+        "folder-scan/review/api/quick-fix/",
+        folder_review_api_quick_fix,
+        name="folder_review_api_quick_fix",
+    ),
+    path(
+        "folder-scan/review/api/ignore/",
+        folder_review_api_ignore,
+        name="folder_review_api_ignore",
+    ),
+    path(
+        "folder-scan/review/api/unignore/",
+        folder_review_api_unignore,
+        name="folder_review_api_unignore",
+    ),
+    path(
+        "folder-scan/review/api/contents/<str:drive_item_id>/",
+        folder_review_api_contents,
+        name="folder_review_api_contents",
+    ),
+    path(
+        "folder-scan/review/api/search-contracts/",
+        folder_review_api_search_contracts,
+        name="folder_review_api_search_contracts",
+    ),
+    path(
+        "folder-scan/review/api/search-folders/",
+        folder_review_api_search_folders,
+        name="folder_review_api_search_folders",
     ),
     # Admin tools
     path("admin-tools/", supplier_admin_tools, name="admin_tools"),

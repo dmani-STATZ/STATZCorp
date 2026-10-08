@@ -313,6 +313,7 @@ This pattern (popup_base + popup view + popup_add + popup_edit) is the approved 
 
 ### SharePoint folder scanner
 - All `files_url` corrections must go through `apply_folder_path_fixes` in `contracts/services/folder_scan/fix_paths.py` — no duplicate fix logic in views or commands.
+- **Folder Review (Stage A):** all review writes go through `contracts/services/folder_review/actions.py`. Ignores and duplicate decisions are keyed by **drive item id** or **contract id**, never `ScannedFolder.pk`. Stage A must **never** write to SharePoint (Graph reads only: `get_folder_path_by_item_id`, duplicate contents panel). `apply_folder_path_fixes` remains the only path-fix implementation for quick-fix actions.
 - The scan is **CLI-only** (`scan_folders`); do not add WebJobs, `ScheduledTask` rows, or heartbeat `TASK_FUNCTIONS` entries for it.
 - `normalize_path_for_compare` in `contracts/services/folder_scan/normalize.py` is for equality checks only; never persist its output as `files_url`.
 - Do **not** modify `contracts/services/sharepoint_service.py` for scanner work; extend `contracts/services/folder_scan/` instead. Do **not** change `sharepoint_paths.py` for scanner work except the sanctioned ID-first resolver branches.

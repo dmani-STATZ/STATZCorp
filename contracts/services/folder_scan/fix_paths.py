@@ -8,17 +8,10 @@ from contracts.services.folder_scan.exceptions import NoCompletedScan
 from contracts.services.folder_scan.run_log import ScanLogger
 from contracts.services.sharepoint_paths import (
     build_explorer_uri,
+    format_stored_files_url,
     is_modern_sharepoint_path,
     resolve_contract_folder_path,
 )
-
-
-def _format_files_url(path: str) -> str:
-    """Match Link Contract trailing-slash storage."""
-    cleaned = (path or '').strip()
-    if not cleaned:
-        return ''
-    return cleaned.rstrip('/') + '/'
 
 
 def apply_folder_path_fixes(
@@ -97,7 +90,7 @@ def apply_folder_path_fixes(
                 )
             continue
 
-        new_value = _format_files_url(row.get('path') or '')
+        new_value = format_stored_files_url(row.get('path') or '')
         if not is_modern_sharepoint_path(new_value, company=contract.company):
             skipped_invalid += 1
             if logger:

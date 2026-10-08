@@ -38,6 +38,14 @@ def get_sharepoint_prefix(company=None) -> str:
     return prefix or "Statz-Public/data/V87/aFed-DOD"
 
 
+def format_stored_files_url(path: str) -> str:
+    """Match Link Contract / scan fix trailing-slash storage."""
+    cleaned = (path or '').strip()
+    if not cleaned:
+        return ''
+    return cleaned.rstrip('/') + '/'
+
+
 def join_path(*parts) -> str:
     """
     Smart path joiner. Handles trailing/leading slashes correctly.

@@ -2299,6 +2299,8 @@ class PartnerReconciliationRow(models.Model):
 
 
 from contracts.models_folder_scan import (  # noqa: E402, F401
+    FolderRepairLog,
+    FolderReviewIgnore,
     FolderScanLog,
     FolderScanRun,
     ScannedFolder,

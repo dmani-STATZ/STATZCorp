@@ -54,6 +54,8 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 
 #### SharePoint Integration
 
+Superuser **Folder Review** (DB-only repair queues from the latest completed folder scan): `/contracts/folder-scan/review/` — see `contracts/CONTEXT_contracts.md` § Folder Review (Stage A).
+
 ##### SharePoint Document Browser
 Standalone document browser at `/contracts/documents/` lists and uploads files for a contract's SharePoint folder. It integrates with `contract_management.html` via a "Documents" button. Graph calls use client credentials flow (service principal), folder paths are stored in `Contract.files_url`, and the browser syncs contract context across tabs using `localStorage` plus a named window. It supports fallback to a parent/root folder and legacy path handling.
 

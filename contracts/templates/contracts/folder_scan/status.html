@@ -5,7 +5,10 @@
 
 {% block content %}
 <div class="container py-4">
-    <h1 class="h3 mb-3">SharePoint Folder Scan</h1>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <h1 class="h3 mb-0">SharePoint Folder Scan</h1>
+        <a href="{% url 'contracts:folder_scan_review' %}" class="btn btn-secondary btn-sm">Review queues →</a>
+    </div>
 
     <div class="card mb-4">
         <div class="card-header">SSH commands</div>
