@@ -1,7 +1,7 @@
 ---
 id: 2026-10-08-folder-lookup-by-id
 title: Contract and IDIQ folders follow SharePoint moves
-published: false
+published: true
 publish_date: 2026-10-08
 tags: [improved, contracts]
 critical: false
