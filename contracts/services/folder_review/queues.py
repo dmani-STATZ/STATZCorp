@@ -211,6 +211,15 @@ def load_review_context(
         if i['sharepoint_drive_item_id']
     }
 
+    folder_by_id: dict[str, dict] = {}
+    for r in folders:
+        folder_by_id.setdefault(_str(r.get('drive_item_id')), r)
+    folder_name_by_id = {_str(r.get('drive_item_id')): _str(r.get('name')) for r in folders}
+    folder_path_by_id = {_str(r.get('drive_item_id')): _str(r.get('path')) for r in folders}
+    folder_parent_by_id = {
+        _str(r.get('drive_item_id')): _str(r.get('parent_drive_item_id')) for r in folders
+    }
+
     ignores = list(
         FolderReviewIgnore.objects.values(
             'id',
@@ -575,12 +584,6 @@ def load_review_context(
         )
     do_mismatch.sort(key=lambda r: (r.get('do_number') or '').lower())
 
-    folder_name_by_id = {_str(r.get('drive_item_id')): _str(r.get('name')) for r in folders}
-    folder_path_by_id = {_str(r.get('drive_item_id')): _str(r.get('path')) for r in folders}
-    folder_parent_by_id = {
-        _str(r.get('drive_item_id')): _str(r.get('parent_drive_item_id')) for r in folders
-    }
-
     name_mismatch: list[dict] = []
     for c in contracts:
         did = c.get('sharepoint_drive_item_id') or ''
@@ -588,7 +591,7 @@ def load_review_context(
             continue
         if folder_ignored('name_mismatch', did):
             continue
-        folder_row = next((r for r in folders if _str(r.get('drive_item_id')) == did), None)
+        folder_row = folder_by_id.get(did)
         if not folder_row:
             continue
         expected = _expected_name_for_contract_row(c)
@@ -620,7 +623,7 @@ def load_review_context(
             continue
         if folder_ignored('name_mismatch', did):
             continue
-        folder_row = next((r for r in folders if _str(r.get('drive_item_id')) == did), None)
+        folder_row = folder_by_id.get(did)
         if not folder_row:
             continue
         expected = f"Contract {i.get('contract_number') or ''}"
@@ -662,7 +665,7 @@ def load_review_context(
         did = c.get('sharepoint_drive_item_id') or ''
         if not did or did not in run_folder_ids:
             continue
-        folder_row = next((r for r in folders if _str(r.get('drive_item_id')) == did), None)
+        folder_row = folder_by_id.get(did)
         if not folder_row:
             continue
         if folder_row.get('folder_kind') != ScannedFolder.FolderKind.CONTRACT:

@@ -1,0 +1,197 @@
+{
+  "counts": {
+    "do_mismatch": 1,
+    "duplicates": 1,
+    "folderless": 0,
+    "ignored": 1,
+    "misnamed": 1,
+    "move_closed": 1,
+    "mover": 1,
+    "name_mismatch": 3,
+    "orphans": 2,
+    "pairs": 1,
+    "quick_fix": 1,
+    "ready_to_merge": 1
+  },
+  "misnamed_excluded_substructure": 3,
+  "pages": {
+    "do_mismatch": [
+      {
+        "contract_id": 6,
+        "db_idiq_number": "SPE4AX-21-D-0009",
+        "do_number": "SPE4AX21D0001",
+        "drive_item_id": "do-mismatch",
+        "folder_path": "Statz-Public/data/V87/Equiv-Review/wrong/DO",
+        "folder_web_url": "",
+        "parent_folder_number": "SPE4AX21D0009"
+      }
+    ],
+    "duplicates": [
+      {
+        "contract_id": 3,
+        "db_drive_item_id": "dup-winner",
+        "db_path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-24-V-D001/",
+        "display_number": "SPE7L3-24-V-D001",
+        "folders": [
+          {
+            "drive_item_id": "dup-winner",
+            "name": "Contract SPE7L3-24-V-D001",
+            "path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-24-V-D001",
+            "web_url": ""
+          },
+          {
+            "drive_item_id": "dup-loser",
+            "name": "Contract SPE7L3-24-V-D001 copy",
+            "path": "Statz-Public/data/V87/Equiv-Review/dup/Contract SPE7L3-24-V-D001 copy",
+            "web_url": ""
+          }
+        ],
+        "idiq_contract_id": null,
+        "normalized_number": "SPE7L324VD001",
+        "record_number": "SPE7L3-24-V-D001",
+        "record_type": "Contract"
+      }
+    ],
+    "folderless": [],
+    "ignored": [
+      {
+        "created_at": "2026-10-08T17:26:00.717941+00:00",
+        "created_by": "",
+        "ignore_id": 1,
+        "item_label": "SPE7L3-24-V-P001",
+        "note": "golden ignore",
+        "queue": "folderless"
+      }
+    ],
+    "misnamed": [
+      {
+        "drive_item_id": "misnamed-1",
+        "name": "Conract SPE7M5-19-V-1384",
+        "path": "Statz-Public/data/V87/Equiv-Review/Conract SPE7M5-19-V-1384",
+        "suggested_contract_id": null,
+        "token": "SPE7M519V1384",
+        "web_url": ""
+      }
+    ],
+    "move_closed": [
+      {
+        "contract_id": 9,
+        "contract_number": "SPE7L3-24-V-C001",
+        "drive_item_id": "move-closed-1",
+        "folder_path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-24-V-C001",
+        "folder_web_url": "",
+        "new_path_preview": "Statz-Public/data/V87/Equiv-Review/Closed Contracts/Contract SPE7L3-24-V-C001/",
+        "status": "Closed"
+      }
+    ],
+    "mover": [
+      {
+        "contract_id": 4,
+        "contract_number": "SPE7L3-24-V-M001",
+        "db_path": "Statz-Public/data/V87/Equiv-Review/Closed Contracts/Contract SPE7L3-24-V-M001/",
+        "folder_path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-24-V-M001",
+        "folder_web_url": "",
+        "status": ""
+      }
+    ],
+    "name_mismatch": [
+      {
+        "contract_number": "DO-NMK-1",
+        "current_name": "Contract DO-NMK-1",
+        "drive_item_id": "do-nmk",
+        "expected_name": "Delivery Order DO-NMK-1",
+        "idiq_number": "IDIQ-NMK",
+        "mismatch_kind": "kind",
+        "parent_folder_name": "Contract IDIQ-NMK",
+        "parent_folder_path": "Statz-Public/data/V87/Equiv-Review/Contract IDIQ-NMK/",
+        "path": "Statz-Public/data/V87/Equiv-Review/Contract IDIQ-NMK/Contract DO-NMK-1/",
+        "record_id": 8,
+        "record_type": "contract",
+        "web_url": ""
+      },
+      {
+        "contract_number": "IDIQ-NMT",
+        "current_name": "Contract IDIQ-NMT wrong",
+        "drive_item_id": "idiq-nmt",
+        "expected_name": "Contract IDIQ-NMT",
+        "idiq_number": "none",
+        "mismatch_kind": "text",
+        "parent_folder_name": "",
+        "parent_folder_path": "",
+        "path": "Statz-Public/data/V87/Equiv-Review/Contract IDIQ-NMT wrong/",
+        "record_id": 3,
+        "record_type": "idiq",
+        "web_url": ""
+      },
+      {
+        "contract_number": "SPE7L3-24-V-NMT1",
+        "current_name": "Contract SPE7L3-24-V-NMTX",
+        "drive_item_id": "nm-text-drive",
+        "expected_name": "Contract SPE7L3-24-V-NMT1",
+        "idiq_number": "none",
+        "mismatch_kind": "text",
+        "parent_folder_name": "",
+        "parent_folder_path": "",
+        "path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-24-V-NMTX",
+        "record_id": 7,
+        "record_type": "contract",
+        "web_url": ""
+      }
+    ],
+    "orphans": [
+      {
+        "drive_item_id": "misnamed-1",
+        "name": "Conract SPE7M5-19-V-1384",
+        "path": "Statz-Public/data/V87/Equiv-Review/Conract SPE7M5-19-V-1384",
+        "web_url": ""
+      },
+      {
+        "drive_item_id": "orph-only",
+        "name": "Contract SPE7L3-99-Z-9999",
+        "path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-99-Z-9999",
+        "web_url": ""
+      }
+    ],
+    "pairs": [
+      {
+        "contract_files_url": "",
+        "contract_id": 2,
+        "contract_number": "SPE7L3-24-V-F001",
+        "contract_status": "Open",
+        "distance": 2,
+        "drive_item_id": "orph-pair",
+        "folder_name": "Contract SPE7L3-24-V-P002",
+        "folder_path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-24-V-P002",
+        "folder_web_url": ""
+      }
+    ],
+    "quick_fix": [
+      {
+        "contract_id": 5,
+        "contract_number": "SPE7L3-24-V-Q001",
+        "db_path": "",
+        "drive_item_id": "qf-1",
+        "folder_path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-24-V-Q001",
+        "folder_web_url": ""
+      }
+    ],
+    "ready_to_merge": [
+      {
+        "display_number": "SPE7L3-24-V-D001",
+        "losers": [
+          {
+            "drive_item_id": "dup-loser",
+            "name": "Contract SPE7L3-24-V-D001 copy",
+            "path": "Statz-Public/data/V87/Equiv-Review/dup/Contract SPE7L3-24-V-D001 copy",
+            "web_url": ""
+          }
+        ],
+        "normalized_number": "SPE7L324VD001",
+        "record_id": 3,
+        "record_type": "contract",
+        "winner_drive_item_id": "dup-winner",
+        "winner_path": "Statz-Public/data/V87/Equiv-Review/Contract SPE7L3-24-V-D001"
+      }
+    ]
+  }
+}
