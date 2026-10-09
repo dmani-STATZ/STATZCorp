@@ -74,17 +74,28 @@ def _draft_for_request(request, draft_id: int):
     return draft
 
 
+GATE_ID_REQUIRED_MSG = "contract_id, draft_id or idiq_id is required."
+
+
 def _authorize_contract_or_draft(
     request,
     contract_pk: Optional[int],
     draft_pk: Optional[int],
-) -> tuple[Optional[Contract], object | None]:
-    """Return (contract, draft) after access checks; exactly one may be set."""
+    idiq_pk: Optional[int] = None,
+) -> tuple[Optional[Contract], object | None, object | None]:
+    """Return (contract, draft, idiq) after access checks; exactly one gate may be set."""
+    gates = (
+        contract_pk is not None,
+        draft_pk is not None,
+        idiq_pk is not None,
+    )
+    if sum(gates) != 1:
+        raise ValueError(GATE_ID_REQUIRED_MSG)
     if contract_pk is not None:
-        return _contract_for_request(request, contract_pk), None
+        return _contract_for_request(request, contract_pk), None, None
     if draft_pk is not None:
-        return None, _draft_for_request(request, draft_pk)
-    raise ValueError("contract_id or draft_id required")
+        return None, _draft_for_request(request, draft_pk), None
+    return None, None, _idiq_for_request(request, idiq_pk)
 
 
 def _error_response(error: SharePointError, *, status: Optional[int] = None) -> JsonResponse:
@@ -308,11 +319,14 @@ def sharepoint_files_api(request):
 def _list_sharepoint_files(request) -> JsonResponse:
     contract_pk = _parse_contract_id(request.GET.get("contract_id"))
     draft_pk = _parse_contract_id(request.GET.get("draft_id"))
+    idiq_pk = _parse_contract_id(request.GET.get("idiq_id"))
     try:
-        contract, draft = _authorize_contract_or_draft(request, contract_pk, draft_pk)
+        contract, draft, idiq = _authorize_contract_or_draft(
+            request, contract_pk, draft_pk, idiq_pk
+        )
     except ValueError:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id is required."},
+            {"success": False, "error": GATE_ID_REQUIRED_MSG},
             status=400,
         )
     except PermissionDenied as exc:
@@ -330,6 +344,10 @@ def _list_sharepoint_files(request) -> JsonResponse:
             requested_path = sharepoint_service.normalize_folder_path(raw_folder_path)
     elif contract is not None:
         resolution = resolve_contract_folder_path(contract)
+        requested_path = resolution["path"]
+        legacy_detected = resolution["legacy_detected"]
+    elif idiq is not None:
+        resolution = resolve_idiq_folder_path(idiq)
         requested_path = resolution["path"]
         legacy_detected = resolution["legacy_detected"]
     else:
@@ -354,6 +372,8 @@ def _list_sharepoint_files(request) -> JsonResponse:
         if isinstance(error, SharePointNotFound) or (isinstance(error, SharePointError) and error.status_code in (400, 404)):
             if contract is not None:
                 root_fallback = get_root_fallback_path(contract)
+            elif idiq is not None:
+                root_fallback = get_idiq_root_fallback_path(idiq)
             else:
                 root_fallback = get_sharepoint_prefix(company=draft.company) + '/'
             fallback_path = (
@@ -390,20 +410,23 @@ def _upload_sharepoint_file(request) -> JsonResponse:
     uploaded_file = request.FILES.get("file")
     contract_pk = _parse_contract_id(request.POST.get("contract_id"))
     draft_pk = _parse_contract_id(request.POST.get("draft_id"))
-    if (contract_pk is None and draft_pk is None) or not folder_path or uploaded_file is None:
+    idiq_pk = _parse_contract_id(request.POST.get("idiq_id"))
+    if (
+        contract_pk is None and draft_pk is None and idiq_pk is None
+    ) or not folder_path or uploaded_file is None:
         return JsonResponse(
             {
                 "success": False,
-                "error": "contract_id or draft_id, folder_path, and file are required.",
+                "error": "contract_id, draft_id or idiq_id, folder_path, and file are required.",
             },
             status=400,
         )
 
     try:
-        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+        _authorize_contract_or_draft(request, contract_pk, draft_pk, idiq_pk)
     except ValueError:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id is required."},
+            {"success": False, "error": GATE_ID_REQUIRED_MSG},
             status=400,
         )
     except PermissionDenied as exc:
@@ -444,26 +467,32 @@ def create_folder_api(request):
 
     contract_pk = _parse_contract_id(payload.get("contract_id"))
     draft_pk = _parse_contract_id(payload.get("draft_id"))
-    if (contract_pk is None and draft_pk is None) or not parent_path or not folder_name:
+    idiq_pk = _parse_contract_id(payload.get("idiq_id"))
+    if (
+        contract_pk is None and draft_pk is None and idiq_pk is None
+    ) or not parent_path or not folder_name:
         return JsonResponse(
             {
                 "success": False,
-                "error": "contract_id or draft_id, parent_path, and folder_name are required.",
+                "error": "contract_id, draft_id or idiq_id, parent_path, and folder_name are required.",
             },
             status=400,
         )
 
     try:
-        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+        _authorize_contract_or_draft(request, contract_pk, draft_pk, idiq_pk)
     except ValueError:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id is required."},
+            {"success": False, "error": GATE_ID_REQUIRED_MSG},
             status=400,
         )
     except PermissionDenied as exc:
         return JsonResponse({"success": False, "error": str(exc)}, status=403)
     except Http404:
-        return JsonResponse({"success": False, "error": "Contract or draft not found."}, status=404)
+        return JsonResponse(
+            {"success": False, "error": "Contract, draft, or IDIQ not found."},
+            status=404,
+        )
 
     try:
         folder = sharepoint_service.create_folder(parent_path, folder_name)
@@ -644,17 +673,23 @@ def download_file_api(request):
 
     contract_pk = _parse_contract_id(payload.get("contract_id"))
     draft_pk = _parse_contract_id(payload.get("draft_id"))
-    if (contract_pk is None and draft_pk is None) or not file_id:
+    idiq_pk = _parse_contract_id(payload.get("idiq_id"))
+    if (
+        contract_pk is None and draft_pk is None and idiq_pk is None
+    ) or not file_id:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id and file_id are required."},
+            {
+                "success": False,
+                "error": "contract_id, draft_id or idiq_id and file_id are required.",
+            },
             status=400,
         )
 
     try:
-        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+        _authorize_contract_or_draft(request, contract_pk, draft_pk, idiq_pk)
     except ValueError:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id is required."},
+            {"success": False, "error": GATE_ID_REQUIRED_MSG},
             status=400,
         )
     except PermissionDenied as exc:
@@ -692,17 +727,23 @@ def delete_file_api(request):
 
     contract_pk = _parse_contract_id(payload.get("contract_id"))
     draft_pk = _parse_contract_id(payload.get("draft_id"))
-    if (contract_pk is None and draft_pk is None) or not file_id:
+    idiq_pk = _parse_contract_id(payload.get("idiq_id"))
+    if (
+        contract_pk is None and draft_pk is None and idiq_pk is None
+    ) or not file_id:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id and file_id are required."},
+            {
+                "success": False,
+                "error": "contract_id, draft_id or idiq_id and file_id are required.",
+            },
             status=400,
         )
 
     try:
-        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+        _authorize_contract_or_draft(request, contract_pk, draft_pk, idiq_pk)
     except ValueError:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id is required."},
+            {"success": False, "error": GATE_ID_REQUIRED_MSG},
             status=400,
         )
     except PermissionDenied as exc:
@@ -725,17 +766,23 @@ def folder_weburl_api(request):
 
     contract_pk = _parse_contract_id(request.GET.get("contract_id"))
     draft_pk = _parse_contract_id(request.GET.get("draft_id"))
-    if (contract_pk is None and draft_pk is None) or not folder_path:
+    idiq_pk = _parse_contract_id(request.GET.get("idiq_id"))
+    if (
+        contract_pk is None and draft_pk is None and idiq_pk is None
+    ) or not folder_path:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id and folder_path are required."},
+            {
+                "success": False,
+                "error": "contract_id, draft_id or idiq_id and folder_path are required.",
+            },
             status=400,
         )
 
     try:
-        _authorize_contract_or_draft(request, contract_pk, draft_pk)
+        _authorize_contract_or_draft(request, contract_pk, draft_pk, idiq_pk)
     except ValueError:
         return JsonResponse(
-            {"success": False, "error": "contract_id or draft_id is required."},
+            {"success": False, "error": GATE_ID_REQUIRED_MSG},
             status=400,
         )
     except PermissionDenied as exc:

@@ -230,6 +230,7 @@ use the shipment-completion definition instead.
   - `_folder_payload` includes `id` and `webUrl` for each folder row (used by multi-select and Open in SharePoint).
   - `get_folder_weburl(folder_path)` — returns SharePoint `webUrl` for a drive-relative path (empty string if not found).
   - `delete_item_by_id(item_id)` — user-facing permanent delete; raises `SharePointError` on failure. Distinct from internal `delete_file_by_id` (temp PDF cleanup only).
+  - File APIs (`sharepoint_files_api` list/upload, `download_file_api`, `delete_file_api`, `folder_weburl_api`, `create_folder_api`) authorize via `_authorize_contract_or_draft()`: exactly one of `contract_id`, `draft_id`, or `idiq_id`. IDIQ requests use `resolve_idiq_folder_path` / `get_idiq_root_fallback_path` (global `get_sharepoint_prefix()`, no company scope).
   - Views: `download_file_api` (POST, streams file bytes), `delete_file_api` (POST, staff-only), `folder_weburl_api` (GET).
   - URLs: `api/download-file/`, `api/delete-file/`, `api/folder-weburl/`.
   - UI: multi-select checkboxes on files and folders, single **Actions** dropdown menu (Save Path, Open in SharePoint, Download, staff-gated Delete with confirmation modal). Selection clears on folder navigation. Breadcrumb position is unchanged.
