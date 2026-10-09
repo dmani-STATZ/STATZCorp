@@ -80,6 +80,18 @@
 - `path("delete-pages/", delete_pages, name="delete_pages")`: POST-only delete endpoint expecting `file` + `ranges`.
 - `path("split/", split_pdf, name="split_pdf")`: POST-only split endpoint expecting `file` + `ranges`.
 
+### Scan Inbox page (temporary internal tool)
+- **`/tools/scan-inbox/`** (`tools:scan_inbox`) — three-column UI: pending PDF list, iframe preview, contract search + File/Skip. Access is **`@login_required` only** (no AppRegistry row; same as PDF Merger).
+- JSON endpoints (all login-required; File/Skip are `@require_POST` + CSRF):
+  - `tools:scan_inbox_items` — `list_pending()`
+  - `tools:scan_inbox_pdf` — inline PDF preview (`xframe_options_sameorigin`, `%PDF` magic check)
+  - `tools:scan_inbox_search` — `search_contracts(request.active_company, q)` (empty list if no active company)
+  - `tools:scan_inbox_destination` — company-scoped contract + `resolve_destination`
+  - `tools:scan_inbox_file` / `tools:scan_inbox_skip` — `file_pdf` / `skip_pdf`
+- Template: `templates/tools/scan_inbox.html` (extends `base_template.html`, blocks `body` + `extra_scripts`).
+- Front-end: `static/tools/js/scan_inbox.js` (vanilla JS, `textContent` only for server data). Styles under `/* === Scan Inbox === */` in `static/css/app-core.css`.
+- Nav: sidebar link next to PDF Merger in `templates/base_template.html`.
+
 ## 13. Permissions / Security Considerations
 - All views carry `@login_required`, so only authenticated users can access the tool, and the project likely relies on session-based auth from the `users` app.
 - Merge/delete/split endpoints also use `@require_POST`; they reject GET requests outright.

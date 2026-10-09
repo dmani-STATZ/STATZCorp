@@ -1,0 +1,121 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block body %}
+<div class="container-fluid py-3 scan-inbox-page">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+        <div>
+            <p class="text-muted small mb-1">Tools</p>
+            <h1 class="h4 mb-1">Scan Inbox</h1>
+            <p class="text-muted small mb-0">
+                Preview scan PDFs from the mailbox, search for a contract, and file into SharePoint.
+            </p>
+        </div>
+        <a href="{% url 'tools:index' %}" class="btn btn-sm btn-outline-secondary">PDF Merger →</a>
+    </div>
+
+    {% if not writes_enabled %}
+    <div class="alert alert-warning py-2 mb-3" role="alert">
+        Filing is turned off (SCAN_INBOX_SHAREPOINT_WRITES=false). You can preview and search, but not file.
+    </div>
+    {% endif %}
+
+    <div
+        id="scan-inbox-app"
+        class="scan-inbox-app"
+        data-items-url="{% url 'tools:scan_inbox_items' %}"
+        data-pdf-url="{% url 'tools:scan_inbox_pdf' %}"
+        data-search-url="{% url 'tools:scan_inbox_search' %}"
+        data-destination-url="{% url 'tools:scan_inbox_destination' %}"
+        data-file-url="{% url 'tools:scan_inbox_file' %}"
+        data-skip-url="{% url 'tools:scan_inbox_skip' %}"
+        data-writes-enabled="{% if writes_enabled %}1{% else %}0{% endif %}"
+    >
+        <div class="row g-3">
+            <div class="col-12 col-lg-3">
+                <div class="card scan-inbox-panel h-100">
+                    <div class="card-header d-flex align-items-center justify-content-between py-2">
+                        <span class="fw-semibold">Pending PDFs</span>
+                        <button type="button" id="scan-inbox-refresh" class="btn btn-sm btn-outline-secondary">Refresh</button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="px-3 py-2 border-bottom small text-muted">
+                            <span id="scan-inbox-count">0</span> item(s)
+                        </div>
+                        <div id="scan-inbox-items-list" class="scan-inbox-items-list"></div>
+                        <div class="border-top px-3 py-2">
+                            <div class="fw-semibold small mb-2">Problems</div>
+                            <div id="scan-inbox-problems-list" class="scan-inbox-problems-list small"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-5">
+                <div class="card scan-inbox-panel h-100">
+                    <div class="card-header py-2 fw-semibold">Preview</div>
+                    <div class="card-body p-0 scan-inbox-preview-wrap">
+                        <iframe
+                            id="scan-inbox-preview"
+                            title="Scan PDF preview"
+                            class="scan-inbox-preview-frame w-100 border-0"
+                        ></iframe>
+                        <div id="scan-inbox-preview-empty" class="scan-inbox-preview-empty text-muted small">
+                            Select a PDF from the list to preview.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-4">
+                <div class="card scan-inbox-panel h-100">
+                    <div class="card-header py-2 fw-semibold">File to contract</div>
+                    <div class="card-body">
+                        <label for="scan-inbox-search" class="form-label small">Contract search</label>
+                        <input
+                            type="search"
+                            id="scan-inbox-search"
+                            class="form-control form-control-sm mb-2"
+                            placeholder="Contract or PO number (min 3 characters)"
+                            autocomplete="off"
+                        />
+                        <div id="scan-inbox-search-results" class="scan-inbox-search-results mb-3"></div>
+
+                        <div id="scan-inbox-destination" class="scan-inbox-destination small mb-2"></div>
+                        <div id="scan-inbox-filename" class="small text-muted mb-3"></div>
+                        <div id="scan-inbox-panel-error" class="alert alert-danger py-2 small d-none" role="alert"></div>
+
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button type="button" id="scan-inbox-file-btn" class="btn btn-success btn-sm" disabled>File</button>
+                        </div>
+
+                        <div class="border-top pt-3">
+                            <label for="scan-inbox-skip-reason" class="form-label small">Skip selected PDF</label>
+                            <div class="d-flex flex-wrap gap-2 align-items-start">
+                                <select id="scan-inbox-skip-reason" class="form-select form-select-sm scan-inbox-skip-select">
+                                    <option value="Not in STATZWeb">Not in STATZWeb</option>
+                                    <option value="Blank / bad scan">Blank / bad scan</option>
+                                    <option value="Duplicate scan">Duplicate scan</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <input
+                                    type="text"
+                                    id="scan-inbox-skip-other"
+                                    class="form-control form-control-sm scan-inbox-skip-other d-none"
+                                    placeholder="Reason"
+                                    maxlength="200"
+                                />
+                                <button type="button" id="scan-inbox-skip-btn" class="btn btn-secondary btn-sm" disabled>Skip</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+<script src="{% static 'tools/js/scan_inbox.js' %}"></script>
+{% endblock extra_scripts %}

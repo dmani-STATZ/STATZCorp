@@ -4986,6 +4986,58 @@ main {
   padding: .25rem 2.25rem .25rem .5rem;
 }
 
+/* === Scan Inbox === */
+.scan-inbox-panel {
+    background: var(--bs-body-bg);
+    border-color: var(--bs-border-color);
+}
+.scan-inbox-items-list {
+    max-height: calc(100vh - 420px);
+    overflow-y: auto;
+}
+.scan-inbox-item-btn {
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+.scan-inbox-item-btn:hover {
+    background: var(--bs-tertiary-bg);
+}
+.scan-inbox-item-selected {
+    background: var(--bs-primary-bg-subtle) !important;
+    box-shadow: inset 3px 0 0 var(--bs-primary);
+}
+.scan-inbox-search-btn {
+    background: var(--bs-body-bg);
+    border-color: var(--bs-border-color) !important;
+    color: var(--bs-body-color);
+}
+.scan-inbox-search-btn:hover {
+    background: var(--bs-tertiary-bg);
+}
+.scan-inbox-preview-wrap {
+    position: relative;
+    min-height: calc(100vh - 220px);
+}
+.scan-inbox-preview-frame {
+    height: calc(100vh - 220px);
+    display: block;
+}
+.scan-inbox-preview-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.scan-inbox-skip-select {
+    min-width: 10rem;
+    flex: 1 1 10rem;
+}
+.scan-inbox-skip-other {
+    flex: 1 1 8rem;
+}
+
 /* ===== Late responsive overrides (must follow the app-shell rules above) ===== */
 @media (max-width: 767.98px) {
     .app-shell {

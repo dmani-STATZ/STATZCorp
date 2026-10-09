@@ -256,7 +256,8 @@
             <a href="{% url 'training:dashboard' %}" class="sidebar-link {% if app == 'training' %}is-active{% endif %}"><i class="bi bi-mortarboard" aria-hidden="true"></i><span>Training</span></a>
 
             <div class="sidebar-section-label">Tools</div>
-            <a href="{% url 'tools:index' %}" class="sidebar-link {% if app == 'tools' %}is-active{% endif %}"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><span>PDF Merger</span></a>
+            <a href="{% url 'tools:index' %}" class="sidebar-link {% if vn == 'tools:index' %}is-active{% endif %}"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><span>PDF Merger</span></a>
+            <a href="{% url 'tools:scan_inbox' %}" class="sidebar-link {% if vn == 'tools:scan_inbox' %}is-active{% endif %}"><i class="bi bi-inbox" aria-hidden="true"></i><span>Scan Inbox</span></a>
             <a href="{% url 'contracts:folder_tracking' %}" class="sidebar-link {% if vn == 'contracts:folder_tracking' %}is-active{% endif %}"><i class="bi bi-folder-check" aria-hidden="true"></i><span>Folder Tracking</span></a>
             {% if user.is_authenticated and user.is_superuser %}
             <a href="{% url 'contracts:company_list' %}" class="sidebar-link {% if vn == 'contracts:company_list' %}is-active{% endif %}"><i class="bi bi-buildings" aria-hidden="true"></i><span>Companies</span></a>
