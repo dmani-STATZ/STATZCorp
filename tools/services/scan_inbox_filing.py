@@ -11,7 +11,11 @@ from django.utils import timezone
 
 from tools.models import ScanFilingLog
 from tools.services import scan_inbox_graph as graph
-from tools.services.scan_inbox_destination import Destination, resolve_destination
+from tools.services.scan_inbox_destination import (
+    Destination,
+    resolve_destination,
+    resolve_idiq_destination,
+)
 from tools.services.scan_inbox_errors import (  # noqa: F401 — public API
     ScanInboxAlreadyDone,
     ScanInboxDestinationError,
@@ -83,13 +87,20 @@ def _write_failed_row(
     user,
     message_id: str,
     attachment_name: str,
-    contract,
+    contract=None,
+    idiq_contract=None,
+    contract_number: str = "",
     error: str,
     attachment_size: int = 0,
     internet_message_id: str = "",
     received_at=None,
     mailbox: str = "",
 ) -> ScanFilingLog:
+    if not contract_number:
+        if contract is not None:
+            contract_number = contract.contract_number or ""
+        elif idiq_contract is not None:
+            contract_number = idiq_contract.contract_number or ""
     return ScanFilingLog.objects.create(
         action=ScanFilingLog.Action.FAILED,
         user=user,
@@ -100,7 +111,8 @@ def _write_failed_row(
         attachment_name=attachment_name,
         attachment_size=attachment_size,
         contract=contract,
-        contract_number=(contract.contract_number or "") if contract else "",
+        idiq_contract=idiq_contract,
+        contract_number=contract_number,
         error=(error or "")[:1000],
     )
 
@@ -109,9 +121,18 @@ def file_pdf(
     user,
     message_id: str,
     attachment_name: str,
-    contract,
+    *,
+    target,
+    target_type: str = "contract",
     dry_run: bool = False,
 ):
+    target_type = (target_type or "contract").strip().lower()
+    if target_type not in ("contract", "idiq"):
+        raise ValueError("target_type must be contract or idiq")
+
+    contract = target if target_type == "contract" else None
+    idiq_contract = target if target_type == "idiq" else None
+    display_number = (target.contract_number or "") if target else ""
     mailbox = (settings.SCAN_INBOX_MAILBOX or "").strip()
 
     if _is_done(message_id, attachment_name):
@@ -153,6 +174,7 @@ def file_pdf(
                 message_id=message_id,
                 attachment_name=attachment_name,
                 contract=contract,
+                idiq_contract=idiq_contract,
                 error="ScanInboxTooLarge",
                 attachment_size=meta["attachment_size"],
                 mailbox=mailbox,
@@ -169,28 +191,31 @@ def file_pdf(
                 message_id=message_id,
                 attachment_name=attachment_name,
                 contract=contract,
+                idiq_contract=idiq_contract,
                 error="not a PDF",
                 attachment_size=len(data),
                 mailbox=mailbox,
             )
             raise ScanInboxNotPdf()
 
-        dest: Destination = resolve_destination(contract)
+        if target_type == "idiq":
+            dest: Destination = resolve_idiq_destination(target)
+        else:
+            dest = resolve_destination(target)
         if dest.kind in _DESTINATION_FAIL_KINDS:
             _write_failed_row(
                 user=user,
                 message_id=message_id,
                 attachment_name=attachment_name,
                 contract=contract,
+                idiq_contract=idiq_contract,
                 error=dest.message or dest.kind,
                 attachment_size=len(data),
                 mailbox=mailbox,
             )
             raise ScanInboxDestinationError(dest.message or dest.kind)
 
-        upload_name = build_upload_filename(
-            contract.contract_number or "", meta.get("received_at")
-        )
+        upload_name = build_upload_filename(display_number, meta.get("received_at"))
 
         if dry_run:
             return {
@@ -237,6 +262,7 @@ def file_pdf(
                         message_id=message_id,
                         attachment_name=attachment_name,
                         contract=contract,
+                        idiq_contract=idiq_contract,
                         error="ScanInboxNameConflict",
                         attachment_size=len(data),
                         mailbox=mailbox,
@@ -253,7 +279,8 @@ def file_pdf(
             attachment_name=attachment_name,
             attachment_size=len(data),
             contract=contract,
-            contract_number=contract.contract_number or "",
+            idiq_contract=idiq_contract,
+            contract_number=display_number,
             destination_kind=dest.kind,
             folder_item_id=folder_item_id,
             folder_path=folder_path,
@@ -290,6 +317,7 @@ def file_pdf(
             message_id=message_id,
             attachment_name=attachment_name,
             contract=contract,
+            idiq_contract=idiq_contract,
             error=f"{exc.__class__.__name__}: {str(exc)[:900]}",
             attachment_size=meta.get("attachment_size", 0),
             mailbox=mailbox,

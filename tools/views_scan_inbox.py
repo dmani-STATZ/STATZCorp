@@ -13,7 +13,10 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_POST
 
 from tools.services import scan_inbox_graph as graph
-from tools.services.scan_inbox_destination import resolve_destination
+from tools.services.scan_inbox_destination import (
+    resolve_destination,
+    resolve_idiq_destination,
+)
 from tools.services.scan_inbox_errors import (
     ScanInboxAlreadyDone,
     ScanInboxDestinationError,
@@ -64,6 +67,33 @@ def _get_company_contract(request, contract_id: int):
     if company is None:
         return None
     return Contract.objects.filter(pk=contract_id, company=company).first()
+
+
+def _parse_target_params(request) -> tuple[str, int | None]:
+    target_type = (
+        request.GET.get("target_type") or request.POST.get("target_type") or "contract"
+    ).strip().lower()
+    if target_type not in ("contract", "idiq"):
+        target_type = "contract"
+    raw_id = (
+        request.GET.get("target_id")
+        or request.GET.get("contract_id")
+        or request.POST.get("target_id")
+        or request.POST.get("contract_id")
+    )
+    try:
+        target_pk = int(raw_id)
+    except (TypeError, ValueError):
+        return target_type, None
+    return target_type, target_pk
+
+
+def _get_filing_target(request, target_type: str, target_pk: int):
+    if target_type == "idiq":
+        from contracts.models import IdiqContract
+
+        return IdiqContract.objects.filter(pk=target_pk).first()
+    return _get_company_contract(request, target_pk)
 
 
 @login_required
@@ -128,27 +158,29 @@ def scan_inbox_search_view(request):
 @login_required
 @require_GET
 def scan_inbox_destination_view(request):
-    contract_id = request.GET.get("contract_id")
-    try:
-        contract_pk = int(contract_id)
-    except (TypeError, ValueError):
+    target_type, target_pk = _parse_target_params(request)
+    if target_pk is None:
         return JsonResponse(
-            {"ok": False, "error": "contract_id is required."},
+            {"ok": False, "error": "target_id (or contract_id) is required."},
             status=400,
         )
 
-    contract = _get_company_contract(request, contract_pk)
-    if contract is None:
+    target = _get_filing_target(request, target_type, target_pk)
+    if target is None:
         from django.http import Http404
 
         raise Http404()
 
     t0 = time.perf_counter()
-    dest = resolve_destination(contract)
+    if target_type == "idiq":
+        dest = resolve_idiq_destination(target)
+    else:
+        dest = resolve_destination(target)
     elapsed_ms = (time.perf_counter() - t0) * 1000
     logger.info(
-        "scan_inbox destination contract_id=%s kind=%s ms=%.1f",
-        contract.pk,
+        "scan_inbox destination target_type=%s target_id=%s kind=%s ms=%.1f",
+        target_type,
+        target.pk,
         dest.kind,
         elapsed_ms,
     )
@@ -160,28 +192,34 @@ def scan_inbox_destination_view(request):
 def scan_inbox_file(request):
     message_id = (request.POST.get("message_id") or "").strip()
     attachment_name = (request.POST.get("attachment_name") or "").strip()
-    contract_id_raw = request.POST.get("contract_id")
+    target_type, target_pk = _parse_target_params(request)
 
-    if not message_id or not attachment_name or not contract_id_raw:
+    if not message_id or not attachment_name or target_pk is None:
         return JsonResponse(
-            {"ok": False, "error": "message_id, attachment_name, and contract_id are required."},
+            {
+                "ok": False,
+                "error": "message_id, attachment_name, and target_id (or contract_id) are required.",
+            },
             status=400,
         )
 
-    try:
-        contract_pk = int(contract_id_raw)
-    except (TypeError, ValueError):
-        return JsonResponse({"ok": False, "error": "Invalid contract_id."}, status=400)
-
-    contract = _get_company_contract(request, contract_pk)
-    if contract is None:
+    target = _get_filing_target(request, target_type, target_pk)
+    if target is None:
+        if target_type == "idiq":
+            return JsonResponse({"ok": False, "error": "IDIQ not found."}, status=404)
         return JsonResponse(
             {"ok": False, "error": "Contract not found for your active company."},
             status=404,
         )
 
     try:
-        row = file_pdf(request.user, message_id, attachment_name, contract)
+        row = file_pdf(
+            request.user,
+            message_id,
+            attachment_name,
+            target=target,
+            target_type=target_type,
+        )
         return JsonResponse(
             {
                 "ok": True,

@@ -268,7 +268,7 @@
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "scan-inbox-search-btn w-100 text-start border rounded px-2 py-2 mb-1";
-            if (selectedContract && selectedContract.id === row.id) {
+            if (isSameTarget(selectedContract, row)) {
                 btn.classList.add("scan-inbox-item-selected");
             }
 
@@ -279,8 +279,13 @@
                 row.po_number ? ` · PO ${row.po_number}` : ""
             }`;
             const badge = document.createElement("span");
-            badge.className = `badge ${statusBadgeClass(row.status__description)}`;
-            badge.textContent = row.status__description || "—";
+            if ((row.target_type || "contract") === "idiq") {
+                badge.className = "badge bg-info";
+                badge.textContent = "IDIQ";
+            } else {
+                badge.className = `badge ${statusBadgeClass(row.status__description)}`;
+                badge.textContent = row.status__description || "—";
+            }
             line.appendChild(left);
             line.appendChild(badge);
             btn.appendChild(line);
@@ -299,6 +304,13 @@
         return "bg-secondary";
     }
 
+    function isSameTarget(a, b) {
+        if (!a || !b) return false;
+        const typeA = a.target_type || "contract";
+        const typeB = b.target_type || "contract";
+        return a.id === b.id && typeA === typeB;
+    }
+
     async function selectContract(row) {
         clearPanelError();
         selectedContract = row;
@@ -309,7 +321,10 @@
         updateFilenamePreview();
         updateActionButtons();
         try {
-            const params = new URLSearchParams({ contract_id: String(row.id) });
+            const params = new URLSearchParams({
+                target_id: String(row.id),
+                target_type: row.target_type || "contract",
+            });
             const resp = await fetch(`${urls.destination}?${params.toString()}`, {
                 credentials: "same-origin",
             });
@@ -407,6 +422,8 @@
             const body = new FormData();
             body.append("message_id", item.message_id);
             body.append("attachment_name", item.attachment_name);
+            body.append("target_id", String(selectedContract.id));
+            body.append("target_type", selectedContract.target_type || "contract");
             body.append("contract_id", String(selectedContract.id));
             const resp = await fetch(urls.file, {
                 method: "POST",

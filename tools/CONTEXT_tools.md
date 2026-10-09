@@ -25,8 +25,8 @@
 - `templates/tools/pdf_merger.html`: server-rendered page with drag-and-drop file input, file list with reorder/delete controls, preview iframe, range input, action buttons, status banner, and the inline script that talks to the view endpoints.
 - `services/scan_inbox_graph.py`: Microsoft Graph client for the scan mailbox (GCC High, immutable message IDs).
 - `services/scan_inbox_queue.py`: pending PDF queue and mail-folder sweep.
-- `services/scan_inbox_search.py`: dash-insensitive contract search (company-scoped).
-- `services/scan_inbox_destination.py`: read-only SharePoint folder resolution (strict Graph GETs; no `drive_item_lookup`).
+- `services/scan_inbox_search.py`: dash-insensitive contract search (company-scoped) plus global IDIQ search by contract number; each hit includes `target_type` (`contract` | `idiq`).
+- `services/scan_inbox_destination.py`: read-only SharePoint folder resolution for contracts (`resolve_destination`) and IDIQs (`resolve_idiq_destination`; strict Graph GETs; no `drive_item_lookup` or `resolve_*_folder_path`).
 - `services/scan_inbox_sharepoint.py`: **only** SharePoint writer for Scan Inbox (`conflictBehavior=fail`).
 - `services/scan_inbox_filing.py`: file/skip orchestration and append-only audit rows.
 - `models.py`: `ScanFilingLog` (`tools_scan_filing_log`), append-only filing audit.
@@ -35,7 +35,7 @@
 - `tests/test_scan_inbox_probe.py`, `tests/test_scan_inbox_stage1.py`: mocked Graph/SharePoint tests.
 
 ## 5. Data Model / Domain Objects
-- **`ScanFilingLog`** (`tools_scan_filing_log`): append-only audit of filed, skipped, and failed scan PDFs. Application code only calls `ScanFilingLog.objects.create()`. Read-only in Django admin.
+- **`ScanFilingLog`** (`tools_scan_filing_log`): append-only audit of filed, skipped, and failed scan PDFs. Optional FKs: `contract` (delivery orders / standalone contracts) or `idiq_contract` (IDIQ filings — `contract` null). `contract_number` stores the filed number in both cases. Application code only calls `ScanFilingLog.objects.create()`. Read-only in Django admin.
 - PDF merge/split/delete remains stateless (no models for that UI).
 
 ## 6. Request / User Flow
@@ -85,9 +85,9 @@
 - JSON endpoints (all login-required; File/Skip are `@require_POST` + CSRF):
   - `tools:scan_inbox_items` — `list_pending()`
   - `tools:scan_inbox_pdf` — inline PDF preview (`xframe_options_sameorigin`, `%PDF` magic check)
-  - `tools:scan_inbox_search` — `search_contracts(request.active_company, q)` (empty list if no active company)
-  - `tools:scan_inbox_destination` — company-scoped contract + `resolve_destination`
-  - `tools:scan_inbox_file` / `tools:scan_inbox_skip` — `file_pdf` / `skip_pdf`
+  - `tools:scan_inbox_search` — `search_contracts(request.active_company, q)` (empty list if no active company; merges contracts + IDIQs)
+  - `tools:scan_inbox_destination` — `target_type` (`contract` | `idiq`, default `contract`) + `target_id` (alias `contract_id`); contract is company-scoped, IDIQ by PK → `resolve_destination` / `resolve_idiq_destination`
+  - `tools:scan_inbox_file` / `tools:scan_inbox_skip` — `file_pdf(..., target=, target_type=)` / `skip_pdf`
 - Template: `templates/tools/scan_inbox.html` (extends `base_template.html`, blocks `body` + `extra_scripts`).
 - Front-end: `static/tools/js/scan_inbox.js` (vanilla JS, `textContent` only for server data). Styles under `/* === Scan Inbox === */` in `static/css/app-core.css`.
 - Nav: sidebar link next to PDF Merger in `templates/base_template.html`.
@@ -103,7 +103,7 @@
 - **`python manage.py scan_inbox_probe`** — Stage 0 diagnostic. Read-only by default; optional **`--test-write`** with **`--message-id`** exercises mail-folder create/move.
 - **`python manage.py scan_inbox <subcommand>`** — Stage 1 backend CLI: `list`, `search`, `destination`, `file`, `skip`, `sweep`, `log`. Prints **full** Graph message IDs on `list`. `file` without **`--dry-run`** requires **`SCAN_INBOX_SHAREPOINT_WRITES=true`**.
 - **Done rule:** a PDF is done when a `ScanFilingLog` row exists with the same `message_id` and `attachment_name` and `action` in (`FILED`, `SKIPPED`). `FAILED` does not mark done.
-- **Destination ladder** (`scan_inbox_destination.resolve_destination`, read-only): confirmed contract drive ID → modern `files_url` → latest completed folder-scan snapshot (single in-scope row) → create path (IDIQ parent via Graph, else `Contract.get_sharepoint_relative_path()`). Never calls `resolve_contract_folder_path` or `contracts.services.drive_item_lookup`. Network errors → `kind=error`.
+- **Destination ladder** (read-only): **`resolve_destination(contract)`** — drive ID → modern `files_url` → folder-scan snapshot on `contract_id` → create path (IDIQ parent via Graph for DOs, else `Contract.get_sharepoint_relative_path()`). **`resolve_idiq_destination(idiq)`** — drive ID → modern `files_url` (`company=None`) → snapshot on `idiq_contract_id` → `build_idiq_pattern_path(idiq)`. Neither calls `resolve_contract_folder_path`, `resolve_idiq_folder_path`, or `drive_item_lookup`. Network errors → `kind=error`.
 - **Never-overwrite:** SharePoint uploads use `@microsoft.graph.conflictBehavior=fail`; equal-size conflict treats existing file as already present; otherwise one retry with ` (2)` before `.pdf`.
 - **Upload filename:** `Completed - {contract_number} - {YYYYMMDDHHMMSS}.pdf` where the stamp is `timezone.localtime(received_at)` from the message’s `receivedDateTime` (or `timezone.now()` if missing). Same stamp is exposed on queue items as `name_stamp` for the page preview. Bad SharePoint characters are still sanitized; conflict retry is still ` (2)` before `.pdf` (existing SharePoint files are not renamed).
 - **Destination Graph lookups:** `scan_inbox_destination._sp_token()` caches `get_graph_access_token()` for 45 minutes; Graph GETs use a module-level `requests.Session()`. SharePoint writes use the same token helper via `_auth_headers()` and their own session.
@@ -115,7 +115,7 @@
 - PDF merge/split/delete views still have no automated tests.
 
 ## 16. Migrations / Schema Notes
-- **`tools/migrations/0001_initial.py`** creates **`ScanFilingLog`** only.
+- **`tools/migrations/0001_initial.py`** creates **`ScanFilingLog`**; later migrations add optional **`idiq_contract`** FK (additive).
 
 ## 17. Known Gaps / Ambiguities
 - No automated tests exist, so you cannot rely on regression coverage when modifying parsing or upload logic.

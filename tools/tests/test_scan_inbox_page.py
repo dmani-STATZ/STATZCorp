@@ -113,6 +113,19 @@ class ScanInboxPageTests(TestCase):
         resp = self.client.get(url, {"contract_id": self.other_contract.pk})
         self.assertEqual(resp.status_code, 404)
 
+    def test_scan_inbox_file_idiq_not_found(self):
+        url = reverse("tools:scan_inbox_file")
+        resp = self.client.post(
+            url,
+            {
+                "message_id": "m1",
+                "attachment_name": "a.pdf",
+                "target_type": "idiq",
+                "target_id": "999999",
+            },
+        )
+        self.assertEqual(resp.status_code, 404)
+
     def test_scan_inbox_file_requires_post(self):
         url = reverse("tools:scan_inbox_file")
         resp = self.client.get(url)

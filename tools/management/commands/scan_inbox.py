@@ -130,7 +130,8 @@ class Command(BaseCommand):
             user,
             options["message_id"],
             options["attachment"],
-            contract,
+            target=contract,
+            target_type="contract",
             dry_run=options["dry_run"],
         )
         if options["dry_run"]:

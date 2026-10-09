@@ -13,7 +13,7 @@ from django.test import TestCase, override_settings
 from requests.exceptions import Timeout
 
 from tools.models import ScanFilingLog
-from tools.services.scan_inbox_destination import resolve_destination
+from tools.services.scan_inbox_destination import resolve_destination, resolve_idiq_destination
 from tools.services.scan_inbox_errors import ScanInboxLookupError
 from tools.services.scan_inbox_filing import (
     ScanInboxAlreadyDone,
@@ -438,6 +438,116 @@ class DestinationTests(ScanInboxTestBase):
         resolve_destination(self.contract)
 
 
+@override_settings(**GRAPH_SETTINGS)
+class IdiqDestinationTests(ScanInboxTestBase):
+    def setUp(self):
+        from contracts.models import IdiqContract
+        from contracts.models_folder_scan import FolderScanRun, ScannedFolder
+
+        self.idiq = IdiqContract.objects.create(
+            contract_number="IDIQ-9",
+            company=self.company,
+        )
+        self.run = FolderScanRun.objects.create(
+            root_path=ROOT,
+            status=FolderScanRun.Status.COMPLETED,
+        )
+        self.ScannedFolder = ScannedFolder
+
+    @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
+    def test_existing_via_drive_id(self, mock_get, _tok):
+        self.idiq.sharepoint_drive_item_id = "idiq-drive"
+        self.idiq.save(update_fields=["sharepoint_drive_item_id"])
+        mock_get.return_value = _mock_response(
+            200, _folder_json("idiq-drive", "Contract IDIQ-9", ROOT)
+        )
+        dest = resolve_idiq_destination(self.idiq)
+        self.assertEqual(dest.kind, "existing")
+
+    @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
+    def test_stored_missing_drive_id_404(self, mock_get, _tok):
+        self.idiq.sharepoint_drive_item_id = "gone"
+        self.idiq.save(update_fields=["sharepoint_drive_item_id"])
+        mock_get.return_value = _mock_response(404)
+        dest = resolve_idiq_destination(self.idiq)
+        self.assertEqual(dest.kind, "stored_missing")
+        self.assertIn("IDIQ Documents browser", dest.message)
+
+    @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
+    def test_existing_via_files_url(self, mock_get, _tok):
+        path = f"{ROOT}/Contract IDIQ-9"
+        self.idiq.files_url = path + "/"
+        self.idiq.save(update_fields=["files_url"])
+        mock_get.return_value = _mock_response(
+            200, _folder_json("id-files", "Contract IDIQ-9", ROOT)
+        )
+        dest = resolve_idiq_destination(self.idiq)
+        self.assertEqual(dest.kind, "existing")
+
+    @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
+    def test_snapshot_single(self, mock_get, _tok):
+        self.ScannedFolder.objects.create(
+            run=self.run,
+            in_scope=True,
+            idiq_contract=self.idiq,
+            drive_item_id="snap-idiq",
+            path=f"{ROOT}/Contract IDIQ-9/",
+        )
+        mock_get.return_value = _mock_response(
+            200, _folder_json("snap-idiq", "Contract IDIQ-9", ROOT)
+        )
+        dest = resolve_idiq_destination(self.idiq)
+        self.assertEqual(dest.kind, "snapshot")
+
+    @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
+    def test_duplicates(self, _tok):
+        for i in range(2):
+            self.ScannedFolder.objects.create(
+                run=self.run,
+                in_scope=True,
+                idiq_contract=self.idiq,
+                drive_item_id=f"dup-{i}",
+                path=f"{ROOT}/Contract IDIQ-9/",
+            )
+        dest = resolve_idiq_destination(self.idiq)
+        self.assertEqual(dest.kind, "duplicates")
+
+    @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
+    def test_create_pattern_path(self, _tok):
+        dest = resolve_idiq_destination(self.idiq)
+        self.assertEqual(dest.kind, "create")
+        self.assertTrue(dest.create_path.endswith("Contract IDIQ-9"))
+        self.assertFalse(dest.create_path.endswith("/"))
+
+    @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
+    def test_snapshot_verify_timeout_is_error(self, _tok):
+        self.ScannedFolder.objects.create(
+            run=self.run,
+            in_scope=True,
+            idiq_contract=self.idiq,
+            drive_item_id="snap-idiq",
+            path=f"{ROOT}/Contract IDIQ-9/",
+        )
+        with patch(
+            "tools.services.scan_inbox_destination._GRAPH_SESSION.get",
+            side_effect=Timeout("t"),
+        ):
+            dest = resolve_idiq_destination(self.idiq)
+        self.assertEqual(dest.kind, "error")
+
+    @patch(
+        "contracts.services.sharepoint_paths.resolve_idiq_folder_path",
+        side_effect=AssertionError("must not call"),
+    )
+    @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
+    def test_never_calls_resolve_idiq_folder_path(self, _tok, _resolver):
+        resolve_idiq_destination(self.idiq)
+
+
 class FilenameTests(TestCase):
     def test_stamp_from_utc_received_at(self):
         from datetime import datetime, timezone as dt_tz
@@ -547,7 +657,9 @@ class FilingTests(ScanInboxTestBase):
             },
         )()
         mock_up.return_value = {"id": "up-1", "name": "SPE1-24-D-0001 - scan.pdf", "size": 9}
-        row = file_pdf(self.user, "msg-full-id-12345", "scan.pdf", self.contract)
+        row = file_pdf(
+            self.user, "msg-full-id-12345", "scan.pdf", target=self.contract
+        )
         self.assertEqual(row.action, ScanFilingLog.Action.FILED)
         self.assertEqual(row.folder_item_id, "folder-id")
         self.assertEqual(row.uploaded_item_id, "up-1")
@@ -575,7 +687,7 @@ class FilingTests(ScanInboxTestBase):
             },
         )()
         mock_up.return_value = {"id": "u", "name": "n.pdf", "size": 9}
-        row = file_pdf(self.user, "m1", "s.pdf", self.contract)
+        row = file_pdf(self.user, "m1", "s.pdf", target=self.contract)
         mock_ensure.assert_called_once()
         self.assertTrue(row.folder_created)
 
@@ -605,7 +717,7 @@ class FilingTests(ScanInboxTestBase):
 
         mock_up.side_effect = ScanInboxNameConflict()
         mock_child.return_value = {"id": "existing", "size": len(PDF_BYTES), "name": "n.pdf"}
-        row = file_pdf(self.user, "m1", "s.pdf", self.contract)
+        row = file_pdf(self.user, "m1", "s.pdf", target=self.contract)
         self.assertTrue(row.already_present)
         self.assertEqual(mock_up.call_count, 1)
 
@@ -637,7 +749,7 @@ class FilingTests(ScanInboxTestBase):
             ScanInboxNameConflict(),
             {"id": "u2", "name": "SPE1-24-D-0001 - s (2).pdf", "size": 9},
         ]
-        row = file_pdf(self.user, "m1", "s.pdf", self.contract)
+        row = file_pdf(self.user, "m1", "s.pdf", target=self.contract)
         self.assertEqual(mock_up.call_count, 2)
         self.assertIn("(2)", row.uploaded_name)
 
@@ -651,7 +763,7 @@ class FilingTests(ScanInboxTestBase):
             attachment_name="s.pdf",
         )
         with self.assertRaises(ScanInboxAlreadyDone):
-            file_pdf(self.user, "m1", "s.pdf", self.contract)
+            file_pdf(self.user, "m1", "s.pdf", target=self.contract)
         mock_list.assert_not_called()
 
     @patch("tools.services.scan_inbox_filing.graph.download_attachment")
@@ -661,7 +773,7 @@ class FilingTests(ScanInboxTestBase):
         mock_list.return_value = [{"id": "a1", "name": "s.pdf", "size": 10}]
         mock_dl.return_value = b"NOTPDF"
         with self.assertRaises(ScanInboxNotPdf):
-            file_pdf(self.user, "m1", "s.pdf", self.contract)
+            file_pdf(self.user, "m1", "s.pdf", target=self.contract)
         self.assertTrue(
             ScanFilingLog.objects.filter(action=ScanFilingLog.Action.FAILED).exists()
         )
@@ -676,7 +788,7 @@ class FilingTests(ScanInboxTestBase):
             {"id": "a1", "name": "s.pdf", "size": MAX_UPLOAD_BYTES + 1}
         ]
         with self.assertRaises(ScanInboxTooLarge):
-            file_pdf(self.user, "m1", "s.pdf", self.contract)
+            file_pdf(self.user, "m1", "s.pdf", target=self.contract)
         mock_dl.assert_not_called()
 
     @patch("tools.services.scan_inbox_filing.upload_into_folder")
@@ -698,7 +810,7 @@ class FilingTests(ScanInboxTestBase):
             },
         )()
         with self.assertRaises(ScanInboxDestinationError):
-            file_pdf(self.user, "m1", "s.pdf", self.contract)
+            file_pdf(self.user, "m1", "s.pdf", target=self.contract)
         mock_up.assert_not_called()
 
     @patch("tools.services.scan_inbox_filing.upload_into_folder")
@@ -720,7 +832,7 @@ class FilingTests(ScanInboxTestBase):
             },
         )()
         result = file_pdf(
-            self.user, "m1", "s.pdf", self.contract, dry_run=True
+            self.user, "m1", "s.pdf", target=self.contract, dry_run=True
         )
         self.assertEqual(
             result["filename"],
@@ -733,6 +845,58 @@ class FilingTests(ScanInboxTestBase):
     def test_kill_switch_sharepoint(self):
         with self.assertRaises(ScanInboxWritesDisabled):
             upload_into_folder("f", "a.pdf", PDF_BYTES)
+
+    @patch("tools.services.scan_inbox_filing.sweep_message")
+    @patch("tools.services.scan_inbox_filing.upload_into_folder")
+    @patch("tools.services.scan_inbox_filing.resolve_idiq_destination")
+    @patch("tools.services.scan_inbox_filing.graph.download_attachment", return_value=PDF_BYTES)
+    @patch("tools.services.scan_inbox_filing.graph.list_attachments")
+    @patch("tools.services.scan_inbox_filing.graph.get_message")
+    def test_idiq_filed_row(
+        self, mock_msg, mock_list, _dl, mock_dest, mock_up, _sweep
+    ):
+        from contracts.models import IdiqContract
+
+        idiq = IdiqContract.objects.create(
+            contract_number="IDIQ-77",
+            company=self.company,
+            sharepoint_drive_item_id="idiq-folder",
+        )
+        mock_msg.return_value = {
+            "internetMessageId": "<i>",
+            "receivedDateTime": "2026-01-01T10:00:00Z",
+        }
+        mock_list.return_value = [
+            {"id": "a1", "name": "scan.pdf", "size": len(PDF_BYTES)}
+        ]
+        mock_dest.return_value = type(
+            "D",
+            (),
+            {
+                "kind": "existing",
+                "folder_item_id": "idiq-folder",
+                "path": f"{ROOT}/Contract IDIQ-77",
+                "create_path": "",
+                "message": "",
+            },
+        )()
+        mock_up.return_value = {
+            "id": "up-idiq",
+            "name": "Completed - IDIQ-77 - 20260101040000.pdf",
+            "size": 9,
+        }
+        row = file_pdf(
+            self.user,
+            "msg-idiq",
+            "scan.pdf",
+            target=idiq,
+            target_type="idiq",
+        )
+        self.assertEqual(row.action, ScanFilingLog.Action.FILED)
+        self.assertIsNone(row.contract_id)
+        self.assertEqual(row.idiq_contract_id, idiq.pk)
+        self.assertEqual(row.contract_number, "IDIQ-77")
+        self.assertIn("IDIQ-77", row.uploaded_name)
 
 
 @override_settings(**GRAPH_SETTINGS)
@@ -769,6 +933,18 @@ class SkipSweepSearchCliTests(ScanInboxTestBase):
 
     def test_search_short_query(self):
         self.assertEqual(search_contracts(self.company, "ab"), [])
+
+    def test_search_includes_idiq_dash_insensitive(self):
+        from contracts.models import IdiqContract
+
+        idiq = IdiqContract.objects.create(
+            contract_number="W912-IDIQ-1",
+            company=self.company,
+        )
+        hits = search_contracts(self.company, "w912idiq1")
+        idiq_hits = [h for h in hits if h.get("target_type") == "idiq"]
+        self.assertTrue(any(h["id"] == idiq.id for h in idiq_hits))
+        self.assertTrue(all(h.get("status__description") == "IDIQ" for h in idiq_hits))
 
     @patch("tools.services.scan_inbox_queue.graph.move_message")
     @patch("tools.services.scan_inbox_queue.graph.ensure_mail_folder", return_value=("fid", False))

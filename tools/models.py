@@ -29,6 +29,13 @@ class ScanFilingLog(models.Model):
         blank=True,
         related_name="scan_filing_logs",
     )
+    idiq_contract = models.ForeignKey(
+        "contracts.IdiqContract",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="scan_filing_logs",
+    )
     contract_number = models.CharField(max_length=100, blank=True, default="")
     destination_kind = models.CharField(max_length=20, blank=True, default="")
     folder_item_id = models.CharField(max_length=255, blank=True, default="")

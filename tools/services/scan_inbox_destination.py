@@ -38,7 +38,9 @@ def _auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {_sp_token()}"}
 
 _STORED_MISSING = "Stored folder not found in SharePoint. Fix it in Folder Review."
-_IDIQ_MISSING = "IDIQ folder not found in SharePoint. Fix it in Folder Review."
+_IDIQ_MISSING = (
+    "IDIQ folder not found in SharePoint. Open the IDIQ Documents browser and Save Path."
+)
 _DUPLICATES = "Multiple folders exist for this contract. Resolve in Folder Review."
 
 
@@ -155,6 +157,106 @@ def resolve_destination(contract) -> Destination:
         return _resolve_destination_inner(contract)
     except ScanInboxLookupError as exc:
         return _lookup_error_destination(exc)
+
+
+def resolve_idiq_destination(idiq) -> Destination:
+    """Resolve IDIQ filing destination (Scan Inbox ladder only; no path resolvers)."""
+    try:
+        return _resolve_idiq_destination_inner(idiq)
+    except ScanInboxLookupError as exc:
+        return _lookup_error_destination(exc)
+
+
+def _prefix_check_idiq(create_path: str) -> Destination | None:
+    from contracts.services.sharepoint_paths import get_sharepoint_prefix
+
+    prefix = get_sharepoint_prefix().strip("/")
+    expected_start = f"{prefix}/"
+    if not create_path.startswith(expected_start):
+        return Destination(
+            kind="invalid",
+            create_path=create_path,
+            message=f"Path {create_path!r} does not start with prefix {prefix!r}",
+        )
+    return None
+
+
+def _resolve_idiq_destination_inner(idiq) -> Destination:
+    drive_id = (getattr(idiq, "sharepoint_drive_item_id", None) or "").strip()
+    if drive_id:
+        item = _get_drive_item_by_id(drive_id)
+        if item:
+            return Destination(
+                kind="existing",
+                folder_item_id=item.get("id") or drive_id,
+                path=_item_path(item),
+            )
+        return Destination(kind="stored_missing", message=_IDIQ_MISSING)
+
+    from contracts.services.sharepoint_paths import (
+        build_idiq_pattern_path,
+        is_modern_sharepoint_path,
+    )
+
+    files_url = (getattr(idiq, "files_url", None) or "").strip()
+    if files_url and is_modern_sharepoint_path(files_url, company=None):
+        item = _get_drive_item_by_path(files_url)
+        if item:
+            return Destination(
+                kind="existing",
+                folder_item_id=item.get("id") or "",
+                path=_item_path(item),
+            )
+        return Destination(kind="stored_missing", message=_IDIQ_MISSING)
+
+    from contracts.models import Company
+    from contracts.models_folder_scan import FolderScanRun, ScannedFolder
+    from contracts.services.folder_scan.roots import resolve_company_root
+
+    company = getattr(idiq, "company", None) or Company.get_default_company()
+    root = resolve_company_root(company)
+    run = None
+    if root:
+        run = (
+            FolderScanRun.objects.filter(
+                root_path=root.strip("/"),
+                status=FolderScanRun.Status.COMPLETED,
+            )
+            .order_by("-finished_at", "-started_at")
+            .first()
+        )
+
+    if run is not None:
+        rows = list(
+            ScannedFolder.objects.filter(
+                run=run, in_scope=True, idiq_contract_id=idiq.pk
+            ).values("drive_item_id", "path")
+        )
+        if len(rows) >= 2:
+            return Destination(kind="duplicates", message=_DUPLICATES)
+        if len(rows) == 1:
+            row = rows[0]
+            snap_id = (row.get("drive_item_id") or "").strip()
+            item = _get_drive_item_by_id(snap_id)
+            if item:
+                return Destination(
+                    kind="snapshot",
+                    folder_item_id=item.get("id") or snap_id,
+                    path=_item_path(item),
+                )
+
+    create_path = build_idiq_pattern_path(idiq).strip("/")
+    if not create_path:
+        return Destination(
+            kind="invalid",
+            message="IDIQ has no SharePoint path pattern (missing contract number?)",
+        )
+
+    invalid = _prefix_check_idiq(create_path)
+    if invalid:
+        return invalid
+
+    return Destination(kind="create", create_path=create_path)
 
 
 def _resolve_destination_inner(contract) -> Destination:
