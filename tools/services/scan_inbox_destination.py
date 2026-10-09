@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from urllib.parse import quote, unquote
 
@@ -13,6 +14,28 @@ from tools.services.scan_inbox_errors import ScanInboxLookupError
 _LOOKUP_TIMEOUT = 10
 _GRAPH_BASE = "https://graph.microsoft.us/v1.0"
 _SELECT = "id,name,folder,parentReference"
+_TOKEN_TTL_SEC = 45 * 60
+
+_GRAPH_SESSION = requests.Session()
+_token_cache: tuple[str, float] | None = None
+
+
+def _sp_token() -> str:
+    global _token_cache
+    now = time.monotonic()
+    if _token_cache is not None:
+        token, fetched_at = _token_cache
+        if now - fetched_at < _TOKEN_TTL_SEC:
+            return token
+    from contracts.services.sharepoint_service import get_graph_access_token
+
+    token = get_graph_access_token()
+    _token_cache = (token, now)
+    return token
+
+
+def _auth_headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {_sp_token()}"}
 
 _STORED_MISSING = "Stored folder not found in SharePoint. Fix it in Folder Review."
 _IDIQ_MISSING = "IDIQ folder not found in SharePoint. Fix it in Folder Review."
@@ -35,12 +58,6 @@ def _drive_segment() -> str:
     return quote(drive_id, safe="!_")
 
 
-def _auth_headers() -> dict[str, str]:
-    from contracts.services.sharepoint_service import get_graph_access_token
-
-    return {"Authorization": f"Bearer {get_graph_access_token()}"}
-
-
 def _get_drive_item_by_id(item_id: str) -> dict | None:
     item_id = (item_id or "").strip()
     if not item_id:
@@ -51,7 +68,9 @@ def _get_drive_item_by_id(item_id: str) -> dict | None:
         f"?$select={_SELECT}"
     )
     try:
-        response = requests.get(url, headers=_auth_headers(), timeout=_LOOKUP_TIMEOUT)
+        response = _GRAPH_SESSION.get(
+            url, headers=_auth_headers(), timeout=_LOOKUP_TIMEOUT
+        )
     except requests.RequestException as exc:
         raise ScanInboxLookupError(0, str(exc)[:200]) from exc
 
@@ -77,7 +96,9 @@ def _get_drive_item_by_path(path: str) -> dict | None:
         f"?$select={_SELECT}"
     )
     try:
-        response = requests.get(url, headers=_auth_headers(), timeout=_LOOKUP_TIMEOUT)
+        response = _GRAPH_SESSION.get(
+            url, headers=_auth_headers(), timeout=_LOOKUP_TIMEOUT
+        )
     except requests.RequestException as exc:
         raise ScanInboxLookupError(0, str(exc)[:200]) from exc
 

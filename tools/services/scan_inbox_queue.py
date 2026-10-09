@@ -83,6 +83,11 @@ def list_pending(max_pages: int = 20) -> dict:
                 )
             continue
 
+        received_at = _parse_received(msg.get("receivedDateTime"))
+        from tools.services.scan_inbox_filing import name_stamp_for_received
+
+        name_stamp = name_stamp_for_received(received_at)
+
         for idx, att in enumerate(pdf_atts, start=1):
             name = att.get("name") or ""
             if (message_id, name) in done:
@@ -91,7 +96,8 @@ def list_pending(max_pages: int = 20) -> dict:
                 {
                     "message_id": message_id,
                     "internet_message_id": msg.get("internetMessageId") or "",
-                    "received_at": _parse_received(msg.get("receivedDateTime")),
+                    "received_at": received_at,
+                    "name_stamp": name_stamp,
                     "subject": msg.get("subject") or "",
                     "attachment_id": att.get("id") or "",
                     "attachment_name": name,

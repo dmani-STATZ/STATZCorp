@@ -37,9 +37,17 @@
     let selectedKey = null;
     let selectedContract = null;
     let destination = null;
+    let destinationLoading = false;
     let searchResults = [];
     let busy = false;
     let searchTimer = null;
+
+    const BLOCKING_DESTINATION_KINDS = new Set([
+        "stored_missing",
+        "duplicates",
+        "invalid",
+        "error",
+    ]);
 
     els.refresh.addEventListener("click", () => loadItems());
     els.search.addEventListener("input", onSearchInput);
@@ -295,6 +303,7 @@
         clearPanelError();
         selectedContract = row;
         destination = null;
+        destinationLoading = true;
         renderSearchResults();
         renderDestination();
         updateFilenamePreview();
@@ -312,6 +321,10 @@
             updateActionButtons();
         } catch (err) {
             showPanelError(err.message || "Could not resolve destination.");
+        } finally {
+            destinationLoading = false;
+            renderDestination();
+            updateActionButtons();
         }
     }
 
@@ -323,7 +336,9 @@
         if (!destination) {
             const loading = document.createElement("div");
             loading.className = "text-muted";
-            loading.textContent = "Loading destination…";
+            loading.textContent = destinationLoading
+                ? "Checking folder…"
+                : "Select a contract to see the folder.";
             els.destination.appendChild(loading);
             return;
         }
@@ -345,9 +360,11 @@
     function canFile() {
         if (!writesEnabled || busy) return false;
         const item = getSelectedItem();
-        if (!item || !selectedContract || !destination) return false;
-        const kind = destination.kind || "";
-        return kind === "existing" || kind === "snapshot" || kind === "create";
+        if (!item || !selectedContract) return false;
+        if (destination && BLOCKING_DESTINATION_KINDS.has(destination.kind || "")) {
+            return false;
+        }
+        return true;
     }
 
     function updateFilenamePreview() {
@@ -357,7 +374,8 @@
             return;
         }
         const cn = selectedContract.contract_number || "";
-        els.filename.textContent = `Target filename: ${cn} - ${item.attachment_name}`;
+        const stamp = item.name_stamp || "";
+        els.filename.textContent = `Target filename: Completed - ${cn} - ${stamp}.pdf`;
     }
 
     function updateActionButtons() {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -142,7 +143,15 @@ def scan_inbox_destination_view(request):
 
         raise Http404()
 
+    t0 = time.perf_counter()
     dest = resolve_destination(contract)
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    logger.info(
+        "scan_inbox destination contract_id=%s kind=%s ms=%.1f",
+        contract.pk,
+        dest.kind,
+        elapsed_ms,
+    )
     return JsonResponse(_destination_payload(dest))
 
 

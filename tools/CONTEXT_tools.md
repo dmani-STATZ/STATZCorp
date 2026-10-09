@@ -105,6 +105,8 @@
 - **Done rule:** a PDF is done when a `ScanFilingLog` row exists with the same `message_id` and `attachment_name` and `action` in (`FILED`, `SKIPPED`). `FAILED` does not mark done.
 - **Destination ladder** (`scan_inbox_destination.resolve_destination`, read-only): confirmed contract drive ID → modern `files_url` → latest completed folder-scan snapshot (single in-scope row) → create path (IDIQ parent via Graph, else `Contract.get_sharepoint_relative_path()`). Never calls `resolve_contract_folder_path` or `contracts.services.drive_item_lookup`. Network errors → `kind=error`.
 - **Never-overwrite:** SharePoint uploads use `@microsoft.graph.conflictBehavior=fail`; equal-size conflict treats existing file as already present; otherwise one retry with ` (2)` before `.pdf`.
+- **Upload filename:** `Completed - {contract_number} - {YYYYMMDDHHMMSS}.pdf` where the stamp is `timezone.localtime(received_at)` from the message’s `receivedDateTime` (or `timezone.now()` if missing). Same stamp is exposed on queue items as `name_stamp` for the page preview. Bad SharePoint characters are still sanitized; conflict retry is still ` (2)` before `.pdf` (existing SharePoint files are not renamed).
+- **Destination Graph lookups:** `scan_inbox_destination._sp_token()` caches `get_graph_access_token()` for 45 minutes; Graph GETs use a module-level `requests.Session()`. SharePoint writes use the same token helper via `_auth_headers()` and their own session.
 - Settings: **`SCAN_INBOX_MAILBOX`**, **`SCAN_INBOX_ALLOWED_SENDERS`**, **`SCAN_INBOX_ALLOWED_SENDERS_LIST`**, **`SCAN_INBOX_SHAREPOINT_WRITES`**. Graph token via **`GRAPH_MAIL_*`**; drive via **`SHAREPOINT_DRIVE_ID`**.
 
 ## 15. Testing Coverage

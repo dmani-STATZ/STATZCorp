@@ -270,7 +270,7 @@ class DestinationTests(ScanInboxTestBase):
         self.ScannedFolder = ScannedFolder
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_existing_via_drive_id(self, mock_get, _tok):
         self.contract.sharepoint_drive_item_id = "drive-abc"
         self.contract.save(update_fields=["sharepoint_drive_item_id"])
@@ -282,7 +282,7 @@ class DestinationTests(ScanInboxTestBase):
         self.assertEqual(dest.folder_item_id, "drive-abc")
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_stored_missing_drive_id_404(self, mock_get, _tok):
         self.contract.sharepoint_drive_item_id = "gone"
         self.contract.save(update_fields=["sharepoint_drive_item_id"])
@@ -291,7 +291,7 @@ class DestinationTests(ScanInboxTestBase):
         self.assertEqual(dest.kind, "stored_missing")
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_existing_via_files_url(self, mock_get, _tok):
         path = f"{ROOT}/Contract SPE1-24-D-0001"
         self.contract.files_url = path + "/"
@@ -303,7 +303,7 @@ class DestinationTests(ScanInboxTestBase):
         self.assertEqual(dest.kind, "existing")
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_stored_missing_files_url_404(self, mock_get, _tok):
         self.contract.files_url = f"{ROOT}/Contract SPE1-24-D-0001/"
         self.contract.save(update_fields=["files_url"])
@@ -312,7 +312,7 @@ class DestinationTests(ScanInboxTestBase):
         self.assertEqual(dest.kind, "stored_missing")
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_snapshot_single(self, mock_get, _tok):
         self.ScannedFolder.objects.create(
             run=self.run,
@@ -328,7 +328,7 @@ class DestinationTests(ScanInboxTestBase):
         self.assertEqual(dest.kind, "snapshot")
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_snapshot_404_falls_through_create(self, mock_get, _tok):
         self.ScannedFolder.objects.create(
             run=self.run,
@@ -352,7 +352,7 @@ class DestinationTests(ScanInboxTestBase):
             path=f"{ROOT}/Contract SPE1-24-D-0001/",
         )
         with patch(
-            "tools.services.scan_inbox_destination.requests.get",
+            "tools.services.scan_inbox_destination._GRAPH_SESSION.get",
             side_effect=Timeout("t"),
         ):
             dest = resolve_destination(self.contract)
@@ -379,7 +379,7 @@ class DestinationTests(ScanInboxTestBase):
         self.assertFalse(dest.create_path.endswith("/"))
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_create_under_resolvable_idiq(self, mock_get, _tok):
         self.idiq.sharepoint_drive_item_id = "idiq-drive"
         self.idiq.save(update_fields=["sharepoint_drive_item_id"])
@@ -391,7 +391,7 @@ class DestinationTests(ScanInboxTestBase):
         self.assertIn("Delivery Order DO-1", dest.create_path)
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_idiq_drive_404_stored_missing(self, mock_get, _tok):
         self.idiq.sharepoint_drive_item_id = "idiq-missing"
         self.idiq.save(update_fields=["sharepoint_drive_item_id"])
@@ -401,7 +401,7 @@ class DestinationTests(ScanInboxTestBase):
         self.assertIn("IDIQ", dest.message)
 
     @patch("contracts.services.sharepoint_service.get_graph_access_token", return_value="tok")
-    @patch("tools.services.scan_inbox_destination.requests.get")
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
     def test_idiq_lookup_500_error(self, mock_get, _tok):
         self.idiq.sharepoint_drive_item_id = "idiq-drive"
         self.idiq.save(update_fields=["sharepoint_drive_item_id"])
@@ -423,7 +423,7 @@ class DestinationTests(ScanInboxTestBase):
         self.contract.sharepoint_drive_item_id = "x"
         self.contract.save(update_fields=["sharepoint_drive_item_id"])
         with patch(
-            "tools.services.scan_inbox_destination.requests.get",
+            "tools.services.scan_inbox_destination._GRAPH_SESSION.get",
             side_effect=Timeout("t"),
         ):
             dest = resolve_destination(self.contract)
@@ -439,14 +439,74 @@ class DestinationTests(ScanInboxTestBase):
 
 
 class FilenameTests(TestCase):
-    def test_sanitize_and_pdf_suffix(self):
-        name = build_upload_filename("C-1", "a:b*c.PDF")
+    def test_stamp_from_utc_received_at(self):
+        from datetime import datetime, timezone as dt_tz
+
+        from django.test.utils import override_settings
+
+        received = datetime(2026, 10, 8, 18, 36, 30, tzinfo=dt_tz.utc)
+        with override_settings(TIME_ZONE="America/Chicago"):
+            name = build_upload_filename("SPE7L3-24-P-8222", received)
+        self.assertEqual(
+            name, "Completed - SPE7L3-24-P-8222 - 20261008133630.pdf"
+        )
+
+    def test_missing_received_at_uses_now(self):
+        from datetime import datetime, timezone as dt_tz
+        from unittest.mock import patch
+
+        from django.test.utils import override_settings
+        from django.utils import timezone
+
+        fixed = datetime(2026, 6, 1, 17, 5, 4, tzinfo=dt_tz.utc)
+        with override_settings(TIME_ZONE="America/Chicago"):
+            with patch.object(timezone, "now", return_value=fixed):
+                name = build_upload_filename("CN-1", None)
+        self.assertEqual(name, "Completed - CN-1 - 20260601120504.pdf")
+
+    def test_sanitize_bad_chars_in_contract_number(self):
+        from datetime import datetime, timezone as dt_tz
+
+        received = datetime(2026, 1, 1, 12, 0, 0, tzinfo=dt_tz.utc)
+        name = build_upload_filename('C:1*test', received)
         self.assertTrue(name.lower().endswith(".pdf"))
         self.assertNotIn(":", name)
         self.assertNotIn("*", name)
 
     def test_conflict_variant(self):
-        self.assertEqual(conflict_upload_filename("x.pdf"), "x (2).pdf")
+        base = "Completed - CN-1 - 20260101120000.pdf"
+        self.assertEqual(conflict_upload_filename(base), f"{base[:-4]} (2).pdf")
+
+
+@override_settings(**GRAPH_SETTINGS)
+class SpTokenCacheTests(ScanInboxTestBase):
+    def setUp(self):
+        from contracts.models import Contract
+
+        import tools.services.scan_inbox_destination as dest_mod
+
+        dest_mod._token_cache = None
+        self.contract = Contract.objects.create(
+            contract_number="SPE1-24-D-0001",
+            company=self.company,
+            status=self.open_status,
+            sharepoint_drive_item_id="folder-id",
+            contract_value=Decimal("1"),
+        )
+
+    @patch("tools.services.scan_inbox_destination._GRAPH_SESSION.get")
+    @patch(
+        "contracts.services.sharepoint_service.get_graph_access_token",
+        return_value="cached-tok",
+    )
+    def test_sp_token_fetched_once_for_two_resolve_calls(self, mock_token, mock_get):
+        mock_get.return_value = _mock_response(
+            200,
+            _folder_json("folder-id", "Contract SPE1-24-D-0001", ROOT),
+        )
+        resolve_destination(self.contract)
+        resolve_destination(self.contract)
+        mock_token.assert_called_once()
 
 
 @override_settings(**GRAPH_SETTINGS)
@@ -662,7 +722,10 @@ class FilingTests(ScanInboxTestBase):
         result = file_pdf(
             self.user, "m1", "s.pdf", self.contract, dry_run=True
         )
-        self.assertEqual(result["filename"], build_upload_filename("SPE1-24-D-0001", "s.pdf"))
+        self.assertEqual(
+            result["filename"],
+            build_upload_filename("SPE1-24-D-0001", None),
+        )
         self.assertEqual(ScanFilingLog.objects.count(), 0)
         mock_up.assert_not_called()
 
@@ -691,7 +754,7 @@ class SkipSweepSearchCliTests(ScanInboxTestBase):
 
     @patch("tools.services.scan_inbox_filing.sweep_message")
     def test_skip_writes_skipped_no_sharepoint(self, _sweep):
-        with patch("tools.services.scan_inbox_sharepoint.requests.put") as mock_put:
+        with patch("tools.services.scan_inbox_sharepoint._GRAPH_SESSION.put") as mock_put:
             skip_pdf(self.user, "m1", "a.pdf", "not relevant")
             mock_put.assert_not_called()
         self.assertEqual(

@@ -24,6 +24,7 @@ FILED_FOLDER = "Scans - Filed"
 SKIPPED_FOLDER = "Scans - Skipped"
 _UPLOAD_TIMEOUT = 60
 _GRAPH_BASE = "https://graph.microsoft.us/v1.0"
+_GRAPH_SESSION = requests.Session()
 
 
 def _require_writes() -> None:
@@ -84,7 +85,7 @@ def ensure_folder_path(path: str) -> tuple[str, bool]:
             "@microsoft.graph.conflictBehavior": "fail",
         }
         try:
-            response = requests.post(
+            response = _GRAPH_SESSION.post(
                 _children_url(parent_id),
                 headers={**_auth_headers(), "Content-Type": "application/json"},
                 json=payload,
@@ -124,7 +125,7 @@ def upload_into_folder(folder_item_id: str, filename: str, data: bytes) -> dict:
         raise ScanInboxTooLarge()
     url = _content_url_by_folder_id(folder_item_id, filename)
     try:
-        response = requests.put(
+        response = _GRAPH_SESSION.put(
             url,
             headers={**_auth_headers(), "Content-Type": "application/pdf"},
             data=data,
@@ -151,7 +152,7 @@ def get_child_by_name(folder_item_id: str, filename: str) -> dict | None:
     _require_writes()
     url = _item_url_by_folder_id(folder_item_id, filename)
     try:
-        response = requests.get(
+        response = _GRAPH_SESSION.get(
             url,
             headers=_auth_headers(),
             timeout=_UPLOAD_TIMEOUT,

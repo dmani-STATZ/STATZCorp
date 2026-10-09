@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime
 
 from django.conf import settings
+from django.utils import timezone
 
 from tools.models import ScanFilingLog
 from tools.services import scan_inbox_graph as graph
@@ -45,14 +47,27 @@ def _is_done(message_id: str, attachment_name: str) -> bool:
     ).exists()
 
 
-def build_upload_filename(contract_number: str, attachment_name: str) -> str:
-    base = f"{contract_number} - {attachment_name}"
+def name_stamp_for_received(received_at: datetime | None) -> str:
+    if received_at is None:
+        dt = timezone.localtime(timezone.now())
+    else:
+        dt = timezone.localtime(received_at)
+    return dt.strftime("%Y%m%d%H%M%S")
+
+
+def _sanitize_filename_part(part: str) -> str:
+    cleaned = part or ""
     for ch in _BAD_FILENAME_CHARS:
-        base = base.replace(ch, "-")
-    base = re.sub(r"\s+", " ", base).strip()
-    if not base.lower().endswith(".pdf"):
-        base = f"{base}.pdf"
-    return base
+        cleaned = cleaned.replace(ch, "-")
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def build_upload_filename(
+    contract_number: str, received_at: datetime | None
+) -> str:
+    stamp = name_stamp_for_received(received_at)
+    cn = _sanitize_filename_part(contract_number)
+    return f"Completed - {cn} - {stamp}.pdf"
 
 
 def conflict_upload_filename(filename: str) -> str:
@@ -174,7 +189,7 @@ def file_pdf(
             raise ScanInboxDestinationError(dest.message or dest.kind)
 
         upload_name = build_upload_filename(
-            contract.contract_number or "", attachment_name
+            contract.contract_number or "", meta.get("received_at")
         )
 
         if dry_run:
