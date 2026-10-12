@@ -26,6 +26,7 @@ Tasks run in `run_order` when multiple are due on the same heartbeat. A failure 
 | 4 | `dispatch_campaigns` | 10 min | `mailer/tasks/dispatch_campaigns.py` | Dispatches outbound mailer campaigns. |
 | 5 | `process_ai_snippets` | 5 min | `mailer/tasks/generate_ai.py` | Generates AI snippets for pending mailer content. |
 | 6 | `dispatch_followups` | 10 min | `mailer/tasks/dispatch_followups.py` | Dispatches mailer follow-up messages. |
+| 11 | `file_dfas_receipts` | 15 min | `contracts/tasks/dfas_receipts.py` | Files DFAS payment notices from finance@ into the contract SharePoint folder. Guarded by `DFAS_RECEIPTS_ENABLED`. |
 
 ## Adding a New Task
 
@@ -40,6 +41,7 @@ Tasks run in `run_order` when multiple are due on the same heartbeat. A failure 
 | `GRAPH_MAIL_ENABLED` | Set to `"true"` to enable Graph email dispatch (award alerts, mailer). |
 | `GRAPH_MAIL_SENDER_RFQ` | The `quotes@` shared mailbox read by `quote.services.graph_inbox` (e.g. `quotes@statzcorp.com`). |
 | `WE_WON_POLL_ENABLED` | Set to `"true"` to enable the daytime we-won CAGE poll. Omit or set to any other value to disable without a deploy. |
+| `DFAS_RECEIPTS_ENABLED` | Set to `"true"` to enable DFAS payment-notice filing. Omit or set to any other value and `file_dfas_receipts` logs one line and returns. |
 | `SHAREPOINT_CALENDAR_PUSH_ENABLED` | Master switch for writing portal calendar events back to SharePoint. Defaults to `"true"`. Set to `"false"` to make the calendar pull-only. |
 | `SHAREPOINT_CALENDAR_BACKFILL_ENABLED` | Set to `"true"` to let the sync retry events that have no SharePoint item yet. Defaults to `"false"` — enabling it writes existing portal events onto the shared company calendar. |
 | `SHAREPOINT_CALENDAR_BACKFILL_SINCE_DAYS` | How far back the backlog sweep reaches, in days, measured against event `start_at`. Defaults to `30`. |

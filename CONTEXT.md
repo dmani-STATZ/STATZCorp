@@ -78,3 +78,13 @@ the queue (Known Gap #7 stands). Excel adds an `Open Solicitations` sheet built 
 `LoginRequiredMiddleware` / `users.AppPermission` for the `quote` app registry row.
 
 **Stage 4 status:** Live DIBBS lookup deferred; page uses local tables and SAM cache only.
+
+---
+
+## DFAS Payment Receipt Filing (`contracts` app)
+
+DFAS payment notices in the finance@ mailbox are filed as PDFs in the matching contract's SharePoint folder. The background task is `file_dfas_receipts` (15 minutes, `run_order` 11). It does nothing unless `DFAS_RECEIPTS_ENABLED=true`.
+
+In-scope mail is from `disa.ogden.eis.mbx.wawfnoreply@mail.mil` with subject `Notification of new DFAS payment action` (no FW:/RE:). The live job reads Inbox only. Filed messages are marked read and moved to `Inbox/WAWF/DFAS Receipts`. Unmatched messages are marked unread and moved to `Inbox/WAWF/Unmatched`.
+
+`DfasPaymentNotice` records the parse and the SharePoint item. Contract data is read-only, and the lookup is not company-scoped. `python manage.py dfas_receipts_backfill` is a dry run; add `--apply` to write. Drag an unmatched email back to the Inbox, or pass `--folder "Inbox/WAWF/Unmatched" --apply`, after the contract or folder is fixed.

@@ -15,6 +15,7 @@ from dibbs.tasks.check_dibbs_notices import run as check_dibbs_notices_task
 from intake.tasks.reconcile_award_ledger import reconcile_award_ledger_task
 from quote.tasks.archive_stale_solicitations import archive_stale_solicitations_task
 from quote.tasks.reconcile_bid_outcomes import reconcile_bid_outcomes_task
+from contracts.tasks.dfas_receipts import file_dfas_receipts
 
 logger = logging.getLogger("core.background_tasks")
 
@@ -28,6 +29,7 @@ TASK_FUNCTIONS = {
     "reconcile_award_ledger": reconcile_award_ledger_task,
     "archive_stale_solicitations": archive_stale_solicitations_task,
     "reconcile_bid_outcomes": reconcile_bid_outcomes_task,
+    "file_dfas_receipts": file_dfas_receipts,
 }
 
 

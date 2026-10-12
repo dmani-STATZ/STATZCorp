@@ -38,6 +38,13 @@
 - `get_sam_entity` has three states (`ok` / `not_found` / `error`); a failed lookup must never
   render as "no record found".
 
+## DFAS payment receipts (when touching `contracts/services/dfas_receipts/`)
+- One pipeline: `process_message`. The live task and the backfill command both call it.
+- The mailbox write is always last. Save the SharePoint item id before any PATCH or move.
+- Never upload to a documents-root fallback folder. Never use `send_pdf_bytes_to_folder`.
+- `normalize_piid` slices on length only. Do not strip a `P` with a regex.
+- No company scoping on the contract lookup. Never write `Contract`, `IdiqContract`, `PaymentHistory`, or `files_url`.
+
 ## CSS (when touching `static/css/app-core.css` or any date field)
 - Date inputs use the native browser calendar indicator only. Never add a
   background-image calendar icon or an `input-group-text` calendar icon next to a

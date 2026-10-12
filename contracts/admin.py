@@ -16,6 +16,7 @@ from .models import (
     ContractType,
     DfasImportBatch,
     DfasImportRow,
+    DfasPaymentNotice,
     FinanceLinePayment,
     FinanceLineType,
     POLineItem,
@@ -177,6 +178,38 @@ class DfasImportRowAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(DfasPaymentNotice)
+class DfasPaymentNoticeAdmin(admin.ModelAdmin):
+    list_display = (
+        'received_at',
+        'invoice_number',
+        'contract_number_raw',
+        'call_number_raw',
+        'status',
+        'unmatched_reason',
+        'attempts',
+        'sharepoint_file_name',
+    )
+    list_filter = ('status', 'unmatched_reason')
+    search_fields = (
+        'invoice_number',
+        'contract_number_raw',
+        'contract_number_base',
+        'call_number_raw',
+    )
+    readonly_fields = tuple(f.name for f in DfasPaymentNotice._meta.fields)
+    ordering = ('-received_at',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return bool(request.user and request.user.is_superuser)
 
 
 # =============================================================================

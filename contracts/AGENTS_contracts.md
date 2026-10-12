@@ -390,7 +390,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 ## 7. Security / Permissions Rules
 
 - **Never remove `ActiveCompanyQuerysetMixin`** from a view that returns company-scoped data. Without it, users will see records from other companies.
-- **`request.active_company` is set by middleware** (`users` app). Do not query `Company`-scoped models without it.
+- **`request.active_company` is set by middleware** (`users` app). Do not query `Company`-scoped models without it. **Exception:** `file_dfas_receipts` / `find_contract` search every company. That job has no request. Do not copy that exception into a view.
 - Superuser-only views use `@user_passes_test(lambda u: u.is_superuser)`. Do not downgrade to `is_staff` — these views expose company config, logo upload, and bulk SharePoint updates.
 - Note **delete** still requires `request.user == note.created_by or request.user.is_staff` in views (`delete_note`). **Edit** in `note_update` and **`note_detail_json`** `can_edit` / `can_manage_reminder`: `note.created_by == request.user OR note.assigned_to == request.user` only — **no `is_staff` exception** (staff is most users; `Note.assigned_to` is the delegation mechanism). **UI:** In **`partials/notes_popup_tab_panel.html`** and **`partials/notes_list.html`**, the **Edit** button is shown when `request.user == note.created_by or request.user == note.assigned_to`. The meta row reads **Assigned to** *username* **on** *date*: `assigned_to.username` if set, else `created_by.username`. Reminder create/update/delete on a note in `note_update` / `add_note` follows the same edit permission; `reminder_user` is chosen from POST (any active user, default `request.user`). The meta-row **reminder pill** (when `current_user_has_reminder`) and the full note body open **`#noteFullViewModal`**; Mark Complete / Incomplete POSTs to `contracts:toggle_reminder`.
 - Reminder completion toggle requires ownership check. Same pattern.
@@ -454,6 +454,14 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 - **`initialize_sequence_numbers`** management command seeds PO/TAB counters from existing contracts. Must be run after bulk data imports to avoid duplicate sequence numbers.
 - **`ExportTiming`** records export duration during request-time. It degrades gracefully; it does not affect correctness if it fails.
 - **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 16.
+- **DFAS payment receipts** (`contracts/services/dfas_receipts/`):
+  - One pipeline. The live task and `dfas_receipts_backfill` both call `process_message`. Do not duplicate that state machine.
+  - The mailbox write (PATCH `isRead`, then move) is always last. Save `sharepoint_item_id` in its own `save(update_fields=...)` before that write.
+  - Never upload to a documents-root fallback folder. `folder_missing` covers a missing folder and any path that is only the company/global root. Never create contract folders.
+  - Never use `send_pdf_bytes_to_folder` here. The PDF upload uses `conflict_behavior="fail"`.
+  - `normalize_piid` uppercases, drops every character that is not `A-Z` or `0-9`, then slices on length (`base = s[:13]`, `mod = s[13:]` when longer than 13). Do not strip a `P` or any other character with a regex.
+  - No company scoping. `find_contract` searches all companies. Approved exception to the multi-tenant queryset rule because this is a system job with no request.
+  - Never write to `Contract`, `IdiqContract`, `PaymentHistory`, or `files_url`. This feature is read-only against contract data.
 
 ---
 

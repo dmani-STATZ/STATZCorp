@@ -34,7 +34,7 @@ Multi-app Django monolith. All apps share one process, one database, one auth la
 ### `contracts` — Core Contract Workspace
 **Purpose:** Full contract lifecycle — headers, CLINs, notes, reminders, payments, shipments, folder tracking, SharePoint links, and exports.
 
-**Owns:** `Contract`, `Clin`, `Company`, `PaymentHistory`, `Note`, `Reminder`, `ClinShipment`, `ContractSplit`, `FolderTracking`, `FolderStack`, `GovAction`, `AcknowledgementLetter`, `IdiqContract`, `IdiqContractDetails`, `Buyer`, `ContractType`, `ClinType`, `SpecialPaymentTerms`, `SalesClass`
+**Owns:** `Contract`, `Clin`, `Company`, `PaymentHistory`, `Note`, `Reminder`, `ClinShipment`, `ContractSplit`, `FolderTracking`, `FolderStack`, `GovAction`, `AcknowledgementLetter`, `IdiqContract`, `IdiqContractDetails`, `Buyer`, `ContractType`, `ClinType`, `SpecialPaymentTerms`, `SalesClass`, `DfasPaymentNotice`
 
 **Consumes from other apps:**
 - `products.Nsn` — FK on `Clin`
@@ -247,6 +247,7 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 - **Stale award staging cleanup:** `python manage.py purge_stale_award_staging --older-than-hours=24 --dry-run`. Never blanket-truncate staging tables.
 - Background tasks (via `core/management/commands/run_background_tasks.py` + `core.ScheduledTask`; WebJob heartbeat every minute, 6 AM–5 PM CT):
   - `poll_we_won_today` (15 min): `dibbs/services/poll_we_won_today.py` (wrapped in `dibbs/tasks/poll_we_won_today.py`). Enabled by `WE_WON_POLL_ENABLED=true`. `make_www_session()` (requests only). Inserts `AwardImportBatch` with source `hot_poll`, never touched by nightly reconciliation; nightly `scrape_awards` is the backstop.
+  - `file_dfas_receipts` (15 min, run_order 11): `contracts/tasks/dfas_receipts.py`. Guarded by `DFAS_RECEIPTS_ENABLED=true` (read from `os.environ` inside the task; unset means a no-op). Files DFAS payment-notice mail from finance@ into the contract SharePoint folder. See `contracts/CONTEXT_contracts.md`.
   - **Mod leak gate (hot poll):** `parse_awdrecs_html` must populate `Last_Mod_Posting_Date` so MOD rows route to `dibbs_award_mod`, never `WeWonAward` / Intake drafts.
   - **`DibbsAwardMod` contract link:** `matched_contract` (exact normalized contract-number match), `acknowledged_at`, `acknowledged_by`. Matching runs after each award import when `awardee_cage` is an active `CompanyCAGE` **or** in `dibbs/constants.py::PARTNER_CAGES` (ETP / `64W95`).
   - `check_dibbs_notices` (daily): scrapes the DIBBS homepage with `make_www_session()`; `get_or_create` on `(title, posted_date)`, never overwrites.

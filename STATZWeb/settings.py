@@ -392,6 +392,26 @@ SCAN_INBOX_SHAREPOINT_WRITES = (
     os.environ.get("SCAN_INBOX_SHAREPOINT_WRITES", "False").strip().lower() == "true"
 )
 
+# DFAS payment-notice filing (finance@ mailbox → contract folder PDF).
+# DFAS_RECEIPTS_ENABLED is read with os.environ inside the task, not here.
+DFAS_RECEIPTS_MAILBOX = os.environ.get(
+    "DFAS_RECEIPTS_MAILBOX", "finance@statzcorp.com"
+)
+DFAS_RECEIPTS_SENDER = os.environ.get(
+    "DFAS_RECEIPTS_SENDER", "disa.ogden.eis.mbx.wawfnoreply@mail.mil"
+)
+DFAS_RECEIPTS_SUBJECT = os.environ.get(
+    "DFAS_RECEIPTS_SUBJECT", "Notification of new DFAS payment action"
+)
+DFAS_RECEIPTS_FILED_FOLDER = os.environ.get(
+    "DFAS_RECEIPTS_FILED_FOLDER", "Inbox/WAWF/DFAS Receipts"
+)
+DFAS_RECEIPTS_UNMATCHED_FOLDER = os.environ.get(
+    "DFAS_RECEIPTS_UNMATCHED_FOLDER", "Inbox/WAWF/Unmatched"
+)
+DFAS_RECEIPTS_MAX_PER_RUN = int(os.environ.get("DFAS_RECEIPTS_MAX_PER_RUN", "25"))
+DFAS_RECEIPTS_MAX_ATTEMPTS = int(os.environ.get("DFAS_RECEIPTS_MAX_ATTEMPTS", "3"))
+
 # ---------------------------------------------------------------------------
 # SharePoint / Graph API — Service Principal (STATZ Web App Mail registration)
 # Used for app-only (client credentials) access to SharePoint calendar

@@ -2298,6 +2298,76 @@ class PartnerReconciliationRow(models.Model):
         return f"{self.partner_contract_number} — {self.get_status_display()}"
 
 
+class DfasPaymentNotice(models.Model):
+    """One DFAS payment-notice email and where it was filed. Read-only against Contract."""
+
+    STATUS_NEW = 'new'
+    STATUS_FILED = 'filed'
+    STATUS_UNMATCHED = 'unmatched'
+    STATUS_ERROR = 'error'
+    STATUS_CHOICES = [
+        (STATUS_NEW, 'New'),
+        (STATUS_FILED, 'Filed'),
+        (STATUS_UNMATCHED, 'Unmatched'),
+        (STATUS_ERROR, 'Error'),
+    ]
+    UNMATCHED_REASON_CHOICES = [
+        ('', ''),
+        ('parse_failed', 'Parse failed'),
+        ('multiple_payments', 'Multiple payments'),
+        ('contract_not_found', 'Contract not found'),
+        ('ambiguous_contract', 'Ambiguous contract'),
+        ('folder_missing', 'Folder missing'),
+        ('upload_failed', 'Upload failed'),
+    ]
+
+    message_hash = models.CharField(max_length=64, unique=True)
+    internet_message_id = models.CharField(max_length=998, blank=True, default='')
+    graph_message_id = models.CharField(max_length=512, blank=True, default='')
+    received_at = models.DateTimeField(null=True, blank=True)
+    cage_code = models.CharField(max_length=10, blank=True, default='')
+    contract_number_raw = models.CharField(max_length=64, blank=True, default='')
+    contract_number_base = models.CharField(max_length=13, blank=True, default='')
+    contract_mod = models.CharField(max_length=32, blank=True, default='')
+    call_number_raw = models.CharField(max_length=64, blank=True, default='')
+    call_number_base = models.CharField(max_length=13, blank=True, default='')
+    invoice_number = models.CharField(max_length=64, blank=True, default='')
+    invoice_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    payment_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    payment_date = models.DateField(null=True, blank=True)
+    contract = models.ForeignKey(
+        'contracts.Contract',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='dfas_payment_notices',
+        db_index=False,
+    )
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_NEW)
+    unmatched_reason = models.CharField(
+        max_length=32,
+        blank=True,
+        default='',
+        choices=UNMATCHED_REASON_CHOICES,
+    )
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True, default='')
+    sharepoint_folder_path = models.CharField(max_length=1024, blank=True, default='')
+    sharepoint_file_name = models.CharField(max_length=255, blank=True, default='')
+    sharepoint_item_id = models.CharField(max_length=255, blank=True, default='')
+    source_folder = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'contracts_dfas_payment_notice'
+        ordering = ['-received_at']
+
+    def __str__(self):
+        label = self.invoice_number or self.message_hash[:12]
+        return f"DFAS {label} ({self.status})"
+
+
 from contracts.models_folder_scan import (  # noqa: E402, F401
     FolderRepairLog,
     FolderReviewIgnore,

@@ -321,16 +321,30 @@ def upload_bytes_to_folder(
     filename: str,
     file_bytes: bytes,
     content_type: str = "application/octet-stream",
+    *,
+    conflict_behavior: str | None = None,
 ) -> Dict[str, Any]:
     """
     Upload raw bytes to a SharePoint folder. Returns the file payload dict
     including the 'id' field needed for subsequent operations.
     Used for in-memory files (e.g. substituted .docx templates).
+
+    conflict_behavior=None keeps the historical PUT (Graph replace-on-conflict).
+    Pass conflict_behavior="fail" to refuse to overwrite an existing file
+    (@microsoft.graph.conflictBehavior=fail).
     """
     path = normalize_folder_path(f"{folder_path}/{_safe_filename(filename)}")
     token = get_graph_access_token()
+    url = _content_url(path)
+    if conflict_behavior == "fail":
+        url = f"{url}?@microsoft.graph.conflictBehavior=fail"
+    elif conflict_behavior:
+        url = (
+            f"{url}?@microsoft.graph.conflictBehavior="
+            f"{quote(str(conflict_behavior), safe='')}"
+        )
     response = requests.put(
-        _content_url(path),
+        url,
         headers={**_auth_headers(token), "Content-Type": content_type},
         data=file_bytes,
         timeout=120,

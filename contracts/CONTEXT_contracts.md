@@ -379,6 +379,37 @@ use the shipment-completion definition instead.
 - Management commands: `initialize_sequence_numbers` (re-syncs PO/TAB numbers), and `refresh_nsn_view` (now deprecated, only reports stats for the legacy view).
 - No Celery tasks; background-like behavior includes `FolderTracking` exports and `ExportTiming` (which records timing so the UI can estimate export duration).
 - Reminders are generated/read during requests via `context_processors.reminders_processor` (no periodic jobs).
+- `file_dfas_receipts` (15 min, `run_order` 11) files DFAS payment notices. See **DFAS Payment Receipt Filing** below. It is a no-op unless `DFAS_RECEIPTS_ENABLED=true`.
+
+## DFAS Payment Receipt Filing
+
+DFAS sends a "Notification of new DFAS payment action" email for every payment. An Exchange redirect drops those into the shared mailbox `finance@statzcorp.com` (the To header stays the original recipient; the job never filters on it). The same sender also sends WAWF submission mail, which is ignored.
+
+**Flow.** The background task `file_dfas_receipts` (`contracts/tasks/dfas_receipts.py`) reads **Inbox** only. For each in-scope message it parses the plain-text body, matches a `Contract` (or an IDIQ delivery order), converts the original MIME to PDF through Graph, and uploads that PDF into the contract's SharePoint folder. Filed mail is marked read and moved to `Inbox/WAWF/DFAS Receipts`. Mail the system cannot match is marked **unread** and moved to `Inbox/WAWF/Unmatched` for Finance to work by hand. The mailbox move is always the last step.
+
+**Model.** `DfasPaymentNotice` (`contracts_dfas_payment_notice`) stores the parse, the match, the SharePoint item id, and the status (`new` / `filed` / `unmatched` / `error`). The dedupe key is `message_hash` (sha256 of the internet message id). Admin is read-only; superusers may delete.
+
+**Matching.** Contract numbers are compared dash-free and space-free, uppercased, on both sides. An empty Call Number matches `Contract.contract_number`. A Call Number matches the delivery order's `contract_number` **and** its `IdiqContract.contract_number`. There is no fallback to the call number alone, and there is no company filter (this job has no request). The job never writes `Contract`, `IdiqContract`, `PaymentHistory`, or `files_url`.
+
+**Folder.** `resolve_contract_folder_path` must point at a folder that exists. A missing folder, or a path that is only the company/global documents root, is `folder_missing`. The job never creates contract folders and never uploads to a root.
+
+**Settings** (all env-overridable) in `STATZWeb/settings.py`: `DFAS_RECEIPTS_MAILBOX`, `DFAS_RECEIPTS_SENDER`, `DFAS_RECEIPTS_SUBJECT`, `DFAS_RECEIPTS_FILED_FOLDER`, `DFAS_RECEIPTS_UNMATCHED_FOLDER`, `DFAS_RECEIPTS_MAX_PER_RUN` (25), `DFAS_RECEIPTS_MAX_ATTEMPTS` (3). `DFAS_RECEIPTS_ENABLED` is **not** a settings constant. The task reads `os.environ` and returns after one INFO line when it is not `true`.
+
+**Mail folders.** Paths are walked from the well-known Inbox by display name. The filed folder is never created; if it is missing the run aborts and touches nothing. `Unmatched` is created when its parent (`Inbox/WAWF`) exists. If that parent is missing, the run aborts the same way. Confirm the real display names before relying on the defaults (the filed folder may be spelled differently; set `DFAS_RECEIPTS_FILED_FOLDER`).
+
+**Reason codes.** `parse_failed`, `multiple_payments`, `contract_not_found`, `ambiguous_contract`, `folder_missing`, `upload_failed`. A Graph/conversion/upload/move failure leaves the message in the Inbox, increments `attempts`, and sets status `error`. At `DFAS_RECEIPTS_MAX_ATTEMPTS` it becomes `upload_failed` and moves to Unmatched.
+
+**Command.**
+
+```bash
+python manage.py dfas_receipts_backfill
+python manage.py dfas_receipts_backfill --apply --limit 5
+python manage.py dfas_receipts_backfill --folder "Inbox/WAWF/Unmatched" --apply
+```
+
+Without `--apply` it is a dry run: parse, match, check the folder, print one tab-separated line per message, and write nothing. It ignores `DFAS_RECEIPTS_ENABLED` and has no default limit.
+
+**Retry an unmatched email.** Fix the contract data (or the folder), then either drag the email back to the Inbox or run `--folder "Inbox/WAWF/Unmatched" --apply`. A row already marked `unmatched` is reprocessed from scratch, with `attempts` reset. A row already `filed` is not uploaded again; it is only marked read and moved back to DFAS Receipts.
 
 ## 15. Testing Coverage
 - Focused tests live under `contracts/tests/`; new features should continue adding smoke/integration coverage.
