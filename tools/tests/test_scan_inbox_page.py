@@ -173,3 +173,90 @@ class ScanInboxPageTests(TestCase):
             },
         )
         self.assertFalse(resp.json()["ok"])
+
+    @override_settings(TIME_ZONE="America/Chicago")
+    @patch("tools.views_scan_inbox.graph.get_message")
+    @patch("tools.views_scan_inbox.graph.inspect_pdf", return_value={"magic_ok": True})
+    @patch("tools.views_scan_inbox.graph.download_attachment", return_value=PDF_BYTES)
+    def test_download_uses_filing_name(self, _dl, _inspect, mock_msg):
+        mock_msg.return_value = {"receivedDateTime": "2026-10-08T18:36:30Z"}
+        resp = self.client.get(
+            reverse("tools:scan_inbox_download"),
+            {
+                "message_id": "m1",
+                "attachment_id": "a1",
+                "target_id": str(self.contract.pk),
+                "target_type": "contract",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertEqual(
+            resp["Content-Disposition"],
+            'attachment; filename="Completed - CN-100 - 20261008133630.pdf"',
+        )
+        self.assertEqual(resp.content, PDF_BYTES)
+
+    @patch("tools.views_scan_inbox.graph.download_attachment")
+    def test_download_404_other_company(self, mock_dl):
+        resp = self.client.get(
+            reverse("tools:scan_inbox_download"),
+            {
+                "message_id": "m1",
+                "attachment_id": "a1",
+                "target_id": str(self.other_contract.pk),
+            },
+        )
+        self.assertEqual(resp.status_code, 404)
+        mock_dl.assert_not_called()
+
+    @patch("tools.views_scan_inbox.graph.get_message", return_value={})
+    @patch("tools.views_scan_inbox.graph.inspect_pdf", return_value={"magic_ok": False})
+    @patch("tools.views_scan_inbox.graph.download_attachment", return_value=NOT_PDF)
+    def test_download_415_for_non_pdf(self, *_mocks):
+        resp = self.client.get(
+            reverse("tools:scan_inbox_download"),
+            {
+                "message_id": "m1",
+                "attachment_id": "a1",
+                "target_id": str(self.contract.pk),
+            },
+        )
+        self.assertEqual(resp.status_code, 415)
+
+    @patch("tools.views_scan_inbox.resolve_destination")
+    def test_destination_includes_web_url(self, mock_dest):
+        mock_dest.return_value = Destination(
+            kind="existing",
+            folder_item_id="f1",
+            path="Root/Contract CN-100",
+            web_url="https://statz.sharepoint.us/folder",
+        )
+        resp = self.client.get(
+            reverse("tools:scan_inbox_destination"),
+            {"contract_id": self.contract.pk},
+        )
+        self.assertEqual(resp.json()["web_url"], "https://statz.sharepoint.us/folder")
+
+
+class FoundDestinationTests(TestCase):
+    def _item(self, web_url):
+        return {
+            "id": "f1",
+            "name": "Contract X",
+            "parentReference": {"path": "/drives/d/root:/Root"},
+            "webUrl": web_url,
+        }
+
+    def test_keeps_https_web_url(self):
+        from tools.services.scan_inbox_destination import _found
+
+        dest = _found("existing", self._item("https://x.sharepoint.us/f"))
+        self.assertEqual(dest.web_url, "https://x.sharepoint.us/f")
+        self.assertEqual(dest.path, "Root/Contract X")
+
+    def test_drops_non_https_web_url(self):
+        from tools.services.scan_inbox_destination import _found
+
+        dest = _found("existing", self._item("javascript:alert(1)"))
+        self.assertEqual(dest.web_url, "")

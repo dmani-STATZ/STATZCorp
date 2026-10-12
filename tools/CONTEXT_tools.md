@@ -85,6 +85,8 @@
 - JSON endpoints (all login-required; File/Skip are `@require_POST` + CSRF):
   - `tools:scan_inbox_items` — `list_pending()`
   - `tools:scan_inbox_pdf` — inline PDF preview (`xframe_options_sameorigin`, `%PDF` magic check)
+  - `tools:scan_inbox_download` — same bytes as an attachment named with `build_upload_filename` (target-scoped like File; no size cap, no `ScanFilingLog` row). For PDFs over the 4 MB upload cap: Download → **Open folder** → drag in → Skip with "Filed manually".
+  - The destination JSON includes `web_url` (Graph `webUrl`, `https://` only) for `existing` / `snapshot`; the page shows it as **Open folder**. `create` has no folder yet, so no link.
   - `tools:scan_inbox_search` — `search_contracts(request.active_company, q)` (empty list if no active company; merges contracts + IDIQs)
   - `tools:scan_inbox_destination` — `target_type` (`contract` | `idiq`, default `contract`) + `target_id` (alias `contract_id`); contract is company-scoped, IDIQ by PK → `resolve_destination` / `resolve_idiq_destination`
   - `tools:scan_inbox_file` / `tools:scan_inbox_skip` — `file_pdf(..., target=, target_type=)` / `skip_pdf`

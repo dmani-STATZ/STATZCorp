@@ -13,7 +13,7 @@ from tools.services.scan_inbox_errors import ScanInboxLookupError
 
 _LOOKUP_TIMEOUT = 10
 _GRAPH_BASE = "https://graph.microsoft.us/v1.0"
-_SELECT = "id,name,folder,parentReference"
+_SELECT = "id,name,folder,parentReference,webUrl"
 _TOKEN_TTL_SEC = 45 * 60
 
 _GRAPH_SESSION = requests.Session()
@@ -51,6 +51,7 @@ class Destination:
     path: str = ""
     create_path: str = ""
     message: str = ""
+    web_url: str = ""
 
 
 def _drive_segment() -> str:
@@ -130,6 +131,16 @@ def _item_path(item: dict) -> str:
     return (name or rel).strip("/")
 
 
+def _found(kind: str, item: dict, fallback_id: str = "") -> Destination:
+    web_url = (item.get("webUrl") or "").strip()
+    return Destination(
+        kind=kind,
+        folder_item_id=item.get("id") or fallback_id,
+        path=_item_path(item),
+        web_url=web_url if web_url.startswith("https://") else "",
+    )
+
+
 def _lookup_error_destination(exc: ScanInboxLookupError) -> Destination:
     return Destination(
         kind="error",
@@ -186,11 +197,7 @@ def _resolve_idiq_destination_inner(idiq) -> Destination:
     if drive_id:
         item = _get_drive_item_by_id(drive_id)
         if item:
-            return Destination(
-                kind="existing",
-                folder_item_id=item.get("id") or drive_id,
-                path=_item_path(item),
-            )
+            return _found("existing", item, drive_id)
         return Destination(kind="stored_missing", message=_IDIQ_MISSING)
 
     from contracts.services.sharepoint_paths import (
@@ -202,11 +209,7 @@ def _resolve_idiq_destination_inner(idiq) -> Destination:
     if files_url and is_modern_sharepoint_path(files_url, company=None):
         item = _get_drive_item_by_path(files_url)
         if item:
-            return Destination(
-                kind="existing",
-                folder_item_id=item.get("id") or "",
-                path=_item_path(item),
-            )
+            return _found("existing", item)
         return Destination(kind="stored_missing", message=_IDIQ_MISSING)
 
     from contracts.models import Company
@@ -239,11 +242,7 @@ def _resolve_idiq_destination_inner(idiq) -> Destination:
             snap_id = (row.get("drive_item_id") or "").strip()
             item = _get_drive_item_by_id(snap_id)
             if item:
-                return Destination(
-                    kind="snapshot",
-                    folder_item_id=item.get("id") or snap_id,
-                    path=_item_path(item),
-                )
+                return _found("snapshot", item, snap_id)
 
     create_path = build_idiq_pattern_path(idiq).strip("/")
     if not create_path:
@@ -264,11 +263,7 @@ def _resolve_destination_inner(contract) -> Destination:
     if drive_id:
         item = _get_drive_item_by_id(drive_id)
         if item:
-            return Destination(
-                kind="existing",
-                folder_item_id=item.get("id") or drive_id,
-                path=_item_path(item),
-            )
+            return _found("existing", item, drive_id)
         return Destination(kind="stored_missing", message=_STORED_MISSING)
 
     from contracts.services.sharepoint_paths import is_modern_sharepoint_path
@@ -279,11 +274,7 @@ def _resolve_destination_inner(contract) -> Destination:
     ):
         item = _get_drive_item_by_path(files_url)
         if item:
-            return Destination(
-                kind="existing",
-                folder_item_id=item.get("id") or "",
-                path=_item_path(item),
-            )
+            return _found("existing", item)
         return Destination(kind="stored_missing", message=_STORED_MISSING)
 
     from contracts.models_folder_scan import FolderScanRun, ScannedFolder
@@ -314,11 +305,7 @@ def _resolve_destination_inner(contract) -> Destination:
             snap_id = (row.get("drive_item_id") or "").strip()
             item = _get_drive_item_by_id(snap_id)
             if item:
-                return Destination(
-                    kind="snapshot",
-                    folder_item_id=item.get("id") or snap_id,
-                    path=_item_path(item),
-                )
+                return _found("snapshot", item, snap_id)
 
     create_path = ""
     idiq_id = getattr(contract, "idiq_contract_id", None)

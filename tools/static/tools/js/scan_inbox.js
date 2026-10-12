@@ -7,6 +7,7 @@
     const urls = {
         items: root.dataset.itemsUrl,
         pdf: root.dataset.pdfUrl,
+        download: root.dataset.downloadUrl,
         search: root.dataset.searchUrl,
         destination: root.dataset.destinationUrl,
         file: root.dataset.fileUrl,
@@ -27,6 +28,8 @@
         filename: document.getElementById("scan-inbox-filename"),
         panelError: document.getElementById("scan-inbox-panel-error"),
         fileBtn: document.getElementById("scan-inbox-file-btn"),
+        downloadBtn: document.getElementById("scan-inbox-download-btn"),
+        folderLink: document.getElementById("scan-inbox-folder-link"),
         skipBtn: document.getElementById("scan-inbox-skip-btn"),
         skipReason: document.getElementById("scan-inbox-skip-reason"),
         skipOther: document.getElementById("scan-inbox-skip-other"),
@@ -53,6 +56,7 @@
     els.search.addEventListener("input", onSearchInput);
     els.search.addEventListener("keydown", onSearchKeydown);
     els.fileBtn.addEventListener("click", () => fileSelected());
+    els.downloadBtn.addEventListener("click", () => downloadSelected());
     els.skipBtn.addEventListener("click", () => skipSelectedPdf());
     els.skipReason.addEventListener("change", toggleSkipOther);
     document.addEventListener("keydown", onGlobalKeydown);
@@ -343,8 +347,20 @@
         }
     }
 
+    function renderFolderLink() {
+        const url = (destination && destination.web_url) || "";
+        if (selectedContract && url.startsWith("https://")) {
+            els.folderLink.href = url;
+            els.folderLink.classList.remove("d-none");
+        } else {
+            els.folderLink.removeAttribute("href");
+            els.folderLink.classList.add("d-none");
+        }
+    }
+
     function renderDestination() {
         els.destination.replaceChildren();
+        renderFolderLink();
         if (!selectedContract) {
             return;
         }
@@ -364,7 +380,7 @@
             line.textContent = `Files into: ${destination.path || ""}`;
         } else if (kind === "create") {
             line.className = "text-primary";
-            line.textContent = `Will create: ${destination.create_path || ""}`;
+            line.textContent = `Will create: ${destination.create_path || ""} (no folder to open yet)`;
         } else {
             line.className = "text-danger";
             line.textContent = destination.message || kind || "Cannot file to this contract.";
@@ -397,6 +413,7 @@
         const hasItem = !!getSelectedItem();
         els.skipBtn.disabled = busy || !hasItem;
         els.fileBtn.disabled = !canFile();
+        els.downloadBtn.disabled = busy || !hasItem || !selectedContract;
         renderProblems();
     }
 
@@ -438,6 +455,44 @@
             removeCurrentItem(item);
         } catch (err) {
             showPanelError(err.message || "File failed.");
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function downloadSelected() {
+        const item = getSelectedItem();
+        if (!item || !selectedContract || busy) return;
+        clearPanelError();
+        setBusy(true);
+        try {
+            const params = new URLSearchParams({
+                message_id: item.message_id,
+                attachment_id: item.attachment_id,
+                target_id: String(selectedContract.id),
+                target_type: selectedContract.target_type || "contract",
+            });
+            const resp = await fetch(`${urls.download}?${params.toString()}`, {
+                credentials: "same-origin",
+            });
+            if (!resp.ok) {
+                throw new Error(`Download failed (${resp.status}).`);
+            }
+            const disposition = resp.headers.get("Content-Disposition") || "";
+            const match = disposition.match(/filename="([^"]+)"/);
+            const filename = match
+                ? match[1]
+                : `Completed - ${selectedContract.contract_number || ""} - ${item.name_stamp || ""}.pdf`;
+            const blobUrl = URL.createObjectURL(await resp.blob());
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = filename;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+            els.skipReason.value = "Filed manually";
+            toggleSkipOther();
+        } catch (err) {
+            showPanelError(err.message || "Download failed.");
         } finally {
             setBusy(false);
         }

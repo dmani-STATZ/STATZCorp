@@ -13,6 +13,11 @@ urlpatterns = [
     path("scan-inbox/items/", views_scan_inbox.scan_inbox_items, name="scan_inbox_items"),
     path("scan-inbox/pdf/", views_scan_inbox.scan_inbox_pdf, name="scan_inbox_pdf"),
     path(
+        "scan-inbox/download/",
+        views_scan_inbox.scan_inbox_download,
+        name="scan_inbox_download",
+    ),
+    path(
         "scan-inbox/search/",
         views_scan_inbox.scan_inbox_search_view,
         name="scan_inbox_search",

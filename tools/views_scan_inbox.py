@@ -7,8 +7,10 @@ import time
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.utils.dateparse import parse_datetime
+from django.utils.http import content_disposition_header
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_POST
 
@@ -26,7 +28,7 @@ from tools.services.scan_inbox_errors import (
     ScanInboxTooLarge,
     ScanInboxWritesDisabled,
 )
-from tools.services.scan_inbox_filing import file_pdf, skip_pdf
+from tools.services.scan_inbox_filing import build_upload_filename, file_pdf, skip_pdf
 from tools.services.scan_inbox_queue import list_pending
 from tools.services.scan_inbox_search import search_contracts
 
@@ -57,6 +59,7 @@ def _destination_payload(dest) -> dict:
         "create_path": dest.create_path,
         "message": dest.message,
         "folder_item_id": dest.folder_item_id,
+        "web_url": dest.web_url,
     }
 
 
@@ -115,33 +118,83 @@ def scan_inbox_items(request):
     return JsonResponse(list_pending())
 
 
-@login_required
-@require_GET
-@xframe_options_sameorigin
-def scan_inbox_pdf(request):
+def _fetch_attachment_pdf(request) -> tuple[bytes | None, HttpResponse | None]:
+    """Return (pdf_bytes, None) or (None, error_response)."""
     message_id = (request.GET.get("message_id") or "").strip()
     attachment_id = (request.GET.get("attachment_id") or "").strip()
     if not message_id or not attachment_id:
-        return JsonResponse(
+        return None, JsonResponse(
             {"ok": False, "error": "message_id and attachment_id are required."},
             status=400,
         )
 
     mailbox = (settings.SCAN_INBOX_MAILBOX or "").strip()
     data = graph.download_attachment(mailbox, message_id, attachment_id)
-    inspected = graph.inspect_pdf(data)
-    if not inspected.get("magic_ok"):
-        return HttpResponse(
+    if not graph.inspect_pdf(data).get("magic_ok"):
+        return None, HttpResponse(
             "Not a PDF.",
             status=415,
             content_type="text/plain; charset=utf-8",
         )
+    return data, None
+
+
+def _received_at(message_id: str):
+    mailbox = (settings.SCAN_INBOX_MAILBOX or "").strip()
+    try:
+        raw = graph.get_message(mailbox, message_id).get("receivedDateTime")
+    except graph.ScanInboxGraphError:
+        return None
+    return parse_datetime(raw) if raw else None
+
+
+@login_required
+@require_GET
+@xframe_options_sameorigin
+def scan_inbox_pdf(request):
+    data, error = _fetch_attachment_pdf(request)
+    if error:
+        return error
 
     resp = HttpResponse(data, content_type="application/pdf")
-    safe_name = "scan.pdf"
-    resp["Content-Disposition"] = f'inline; filename="{safe_name}"'
+    resp["Content-Disposition"] = 'inline; filename="scan.pdf"'
     resp["X-Content-Type-Options"] = "nosniff"
     resp["Content-Security-Policy"] = PREVIEW_CSP
+    return resp
+
+
+@login_required
+@require_GET
+def scan_inbox_download(request):
+    """Download the attachment under the filing name, for manual upload (e.g. over the size cap)."""
+    target_type, target_pk = _parse_target_params(request)
+    if target_pk is None:
+        return JsonResponse(
+            {"ok": False, "error": "target_id (or contract_id) is required."},
+            status=400,
+        )
+    target = _get_filing_target(request, target_type, target_pk)
+    if target is None:
+        raise Http404()
+
+    data, error = _fetch_attachment_pdf(request)
+    if error:
+        return error
+
+    message_id = request.GET["message_id"].strip()
+    filename = build_upload_filename(
+        target.contract_number or "", _received_at(message_id)
+    )
+    logger.info(
+        "scan_inbox download user=%s target_type=%s target_id=%s filename=%r",
+        request.user.pk,
+        target_type,
+        target.pk,
+        filename,
+    )
+    resp = HttpResponse(data, content_type="application/pdf")
+    resp["Content-Disposition"] = content_disposition_header(True, filename)
+    resp["X-Content-Type-Options"] = "nosniff"
     return resp
 
 
@@ -167,8 +220,6 @@ def scan_inbox_destination_view(request):
 
     target = _get_filing_target(request, target_type, target_pk)
     if target is None:
-        from django.http import Http404
-
         raise Http404()
 
     t0 = time.perf_counter()
