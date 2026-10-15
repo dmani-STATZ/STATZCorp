@@ -3,16 +3,23 @@
 
 {% block content %}
 <div id="workspace" data-sol="{{ solicitation.solicitation_number }}"
-     data-claimed-other="{{ claimed_by_other|yesno:'1,0' }}">
+     data-claimed-other="{{ claimed_by_other|yesno:'1,0' }}"
+     data-cage-names-url="{% url 'quote:cage_names' %}">
 
 <div class="mb-2" id="backToQueue">
-  <a href="{% url 'quote:solicitation_queue' %}?tab={{ state.status }}" class="small">&larr; Back to queue</a>
+  {% if state.status == 'RFQ_SENT' %}
+  <a href="{% url 'quote:solicitation_queue' %}?tab=RFQ_SENT" class="small">&larr; Back to queue</a>
+  {% elif state.status == 'UNMATCHED' or state.status == 'MATCHED' %}
+  <a href="{% url 'quote:solicitation_queue' %}?tab=OPEN&status={{ state.status }}" class="small">&larr; Back to queue</a>
+  {% else %}
+  <a href="{% url 'quote:solicitation_queue' %}?tab=OPEN" class="small">&larr; Back to queue</a>
+  {% endif %}
 </div>
 
 {# Work-the-list bar -- shown by JS when this SOL is in the rep's snapshotted list #}
 <div class="quote-run-bar d-none" id="runBar" role="navigation" aria-label="Work the list">
   <div class="quote-run-info">
-    <span class="label">Working list</span>
+    <span class="label">WORKING LIST</span>
     <span id="runLabel" class="fw-semibold"></span>
     <span class="text-body-secondary" id="runPosition"></span>
   </div>
@@ -112,7 +119,14 @@
             <tr>
               <td class="font-monospace"><a href="{% url 'dibbs:entity_cage_lookup' src.approved_cage %}" target="statz_entity">{{ src.approved_cage }}</a></td>
               <td class="font-monospace">{{ src.part_number|default:"—" }}</td>
-              <td>{{ src.supplier.name|default:src.company_name|default:"—" }}</td>
+              <td>
+                {% with d=src.cage_display %}
+                <span class="quote-cage-name" data-cage="{{ src.cage }}" data-cage-state="{{ d.state }}" data-cage-source="{{ d.source|default:'' }}"{% if d.name and d.title %} title="{{ d.name }} — {{ d.title }}"{% elif d.title %} title="{{ d.title }}"{% elif d.name %} title="{{ d.name }}"{% endif %}>
+                  {% if d.name %}{{ d.name }}{% elif d.state == 'not_found' %}<span class="quote-cage-name-muted">Not in SAM</span>{% else %}<span class="quote-cage-name-muted">—</span>{% endif %}
+                </span>
+                {% if d.is_ours %}<span class="badge quote-ours-badge ms-1">Ours</span>{% endif %}
+                {% endwith %}
+              </td>
               <td class="text-end">
                 {% if src.linked %}
                   <span class="badge text-bg-success">Linked</span>
@@ -147,7 +161,17 @@
           {% for ph in procurement_history %}
             <tr>
               <td>{{ ph.award_date|date:"M j, Y" }}</td>
-              <td class="font-monospace">{{ ph.cage_code }}</td>
+              <td class="font-monospace">
+                {% with d=ph.cage_display %}
+                <a href="{% url 'dibbs:entity_cage_lookup' ph.cage_code %}" target="statz_entity">{{ ph.cage_code }}</a>
+                <div class="quote-cage-name-line">
+                  <span class="quote-cage-name" data-cage="{{ ph.cage_key }}" data-cage-state="{{ d.state }}" data-cage-source="{{ d.source|default:'' }}"{% if d.name and d.title %} title="{{ d.name }} — {{ d.title }}"{% elif d.title %} title="{{ d.title }}"{% elif d.name %} title="{{ d.name }}"{% endif %}>
+                    {% if d.name %}{{ d.name }}{% elif d.state == 'not_found' %}<span class="quote-cage-name-muted">Not in SAM</span>{% else %}<span class="quote-cage-name-muted">—</span>{% endif %}
+                  </span>
+                  {% if d.is_ours %}<span class="badge quote-ours-badge ms-1">Ours</span>{% endif %}
+                </div>
+                {% endwith %}
+              </td>
               <td class="font-monospace">{{ ph.contract_number }}</td>
               <td class="text-end">{{ ph.quantity|floatformat:"-3" }}</td>
               <td class="text-end">${{ ph.unit_cost|floatformat:2 }}</td>
@@ -270,6 +294,7 @@
 {% block extra_js %}
 {{ block.super }}
 <script src="{% static 'quote/js/capabilities.js' %}?v={{ cache_version }}"></script>
+<script src="{% static 'quote/js/cage-names.js' %}?v={{ cache_version }}"></script>
 <script>
 (function () {
   // A supplier's NSN / FSC list opens in a drawer without leaving the solicitation.
@@ -349,7 +374,8 @@
   document.querySelectorAll('.run-hide').forEach(el => el.classList.add('d-none'));
   const bar = document.getElementById('runBar');
   bar.classList.remove('d-none');
-  document.getElementById('runLabel').textContent = run.label || '';
+  const STATUS_LABELS = { UNMATCHED: 'Unmatched', MATCHED: 'Matched', RFQ_SENT: 'RFQ Sent' };
+  document.getElementById('runLabel').textContent = run.label || STATUS_LABELS[run.status] || '';
   document.getElementById('runPosition').textContent =
     (idx + 1).toLocaleString() + ' of ' + run.sols.length.toLocaleString();
   document.getElementById('runProgress').style.width =
@@ -380,7 +406,10 @@
           (allSkipped.length ? ' ' + allSkipped.length + ' skipped (taken or already worked).' : ''));
         return;
       }
-      post(NEXT_URL, { candidates: batch, status: run.status, release: SOL }, true)
+      const payload = { candidates: batch, release: SOL };
+      if (Array.isArray(run.statuses) && run.statuses.length) payload.statuses = run.statuses;
+      if (run.status) payload.status = run.status;
+      post(NEXT_URL, payload, true)
         .then(r => r.ok ? r.json() : Promise.reject(r.status))
         .then(res => {
           allSkipped.push.apply(allSkipped, res.skipped);

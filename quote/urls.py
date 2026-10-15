@@ -29,6 +29,7 @@ urlpatterns = [
     path('solicitations/<str:sol_number>/status/', views.set_status, name='set_status'),
     path('solicitations/<str:sol_number>/claim/', views.claim, name='claim'),
     path('suppliers/search/', views.supplier_search, name='supplier_search'),
+    path('cages/names/', views.cage_names, name='cage_names'),
     # Supplier capabilities -- the NSN / FSC lists that drive matching
     path('capabilities/', views.capabilities, name='capabilities'),
     path('capabilities/import/', views.capability_import_page, name='capability_import'),

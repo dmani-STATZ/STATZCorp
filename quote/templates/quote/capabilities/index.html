@@ -42,7 +42,7 @@
     <span class="kpi-tile-value">{{ totals.fscs }}</span>
     <span class="kpi-tile-help">whole classes</span>
   </div></div>
-  <div class="col"><a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=UNMATCHED">
+  <div class="col"><a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=OPEN&status=UNMATCHED">
     <span class="icon-tile icon-tile-warning"><i class="bi bi-question-diamond" aria-hidden="true"></i></span>
     <span class="kpi-tile-label">Still unmatched</span>
     <span class="kpi-tile-value">{{ unmatched_open }}</span>

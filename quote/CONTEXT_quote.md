@@ -70,7 +70,10 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `views/bids.py` | Bid Board, compare drawer, builder, export. |
 | `services/outcomes.py` + `tasks/reconcile_bid_outcomes.py` | Phase 4: award matching, won/lost + derived deltas, KPI rows, trends. |
 | `views/our_bids.py` | Our Bids page, forensic drawer, reconcile-now. |
-| `services/walk.py` | `claim_next` — next-available navigation for work-the-list mode. |
+| `services/walk.py` | `claim_next` — next-available navigation for work-the-list mode. Accepts a set of statuses. |
+| `services/cage_names.py` | Read-only CAGE → name resolver: SAM cache, supplier directory, our CAGEs. Never calls SAM. |
+| `views/cages.py` | `cage_names` — cache-only JSON for the workspace refresh. |
+| `static/quote/js/cage-names.js` | Refreshes unnamed CAGE cells when the workspace tab regains focus. |
 | `services/rfq.py` | `queue_rfqs`, `resolve_recipients`, `compose_message`, `pending_groups`, `send_supplier_rfqs`. |
 | `services/archival.py` + `tasks/archive_stale_solicitations.py` | 7-day / past-due archival (daily `ScheduledTask`, seeded by `0005`). |
 | `views/solicitations.py`, `views/rfq.py` | Phase 1 screens (orchestration only). |
@@ -99,26 +102,36 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 **Phase 1 (built):**
 1. Every DIBBS import seeds `QuoteSolicitation` rows and runs NSN/FSC matching.
 2. `/quote/solicitations/` — queue of open solicitations (return-by ≥ today) in
-   Unmatched / Matched / RFQ Sent tabs. The whole open set loads once from
-   `queue_data` (columnar, gzipped, ~3 s for ~11k rows) and filters client-side:
-   set-aside, due-date and estimated-value pills + text search. Est. value =
+   two tabs: **Open SOLs** (Unmatched + Matched, with a Status filter, Matched
+   checked by default) and **RFQ Sent**. The whole open set loads once from
+   `queue_data` (columnar, gzipped, ~3 s for ~11k rows) and filters client-side
+   from a left rail: Status (Open SOLs only), set-aside, due-date and
+   estimated-value, each with a live count, plus text search. Est. value =
    qty × latest DLA unit price (`NsnProcurementHistory`). A self-scheduling
    30 s poll (`queue_poll`) applies status moves and shows who is reviewing a row.
+   Legacy `?tab=UNMATCHED` and `?tab=MATCHED` still open Open SOLs with that
+   status checked.
 3. `/quote/solicitations/<sol>/` — workspace. Opening it takes the 20-minute
    review claim (banner + "Take over" if someone else holds it). Shows lines,
    approved sources (one-click **Link** when the CAGE is in the supplier
    directory), recent DLA purchases, linked suppliers with NSN/FSC/Manual badges.
+   Approved sources and recent DLA purchases show a company name from the SAM
+   cache (SAM legal name, else the supplier directory, else the approved-source
+   file). The page never calls SAM; unnamed CAGEs refresh from the cache when
+   the tab regains focus.
    **Add supplier** modal: search by name/CAGE/type, optional "save NSN / FSC to
    this supplier" — saved capabilities immediately re-match other open
    solicitations. Tick suppliers → **Queue RFQ**. **No bid** / **Reopen**.
 3a. **Work the list.** Clicking a SOL (or **Start working this list**) snapshots the
-   current filtered, sorted list into `sessionStorage['quoteRun']`; the queue is
-   not reloaded while working. The workspace shows a sticky run bar (position,
-   progress, Prev / Next / Exit, keys `N` / `P`) and swaps in **No bid & next** /
-   **Queue RFQ & next** (fetch POSTs that answer JSON, then advance).
-   Next = `POST /quote/solicitations/next/` with the upcoming candidates:
-   `services/walk.claim_next` skips SOLs held by a teammate, no longer in the
-   list's status, or past due, and claims the first free one with
+   current filtered, sorted list into `sessionStorage['quoteRun']` (`statuses` +
+   `label`, and legacy `status` when the run is a single status); the queue is
+   not reloaded while working. The workspace shows a sticky run bar (WORKING LIST
+   plus the snapshot label, position, progress, Prev / Next / Exit, keys `N` / `P`)
+   and swaps in **No bid & next** / **Queue RFQ & next** (fetch POSTs that answer
+   JSON, then advance). Next = `POST /quote/solicitations/next/` with the upcoming
+   candidates and `statuses` (a legacy single `status` is still accepted):
+   `services/walk.claim_next` skips SOLs held by a teammate, whose status is not
+   in that set, or past due, and claims the first free one with
    `QuoteSolicitation.try_claim` — one conditional UPDATE, so two reps can never
    land on the same SOL. Skips surface as a toast on the next page. The open
    workspace renews its claim every 5 min (`claim` action `renew`) and warns if
@@ -374,7 +387,8 @@ hold. Warnings: delivery longer than required; template holding U+FFFD.
    built on this supplier have fared.
 
 Winner names come from our CAGEs, the supplier directory, then cached SAM names
-(`entity_names`); reconciliation never calls the SAM API.
+(`entity_names`, which delegates to `cage_names.resolve_cages` with that same
+precedence); reconciliation never calls the SAM API.
 
 ## 7. Templates and UI
 - Bootstrap 5.3.3 (Spacelab) from the global base. New classes go in
@@ -427,11 +441,12 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 | Name | Path | Notes |
 |---|---|---|
 | `quote:dashboard` | `/quote/` | pipeline counts |
-| `quote:solicitation_queue` | `/quote/solicitations/` | `?tab=UNMATCHED\|MATCHED\|RFQ_SENT` |
+| `quote:solicitation_queue` | `/quote/solicitations/` | `?tab=OPEN\|RFQ_SENT&status=UNMATCHED,MATCHED\|ANY` (legacy `tab=UNMATCHED\|MATCHED` still accepted) |
 | `quote:queue_data` | `/quote/solicitations/data/` | JSON, gzipped |
 | `quote:queue_poll` | `/quote/solicitations/poll/?since=` | JSON delta |
 | `quote:rerun_matching` | `/quote/solicitations/rematch/` | POST |
-| `quote:walk_next` | `/quote/solicitations/next/` | POST JSON `{candidates, status, release}` |
+| `quote:walk_next` | `/quote/solicitations/next/` | POST JSON `{candidates, statuses, release}` (legacy `status` still accepted) |
+| `quote:cage_names` | `/quote/cages/names/?cage=` | GET JSON, cache-only, max 50 |
 | `quote:solicitation_workspace` | `/quote/solicitations/<sol>/` | takes the claim |
 | `quote:add_match` / `remove_match` / `queue_supplier_rfqs` / `set_status` / `claim` | `/quote/solicitations/<sol>/...` | POST |
 | `quote:supplier_search` | `/quote/suppliers/search/?q=` | JSON |
@@ -511,7 +526,9 @@ Fragments live in `templates/quote/research/_panel_<panel>.html`; each logs
   (`fields` is a dict of named values, populated only for `ok`; rendered as a grouped grid:
   Identity / Registration / Addresses / Classifications).
   `lookup_cage()` always writes `found` (True / False); a failed call is cached by
-  `get_or_fetch_cage` as `fetch_error=True` (cached 30 days), so `error` shows a **Retry SAM
+  `get_or_fetch_cage` as `fetch_error=True`. Error rows retry after 24 h
+  (`SAMEntityCache.SAM_ERROR_RETRY_HOURS`); a failed refresh keeps the previously
+  cached data; a missing `SAM_API_KEY` is never cached. `error` shows a **Retry SAM
   lookup** button that reloads the panel with `?refresh=1` (`force_refresh=True`).
 - *Awards:* built on `_award_queryset()`, which excludes `is_faux=True` (MOD-before-award
   placeholders with invented dates, no posted date or price). Identical rows on

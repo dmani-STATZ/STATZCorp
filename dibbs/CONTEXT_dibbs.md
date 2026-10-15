@@ -32,7 +32,7 @@ spec is archived at `docs/legacy/sales_DIBBS_System_Spec.md`.
 | `models/awards.py` | `AwardImportBatch`, `DibbsAward`, `DibbsAwardMod`, `DibbsAwardStaging(+Error)`, unmanaged `WeWonAward` (view `dibbs_we_won_awards`) |
 | `models/cages.py` | `CompanyCAGE` (`dibbs_company_cage`) — STATZ's own CAGEs + BQ header defaults |
 | `models/packaging.py`, `sol_analysis.py` | `SolPackaging` (Section D), `SolAnalysis` (LLM-extracted PDF requirements) |
-| `models/sam_cache.py` | `SAMEntityCache` — 30-day SAM.gov CAGE cache |
+| `models/sam_cache.py` | `SAMEntityCache` — SAM.gov CAGE cache. Good rows stay fresh 30 days; error rows are stale after 24 h (`SAM_ERROR_RETRY_HOURS`). A failed refresh never overwrites a good row. A missing `SAM_API_KEY` returns an unsaved error instance and writes nothing. |
 | `models/dibbs_notices.py` | `DibbsNotice` (`dibbs_notice`) |
 | `models/competitor_*.py` | `CompetitorWatchlist`, `CompetitorAwardParseStatus`, `CompetitorAwardEntity` (`dibbs_competitor_*`) |
 | `services/importer.py` | IN/BQ/AS persistence (`parse_dibbs_files`, `create_import_batch`, `upsert_solicitations`, `upsert_lines_and_sources`, `run_import`, `purge_expired_pdf_blobs`) |
@@ -58,6 +58,9 @@ spec is archived at `docs/legacy/sales_DIBBS_System_Spec.md`.
 - `NsnProcurementHistory.nsn` is the 13-digit form; `SolicitationLine.nsn` keeps
   DIBBS's hyphenated form; `ApprovedSource.nsn` is 13-digit. Query both forms.
 - `DibbsAward` has no quantity and no unit price.
+- `SAMEntityCache`: 30-day TTL for good rows (`fetch_error=False`, found or not
+  found). Error rows go stale after 24 h. A failed refresh keeps the previously
+  cached data. A missing `SAM_API_KEY` is never written.
 
 ## 5. Flows
 **Daily import (interactive):** `/dibbs/import/` upload or "fetch from DIBBS" →

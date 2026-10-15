@@ -3950,13 +3950,6 @@ main {
    Built on Bootstrap variables so light/dark follow data-bs-theme.
    ========================================================================== */
 
-.quote-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1.25rem;
-}
-
 .quote-filter-search {
   max-width: 280px;
 }
@@ -5052,3 +5045,251 @@ main {
         display: none;
     }
 }
+
+/* ===== Quote: queue filter rail ===== */
+.quote-queue-layout {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.quote-filter-rail {
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: .75rem;
+  padding: .75rem;
+}
+.quote-filter-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+.quote-filter-rail-title {
+  display: inline-flex;
+  align-items: center;
+  gap: .375rem;
+  font-weight: 600;
+}
+.quote-filter-search-wrap {
+  position: relative;
+  margin: .5rem 0 .25rem;
+}
+.quote-filter-search-wrap .form-control {
+  width: 100%;
+  max-width: none;
+  padding-right: 1.75rem;
+}
+.quote-filter-search-clear {
+  position: absolute;
+  top: 50%;
+  right: .25rem;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  padding: .125rem .375rem;
+  line-height: 1;
+  color: var(--bs-secondary-color);
+  cursor: pointer;
+}
+.quote-filter-group {
+  border-top: 1px solid var(--bs-border-color-translucent);
+  margin-top: .5rem;
+  padding-top: .5rem;
+}
+.quote-filter-group-head {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  width: 100%;
+  padding: .5rem 0;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.quote-filter-group-count {
+  font-size: .65rem;
+  color: var(--bs-body-color);
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+}
+.quote-filter-chevron {
+  margin-left: auto;
+  width: .45rem;
+  height: .45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 150ms;
+}
+.quote-filter-group-head[aria-expanded="false"] .quote-filter-chevron {
+  transform: rotate(225deg);
+}
+.quote-filter-option {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .25rem .375rem;
+  border-radius: .375rem;
+  font-size: .875rem;
+  cursor: pointer;
+}
+.quote-filter-option:hover { background: var(--bs-tertiary-bg); }
+.quote-filter-option .form-check-input {
+  margin: 0;
+  flex: 0 0 auto;
+}
+.quote-filter-option .form-check-input:checked {
+  background-color: var(--company-primary);
+  border-color: var(--company-primary);
+}
+.quote-filter-option .form-check-input:focus-visible {
+  border-color: var(--company-primary);
+  box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--company-primary) 35%, transparent);
+}
+.quote-filter-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quote-filter-count {
+  margin-left: auto;
+  font-size: .75rem;
+  color: var(--bs-secondary-color);
+  font-variant-numeric: tabular-nums;
+}
+.is-empty .quote-filter-label,
+.is-empty .quote-filter-count { color: var(--bs-tertiary-color); }
+.quote-filter-more { margin-top: .125rem; }
+.quote-queue-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .75rem;
+}
+.quote-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .375rem;
+}
+.quote-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  border-radius: 999px;
+  padding: .125rem .5rem;
+  font-size: .75rem;
+  background: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+  border: 1px solid var(--bs-border-color);
+}
+.quote-filter-chip-x {
+  border: 0;
+  background: none;
+  padding: 0 .125rem;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+}
+.quote-filter-group-head:focus-visible,
+.quote-filter-chip-x:focus-visible,
+.quote-filter-search-clear:focus-visible,
+.quote-filter-more:focus-visible {
+  outline: 2px solid var(--company-primary);
+  outline-offset: 2px;
+}
+.quote-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 7px;
+}
+.quote-status-badge.is-unmatched {
+  color: var(--bs-secondary-text-emphasis);
+  background-color: var(--bs-secondary-bg-subtle);
+  border: 1px solid var(--bs-secondary-border-subtle);
+}
+.quote-status-badge.is-matched {
+  color: var(--bs-success-text-emphasis);
+  background-color: var(--bs-success-bg-subtle);
+  border: 1px solid var(--bs-success-border-subtle);
+}
+.quote-status-badge.is-rfq-sent {
+  color: var(--bs-info-text-emphasis);
+  background-color: var(--bs-info-bg-subtle);
+  border: 1px solid var(--bs-info-border-subtle);
+}
+.quote-status-dot.is-unmatched { background-color: var(--bs-secondary-color); }
+.quote-status-dot.is-matched { background-color: var(--bs-success); }
+.quote-status-dot.is-rfq-sent { background-color: var(--bs-info); }
+.quote-cage-name {
+  display: inline-block;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.quote-cage-name-muted { color: var(--bs-secondary-color); }
+.quote-cage-name-line {
+  display: block;
+  margin-top: .125rem;
+  font-family: var(--bs-font-sans-serif);
+  font-size: .75rem;
+  font-weight: 400;
+}
+.quote-ours-badge {
+  color: var(--bs-primary-text-emphasis);
+  background-color: var(--bs-primary-bg-subtle);
+  border: 1px solid var(--bs-primary-border-subtle);
+  font-size: .65rem;
+  vertical-align: middle;
+}
+@media (min-width: 992px) {
+  .quote-filter-rail {
+    position: sticky;
+    top: calc(var(--header-height) + 1rem);
+    max-height: calc(100vh - var(--header-height) - 2rem);
+    overflow-y: auto;
+  }
+}
+@media (max-width: 991.98px) {
+  .quote-queue-layout { grid-template-columns: minmax(0, 1fr); }
+  .quote-filter-rail {
+    position: static;
+    max-height: none;
+    margin-bottom: .75rem;
+  }
+}
+[data-bs-theme="dark"] .quote-filter-chip {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-body-color);
+  border-color: var(--bs-border-color);
+}
+[data-bs-theme="dark"] .quote-status-badge.is-unmatched {
+  color: var(--bs-secondary-color);
+  background-color: var(--bs-secondary-bg);
+  border-color: var(--bs-border-color);
+}
+[data-bs-theme="dark"] .quote-status-badge.is-matched {
+  color: var(--bs-success-text-emphasis);
+  background-color: var(--bs-success-bg-subtle);
+  border-color: var(--bs-success-border-subtle);
+}
+[data-bs-theme="dark"] .quote-status-badge.is-rfq-sent {
+  color: var(--bs-info-text-emphasis);
+  background-color: var(--bs-info-bg-subtle);
+  border-color: var(--bs-info-border-subtle);
+}
+[data-bs-theme="dark"] .quote-status-dot.is-unmatched { background-color: var(--bs-secondary-color); }
+[data-bs-theme="dark"] .quote-status-dot.is-matched { background-color: var(--bs-success); }
+[data-bs-theme="dark"] .quote-status-dot.is-rfq-sent { background-color: var(--bs-info); }

@@ -26,11 +26,11 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.db.models import Q
 from django.utils import timezone
 
-from dibbs.models import CompanyCAGE, DibbsAward, SAMEntityCache
+from dibbs.models import CompanyCAGE, DibbsAward
 from quote.models import BidOutcome
 from quote.services import cost
+from quote.services.cage_names import IN_CHUNK, resolve_cages
 from quote.services.matching import normalize_nsn
-from suppliers.models import Supplier
 
 logger = logging.getLogger(__name__)
 
@@ -43,15 +43,33 @@ TREND_YEARS = 2
 # ── Names ────────────────────────────────────────────────────────────────────
 
 def entity_names(cages):
-    """{CAGE: display name} from our CAGEs, the supplier directory, cached SAM."""
-    cages = {c.upper() for c in cages if c}
+    """{CAGE: display name} from our CAGEs, the supplier directory, cached SAM.
+
+    Precedence is unchanged: a CompanyCAGE name (active or not) wins, then the
+    supplier directory, then a cached SAM legal name. Keys are the uppercased
+    inputs, blanks dropped, whitespace not stripped — same as before.
+    """
+    wanted = {c.upper() for c in cages if c}
+    if not wanted:
+        return {}
+    resolved = resolve_cages(wanted)
     names = {}
-    for cage in SAMEntityCache.objects.filter(cage_code__in=cages).exclude(entity_name=''):
-        names[cage.cage_code.upper()] = cage.entity_name
-    for s in Supplier.objects.filter(cage_code__in=cages).exclude(name__isnull=True).exclude(name=''):
-        names[(s.cage_code or '').upper()] = s.name
-    for c in CompanyCAGE.objects.filter(cage_code__in=cages).select_related('company'):
-        names[c.cage_code.upper()] = (c.company.name if c.company_id else '') or c.company_name or 'STATZ'
+    for cage in wanted:
+        cn = resolved.get(cage)
+        if cn is None:
+            continue
+        if cn.sam_name:
+            names[cage] = cn.sam_name
+        if cn.directory_name:
+            names[cage] = cn.directory_name
+    # Ours overlay keeps the original query, including inactive CompanyCAGE rows.
+    cage_list = list(wanted)
+    for start in range(0, len(cage_list), IN_CHUNK):
+        chunk = cage_list[start:start + IN_CHUNK]
+        for c in CompanyCAGE.objects.filter(cage_code__in=chunk).select_related('company'):
+            names[c.cage_code.upper()] = (
+                (c.company.name if c.company_id else '') or c.company_name or 'STATZ'
+            )
     return names
 
 

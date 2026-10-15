@@ -474,7 +474,7 @@
       if (res.already_on_file) line += '. ' + fmt(res.already_on_file) + ' already on file ' + word(res.already_on_file, 'was', 'were') + ' skipped';
       var actions = '';
       if (res.solicitations_matched) {
-        actions += '<a class="btn btn-outline-secondary btn-sm" href="' + esc(root.dataset.queueUrl) + '?tab=MATCHED">See Matched</a> ';
+        actions += '<a class="btn btn-outline-secondary btn-sm" href="' + esc(root.dataset.queueUrl) + '?tab=OPEN&status=MATCHED">See Matched</a> ';
       }
       actions += '<button type="button" class="btn btn-outline-secondary btn-sm" data-role="again">Add more</button> ' +
         '<button type="button" class="btn btn-link btn-sm text-danger" data-role="undo" data-url="' + esc(res.undo_url) + '">Undo this import</button>';

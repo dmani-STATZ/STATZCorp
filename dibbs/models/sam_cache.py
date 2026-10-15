@@ -1,15 +1,20 @@
+from datetime import timedelta
+
 from django.db import models
 from django.utils import timezone
 
 
 class SAMEntityCache(models.Model):
     """
-    Cached result of a SAM.gov CAGE lookup.
-    Keyed on cage_code. Records older than 30 days are considered stale
-    and will be refreshed on the next lookup.
+    Cached result of a SAM.gov CAGE lookup. Keyed on cage_code.
+
+    A successful lookup (found or not found) is stale after SAM_CACHE_TTL_DAYS
+    (30). A row saved with fetch_error=True is stale after SAM_ERROR_RETRY_HOURS
+    (24), so the next lookup can retry instead of sitting on the failure for a month.
     """
 
     SAM_CACHE_TTL_DAYS = 30
+    SAM_ERROR_RETRY_HOURS = 24
 
     cage_code = models.CharField(max_length=10, primary_key=True)
 
@@ -48,8 +53,10 @@ class SAMEntityCache(models.Model):
         verbose_name = "SAM Entity Cache"
 
     def is_stale(self):
-        """Returns True if the cache record is older than SAM_CACHE_TTL_DAYS."""
+        """True when the next lookup should hit SAM again."""
         age = timezone.now() - self.last_fetched
+        if self.fetch_error:
+            return age >= timedelta(hours=self.SAM_ERROR_RETRY_HOURS)
         return age.days >= self.SAM_CACHE_TTL_DAYS
 
     @property

@@ -55,6 +55,9 @@ The single sanctioned cross-app write is `products.Nsn`'s dimension fields
   exposes only `body` and `extra_js`, with no `content` block.
 - Pass `section` in the view context or the sub-nav highlight breaks.
 - HTMX/fetch fragment partials must **not** use `{% extends %}`.
+- Queue filter rail values and labels (Status, Set-aside, Due, Est. value) are a
+  contract with the queue page script and with `?tab` / `?status` deep links.
+  Change them in the template, the script, and the URL parser together.
 
 ### Before changing urls.py
 `app_name` must stay exactly `'quote'`. `STATZWeb/middleware.py` does
@@ -96,6 +99,12 @@ permission gating silently stops applying.
 - Supplier-page users need Quotes access to edit: gate embeds with
   `services.access.user_can_use_quote`, not by hiding the URL.
 
+### CAGE names
+- Every CAGE → company-name display goes through `services/cage_names`
+  (`resolve_cages` plus a page-specific precedence helper such as `workspace_display`).
+- Never call `get_or_fetch_cage` or `lookup_cage` while rendering a page.
+- Never load `SAMEntityCache.raw_json` to get a name.
+
 ### Supplier Research (`services/supplier_research.py`)
 - Reads **`dibbs.DibbsAward`** filtered by `awardee_cage` for **any** CAGE. Never query
   **`dibbs_we_won_awards`** / **`WeWonAward`** for this feature.
@@ -115,6 +124,7 @@ permission gating silently stops applying.
 - `get_sam_entity` returns `state` = `ok` / `not_found` / `error`. Keep them distinct: a lookup
   failure (`fetch_error=True`) is not "no record", and its retry must go through
   `get_or_fetch_cage(force_refresh=True)`. Do not edit `dibbs/services/sam_entity.py` for this.
+  (The 2026-10-15 error-retry / keep-good-data fix in `get_or_fetch_cage` is owned by `dibbs`.)
 - Panel JS must not inject a response that was redirected or non-OK (login page in a card).
 - **`get_open_solicitations` (the `sols` panel) is read-only.** It reads `QuoteSupplierNSN` and
   never writes it, and calls no write path in `services/capabilities.py` / `matching.py`. NSNs are

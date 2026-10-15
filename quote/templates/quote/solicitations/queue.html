@@ -24,91 +24,204 @@
 </div>
 
 <ul class="nav nav-tabs mb-3" id="queueTabs" role="tablist">
-  <li class="nav-item"><button type="button" class="nav-link" data-tab="UNMATCHED">Unmatched <span class="badge text-bg-secondary ms-1" data-count="UNMATCHED">{{ counts.UNMATCHED }}</span></button></li>
-  <li class="nav-item"><button type="button" class="nav-link" data-tab="MATCHED">Matched <span class="badge text-bg-secondary ms-1" data-count="MATCHED">{{ counts.MATCHED }}</span></button></li>
-  <li class="nav-item"><button type="button" class="nav-link" data-tab="RFQ_SENT">RFQ Sent <span class="badge text-bg-secondary ms-1" data-count="RFQ_SENT">{{ counts.RFQ_SENT }}</span></button></li>
+  <li class="nav-item"><button type="button" class="nav-link{% if queue_filters.tab == 'OPEN' %} active{% endif %}" data-tab="OPEN">Open SOLs <span class="badge text-bg-secondary ms-1" data-count="OPEN">{{ counts.UNMATCHED|add:counts.MATCHED }}</span></button></li>
+  <li class="nav-item"><button type="button" class="nav-link{% if queue_filters.tab == 'RFQ_SENT' %} active{% endif %}" data-tab="RFQ_SENT">RFQ Sent <span class="badge text-bg-secondary ms-1" data-count="RFQ_SENT">{{ counts.RFQ_SENT }}</span></button></li>
 </ul>
 
-<div class="card card-padded mb-3">
-  <div class="quote-filter-bar">
-    <input type="search" id="queueSearch" class="form-control form-control-sm quote-filter-search"
-           placeholder="Search SOL, NSN or nomenclature" autocomplete="off">
-    <div class="quote-pill-group" data-group="setAside" aria-label="Set-aside">
-      <span class="label">Set-aside</span>
-      {% for code, label in set_aside_labels.items %}
-      <button type="button" class="quote-pill" data-value="{{ code }}">{{ label }}</button>
-      {% endfor %}
-    </div>
-    <div class="quote-pill-group" data-group="due" aria-label="Due">
-      <span class="label">Due</span>
-      <button type="button" class="quote-pill" data-value="d3">&le; 3 days</button>
-      <button type="button" class="quote-pill" data-value="d7">4&ndash;7 days</button>
-      <button type="button" class="quote-pill" data-value="d14">8&ndash;14 days</button>
-      <button type="button" class="quote-pill" data-value="d15">15+ days</button>
-    </div>
-    <div class="quote-pill-group" data-group="value" aria-label="Estimated value">
-      <span class="label">Est. value</span>
-      <button type="button" class="quote-pill" data-value="v1">&lt; $2.5K</button>
-      <button type="button" class="quote-pill" data-value="v2">$2.5K&ndash;$25K</button>
-      <button type="button" class="quote-pill" data-value="v3">$25K+</button>
-      <button type="button" class="quote-pill" data-value="v0">No history</button>
-    </div>
-    <button type="button" class="btn btn-link btn-sm p-0" id="clearFilters">Clear filters</button>
-  </div>
-</div>
+<button type="button" class="btn btn-outline-brand btn-sm quote-filter-toggle d-lg-none mb-2" data-bs-toggle="collapse" data-bs-target="#quoteFilterRail" aria-expanded="false" aria-controls="quoteFilterRail">
+  <i class="bi bi-funnel" aria-hidden="true"></i> Filters <span class="badge quote-filter-active-count">{{ queue_filters.statuses|length }}</span>
+</button>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-sm table-hover align-middle mb-0 quote-queue-table">
-      <thead>
-        <tr>
-          <th><button type="button" class="quote-sort" data-sort="sol">Solicitation</button></th>
-          <th>NSN / Nomenclature</th>
-          <th class="text-end">Qty</th>
-          <th>Set-aside</th>
-          <th><button type="button" class="quote-sort" data-sort="due">Due</button></th>
-          <th class="text-end"><button type="button" class="quote-sort" data-sort="estValue" title="Qty &times; latest DLA unit price for the NSN">Est. value</button></th>
-          <th>Suppliers</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="queueBody">
-        <tr><td colspan="8" class="text-center text-body-secondary py-4">Loading solicitations&hellip;</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="row-between px-3 py-2 border-top small">
-    <span class="text-body-secondary" id="queueSummary"></span>
-    <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="showMore">Show more</button>
-  </div>
+<div class="quote-queue-layout">
+  <aside id="quoteFilterRail" class="quote-filter-rail collapse d-lg-block" aria-label="Filters">
+    <div class="quote-filter-rail-head">
+      <span class="quote-filter-rail-title"><i class="bi bi-funnel" aria-hidden="true"></i> Filters</span>
+      <button type="button" class="btn btn-link btn-sm p-0" id="clearFilters"{% if queue_filters.tab != 'OPEN' or not queue_filters.statuses %} hidden{% endif %}>Clear all</button>
+    </div>
+    <div class="quote-filter-search-wrap">
+      <input type="search" id="queueSearch" class="form-control form-control-sm"
+             placeholder="Search SOL, NSN or nomenclature" autocomplete="off">
+      <button type="button" id="queueSearchClear" class="quote-filter-search-clear" hidden aria-label="Clear search">&times;</button>
+    </div>
+
+    <div class="quote-filter-group" data-group="status"{% if queue_filters.tab != 'OPEN' %} hidden{% endif %}>
+      <button type="button" class="quote-filter-group-head" aria-expanded="true" aria-controls="qf-status">
+        <span>Status</span>
+        <span class="badge quote-filter-group-count"{% if not queue_filters.statuses %} hidden{% endif %}>{{ queue_filters.statuses|length }}</span>
+        <span class="quote-filter-chevron" aria-hidden="true"></span>
+      </button>
+      <div id="qf-status" class="quote-filter-group-body">
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="UNMATCHED"{% if 'UNMATCHED' in queue_filters.statuses %} checked{% endif %}>
+          <span class="quote-status-dot is-unmatched" aria-hidden="true"></span>
+          <span class="quote-filter-label">Unmatched</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="MATCHED"{% if 'MATCHED' in queue_filters.statuses %} checked{% endif %}>
+          <span class="quote-status-dot is-matched" aria-hidden="true"></span>
+          <span class="quote-filter-label">Matched</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="quote-filter-group" data-group="setaside">
+      <button type="button" class="quote-filter-group-head" aria-expanded="true" aria-controls="qf-setaside">
+        <span>Set-aside</span>
+        <span class="badge quote-filter-group-count" hidden>0</span>
+        <span class="quote-filter-chevron" aria-hidden="true"></span>
+      </button>
+      <div id="qf-setaside" class="quote-filter-group-body">
+        {% for code, label in set_aside_labels.items %}
+        <label class="quote-filter-option{% if forloop.counter > 4 %} is-extra d-none{% endif %}">
+          <input type="checkbox" class="form-check-input" value="{{ code }}">
+          <span class="quote-filter-label">{{ label }}</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+        {% endfor %}
+        {% if set_aside_labels|length > 4 %}
+        <button type="button" class="btn btn-link btn-sm p-0 quote-filter-more" id="setAsideMore">Show {{ set_aside_labels|length|add:"-4" }} more</button>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="quote-filter-group" data-group="due">
+      <button type="button" class="quote-filter-group-head" aria-expanded="true" aria-controls="qf-due">
+        <span>Due</span>
+        <span class="badge quote-filter-group-count" hidden>0</span>
+        <span class="quote-filter-chevron" aria-hidden="true"></span>
+      </button>
+      <div id="qf-due" class="quote-filter-group-body">
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="d3">
+          <span class="quote-filter-label">&le; 3 days</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="d7">
+          <span class="quote-filter-label">4&ndash;7 days</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="d14">
+          <span class="quote-filter-label">8&ndash;14 days</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="d15">
+          <span class="quote-filter-label">15+ days</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="quote-filter-group" data-group="value">
+      <button type="button" class="quote-filter-group-head" aria-expanded="true" aria-controls="qf-value">
+        <span>Est. value</span>
+        <span class="badge quote-filter-group-count" hidden>0</span>
+        <span class="quote-filter-chevron" aria-hidden="true"></span>
+      </button>
+      <div id="qf-value" class="quote-filter-group-body">
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="v1">
+          <span class="quote-filter-label">&lt; $2.5K</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="v2">
+          <span class="quote-filter-label">$2.5K&ndash;$25K</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="v3">
+          <span class="quote-filter-label">$25K+</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+        <label class="quote-filter-option">
+          <input type="checkbox" class="form-check-input" value="v0">
+          <span class="quote-filter-label">No history</span>
+          <span class="quote-filter-count">0</span>
+        </label>
+      </div>
+    </div>
+  </aside>
+
+  <section class="quote-queue-main">
+    <div class="quote-queue-toolbar">
+      <span aria-live="polite" id="queueSummary">Showing 0 of 0</span>
+      <div class="quote-filter-chips" id="queueChips"></div>
+    </div>
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0 quote-queue-table">
+          <thead>
+            <tr>
+              <th><button type="button" class="quote-sort" data-sort="sol">Solicitation</button></th>
+              <th>NSN / Nomenclature</th>
+              <th class="text-end">Qty</th>
+              <th>Set-aside</th>
+              <th><button type="button" class="quote-sort" data-sort="due">Due</button></th>
+              <th class="text-end"><button type="button" class="quote-sort" data-sort="estValue" title="Qty &times; latest DLA unit price for the NSN">Est. value</button></th>
+              <th class="quote-status-col"{% if queue_filters.tab != 'OPEN' %} hidden{% endif %}>Status</th>
+              <th>Suppliers</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="queueBody">
+            <tr><td colspan="{% if queue_filters.tab == 'OPEN' %}9{% else %}8{% endif %}" class="text-center text-body-secondary py-4">Loading solicitations&hellip;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-3 py-2 text-end">
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="showMore">Show more</button>
+      </div>
+    </div>
+  </section>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 {{ block.super }}
 {{ set_aside_labels|json_script:"quoteSetAsides" }}
+{{ queue_filters|json_script:"quoteQueueFilters" }}
 <script>
 (function () {
   const DATA_URL = '{% url "quote:queue_data" %}';
   const POLL_URL = '{% url "quote:queue_poll" %}';
   const NEXT_URL = '{% url "quote:walk_next" %}';
   const CSRF = '{{ csrf_token }}';
-  const TAB_LABELS = { UNMATCHED: 'Unmatched', MATCHED: 'Matched', RFQ_SENT: 'RFQ Sent' };
   const WORKSPACE_URL = '{% url "quote:solicitation_workspace" "__SOL__" %}';
   const SET_ASIDES = JSON.parse(document.getElementById('quoteSetAsides').textContent);
+  const boot = JSON.parse(document.getElementById('quoteQueueFilters').textContent);
   const PAGE_SIZE = 200;
   const POLL_MS = 30000;
+  const COLLAPSE_KEY = 'quoteQueueFilters:v1:collapsed';
+  const GROUP_LABELS = { status: 'Status', setaside: 'Set-aside', due: 'Due', value: 'Est. value' };
+  const STATUS_BADGE = {
+    UNMATCHED: ['is-unmatched', 'Unmatched'],
+    MATCHED: ['is-matched', 'Matched'],
+    RFQ_SENT: ['is-rfq-sent', 'RFQ Sent'],
+  };
 
   const state = {
     rows: [], byId: new Map(), me: null,
-    tab: '{{ initial_tab|escapejs }}',
-    search: '', filters: { setAside: new Set(), due: new Set(), value: new Set() },
+    tab: boot.tab || 'OPEN',
+    search: '', searchText: '',
+    filters: {
+      status: new Set(boot.statuses || []),
+      setaside: new Set(),
+      due: new Set(),
+      value: new Set(),
+    },
     sort: { key: 'due', dir: 1 }, limit: PAGE_SIZE, since: null,
   };
 
   const body = document.getElementById('queueBody');
   const summary = document.getElementById('queueSummary');
   const showMore = document.getElementById('showMore');
+  const rail = document.getElementById('quoteFilterRail');
+  let renderFrame = 0;
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -132,19 +245,38 @@
     if (v < 25000) return 'v2';
     return 'v3';
   }
-
-  function matches(row) {
-    if (row.status !== state.tab) return false;
-    const f = state.filters;
-    if (f.setAside.size && !f.setAside.has(row.setAside)) return false;
-    if (f.due.size && !f.due.has(dueBucket(row.daysLeft))) return false;
-    if (f.value.size && !f.value.has(valueBucket(row.estValue))) return false;
-    if (state.search) {
-      const hay = (row.sol + ' ' + row.nsn + ' ' + row.nsn.replace(/-/g, '') + ' ' + row.nomen).toLowerCase();
-      if (!hay.includes(state.search)) return false;
-    }
-    return true;
+  function activeGroups() {
+    const groups = ['setaside', 'due', 'value'];
+    if (state.tab === 'OPEN') groups.unshift('status');
+    return groups;
   }
+  function rowToken(row, group) {
+    if (group === 'status') return row.status;
+    if (group === 'setaside') return row.setAside || '';
+    if (group === 'due') return dueBucket(row.daysLeft);
+    return valueBucket(row.estValue);
+  }
+  function failsGroup(row, group) {
+    const selected = state.filters[group];
+    if (!selected || !selected.size) return false;
+    return !selected.has(rowToken(row, group));
+  }
+  function failsSearch(row) {
+    if (!state.search) return false;
+    const nsn = row.nsn || '';
+    const hay = (row.sol + ' ' + nsn + ' ' + nsn.replace(/-/g, '') + ' ' + (row.nomen || '')).toLowerCase();
+    return !hay.includes(state.search);
+  }
+  function inTab(row) {
+    if (state.tab === 'RFQ_SENT') return row.status === 'RFQ_SENT';
+    return row.status === 'UNMATCHED' || row.status === 'MATCHED';
+  }
+  function matches(row) {
+    if (!inTab(row)) return false;
+    if (failsSearch(row)) return false;
+    return activeGroups().every(g => !failsGroup(row, g));
+  }
+  function colCount() { return state.tab === 'OPEN' ? 9 : 8; }
 
   function compare(a, b) {
     const k = state.sort.key, dir = state.sort.dir;
@@ -164,6 +296,11 @@
     if (row.rfqSent) out.push('<span class="badge text-bg-info" title="RFQ lines sent">Sent ' + row.rfqSent + '</span>');
     return out.join(' ') || '<span class="text-body-secondary small">none</span>';
   }
+  function statusCell(row) {
+    if (state.tab !== 'OPEN') return '';
+    const spec = STATUS_BADGE[row.status] || ['', row.status];
+    return '<td><span class="badge quote-status-badge ' + spec[0] + '">' + esc(spec[1]) + '</span></td>';
+  }
 
   function rowHtml(row) {
     const claimed = row.claimedBy && row.claimedById !== state.me;
@@ -178,6 +315,7 @@
       '<td><span class="small">' + esc(SET_ASIDES[row.setAside] || row.setAside) + '</span></td>' +
       '<td>' + due + '</td>' +
       '<td class="text-end">' + money(row.estValue) + '</td>' +
+      statusCell(row) +
       '<td>' + badges(row) + '</td>' +
       '<td class="small">' + (claimed
         ? '<span class="quote-claim" title="Being reviewed"><i class="bi bi-eye"></i> ' + esc(row.claimedBy) + '</span>'
@@ -185,7 +323,6 @@
       '</tr>';
   }
 
-  // Message left by the workspace when a rep finishes or exits a list.
   try {
     const flash = JSON.parse(sessionStorage.getItem('quoteRunFlash') || 'null');
     if (flash) { sessionStorage.removeItem('quoteRunFlash'); setTimeout(() => window.showToast('success', flash, 6000), 0); }
@@ -195,21 +332,43 @@
     return state.rows.filter(matches).sort(compare);
   }
 
-  // ── Work-the-list mode: snapshot the filtered, sorted list for the workspace ──
-  function filterLabel() {
-    const parts = [TAB_LABELS[state.tab] || state.tab];
-    document.querySelectorAll('.quote-pill.active').forEach(p => parts.push(p.textContent.trim()));
-    if (state.search) parts.push('"' + state.search + '"');
-    return parts.join(' · ');
+  function runSnapshot() {
+    if (state.tab === 'RFQ_SENT') {
+      return { statuses: ['RFQ_SENT'], status: 'RFQ_SENT', label: 'RFQ Sent' };
+    }
+    const checked = ['UNMATCHED', 'MATCHED'].filter(s => state.filters.status.has(s));
+    if (checked.length === 1) {
+      const status = checked[0];
+      return {
+        statuses: [status],
+        status: status,
+        label: status === 'UNMATCHED' ? 'Unmatched' : 'Matched',
+      };
+    }
+    return { statuses: ['UNMATCHED', 'MATCHED'], label: 'Open SOLs' };
+  }
+  function syncUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', state.tab);
+    if (state.tab === 'OPEN') {
+      const checked = ['UNMATCHED', 'MATCHED'].filter(s => state.filters.status.has(s));
+      url.searchParams.set('status', checked.length ? checked.join(',') : 'ANY');
+    } else {
+      url.searchParams.delete('status');
+    }
+    window.history.replaceState(null, '', url);
   }
   function saveRun() {
+    syncUrl();
+    const scope = runSnapshot();
     const run = {
-      status: state.tab,
-      label: filterLabel(),
+      statuses: scope.statuses,
+      label: scope.label,
       sols: visibleRows().map(r => r.sol),
       queueUrl: window.location.pathname + window.location.search,
       started: new Date().toISOString(),
     };
+    if (scope.status) run.status = scope.status;
     try { sessionStorage.setItem('quoteRun', JSON.stringify(run)); } catch (e) { /* storage full or blocked */ }
     return run;
   }
@@ -227,10 +386,12 @@
         btn.disabled = false;
         return;
       }
+      const payload = { candidates: batch, statuses: run.statuses };
+      if (run.status) payload.status = run.status;
       fetch(NEXT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ candidates: batch, status: run.status }),
+        body: JSON.stringify(payload),
       })
         .then(r => r.json())
         .then(res => {
@@ -245,72 +406,244 @@
     })(0);
   });
 
+  function computeFacets() {
+    const groups = activeGroups();
+    const counts = {};
+    groups.forEach(g => { counts[g] = {}; });
+    document.querySelectorAll('.quote-filter-group').forEach(group => {
+      const name = group.dataset.group;
+      if (!counts[name]) return;
+      group.querySelectorAll('input[type="checkbox"]').forEach(input => { counts[name][input.value] = 0; });
+    });
+    state.rows.forEach(row => {
+      if (!inTab(row)) return;
+      const failed = [];
+      if (failsSearch(row)) failed.push('search');
+      groups.forEach(g => { if (failsGroup(row, g)) failed.push(g); });
+      const bump = g => {
+        const token = rowToken(row, g);
+        if (token != null && counts[g][token] != null) counts[g][token] += 1;
+      };
+      if (failed.length === 0) groups.forEach(bump);
+      else if (failed.length === 1 && failed[0] !== 'search') bump(failed[0]);
+    });
+    return counts;
+  }
+
+  function activeFilterCount() {
+    let n = state.search ? 1 : 0;
+    activeGroups().forEach(g => { n += state.filters[g].size; });
+    return n;
+  }
+
+  function renderChips() {
+    const box = document.getElementById('queueChips');
+    box.textContent = '';
+    activeGroups().forEach(group => {
+      const wrap = document.querySelector('.quote-filter-group[data-group="' + group + '"]');
+      if (!wrap) return;
+      wrap.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        if (!state.filters[group].has(input.value)) return;
+        const option = input.parentElement.querySelector('.quote-filter-label');
+        addChip(box, GROUP_LABELS[group] + ': ' + (option ? option.textContent.trim() : input.value), group, input.value);
+      });
+    });
+    if (state.searchText) addChip(box, 'Search: "' + state.searchText + '"', 'search', '');
+  }
+  function addChip(box, text, group, value) {
+    const chip = document.createElement('span');
+    chip.className = 'quote-filter-chip';
+    const label = document.createElement('span');
+    label.textContent = text;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'quote-filter-chip-x';
+    btn.setAttribute('aria-label', 'Remove filter ' + text);
+    btn.textContent = '\u00d7';
+    btn.dataset.group = group;
+    btn.dataset.value = value;
+    chip.append(label, btn);
+    box.appendChild(chip);
+  }
+
   function render() {
     const visible = visibleRows();
     const shown = visible.slice(0, state.limit);
+    const cols = colCount();
     body.innerHTML = shown.length
       ? shown.map(rowHtml).join('')
-      : '<tr><td colspan="8" class="text-center text-body-secondary py-4">No solicitations match.</td></tr>';
+      : '<tr><td colspan="' + cols + '" class="text-center text-body-secondary py-4">No solicitations match.</td></tr>';
     summary.textContent = 'Showing ' + shown.length.toLocaleString() + ' of ' + visible.length.toLocaleString();
     showMore.classList.toggle('d-none', visible.length <= shown.length);
     document.getElementById('startWorking').disabled = !visible.length;
     document.getElementById('startCount').textContent = visible.length.toLocaleString();
-    document.querySelectorAll('[data-tab]').forEach(el =>
+    document.querySelectorAll('#queueTabs [data-tab]').forEach(el =>
       el.classList.toggle('active', el.dataset.tab === state.tab));
     document.querySelectorAll('.quote-sort').forEach(el => {
       el.dataset.dir = el.dataset.sort === state.sort.key ? (state.sort.dir > 0 ? 'asc' : 'desc') : '';
     });
+    document.querySelectorAll('.quote-status-col').forEach(el => { el.hidden = state.tab !== 'OPEN'; });
+    const statusGroup = document.querySelector('.quote-filter-group[data-group="status"]');
+    if (statusGroup) statusGroup.hidden = state.tab !== 'OPEN';
+
+    document.querySelectorAll('.quote-filter-option input').forEach(input => {
+      const group = input.closest('.quote-filter-group').dataset.group;
+      input.checked = state.filters[group].has(input.value);
+    });
+    const facets = computeFacets();
+    document.querySelectorAll('.quote-filter-option').forEach(label => {
+      const input = label.querySelector('input');
+      const group = label.closest('.quote-filter-group').dataset.group;
+      const count = (facets[group] && facets[group][input.value]) || 0;
+      label.classList.toggle('is-empty', count === 0);
+      label.querySelector('.quote-filter-count').textContent = count.toLocaleString();
+    });
+    document.querySelectorAll('.quote-filter-group').forEach(group => {
+      const n = state.filters[group.dataset.group].size;
+      const badge = group.querySelector('.quote-filter-group-count');
+      badge.hidden = n === 0;
+      badge.textContent = String(n);
+    });
+    const n = activeFilterCount();
+    document.querySelector('.quote-filter-active-count').textContent = String(n);
+    document.getElementById('clearFilters').hidden = n === 0;
+    document.getElementById('queueSearchClear').hidden = !state.searchText;
+    renderChips();
+    renderCounts();
+  }
+  function scheduleRender() {
+    if (renderFrame) return;
+    renderFrame = requestAnimationFrame(() => { renderFrame = 0; render(); });
   }
 
   function renderCounts() {
     const counts = { UNMATCHED: 0, MATCHED: 0, RFQ_SENT: 0 };
     state.rows.forEach(r => { if (r.status in counts) counts[r.status] += 1; });
-    Object.keys(counts).forEach(k => {
-      const el = document.querySelector('[data-count="' + k + '"]');
-      if (el) el.textContent = counts[k].toLocaleString();
-    });
+    const open = document.querySelector('[data-count="OPEN"]');
+    const rfq = document.querySelector('[data-count="RFQ_SENT"]');
+    if (open) open.textContent = (counts.UNMATCHED + counts.MATCHED).toLocaleString();
+    if (rfq) rfq.textContent = counts.RFQ_SENT.toLocaleString();
   }
 
-  // ── Interactions ────────────────────────────────────────────────────────
-  document.querySelectorAll('[data-tab]').forEach(el => el.addEventListener('click', () => {
-    state.tab = el.dataset.tab; state.limit = PAGE_SIZE;
-    const url = new URL(window.location); url.searchParams.set('tab', state.tab);
-    window.history.replaceState(null, '', url);
-    render();
+  function readCollapsed() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]');
+      return new Set(Array.isArray(raw) ? raw.filter(id => typeof id === 'string') : []);
+    } catch (e) {
+      return new Set();
+    }
+  }
+  function saveCollapsed() {
+    const ids = [];
+    document.querySelectorAll('.quote-filter-group-head[aria-expanded="false"]').forEach(head => {
+      const group = head.closest('.quote-filter-group');
+      if (group) ids.push(group.dataset.group);
+    });
+    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(ids)); } catch (e) { /* storage blocked */ }
+  }
+  function applyCollapsed() {
+    const closed = readCollapsed();
+    document.querySelectorAll('.quote-filter-group').forEach(group => {
+      const head = group.querySelector('.quote-filter-group-head');
+      const panel = group.querySelector('.quote-filter-group-body');
+      const open = !closed.has(group.dataset.group);
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      panel.hidden = !open;
+    });
+  }
+  applyCollapsed();
+  document.querySelectorAll('.quote-filter-group-head').forEach(head => {
+    head.addEventListener('click', () => {
+      const expanded = head.getAttribute('aria-expanded') === 'true';
+      head.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      head.closest('.quote-filter-group').querySelector('.quote-filter-group-body').hidden = expanded;
+      saveCollapsed();
+    });
+  });
+
+  const moreBtn = document.getElementById('setAsideMore');
+  function setAsideExpanded(on) {
+    document.querySelectorAll('[data-group="setaside"] .is-extra').forEach(el => {
+      el.classList.toggle('d-none', !on);
+    });
+    if (!moreBtn) return;
+    moreBtn.dataset.open = on ? '1' : '0';
+    const n = document.querySelectorAll('[data-group="setaside"] .is-extra').length;
+    moreBtn.textContent = on ? 'Show fewer' : 'Show ' + n + ' more';
+  }
+  if (moreBtn) {
+    const extraChecked = Array.from(document.querySelectorAll('[data-group="setaside"] .is-extra input')).some(input => input.checked);
+    setAsideExpanded(extraChecked);
+    moreBtn.addEventListener('click', () => setAsideExpanded(moreBtn.dataset.open !== '1'));
+  }
+
+  document.querySelectorAll('#queueTabs [data-tab]').forEach(el => el.addEventListener('click', () => {
+    state.tab = el.dataset.tab;
+    state.limit = PAGE_SIZE;
+    syncUrl();
+    scheduleRender();
   }));
-  document.querySelectorAll('.quote-pill-group').forEach(group => {
-    const set = state.filters[group.dataset.group];
-    group.querySelectorAll('.quote-pill').forEach(pill => pill.addEventListener('click', () => {
-      const v = pill.dataset.value;
-      if (set.has(v)) set.delete(v); else set.add(v);
-      pill.classList.toggle('active', set.has(v));
-      state.limit = PAGE_SIZE; render();
-    }));
+  rail.addEventListener('change', e => {
+    const input = e.target;
+    if (!input.matches || !input.matches('input[type="checkbox"]')) return;
+    const group = input.closest('.quote-filter-group').dataset.group;
+    if (input.checked) state.filters[group].add(input.value);
+    else state.filters[group].delete(input.value);
+    state.limit = PAGE_SIZE;
+    syncUrl();
+    scheduleRender();
   });
   document.getElementById('clearFilters').addEventListener('click', () => {
-    Object.values(state.filters).forEach(s => s.clear());
-    document.querySelectorAll('.quote-pill.active').forEach(p => p.classList.remove('active'));
-    document.getElementById('queueSearch').value = ''; state.search = '';
-    render();
+    Object.values(state.filters).forEach(set => set.clear());
+    document.getElementById('queueSearch').value = '';
+    state.search = '';
+    state.searchText = '';
+    state.limit = PAGE_SIZE;
+    syncUrl();
+    scheduleRender();
+  });
+  document.getElementById('queueChips').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.group === 'search') {
+      state.search = '';
+      state.searchText = '';
+      document.getElementById('queueSearch').value = '';
+    } else if (state.filters[btn.dataset.group]) {
+      state.filters[btn.dataset.group].delete(btn.dataset.value);
+    }
+    state.limit = PAGE_SIZE;
+    syncUrl();
+    scheduleRender();
   });
   let searchTimer = null;
   document.getElementById('queueSearch').addEventListener('input', e => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { state.search = e.target.value.trim().toLowerCase(); state.limit = PAGE_SIZE; render(); }, 150);
+    searchTimer = setTimeout(() => {
+      state.searchText = e.target.value.trim();
+      state.search = state.searchText.toLowerCase();
+      state.limit = PAGE_SIZE;
+      scheduleRender();
+    }, 150);
+  });
+  document.getElementById('queueSearchClear').addEventListener('click', () => {
+    document.getElementById('queueSearch').value = '';
+    state.search = '';
+    state.searchText = '';
+    state.limit = PAGE_SIZE;
+    scheduleRender();
   });
   document.querySelectorAll('.quote-sort').forEach(el => el.addEventListener('click', () => {
     const key = el.dataset.sort;
     state.sort = { key: key, dir: state.sort.key === key ? -state.sort.dir : (key === 'estValue' ? -1 : 1) };
-    render();
+    scheduleRender();
   }));
-  showMore.addEventListener('click', () => { state.limit += PAGE_SIZE; render(); });
+  showMore.addEventListener('click', () => { state.limit += PAGE_SIZE; scheduleRender(); });
 
-  // ── Data + live updates (self-scheduling poll, never setInterval) ────────
   function applyDelta(delta) {
-    let moved = false;
     delta.changed.forEach(c => {
       const row = state.byId.get(c.id);
-      if (row && row.status !== c.status) { row.status = c.status; moved = true; }
+      if (row && row.status !== c.status) row.status = c.status;
     });
     state.rows.forEach(r => {
       const claim = delta.claims[r.id];
@@ -318,7 +651,6 @@
       r.claimedById = claim ? claim.userId : null;
     });
     state.since = delta.now;
-    if (moved) renderCounts();
     render();
   }
 
@@ -341,11 +673,11 @@
       });
       state.me = data.me; state.since = data.now;
       state.rows.forEach(r => state.byId.set(r.id, r));
-      renderCounts(); render();
+      render();
       setTimeout(poll, POLL_MS);
     })
     .catch(() => {
-      body.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">Could not load solicitations. Refresh to try again.</td></tr>';
+      body.innerHTML = '<tr><td colspan="' + colCount() + '" class="text-center text-danger py-4">Could not load solicitations. Refresh to try again.</td></tr>';
     });
 })();
 </script>

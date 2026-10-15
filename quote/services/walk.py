@@ -19,15 +19,20 @@ def _display_name(user):
     return (user.get_full_name() or user.username) if user else 'Another user'
 
 
-def claim_next(user, candidates, expected_status, release=None):
+def claim_next(user, candidates, statuses, release=None):
     """
     Walk ``candidates`` (solicitation numbers, in list order) and claim the
-    first one that is still ``expected_status`` and not held by someone else.
+    first one whose status is in ``statuses`` and that is not held by someone else.
+
+    ``statuses`` is a set of status codes. An empty set means no status
+    constraint — the same as a walk_next payload that omitted both ``statuses``
+    and the legacy single ``status``.
 
     Returns ``{'sol': <number or None>, 'skipped': [{'sol', 'reason'}]}``.
     ``release`` (the solicitation just finished) has its claim dropped first so
     it immediately frees up for teammates.
     """
+    statuses = set(statuses or ())
     candidates = [c for c in candidates if c][:MAX_CANDIDATES]
     if release:
         state = QuoteSolicitation.objects.filter(
@@ -53,7 +58,7 @@ def claim_next(user, candidates, expected_status, release=None):
         if state is None:
             skipped.append({'sol': number, 'reason': 'no longer in the queue'})
             continue
-        if expected_status and state.status != expected_status:
+        if statuses and state.status not in statuses:
             skipped.append({'sol': number, 'reason': f'already {state.get_status_display()}'})
             continue
         due = state.solicitation.return_by_date

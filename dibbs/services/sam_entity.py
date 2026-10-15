@@ -247,39 +247,69 @@ def get_or_fetch_cage(cage_code, force_refresh=False):
     """
     Returns a SAMEntityCache instance for the given cage_code.
 
-    Logic:
-    1. If force_refresh is False, check for an existing non-stale cache record.
-       If found, return it immediately — no API call.
-    2. If missing, stale, or force_refresh=True, call lookup_cage() and
-       upsert the result into SAMEntityCache.
-    3. If lookup_cage() raises or returns an error payload, save a cache record
-       with fetch_error=True so we don't hammer the API on every page load.
-       Return that error record.
-
     Always returns a SAMEntityCache instance (never None, never raises).
     Callers check record.fetch_error to know if the data is valid.
+
+    1. An empty or whitespace cage returns an unsaved not-found instance.
+       No database access and no API call.
+    2. A fresh cached row is returned as-is unless force_refresh is True.
+    3. Otherwise lookup_cage() runs and the result is upserted.
+    4. ImproperlyConfigured (SAM_API_KEY missing) is never cached. The existing
+       row is returned when there is one; otherwise an unsaved error instance.
+    5. A failed refresh of a good row (fetch_error is False) does not write.
+       That row stays stale, so the next call retries. A missing row, or a row
+       that is already an error, is saved as an error and can be retried after
+       SAMEntityCache.SAM_ERROR_RETRY_HOURS.
     """
     from django.utils import timezone
 
     from dibbs.models.sam_cache import SAMEntityCache
 
     cage_code = (cage_code or "").strip().upper()
+    if not cage_code:
+        return SAMEntityCache(
+            cage_code="",
+            entity_name="",
+            fetch_error=False,
+            last_fetched=timezone.now(),
+            raw_json={"found": False, "cage_code": ""},
+        )
 
-    if not force_refresh:
-        try:
-            record = SAMEntityCache.objects.get(pk=cage_code)
-            if not record.is_stale():
-                return record
-        except SAMEntityCache.DoesNotExist:
-            pass
+    existing = SAMEntityCache.objects.filter(pk=cage_code).first()
+    if not force_refresh and existing and not existing.is_stale():
+        return existing
 
     try:
         data = lookup_cage(cage_code)
+    except ImproperlyConfigured:
+        logger.warning(
+            "get_or_fetch_cage: SAM_API_KEY not configured; CAGE %s not cached",
+            cage_code,
+        )
+        if existing is not None:
+            return existing
+        return SAMEntityCache(
+            cage_code=cage_code,
+            fetch_error=True,
+            last_fetched=timezone.now(),
+            raw_json={
+                "error": "SAM_API_KEY not configured",
+                "cage_code": cage_code,
+                "found": False,
+            },
+        )
     except Exception:
         logger.exception("get_or_fetch_cage: lookup_cage failed for CAGE %s", cage_code)
         data = {"error": "SAM API call failed", "cage_code": cage_code, "found": False}
 
     has_error = bool(data.get("error"))
+    if has_error and existing is not None and existing.fetch_error is False:
+        logger.warning(
+            "get_or_fetch_cage: refresh failed for CAGE %s; keeping cached data from %s",
+            cage_code,
+            existing.last_fetched,
+        )
+        return existing
     physical = data.get("address") or {}
     if not isinstance(physical, dict):
         physical = {}

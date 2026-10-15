@@ -1,3 +1,4 @@
+from .cages import cage_names
 from .bids import (
     bid_board,
     bid_builder,
@@ -95,6 +96,7 @@ __all__ = [
     'save_quote',
     'solicitation_search',
     'add_match',
+    'cage_names',
     'claim',
     'dashboard',
     'queue_data',

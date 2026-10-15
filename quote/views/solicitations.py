@@ -20,6 +20,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from dibbs.models import ApprovedSource, NsnProcurementHistory, Solicitation
 from quote.models import QuoteRFQ, QuoteSolicitation, QuoteSolicitationMatch
+from quote.services.cage_names import normalize_cage, resolve_cages, workspace_display
 from quote.services.matching import (
     add_manual_match,
     normalize_nsn,
@@ -70,6 +71,45 @@ def _done(request, solicitation, ok=True, status=200):
 
 # ── Queue ────────────────────────────────────────────────────────────────────
 
+_OPEN_STATUSES = (
+    QuoteSolicitation.STATUS_UNMATCHED,
+    QuoteSolicitation.STATUS_MATCHED,
+)
+
+
+def parse_queue_params(tab, status):
+    """Map ``?tab`` / ``?status`` to ``{'tab': 'OPEN'|'RFQ_SENT', 'statuses': [...]}``.
+
+    Legacy ``tab=UNMATCHED`` and ``tab=MATCHED`` open the Open SOLs tab with that
+    one status checked and ignore ``status``. Anything else is Open SOLs.
+    """
+    tab_raw = (tab or '').strip().upper()
+    if tab_raw == QuoteSolicitation.STATUS_RFQ_SENT:
+        return {'tab': 'RFQ_SENT', 'statuses': []}
+    if tab_raw == QuoteSolicitation.STATUS_UNMATCHED:
+        return {'tab': 'OPEN', 'statuses': [QuoteSolicitation.STATUS_UNMATCHED]}
+    if tab_raw == QuoteSolicitation.STATUS_MATCHED:
+        return {'tab': 'OPEN', 'statuses': [QuoteSolicitation.STATUS_MATCHED]}
+    return {'tab': 'OPEN', 'statuses': _parse_open_status_param(status)}
+
+
+def _parse_open_status_param(status):
+    if status is None:
+        return [QuoteSolicitation.STATUS_MATCHED]
+    text = str(status).strip()
+    if not text:
+        return [QuoteSolicitation.STATUS_MATCHED]
+    if text.upper() == 'ANY':
+        return []
+    allowed = set(_OPEN_STATUSES)
+    chosen = []
+    for part in text.split(','):
+        token = part.strip().upper()
+        if token in allowed and token not in chosen:
+            chosen.append(token)
+    return chosen or [QuoteSolicitation.STATUS_MATCHED]
+
+
 @login_required
 def solicitation_queue(request):
     """GET /quote/solicitations/ -- shell; rows load from queue_data."""
@@ -77,7 +117,7 @@ def solicitation_queue(request):
         'section': 'solicitations',
         'counts': status_counts(),
         'set_aside_labels': SET_ASIDE_LABELS,
-        'initial_tab': request.GET.get('tab', QuoteSolicitation.STATUS_UNMATCHED),
+        'queue_filters': parse_queue_params(request.GET.get('tab'), request.GET.get('status')),
     })
 
 
@@ -194,6 +234,35 @@ def solicitation_workspace(request, sol_number):
         a['supplier'] = cage_to_supplier.get((a['approved_cage'] or '').upper())
         a['linked'] = bool(a['supplier'] and a['supplier'].pk in suppliers)
 
+    history = list(
+        NsnProcurementHistory.objects.filter(nsn__in=nsn13s)
+        .order_by('-award_date')[:PROCUREMENT_HISTORY_LIMIT]
+    )
+    cage_keys = []
+    seen_cages = set()
+    for row in approved:
+        cage = normalize_cage(row.get('approved_cage'))
+        row['cage'] = cage
+        if cage and cage not in seen_cages:
+            seen_cages.add(cage)
+            cage_keys.append(cage)
+    for row in history:
+        cage = normalize_cage(row.cage_code)
+        row.cage_key = cage
+        if cage and cage not in seen_cages:
+            seen_cages.add(cage)
+            cage_keys.append(cage)
+    resolved = resolve_cages(cage_keys)
+    for row in approved:
+        row['cage_display'] = workspace_display(
+            resolved.get(row['cage']) if row['cage'] else None,
+            row.get('company_name') or '',
+        )
+    for row in history:
+        row.cage_display = workspace_display(
+            resolved.get(row.cage_key) if row.cage_key else None,
+        )
+
     return render(request, 'quote/solicitations/workspace.html', {
         'section': 'solicitations',
         'solicitation': solicitation,
@@ -202,8 +271,7 @@ def solicitation_workspace(request, sol_number):
         'lines': lines,
         'suppliers': list(suppliers.values()),
         'approved_sources': approved,
-        'procurement_history': NsnProcurementHistory.objects.filter(nsn__in=nsn13s)
-        .order_by('-award_date')[:PROCUREMENT_HISTORY_LIMIT],
+        'procurement_history': history,
         'set_aside_label': SET_ASIDE_LABELS.get(solicitation.small_business_set_aside or '', ''),
         'days_left': (
             (solicitation.return_by_date - timezone.now().date()).days
@@ -352,23 +420,52 @@ def claim(request, sol_number):
     return redirect(_workspace_url(state.solicitation))
 
 
+def _walk_statuses(payload):
+    """Return ``(statuses, error_response)``.
+
+    ``statuses`` in the body wins. Otherwise a legacy ``status`` string is
+    wrapped as a one-item set. When both are absent the set is empty, which
+    ``claim_next`` treats as "no status constraint". Unknown tokens are dropped;
+    if that leaves nothing, the response is today's invalid-status 400.
+    """
+    choices = dict(QuoteSolicitation.STATUS_CHOICES)
+    if 'statuses' in payload and payload.get('statuses') is not None:
+        raw = payload.get('statuses')
+        if not isinstance(raw, list):
+            return None, JsonResponse({'error': 'Unknown status.'}, status=400)
+        cleaned = []
+        for item in raw:
+            token = str(item).strip() if item is not None else ''
+            if token in choices and token not in cleaned:
+                cleaned.append(token)
+        if not cleaned:
+            return None, JsonResponse({'error': 'Unknown status.'}, status=400)
+        return set(cleaned), None
+    legacy = payload.get('status') or ''
+    if not legacy:
+        return set(), None
+    if legacy not in choices:
+        return None, JsonResponse({'error': 'Unknown status.'}, status=400)
+    return {legacy}, None
+
+
 @login_required
 @require_POST
 def walk_next(request):
     """
-    POST JSON {candidates: [sol numbers], status, release} -- claim the next
-    solicitation in the rep's list that is still ``status`` and not held by a
-    teammate. Returns {sol, url, skipped: [{sol, reason}]}.
+    POST JSON {candidates, statuses, release} -- claim the next solicitation in
+    the rep's list that is still one of ``statuses`` and not held by a teammate.
+    A legacy ``status`` string is still accepted. Returns {sol, url, skipped}.
     """
     try:
         payload = json.loads(request.body or b'{}')
     except ValueError:
         return JsonResponse({'error': 'Bad JSON.'}, status=400)
     candidates = [str(c) for c in payload.get('candidates') or [] if c]
-    status = payload.get('status') or ''
-    if status and status not in dict(QuoteSolicitation.STATUS_CHOICES):
-        return JsonResponse({'error': 'Unknown status.'}, status=400)
-    result = claim_next(request.user, candidates, status, release=payload.get('release'))
+    statuses, error = _walk_statuses(payload)
+    if error is not None:
+        return error
+    result = claim_next(request.user, candidates, statuses, release=payload.get('release'))
     result['url'] = (
         reverse('quote:solicitation_workspace', args=[result['sol']]) if result['sol'] else None
     )

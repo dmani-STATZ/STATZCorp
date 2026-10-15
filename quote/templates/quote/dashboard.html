@@ -22,7 +22,7 @@
     </a>
   </div>
   <div class="col">
-    <a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=UNMATCHED">
+    <a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=OPEN&status=UNMATCHED">
       <span class="kpi-tile-step">Phase 1</span>
       <span class="icon-tile icon-tile-warning"><i class="bi bi-question-diamond" aria-hidden="true"></i></span>
       <span class="kpi-tile-label">Unmatched</span>
@@ -31,7 +31,7 @@
     </a>
   </div>
   <div class="col">
-    <a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=MATCHED">
+    <a class="card kpi-tile h-100" href="{% url 'quote:solicitation_queue' %}?tab=OPEN&status=MATCHED">
       <span class="kpi-tile-step">Phase 1</span>
       <span class="icon-tile icon-tile-success"><i class="bi bi-link-45deg" aria-hidden="true"></i></span>
       <span class="kpi-tile-label">Matched</span>
