@@ -550,3 +550,27 @@ The Supplier Payment Forecast page provides a read-derived forecast of outstandi
   - `update_clin_field` updates the CLIN's payment terms dropdown inline and registers in the audit log.
   - `payment_history_api` ledger manages payments via the `partial-value-cell` component.
 - **Folder Scan**: Superusers monitor SharePoint contract folder inventory via scan_folders. The scan uses Microsoft Graph delta queries (drive root delta) for efficient incremental passes instead of BFS walks.
+
+## 21. On-Time Delivery Report
+
+Replaces the legacy MS Access on-time delivery report used by Finance Audit. Read-only; no models or migrations.
+
+**URLs.** `GET /contracts/reports/on-time-delivery/` (`on_time_delivery_report`) and `GET /contracts/reports/on-time-delivery/export/` (`on_time_delivery_export`). Both take the same GET parameters, so a run is bookmarkable and the export reuses the page's query string. Linked in the Contract Menu under Finance Audit.
+
+**Files.** `contracts/services/on_time_delivery.py` (`OtdFilters`, `build_otd_queryset`, `compute_otd_report`, `build_otd_workbook`), `contracts/forms.py` (`OnTimeDeliveryFilterForm`, `ScopedModelMultipleChoiceField`), `contracts/views/on_time_delivery_views.py`, `contracts/templates/contracts/on_time_delivery_report.html`, `contracts/tests/test_on_time_delivery.py`.
+
+**Access.** Same gate as Finance Audit: `@login_required`, `ActiveCompanyQuerysetMixin.get_active_company()` (403 without an active company), and the global `contracts` `AppPermission` middleware.
+
+**Filters.** `buyer` (multi, Buyer pk), `clin_type` (multi, ClinType pk), `ia` (multi, `O`/`D`), `start_date`, `end_date` (ISO). Both dates are required, `start <= end`, and the range is at most 366 days (inclusive). Unknown buyer / CLIN type pks are dropped silently; an `ia` outside `O`/`D` is a validation error. `Buyer` and `ClinType` have no company FK, so the option lists are limited to rows referenced by the active company's contracts / CLINs. An empty selection means "all". Selecting both IA values is also treated as "all", so CLINs with blank IA appear as `(Unspecified)`. First load (no `start_date` in GET) does not run: defaults are no buyers, CLIN type `Primary` (case-insensitive), both IA values, and the previous calendar month. **Clear Buyers** / **Select All DLA** are client-side only.
+
+**Definitions.**
+- Population: CLINs whose `contract.company` is the active company, `supplier_due_date` in range, contract status not `cancelled`/`canceled` (stripped, case-insensitive; null status included), and complete.
+- Complete: `clin_completion_ship_date()` returns a date (the dated shipment that first brings cumulative qty ≥ `order_qty`; legacy CLINs with no shipments use `ship_qty`/`ship_date`). Incomplete and undated completions are excluded.
+- Late QDD: completion > `supplier_due_date`. On-Time QDD = CLINs − Late QDD.
+- Late: completion > `Clin.due_date`. On-Time = classifiable CLINs − Late. Null `due_date` = Unclassified: counted in CLINs and the QDD pair, excluded from Late / On-Time, and reported in a footnote.
+- Rows: one per (Buyer, CLIN Type, IA), sorted by those labels. Nulls render `(No Buyer)`, `(No Type)`, `(Unspecified)`.
+- Percents: QDD pair over total CLINs; Late / On-Time over (CLINs − Unclassified). Fractions are quantized to 4 places with `ROUND_HALF_UP`; display is `62.82%`; a zero denominator is `—`.
+
+**Reliance on `due_status.py`.** The service materializes the queryset (with `late_status_shipment_prefetch()`) and calls `clin_completion_ship_date()` and `is_late()` per CLIN. No completion logic lives in this module and nothing is stored.
+
+**Export.** `on_time_delivery_{start}_{end}.xlsx`. `Summary`: parameter block (Report, Company, Supplier Due Date Range, Buyers, CLIN Types, IA, Generated), a blank row, header, data rows, bold Total and Percent rows (`0.00%`, real fractions), red fill `F8CBAD` on Late columns and green `C6E0B4` on On-Time columns (header / total / percent only), frozen below the header, auto-filter, and the Unclassified note when non-zero. `Detail`: one row per CLIN (`Contract #`, `CLIN`, `Buyer`, `CLIN Type`, `IA`, three dates as `m/d/yyyy`, `Late vs QDD`, `Late vs Due Date` as `Yes`/`No`/`N/A`), sorted by buyer, contract #, CLIN, frozen header, auto-filter. An invalid export query returns HTTP 400 with the form errors as plain text.

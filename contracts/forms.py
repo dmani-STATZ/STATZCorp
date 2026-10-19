@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
@@ -32,6 +34,8 @@ from .models import (
     GovAction,
     ClinSplit,
 )
+from .services.due_status import today
+from .services.on_time_delivery import OtdFilters
 
 User = get_user_model()
 
@@ -828,4 +832,101 @@ class PartnerReconciliationForm(forms.Form):
         if not f.name.lower().endswith('.xlsx'):
             raise forms.ValidationError('Only .xlsx files are supported.')
         return f
+
+
+class ScopedModelMultipleChoiceField(forms.ModelMultipleChoiceField):
+    """Drops pks outside the scoped queryset instead of raising."""
+
+    def clean(self, value):
+        pks = [str(v) for v in (value or []) if str(v).isdigit()]
+        if not pks:
+            return self.queryset.none()
+        return self.queryset.filter(pk__in=pks)
+
+
+class OnTimeDeliveryFilterForm(forms.Form):
+    IA_CHOICES = [('D', 'Destination'), ('O', 'Origin')]
+    MAX_RANGE_DAYS = 366
+
+    buyer = ScopedModelMultipleChoiceField(
+        queryset=Buyer.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': '10'}),
+    )
+    clin_type = ScopedModelMultipleChoiceField(
+        queryset=ClinType.objects.none(),
+        required=False,
+        label='CLIN Type',
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': '10'}),
+    )
+    ia = forms.MultipleChoiceField(
+        choices=IA_CHOICES,
+        required=False,
+        label='IA',
+        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': '2'}),
+    )
+    start_date = forms.DateField(
+        label='Supplier Due Date — Start',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
+    )
+    end_date = forms.DateField(
+        label='End',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
+    )
+
+    def __init__(self, *args, company, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['buyer'].queryset = Buyer.objects.filter(
+            pk__in=Contract.objects.filter(company=company).values('buyer_id')
+        ).order_by('description')
+        self.fields['clin_type'].queryset = ClinType.objects.filter(
+            pk__in=Clin.objects.filter(contract__company=company).values('clin_type_id')
+        ).order_by('description')
+        if not self.is_bound:
+            self.initial.update(self._default_initial())
+
+    def _default_initial(self):
+        last_month_end = today().replace(day=1) - timedelta(days=1)
+        primary_ids = list(
+            self.fields['clin_type'].queryset
+            .filter(description__iexact='Primary')
+            .values_list('pk', flat=True)
+        )
+        return {
+            'buyer': [],
+            'clin_type': primary_ids,
+            'ia': [code for code, _ in self.IA_CHOICES],
+            'start_date': last_month_end.replace(day=1),
+            'end_date': last_month_end,
+        }
+
+    def full_clean(self):
+        super().full_clean()
+        for name in self.errors:
+            if name in self.fields:
+                widget = self.fields[name].widget
+                widget.attrs['class'] = f"{widget.attrs.get('class', '')} is-invalid".strip()
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get('start_date'), cleaned.get('end_date')
+        if start and end:
+            if start > end:
+                self.add_error('end_date', 'End date must be on or after the start date.')
+            elif (end - start).days + 1 > self.MAX_RANGE_DAYS:
+                self.add_error('end_date', f'Date range cannot exceed {self.MAX_RANGE_DAYS} days.')
+        return cleaned
+
+    def to_filters(self):
+        cd = self.cleaned_data
+        ia_codes = tuple(sorted(set(cd['ia'])))
+        if len(ia_codes) == len(self.IA_CHOICES):
+            ia_codes = ()
+        return OtdFilters(
+            start_date=cd['start_date'],
+            end_date=cd['end_date'],
+            buyer_ids=tuple(b.pk for b in cd['buyer']),
+            clin_type_ids=tuple(t.pk for t in cd['clin_type']),
+            ia_codes=ia_codes,
+        )
 

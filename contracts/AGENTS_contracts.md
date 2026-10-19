@@ -34,6 +34,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - CLIN status uses the dated shipment that first brings cumulative shipped quantity to the ordered quantity. Contract status uses production CLINs, falling back to all CLINs only when no production CLIN exists.
 - The properties can fetch child rows. Use `late_status_shipment_prefetch()` for CLIN loops and `late_status_clin_prefetch()` for Contract loops.
 - `get_clin_details` intentionally emits legacy JSON keys `due_date_late` and `supplier_due_date_late` as wire-format aliases. Do not rename them without updating the inline JS in `contract_management.html`.
+- The On-Time Delivery Report (`contracts/services/on_time_delivery.py`) consumes `due_status.py`; do not fork its completion logic.
 
 ### Navigation / redirect rules
 

@@ -1,0 +1,146 @@
+{% extends "contracts/contract_base.html" %}
+
+{% block title %}On-Time Delivery Report{% endblock %}
+
+{% block body_class %}metric-detail-page{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+    <h1 class="h3 mb-3">On-Time Delivery Report</h1>
+
+    <form method="get" action="{% url 'contracts:on_time_delivery_report' %}" class="card mb-4" novalidate>
+        <div class="card-body">
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors|join:" " }}</div>
+            {% endif %}
+            <div class="row g-3">
+                <div class="col-12 col-lg-5">
+                    <label for="{{ form.buyer.id_for_label }}" class="form-label">Buyer</label>
+                    <div class="d-flex gap-2 align-items-start">
+                        <div class="flex-grow-1">
+                            {{ form.buyer }}
+                            {% for error in form.buyer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="d-flex flex-column gap-2">
+                            <button type="button" class="btn btn-secondary btn-sm text-nowrap" id="otd-clear-buyers">Clear Buyers</button>
+                            <button type="button" class="btn btn-success btn-sm text-nowrap" id="otd-select-dla">Select All DLA</button>
+                        </div>
+                    </div>
+                    <div class="form-text">No buyers selected means all buyers.</div>
+                </div>
+
+                <div class="col-12 col-md-6 col-lg-3">
+                    <label for="{{ form.clin_type.id_for_label }}" class="form-label">{{ form.clin_type.label }}</label>
+                    {{ form.clin_type }}
+                    {% for error in form.clin_type.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    <div class="form-text">None selected means all types.</div>
+                </div>
+
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="mb-3">
+                        <label for="{{ form.ia.id_for_label }}" class="form-label">{{ form.ia.label }}</label>
+                        {{ form.ia }}
+                        {% for error in form.ia.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-sm-6">
+                            <label for="{{ form.start_date.id_for_label }}" class="form-label">{{ form.start_date.label }}</label>
+                            {{ form.start_date }}
+                            {% for error in form.start_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label for="{{ form.end_date.id_for_label }}" class="form-label">{{ form.end_date.label }}</label>
+                            {{ form.end_date }}
+                            {% for error in form.end_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Run Report</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% if report is None %}
+        {% if not form.is_bound %}
+            <div class="alert alert-secondary">Choose parameters and click Run Report.</div>
+        {% endif %}
+    {% else %}
+        <div class="d-flex justify-content-end mb-2">
+            <a href="{% url 'contracts:on_time_delivery_export' %}?{{ query_string }}" class="btn btn-success">
+                <i class="bi bi-file-earmark-excel me-1"></i>Export to Excel
+            </a>
+        </div>
+
+        {% if not report.rows %}
+            <div class="alert alert-secondary">No completed CLINs match these parameters.</div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Buyer</th>
+                            <th>CLIN Type</th>
+                            <th>IA</th>
+                            <th class="text-end">CLINs</th>
+                            <th class="text-end table-danger">Late QDD</th>
+                            <th class="text-end table-success">On-Time QDD</th>
+                            <th class="text-end table-danger">Late</th>
+                            <th class="text-end table-success">On-Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in report.rows %}
+                            <tr>
+                                <td>{{ row.buyer }}</td>
+                                <td>{{ row.clin_type }}</td>
+                                <td>{{ row.ia_label }}</td>
+                                <td class="text-end">{{ row.clins }}</td>
+                                <td class="text-end">{{ row.late_qdd }}</td>
+                                <td class="text-end">{{ row.ontime_qdd }}</td>
+                                <td class="text-end">{{ row.late }}</td>
+                                <td class="text-end">{{ row.ontime }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="fw-bold">
+                        <tr>
+                            <td colspan="3">Total</td>
+                            <td class="text-end">{{ report.totals.clins }}</td>
+                            <td class="text-end table-danger">{{ report.totals.late_qdd }}</td>
+                            <td class="text-end table-success">{{ report.totals.ontime_qdd }}</td>
+                            <td class="text-end table-danger">{{ report.totals.late }}</td>
+                            <td class="text-end table-success">{{ report.totals.ontime }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="4">Percent</td>
+                            <td class="text-end table-danger">{{ report.percent_labels.late_qdd }}</td>
+                            <td class="text-end table-success">{{ report.percent_labels.ontime_qdd }}</td>
+                            <td class="text-end table-danger">{{ report.percent_labels.late }}</td>
+                            <td class="text-end table-success">{{ report.percent_labels.ontime }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% if report.unclassified %}
+                <p class="small text-body-secondary mb-0">{{ report.unclassified_note }}</p>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+</div>
+
+<script>
+(function () {
+    var select = document.getElementById('{{ form.buyer.id_for_label }}');
+    if (!select) return;
+    function eachOption(fn) { Array.prototype.forEach.call(select.options, fn); }
+    document.getElementById('otd-clear-buyers').addEventListener('click', function () {
+        eachOption(function (option) { option.selected = false; });
+    });
+    document.getElementById('otd-select-dla').addEventListener('click', function () {
+        eachOption(function (option) {
+            if (option.text.trim().toUpperCase().indexOf('DLA') === 0) option.selected = true;
+        });
+    });
+})();
+</script>
+{% endblock %}

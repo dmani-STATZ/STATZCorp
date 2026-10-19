@@ -6,6 +6,13 @@
     </svg>
     Finance Audit
 </a>
+<a href="{% url 'contracts:on_time_delivery_report' %}"
+   class="menu-item {% if request.resolver_match.url_name == 'on_time_delivery_report' %}active{% endif %}">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
+    </svg>
+    On-Time Delivery Report
+</a>
 <a href="{% url 'contracts:partner_reconciliation_list' %}" 
    class="menu-item {% if request.resolver_match.url_name == 'partner_reconciliation_list' or request.resolver_match.url_name == 'partner_reconciliation_detail' %}active{% endif %}">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
