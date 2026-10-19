@@ -53,7 +53,7 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 - Grep the full repo for `'suppliers:supplier_detail'`, `'suppliers:supplier_edit'`, `'suppliers:supplier_enrich_page'`, `'suppliers:supplier_dashboard'` — these names are referenced in: `contracts` templates, `reports` templates, `base_template.html`, and Python view reverse calls in `contracts/views/`.
 
 ### Before changing enrichment logic
-- Read `suppliers/views.py` (enrichment helpers: `call_openrouter_for_supplier`, `fetch_website_html`, `_normalize_*`), `suppliers/openrouter_config.py`, `templates/suppliers/supplier_enrich.html` (inline JS ~lines 760–860), and `static/suppliers/js/supplier_enrich.js`.
+- Read `suppliers/views.py` (enrichment helpers: `call_openrouter_for_supplier`, `fetch_website_html`, `_normalize_*`), `suppliers/openrouter_config.py`, and `templates/suppliers/supplier_enrich.html` (inline JS ~lines 760–860).
 - These four files are tightly coupled; a JSON key change in a view breaks the JS and vice versa.
 
 ### Before changing forms
@@ -82,13 +82,13 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail page also wires inline edits through the transactions modal (`templates/suppliers/supplier_detail.html` + `window.onTransactionSaved`); those fields are listed in `transactions/signals.py` `TRACKED` and captured in the `Supplier` branch of `store_old_state`.
 
 ### Enrichment pipeline change
-`suppliers/views.py` (enrichment helpers) ↔ `suppliers/openrouter_config.py` ↔ `templates/suppliers/supplier_enrich.html` (inline JS) ↔ `static/suppliers/js/supplier_enrich.js`
+`suppliers/views.py` (enrichment helpers) ↔ `suppliers/openrouter_config.py` ↔ `templates/suppliers/supplier_enrich.html` (inline JS)
 
 ### URL rename
 `suppliers/urls.py` → all `{% url 'suppliers:<name>' %}` in `templates/suppliers/`, `contracts/templates/contracts/`, `reports/templates/`, `templates/base_template.html` → Python `reverse('suppliers:<name>')` calls in `contracts/views/supplier_views.py` and `contracts/views/contacts_views.py`
 
 ### Adding a new enrichment-appliable field
-`SupplierApplyEnrichmentView` allowed fields list in `views.py` → `templates/suppliers/supplier_enrich.html` UI + JS → `static/suppliers/js/supplier_enrich.js` if it handles the new field client-side
+`SupplierApplyEnrichmentView` allowed fields list in `views.py` → `templates/suppliers/supplier_enrich.html` UI + inline JS
 
 ### AI model config change
 `suppliers/openrouter_config.py` → `GlobalAIModelConfigView` in `views.py` → enrichment page inline JS in `supplier_enrich.html`
@@ -185,7 +185,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 
 - The URL name `supplier_detail` is aliased twice: `<int:pk>/` and `<int:pk>/detail/` both map to `SupplierDetailView`. Do not remove either pattern without checking all reverse calls.
 - `suppliers/urls.py` imports four views directly from `contracts.views`: `SupplierListView`, `SupplierSearchView`, `SupplierCreateView`, `SupplierUpdateView`, `supplier_autocomplete`. Changing those view names in `contracts` breaks the `suppliers` URL config.
-- `supplier_enrich.html` contains a large inline `<script>` block that POSTs to `apply-enrichment/` and `ai-model/config/`. Changes to the JSON payload shape in `SupplierApplyEnrichmentView` or `GlobalAIModelConfigView` must be mirrored here and in `static/suppliers/js/supplier_enrich.js`.
+- `supplier_enrich.html` contains a large inline `<script>` block that POSTs to `apply-enrichment/` and `ai-model/config/`. Changes to the JSON payload shape in `SupplierApplyEnrichmentView` or `GlobalAIModelConfigView` must be mirrored here.
 - `supplier_detail.html` references `{% url 'contracts:contact_list' %}`, `{% url 'contracts:supplier_add_certification' %}`, `{% url 'contracts:supplier_add_classification' %}`, and `{% url 'contracts:contract_management' %}`. Verify these `contracts` URL names exist before deploying template changes.
 - `supplier_edit.js` tracks form field changes using DOM selectors tied to `supplier_edit.html` field IDs. If field IDs change in the template, update the JS selectors.
 - **Supplier contracts Excel export:** the 17 column headers and order in `SUPPLIER_CONTRACTS_EXPORT_HEADERS` (`suppliers/views.py`) are a user-facing contract (suppliers receive this file) — change only with sign-off. Preserve `_xlsx_safe_set` on every cell write (formula-injection guard for strings starting with `=`, `+`, `-`, `@`).
@@ -252,7 +252,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 5. Update all coupled files identified in Section 5.
 6. Check `contracts/forms.py`, `contracts/views/supplier_views.py`, and all templates using `suppliers:` URL names.
 7. Verify the Django admin loads, the supplier detail page renders, and the enrichment flow responds correctly.
-8. For enrichment changes: confirm JSON payload keys match between `views.py`, `supplier_enrich.html` inline JS, and `supplier_enrich.js`.
+8. For enrichment changes: confirm JSON payload keys match between `views.py` and the `supplier_enrich.html` inline JS.
 9. For model changes: generate and review the migration diff; confirm it only touches `contracts_*` tables that are safe to alter.
 
 ---
@@ -268,7 +268,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - `contracts/views/supplier_views.py`
 
 **Main coupled areas:**
-- Enrichment: `views.py` ↔ `openrouter_config.py` ↔ `supplier_enrich.html` ↔ `supplier_enrich.js`
+- Enrichment: `views.py` ↔ `openrouter_config.py` ↔ `supplier_enrich.html`
 - Edit form: `contracts/forms.py` ↔ `supplier_edit.html` / `supplier_form.html` ↔ `supplier_edit.js`
 - Detail page: `supplier_detail.html` ↔ `SupplierDetailView` ↔ `contracts:` URL names
 

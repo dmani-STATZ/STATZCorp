@@ -27,7 +27,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 | `openrouter_config.py` | Serializes `OpenRouterModelSetting`, falls back to environment defaults, and exposes `get_model_for_request` plus `save_openrouter_model_config`. |
 | `admin.py` | Registers `Supplier` (with `SupplierAlias` TabularInline) and `Contact` with tailored `list_display`, search, filters, and grouped `fieldsets` for compliance metadata. |
 | `templates/suppliers/...` | Server-rendered templates for the dashboard, detail page, info-by-type page, enrichment console, edit form (for `contracts` views), list/search screens, and include partials (`address_picker`, `toggle_switch`). |
-| `static/suppliers/js` | `supplier_edit.js` (change-tracking/highlight helpers for the edit form) and `supplier_enrich.js` (AJAX apply-suggestion bindings) that are bundled into the templates. |
+| `static/suppliers/js` | `supplier_edit.js` (change-tracking/highlight helpers for the edit form). Enrichment JS is inline in `supplier_enrich.html`. |
 | `portal/` | Server-to-server supplier portal API (`auth`, `views`, `serializers`, `audit`, `notify`, `downloads`). Mounted at `/api/supplier-portal/v1/` in root urls. Includes `GET …/suppliers/{cage}/contracts/` (allowlisted contract/CLIN read), plus `POST send-email/` which calls `mailer.services.graph_mail.send_mail_via_graph` as HTML from `GRAPH_MAIL_SENDER_CONTRACT`. |
 | `migrations/` | `0001_initial` bootstraps tables with `contracts_*` naming; `0002`–`0003` add enrichment/AI model settings; `0004` adds `Supplier.rfq_email` (deprecated — dormant fallback after `0013`); `0005` added `SupplierContactGroup` (removed in `0011`); `0009`–`0013` add `SupplierContactCategory`, migrate legacy data, drop `Contact.is_primary`, and backfill Sales contacts from `rfq_email`; `0014` normalizes `cage_code` (trim/upper, purge sentinels), filtered unique constraint, + `SupplierPortalChangeLog`; `0015` creates `SupplierAlias` (`contracts_supplieralias`). |
 | `tests/` | Portal API coverage in `tests/test_supplier_portal_api.py`. |
@@ -93,7 +93,7 @@ The **Copy Category** control in the Contacts section header (`supplier_detail.h
 - `templates/suppliers/supplier_enrich.html` – enrichment console with manual JSON input, AI/model status block, address picker, and inline script (lines ~760–860) that POSTs to `/suppliers/<pk>/apply-enrichment/` and `/suppliers/ai-model/config/`.
 - `templates/suppliers/supplier_edit.html` & `supplier_form.html` – live supplier edit/create forms driven by `contracts.forms.SupplierForm`, using includes like `suppliers/includes/address_picker.html`, `toggle_switch.html`, and `contracts/includes/simple_field.html`; `supplier_edit.js` adds change-tracking visuals.
 - `templates/suppliers/supplier_list.html`, `supplier_search.html`, `supplier_search` partials – consumed by the `contracts` supplier views, including a legacy `legacy_supplier_detail.html` that currently has no code path (see Known Gaps).
-- `static/suppliers/js` – `supplier_edit.js` tracks field diffs/change badges for the edit form, while `supplier_enrich.js` wires the “apply suggestion” button to `SupplierApplyEnrichmentView` and handles CSRF/feedback for API calls.
+- `static/suppliers/js` – `supplier_edit.js` tracks field diffs/change badges for the edit form. The “apply suggestion” wiring to `SupplierApplyEnrichmentView` is inline in `supplier_enrich.html`.
 
 ## 8. Admin / Staff Functionality
 `admin.py` registers `Supplier` with fieldsets grouped into Basic, Contact, Branding, Addresses, Compliance & Status, and Metadata, plus a `SupplierAlias` TabularInline for AKA names. Admin staff get list filters on `archived` and `supplier_type`, searchable name/CAGE/DODAAC, and a `Contact` admin with company/email/phone search. Staff changes still rely on the `AuditModel` fields if they exist.
@@ -157,7 +157,7 @@ No Celery/RQ tasks, cron jobs, or scheduled imports live here—the AI enrichmen
 
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
 - Any change to `Supplier` fields (names, addresses, statuses) must consider all `contracts.views.supplier_views` endpoints and templates that expect those names (`supplier_form.html`, `supplier_edit.html`, detail page loops, and the AJAX update endpoints).
-- The enrichment workflow couples `views.py`, `openrouter_config.py`, `templates/suppliers/supplier_enrich.html`, and `static/suppliers/js/supplier_enrich.js`; changing one file requires verifying the others for synchrony (e.g., JSON payload keys, button IDs, CSRF usage).
+- The enrichment workflow couples `views.py`, `openrouter_config.py`, and `templates/suppliers/supplier_enrich.html`; changing one file requires verifying the others for synchrony (e.g., JSON payload keys, button IDs, CSRF usage).
 - The AI config row is meant to be a singleton; use `OpenRouterModelSetting.get_default()` instead of direct queries and ensure you do not accidentally delete the default key in migrations.
 - Dashboard/Detail metrics run wide joins (`Contract`, `Clin`, `SupplierCertification`, etc.), so heavy filtering tweaks should be re-tested for performance/duplicate counts (the view limits results like documents to 25/`recently_active_suppliers` to keep kernels small).
 - Before renaming templates, search for string-based references in `contracts` URLs/views and the `static` JS files, as everything shares the `suppliers/*` template namespace.
@@ -167,7 +167,7 @@ No Celery/RQ tasks, cron jobs, or scheduled imports live here—the AI enrichmen
 - Main URLs: `/suppliers/` (dashboard), `/suppliers/<pk>/detail/`, `/suppliers/<pk>/enrich/` + `/apply-enrichment/`, `/suppliers/info/<type_slug>/`, `/suppliers/search/` & `/autocomplete/`, `/suppliers/ai-model/config/`.
 - Key templates: `templates/suppliers/dashboard.html`, `supplier_detail.html`, `supplier_enrich.html`, `supplier_edit.html`/`supplier_form.html`, `suppliers_by_type.html`.
 - Key dependencies: `contracts` app for models/forms/views, `STATZWeb` login/URL wiring, external OpenRouter API (`requests` + env vars) and `beautifulsoup4` for `utils`.
-- Risky files to review first: `views.py` (AI/enrichment logic), `openrouter_config.py`, `static/suppliers/js/supplier_enrich.js`, `templates/suppliers/supplier_detail.html`, `templates/suppliers/supplier_enrich.html`.
+- Risky files to review first: `views.py` (AI/enrichment logic), `openrouter_config.py`, `templates/suppliers/supplier_detail.html`, `templates/suppliers/supplier_enrich.html`.
 
 
 ## CSS Architecture
