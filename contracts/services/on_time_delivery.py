@@ -35,8 +35,34 @@ class OtdFilters:
     start_date: datetime.date
     end_date: datetime.date
     buyer_ids: tuple[int, ...] = ()
-    clin_type_ids: tuple[int, ...] = ()
+    item_types: tuple[str, ...] = ()
     ia_codes: tuple[str, ...] = ()
+
+
+_ITEM_TYPE_ORDER = {code: index for index, (code, _label) in enumerate(Clin.ITEM_TYPE_CHOICES)}
+
+
+def item_type_label(clin) -> tuple[str, str]:
+    """Return ``(code, display)`` for grouping. Blank is ``(No Type)``; an unknown code is shown raw."""
+    code = (clin.item_type or "").strip()
+    if not code:
+        return "", NO_TYPE_LABEL
+    if code not in _ITEM_TYPE_ORDER:
+        return code, code
+    return code, clin.get_item_type_display()
+
+
+def _type_sort_key(code: str) -> tuple:
+    if code in _ITEM_TYPE_ORDER:
+        return (0, _ITEM_TYPE_ORDER[code])
+    return (1, code.casefold())
+
+
+def selected_type_text(codes: tuple[str, ...]) -> str:
+    if not codes:
+        return "All"
+    chosen = set(codes)
+    return ", ".join(label for code, label in Clin.ITEM_TYPE_CHOICES if code in chosen)
 
 
 def ia_label(code: str | None) -> str:
@@ -71,13 +97,13 @@ def build_otd_queryset(company, filters: OtdFilters) -> QuerySet:
             supplier_due_date__lte=filters.end_date,
         )
         .exclude(contract__status_id__in=cancelled_status_ids)
-        .select_related("contract", "contract__buyer", "contract__status", "clin_type")
+        .select_related("contract", "contract__buyer", "contract__status")
         .prefetch_related(late_status_shipment_prefetch())
     )
     if filters.buyer_ids:
         qs = qs.filter(contract__buyer_id__in=filters.buyer_ids)
-    if filters.clin_type_ids:
-        qs = qs.filter(clin_type_id__in=filters.clin_type_ids)
+    if filters.item_types:
+        qs = qs.filter(item_type__in=filters.item_types)
     if filters.ia_codes:
         qs = qs.filter(ia__in=filters.ia_codes)
     return qs
@@ -95,11 +121,8 @@ def compute_otd_report(company, filters: OtdFilters) -> dict:
 
         contract = clin.contract
         buyer = contract.buyer
-        clin_type = clin.clin_type
-        buyer_label = (buyer.description or "").strip() if buyer else ""
-        type_label = (clin_type.description or "").strip() if clin_type else ""
-        buyer_label = buyer_label or NO_BUYER_LABEL
-        type_label = type_label or NO_TYPE_LABEL
+        buyer_label = ((buyer.description or "").strip() if buyer else "") or NO_BUYER_LABEL
+        type_code, type_label = item_type_label(clin)
         ia_text = ia_label(clin.ia)
 
         late_qdd = is_late(due_date=clin.supplier_due_date, completion_date=completion)
@@ -109,10 +132,15 @@ def compute_otd_report(company, filters: OtdFilters) -> dict:
             else is_late(due_date=clin.due_date, completion_date=completion)
         )
 
-        key = (contract.buyer_id, clin.clin_type_id, ia_text)
+        key = (contract.buyer_id, type_code, ia_text)
         row = groups.get(key)
         if row is None:
-            row = {"buyer": buyer_label, "clin_type": type_label, "ia_label": ia_text}
+            row = {
+                "buyer": buyer_label,
+                "item_type": type_code,
+                "type_label": type_label,
+                "ia_label": ia_text,
+            }
             row.update(dict.fromkeys(COUNT_KEYS, 0))
             groups[key] = row
         row["clins"] += 1
@@ -127,7 +155,7 @@ def compute_otd_report(company, filters: OtdFilters) -> dict:
                 "contract_number": contract.contract_number or "",
                 "item_number": clin.item_number or "",
                 "buyer": buyer_label,
-                "clin_type": type_label,
+                "type_label": type_label,
                 "ia_label": ia_text,
                 "supplier_due_date": clin.supplier_due_date,
                 "due_date": clin.due_date,
@@ -139,7 +167,7 @@ def compute_otd_report(company, filters: OtdFilters) -> dict:
 
     rows = sorted(
         groups.values(),
-        key=lambda r: (r["buyer"].casefold(), r["clin_type"].casefold(), r["ia_label"].casefold()),
+        key=lambda r: (r["buyer"].casefold(), _type_sort_key(r["item_type"]), r["ia_label"].casefold()),
     )
     totals = {key: sum(r[key] for r in rows) for key in COUNT_KEYS}
     classified = totals["clins"] - totals["unclassified"]
@@ -211,7 +239,6 @@ def build_otd_workbook(
     company_name: str,
     filters: OtdFilters,
     buyer_labels: list[str],
-    clin_type_labels: list[str],
 ) -> bytes:
     from contracts.utils.excel_utils import Font, PatternFill, Workbook, get_column_letter
 
@@ -246,7 +273,7 @@ def build_otd_workbook(
             f"{filters.start_date:%m/%d/%Y} – {filters.end_date:%m/%d/%Y}",
         ),
         ("Buyers", ", ".join(buyer_labels) or "All"),
-        ("CLIN Types", ", ".join(clin_type_labels) or "All"),
+        ("CLIN Types", selected_type_text(filters.item_types)),
         ("IA", ia_text),
         ("Generated", timezone.localtime(timezone.now()).strftime("%m/%d/%Y %I:%M %p")),
     )
@@ -262,7 +289,7 @@ def build_otd_workbook(
     row_idx = header_row
     for row in report["rows"]:
         row_idx += 1
-        values = (row["buyer"], row["clin_type"], row["ia_label"]) + tuple(row[k] for k in SUMMARY_COUNT_KEYS)
+        values = (row["buyer"], row["type_label"], row["ia_label"]) + tuple(row[k] for k in SUMMARY_COUNT_KEYS)
         for col, value in enumerate(values, start=1):
             ws.cell(row=row_idx, column=col, value=value)
     last_data_row = row_idx
@@ -296,7 +323,7 @@ def build_otd_workbook(
             item["contract_number"],
             item["item_number"],
             item["buyer"],
-            item["clin_type"],
+            item["type_label"],
             item["ia_label"],
             item["supplier_due_date"],
             item["due_date"],

@@ -851,19 +851,19 @@ class OnTimeDeliveryFilterForm(forms.Form):
     buyer = ScopedModelMultipleChoiceField(
         queryset=Buyer.objects.none(),
         required=False,
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': '10'}),
+        widget=forms.CheckboxSelectMultiple(),
     )
-    clin_type = ScopedModelMultipleChoiceField(
-        queryset=ClinType.objects.none(),
+    item_type = forms.MultipleChoiceField(
+        choices=Clin.ITEM_TYPE_CHOICES,
         required=False,
         label='CLIN Type',
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': '10'}),
+        widget=forms.CheckboxSelectMultiple(),
     )
     ia = forms.MultipleChoiceField(
         choices=IA_CHOICES,
         required=False,
         label='IA',
-        widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': '2'}),
+        widget=forms.CheckboxSelectMultiple(),
     )
     start_date = forms.DateField(
         label='Supplier Due Date — Start',
@@ -879,22 +879,14 @@ class OnTimeDeliveryFilterForm(forms.Form):
         self.fields['buyer'].queryset = Buyer.objects.filter(
             pk__in=Contract.objects.filter(company=company).values('buyer_id')
         ).order_by('description')
-        self.fields['clin_type'].queryset = ClinType.objects.filter(
-            pk__in=Clin.objects.filter(contract__company=company).values('clin_type_id')
-        ).order_by('description')
         if not self.is_bound:
             self.initial.update(self._default_initial())
 
     def _default_initial(self):
         last_month_end = today().replace(day=1) - timedelta(days=1)
-        primary_ids = list(
-            self.fields['clin_type'].queryset
-            .filter(description__iexact='Primary')
-            .values_list('pk', flat=True)
-        )
         return {
             'buyer': [],
-            'clin_type': primary_ids,
+            'item_type': ['P'],
             'ia': [code for code, _ in self.IA_CHOICES],
             'start_date': last_month_end.replace(day=1),
             'end_date': last_month_end,
@@ -926,7 +918,7 @@ class OnTimeDeliveryFilterForm(forms.Form):
             start_date=cd['start_date'],
             end_date=cd['end_date'],
             buyer_ids=tuple(b.pk for b in cd['buyer']),
-            clin_type_ids=tuple(t.pk for t in cd['clin_type']),
+            item_types=tuple(cd['item_type']),
             ia_codes=ia_codes,
         )
 

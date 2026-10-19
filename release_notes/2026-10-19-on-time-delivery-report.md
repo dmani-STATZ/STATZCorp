@@ -16,6 +16,6 @@ The On-Time Delivery Report replaces the old Access report. Open it from the **C
 
 Cancelled contracts and CLINs that are not fully shipped are left out. A Totals row and a Percent row sit at the bottom. If some CLINs have no contract due date, a note under the table tells you how many were left out of Late / On-Time.
 
-**Filters.** Pick buyers (none selected means all), CLIN types, IA, and a supplier due date range of up to a year. **Clear Buyers** unselects every buyer, and **Select All DLA** selects every DLA buyer. The page opens on last month with Primary CLINs selected. Nothing runs until you click **Run Report**. The page URL saves your filters, so you can bookmark a run.
+**Filters.** Buyers, CLIN types, and IA are checkbox lists (none selected means all). Type in the buyer box to narrow the list. **Clear** unchecks a list, and **Select All DLA** checks every DLA buyer, even ones the search box is hiding. The page opens on last month with Primary checked and both Origin and Destination on. The date range can be up to a year. Nothing runs until you click **Run Report**. The page URL saves your filters, so you can bookmark a run.
 
 **Export.** **Export to Excel** downloads a workbook with a **Summary** tab (your filters, the grouped table, totals, and percents) and a **Detail** tab listing every CLIN with its dates and late flags.

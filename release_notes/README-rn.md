@@ -67,7 +67,7 @@ python manage.py import_release_notes --verbose   # extra logging
 
 ## Recent release notes
 
-- [2026-10-19-on-time-delivery-report](2026-10-19-on-time-delivery-report.md) — New: On-Time Delivery Report (Contract Menu). Late / On-Time counts for fully shipped CLINs against supplier and contract due dates, grouped by Buyer, CLIN Type, and IA, with a Summary + Detail Excel export. (`published: false` until shipped.)
+- [2026-10-19-on-time-delivery-report](2026-10-19-on-time-delivery-report.md) — New: On-Time Delivery Report (Contract Menu). Late / On-Time counts for fully shipped CLINs against supplier and contract due dates, grouped by Buyer, CLIN Type, and IA, with checkbox filters and a Summary + Detail Excel export.
 - [2026-10-12-dfas-payment-receipts](2026-10-12-dfas-payment-receipts.md) — DFAS payment notices are saved as PDFs in the contract folder. Filed mail moves to WAWF / DFAS Receipts; unmatched mail stays unread in WAWF / Unmatched. (`published: false` until the job is turned on.)
 - [2026-10-05-quotes-supplier-research](2026-10-05-quotes-supplier-research.md) — New: Supplier Research page (Quotes → Supplier Research). Enter a CAGE code to see SAM.gov data, approved-source capabilities, and DLA award history, and download it all as a three-tab Excel workbook.
 - [2026-09-14-pdf-intake-parse-error-swallowing-fix](2026-09-14-pdf-intake-parse-error-swallowing-fix.md) — Fixed award PDFs being rejected with a misleading "could not extract a contract number" error after a successful parse.

@@ -5,41 +5,79 @@
 {% block body_class %}metric-detail-page{% endblock %}
 
 {% block content %}
+<style>
+.otd-filters [data-otd-list="buyer"] { max-height: 280px; overflow-y: auto; }
+.otd-filters fieldset .form-check:hover { background-color: var(--bs-secondary-bg); }
+</style>
 <div class="container-fluid px-3 px-md-4 py-4">
     <h1 class="h3 mb-3">On-Time Delivery Report</h1>
 
-    <form method="get" action="{% url 'contracts:on_time_delivery_report' %}" class="card mb-4" novalidate>
+    <form method="get" action="{% url 'contracts:on_time_delivery_report' %}" class="card mb-4 otd-filters" novalidate>
         <div class="card-body">
             {% if form.non_field_errors %}
                 <div class="alert alert-danger">{{ form.non_field_errors|join:" " }}</div>
             {% endif %}
             <div class="row g-3">
-                <div class="col-12 col-lg-5">
-                    <label for="{{ form.buyer.id_for_label }}" class="form-label">Buyer</label>
-                    <div class="d-flex gap-2 align-items-start">
-                        <div class="flex-grow-1">
-                            {{ form.buyer }}
-                            {% for error in form.buyer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                        </div>
-                        <div class="d-flex flex-column gap-2">
-                            <button type="button" class="btn btn-secondary btn-sm text-nowrap" id="otd-clear-buyers">Clear Buyers</button>
-                            <button type="button" class="btn btn-success btn-sm text-nowrap" id="otd-select-dla">Select All DLA</button>
-                        </div>
+                <div class="col-12 col-lg-5 d-flex">
+                    <div class="w-100">
+                        <fieldset class="border rounded h-100 d-flex flex-column mb-0">
+                            <legend class="form-label d-flex flex-wrap align-items-center gap-2 w-100 float-none bg-body-tertiary border-bottom rounded-top px-2 py-2 mb-0">
+                                <span>Buyer</span>
+                                <span class="badge text-bg-secondary" id="otd-buyer-badge" aria-live="polite">All buyers</span>
+                                <span class="ms-auto d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-success" id="otd-select-dla">Select All DLA</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="otd-clear-buyers">Clear</button>
+                                </span>
+                            </legend>
+                            <div class="p-2 pb-0">
+                                <input type="search" class="form-control form-control-sm" id="otd-buyer-filter" placeholder="Filter buyers…" autocomplete="off">
+                            </div>
+                            <div class="otd-check-list px-2 py-1" data-otd-list="buyer">
+                                {% for opt in form.buyer %}
+                                    <div class="form-check" data-otd-row data-otd-label="{{ opt.choice_label }}">
+                                        <input class="form-check-input" type="checkbox" name="buyer" value="{{ opt.data.value }}" id="otd-buyer-{{ opt.data.value }}"{% if opt.data.selected %} checked{% endif %}>
+                                        <label class="form-check-label" for="otd-buyer-{{ opt.data.value }}">{{ opt.choice_label }}</label>
+                                    </div>
+                                {% endfor %}
+                                <div class="text-body-secondary small px-1 py-1 d-none" data-otd-empty="buyer">No buyers match.</div>
+                            </div>
+                        </fieldset>
+                        {% for error in form.buyer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                        <div class="form-text">None selected = all buyers.</div>
                     </div>
-                    <div class="form-text">No buyers selected means all buyers.</div>
                 </div>
 
-                <div class="col-12 col-md-6 col-lg-3">
-                    <label for="{{ form.clin_type.id_for_label }}" class="form-label">{{ form.clin_type.label }}</label>
-                    {{ form.clin_type }}
-                    {% for error in form.clin_type.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                    <div class="form-text">None selected means all types.</div>
+                <div class="col-12 col-lg-3 d-flex">
+                    <div class="w-100">
+                        <fieldset class="border rounded h-100 d-flex flex-column mb-0">
+                            <legend class="form-label d-flex flex-wrap align-items-center gap-2 w-100 float-none bg-body-tertiary border-bottom rounded-top px-2 py-2 mb-0">
+                                <span>CLIN Type</span>
+                                <span class="badge text-bg-secondary" id="otd-clintype-badge" aria-live="polite">All types</span>
+                                <button type="button" class="btn btn-sm btn-secondary ms-auto" id="otd-clear-types">Clear</button>
+                            </legend>
+                            <div class="px-2 py-1" data-otd-list="item_type">
+                                {% for opt in form.item_type %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="item_type" value="{{ opt.data.value }}" id="otd-itemtype-{{ opt.data.value }}"{% if opt.data.selected %} checked{% endif %}>
+                                        <label class="form-check-label" for="otd-itemtype-{{ opt.data.value }}">{{ opt.choice_label }}</label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </fieldset>
+                        {% for error in form.item_type.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                        <div class="form-text">None selected = all types.</div>
+                    </div>
                 </div>
 
-                <div class="col-12 col-md-6 col-lg-4">
+                <div class="col-12 col-lg-4">
                     <div class="mb-3">
-                        <label for="{{ form.ia.id_for_label }}" class="form-label">{{ form.ia.label }}</label>
-                        {{ form.ia }}
+                        <div class="form-label">IA</div>
+                        <div class="btn-group" role="group" aria-label="IA">
+                            {% for opt in form.ia %}
+                                <input type="checkbox" class="btn-check" name="ia" value="{{ opt.data.value }}" id="otd-ia-{{ opt.data.value }}" autocomplete="off"{% if opt.data.selected %} checked{% endif %}>
+                                <label class="btn btn-outline-primary" for="otd-ia-{{ opt.data.value }}">{{ opt.choice_label }}</label>
+                            {% endfor %}
+                        </div>
                         {% for error in form.ia.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                     </div>
                     <div class="row g-2 mb-3">
@@ -92,7 +130,7 @@
                         {% for row in report.rows %}
                             <tr>
                                 <td>{{ row.buyer }}</td>
-                                <td>{{ row.clin_type }}</td>
+                                <td>{{ row.type_label }}</td>
                                 <td>{{ row.ia_label }}</td>
                                 <td class="text-end">{{ row.clins }}</td>
                                 <td class="text-end">{{ row.late_qdd }}</td>
@@ -130,17 +168,62 @@
 
 <script>
 (function () {
-    var select = document.getElementById('{{ form.buyer.id_for_label }}');
-    if (!select) return;
-    function eachOption(fn) { Array.prototype.forEach.call(select.options, fn); }
-    document.getElementById('otd-clear-buyers').addEventListener('click', function () {
-        eachOption(function (option) { option.selected = false; });
-    });
-    document.getElementById('otd-select-dla').addEventListener('click', function () {
-        eachOption(function (option) {
-            if (option.text.trim().toUpperCase().indexOf('DLA') === 0) option.selected = true;
+    var root = document.querySelector('.otd-filters');
+    if (!root) return;
+
+    function boxes(listName) {
+        return root.querySelector('[data-otd-list="' + listName + '"]').querySelectorAll('input[type="checkbox"]');
+    }
+    function setBadge(id, count, emptyLabel) {
+        document.getElementById(id).textContent = count ? count + ' selected' : emptyLabel;
+    }
+    function countChecked(listName) {
+        var n = 0;
+        boxes(listName).forEach(function (box) { if (box.checked) n += 1; });
+        return n;
+    }
+    function refreshBadges() {
+        setBadge('otd-buyer-badge', countChecked('buyer'), 'All buyers');
+        setBadge('otd-clintype-badge', countChecked('item_type'), 'All types');
+    }
+
+    var filter = document.getElementById('otd-buyer-filter');
+    var empty = root.querySelector('[data-otd-empty="buyer"]');
+    filter.addEventListener('input', function () {
+        var query = filter.value.trim().toUpperCase();
+        var visible = 0;
+        root.querySelectorAll('[data-otd-list="buyer"] [data-otd-row]').forEach(function (row) {
+            var label = (row.getAttribute('data-otd-label') || '').toUpperCase();
+            var match = !query || label.indexOf(query) !== -1;
+            row.classList.toggle('d-none', !match);
+            if (match) visible += 1;
         });
+        empty.classList.toggle('d-none', visible !== 0);
     });
+
+    root.querySelector('[data-otd-list="buyer"]').addEventListener('change', refreshBadges);
+    root.querySelector('[data-otd-list="item_type"]').addEventListener('change', refreshBadges);
+
+    document.getElementById('otd-select-dla').addEventListener('click', function () {
+        boxes('buyer').forEach(function (box) {
+            var row = box.closest('[data-otd-row]');
+            var label = (row.getAttribute('data-otd-label') || '').trim().toUpperCase();
+            if (label.indexOf('DLA') === 0) box.checked = true;
+        });
+        refreshBadges();
+    });
+    document.getElementById('otd-clear-buyers').addEventListener('click', function () {
+        boxes('buyer').forEach(function (box) { box.checked = false; });
+        filter.value = '';
+        filter.dispatchEvent(new Event('input'));
+        refreshBadges();
+    });
+    document.getElementById('otd-clear-types').addEventListener('click', function () {
+        boxes('item_type').forEach(function (box) { box.checked = false; });
+        refreshBadges();
+    });
+
+    refreshBadges();
 })();
 </script>
 {% endblock %}

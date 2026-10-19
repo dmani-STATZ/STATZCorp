@@ -16,7 +16,6 @@ from contracts.models import (
     Buyer,
     Clin,
     ClinShipment,
-    ClinType,
     Company,
     Contract,
     ContractStatus,
@@ -39,7 +38,6 @@ class OnTimeDeliveryTestBase(TestCase):
         cls.company = Company.objects.create(name="OTD Co", slug="otd-co", is_active=True)
         cls.other_company = Company.objects.create(name="Other Co", slug="other-co", is_active=True)
         cls.buyer = Buyer.objects.create(description="DLA Land")
-        cls.primary = ClinType.objects.create(description="Primary")
         cls.open_status = ContractStatus.objects.create(description="Open")
         cls.cancelled_status = ContractStatus.objects.create(description=" Cancelled ")
         cls._seq = 0
@@ -55,6 +53,7 @@ class OnTimeDeliveryTestBase(TestCase):
         ship_date=datetime.date(2026, 4, 5),
         shipped=10,
         order_qty=10,
+        item_type="P",
     ):
         type(self)._seq += 1
         company = company or self.company
@@ -68,8 +67,7 @@ class OnTimeDeliveryTestBase(TestCase):
             company=company,
             contract=contract,
             item_number="0001",
-            item_type="P",
-            clin_type=self.primary,
+            item_type=item_type,
             ia=ia,
             order_qty=order_qty,
             supplier_due_date=supplier_due,
@@ -160,6 +158,35 @@ class ComputeOtdReportTests(OnTimeDeliveryTestBase):
         self.make_clin(supplier_due=datetime.date(2026, 5, 1))
         self.assertEqual(self.report()["totals"]["clins"], 0)
 
+    def test_item_type_filter_keeps_only_requested_codes(self):
+        self.make_clin(item_type="P")
+        self.make_clin(item_type="G")
+        self.make_clin(item_type="C")
+        labels = dict(Clin.ITEM_TYPE_CHOICES)
+        rows = self.report(item_types=("G", "C"))["rows"]
+        self.assertEqual([row["type_label"] for row in rows], [labels["G"], labels["C"]])
+
+    def test_blank_item_type_groups_as_no_type(self):
+        self.make_clin(item_type=None)
+        rows = self.report()["rows"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["type_label"], "(No Type)")
+
+    def test_group_order_follows_choice_declaration(self):
+        for code in ("C", "G", "P"):
+            self.make_clin(item_type=code)
+        self.assertEqual(
+            [row["item_type"] for row in self.report()["rows"]],
+            ["P", "G", "C"],
+        )
+
+    def test_unknown_item_type_displays_raw_code_and_sorts_last(self):
+        self.make_clin(item_type="P")
+        self.make_clin(item_type="X")
+        rows = self.report()["rows"]
+        self.assertEqual([row["item_type"] for row in rows], ["P", "X"])
+        self.assertEqual(rows[1]["type_label"], "X")
+
 
 @override_settings(REQUIRE_LOGIN=False)
 class OnTimeDeliveryViewTests(OnTimeDeliveryTestBase):
@@ -186,7 +213,45 @@ class OnTimeDeliveryViewTests(OnTimeDeliveryTestBase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.context["report"])
         self.assertContains(response, "Choose parameters and click Run Report.")
-        self.assertEqual(response.context["form"].initial["clin_type"], [])
+        self.assertEqual(response.context["form"].initial["item_type"], ["P"])
+
+    def test_unbound_checks_production_and_both_ia(self):
+        response = self.client.get(reverse("contracts:on_time_delivery_report"))
+        self.assertContains(response, 'id="otd-itemtype-P" checked')
+        for code, _label in Clin.ITEM_TYPE_CHOICES:
+            if code == "P":
+                continue
+            self.assertNotContains(response, f'id="otd-itemtype-{code}" checked')
+        self.assertContains(response, 'id="otd-ia-D" autocomplete="off" checked')
+        self.assertContains(response, 'id="otd-ia-O" autocomplete="off" checked')
+
+    def test_submitted_checkboxes_stay_checked(self):
+        navy = Buyer.objects.create(description="Navy")
+        army = Buyer.objects.create(description="Army")
+        Contract.objects.create(
+            company=self.company, contract_number="OTD-NAVY", buyer=navy, status=self.open_status,
+        )
+        Contract.objects.create(
+            company=self.company, contract_number="OTD-ARMY", buyer=army, status=self.open_status,
+        )
+        self.make_clin()
+        response = self.client.get(
+            reverse("contracts:on_time_delivery_report"),
+            {
+                "buyer": [self.buyer.pk, navy.pk],
+                "item_type": ["G"],
+                "ia": ["O"],
+                "start_date": START.isoformat(),
+                "end_date": END.isoformat(),
+            },
+        )
+        self.assertContains(response, f'id="otd-buyer-{self.buyer.pk}" checked')
+        self.assertContains(response, f'id="otd-buyer-{navy.pk}" checked')
+        self.assertNotContains(response, f'id="otd-buyer-{army.pk}" checked')
+        self.assertContains(response, 'id="otd-itemtype-G" checked')
+        self.assertNotContains(response, 'id="otd-itemtype-P" checked')
+        self.assertContains(response, 'id="otd-ia-O" autocomplete="off" checked')
+        self.assertContains(response, 'id="otd-ia-D" autocomplete="off">')
 
     def test_run_report(self):
         self.make_clin()
@@ -194,6 +259,14 @@ class OnTimeDeliveryViewTests(OnTimeDeliveryTestBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["report"]["totals"]["clins"], 1)
         self.assertContains(response, "Export to Excel")
+
+    def test_unknown_item_type_is_a_form_error(self):
+        response = self.client.get(
+            reverse("contracts:on_time_delivery_report"),
+            self.params(item_type=["Z"]),
+        )
+        self.assertIsNone(response.context["report"])
+        self.assertTrue(response.context["form"].errors["item_type"])
 
     def test_invalid_range_shows_errors(self):
         response = self.client.get(

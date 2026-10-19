@@ -59,7 +59,6 @@ class OnTimeDeliveryExportView(ActiveCompanyQuerysetMixin, View):
             company_name=company.name,
             filters=filters,
             buyer_labels=[b.description or "" for b in form.cleaned_data["buyer"]],
-            clin_type_labels=[t.description or "" for t in form.cleaned_data["clin_type"]],
         )
         response = HttpResponse(content, content_type=XLSX_CONTENT_TYPE)
         response["Content-Disposition"] = (
