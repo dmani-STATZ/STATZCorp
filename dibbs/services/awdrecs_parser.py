@@ -148,11 +148,6 @@ _CONTRACT_FIELD_KEYS = frozenset({
 })
 
 
-def _span_text(span: Tag) -> str:
-    """Extract visible text from a <span>, normalising whitespace and &nbsp;."""
-    return _clean(span.get_text(separator=" ", strip=True))
-
-
 def _extract_award_basic_number(span: Tag) -> str:
     """
     Extract the Award/Basic Number from the lblAwardBasicNumber span.

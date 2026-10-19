@@ -4,7 +4,6 @@ from django.core.exceptions import ValidationError
 from django.forms.models import construct_instance
 from django.contrib.auth.models import User
 from .models import (
-    Announcement,
     PortalResource,
     PortalSection,
     WorkCalendarEvent,
@@ -53,12 +52,6 @@ class BaseModelForm(BaseFormMixin, forms.ModelForm):
 class BaseForm(BaseFormMixin, forms.Form):
     """Base Form that implements the form-styling-rule."""
     pass
-
-class AnnouncementForm(BaseModelForm):
-    class Meta:
-        model = Announcement
-        fields = ['title', 'content']
-
 
 class PortalSectionForm(BaseModelForm):
     class Meta:

@@ -96,16 +96,6 @@ def _duplicate_count_for(nsn):
     return Nsn.objects.filter(nsn_code__in=variants).count()
 
 
-def _resolve_canonical_nsn_queryset(normalized, raw_hint=''):
-    """Return queryset ordered canonical-first for a normalized code."""
-    if not normalized:
-        return Nsn.objects.none()
-    canonical = _canonical_nsn_from_rows(_nsns_matching_normalized(normalized, raw_hint))
-    if not canonical:
-        return Nsn.objects.none()
-    return Nsn.objects.filter(pk=canonical.pk)
-
-
 def _batched_suppliers_by_cage(cage_codes):
     from suppliers.models import Supplier
 

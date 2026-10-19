@@ -28,8 +28,6 @@ ADDRESS_API_TO_MODEL = {
     "state": "state",
     "zip": "zip",
 }
-ADDRESS_MODEL_TO_API = {v: k for k, v in ADDRESS_API_TO_MODEL.items()}
-
 CONTACT_WRITABLE_FIELDS = (
     "salutation",
     "name",

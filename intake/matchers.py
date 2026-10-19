@@ -66,9 +66,6 @@ def _normalize_nsn_code(value: str) -> str:
     return value
 
 
-MATCH_TYPES = ('buyer', 'idiq', 'nsn', 'supplier', 'contract')
-
-
 class MatcherError(Exception):
     """Raised for malformed match_type / target_path / record lookups."""
 

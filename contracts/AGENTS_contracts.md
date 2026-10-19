@@ -183,7 +183,6 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 ### Adding a field to `Contract`
 - `contracts/models.py` + new migration
 - `processing/models.py` `QueueContract` / `ProcessContract` and finalization mapping if the field is part of import or staging edit
-- `contracts/forms.py` (`ContractCloseForm`/`ContractCancelForm` only if close/cancel flows need it)
 - `contracts/views/contract_views.py` (management/detail context; Transactions modal wiring in templates/JS when the field is user-editable)
 - `contracts/templates/contracts/contract_management.html`, `contract_detail.html`
 - `contracts/views/contract_log_views.py` (if it should appear in exports)
@@ -441,7 +440,7 @@ Fields on `Contract` and `Clin` that appear to be tracked include: `contract_num
 ### Contract status strings and `ContractCloseView`
 - `ContractStatus.description` values in the database must be referenced **exactly** in code: `"Open"`, `"Closed"`, and `"Canceled"` (one L). Do **not** use `"Cancelled"` in lookups, filters, or new logic — it will not match the row in `contracts_contractstatus` (e.g. id=3 is `Canceled`).
 
-- **`ContractCloseView`** is a `DetailView`: `GET` renders the close / confirmation / already-closed page; `POST` applies the close and redirects. It is **not** a form-based `UpdateView` — the empty `ContractCloseForm` is compatibility-only.
+- **`ContractCloseView`** is a `DetailView`: `GET` renders the close / confirmation / already-closed page; `POST` applies the close and redirects. It is **not** a form-based `UpdateView`.
 
 ---
 

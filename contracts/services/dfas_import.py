@@ -433,19 +433,6 @@ def finalize_import_rows(
     }
 
 
-def finalize_import_batch(
-    *,
-    batch: DfasImportBatch,
-    user,
-) -> DfasImportBatch:
-    """
-    Backward-compatible wrapper: finalize all matched rows in the batch.
-    Does not close the batch.
-    """
-    finalize_import_rows(batch=batch, row_ids=None, user=user)
-    return DfasImportBatch.objects.prefetch_related('rows').get(pk=batch.pk)
-
-
 def close_import_batch(
     *,
     batch: DfasImportBatch,

@@ -261,12 +261,6 @@ class SupplierForm(BaseModelForm):
             return 'UNK'
         return value
 
-class ContractCloseForm(BaseModelForm):
-    class Meta:
-        model = Contract
-        fields = []  # No user-editable fields; all set programmatically in the view
-
-
 class SupplierTypeForm(BaseModelForm):
     class Meta:
         model = SupplierType
@@ -442,16 +436,6 @@ class CompanyForm(BaseModelForm):
                 membership.save(update_fields=['is_default'])
 
         self._pending_members = None
-
-class ContractCancelForm(BaseModelForm):
-    class Meta:
-        model = Contract
-        fields = ['status', 'date_canceled', 'canceled_reason']
-        widgets = {
-            'date_canceled': forms.DateTimeInput(attrs={
-                'type': 'datetime-local'
-            })
-        }
 
 class ClinForm(BaseModelForm):
     class Meta:

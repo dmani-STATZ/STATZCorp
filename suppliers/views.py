@@ -1089,26 +1089,6 @@ def _parse_int_ids_post(raw) -> list[int] | None:
     return out
 
 
-def _validate_contact_ids_for_supplier(
-    supplier_pk: int, contact_ids: list[int]
-) -> tuple[list[Contact] | None, list[int] | None]:
-    """
-    All IDs must exist and belong to the supplier. Returns (contacts, None) or
-    (None, bad_ids) on failure.
-    """
-    if not contact_ids:
-        return [], None
-    valid_qs = Contact.objects.filter(
-        id__in=contact_ids, supplier_id=supplier_pk
-    )
-    valid_ids = set(valid_qs.values_list("id", flat=True))
-    unique_requested = list(dict.fromkeys(contact_ids))
-    bad = [i for i in unique_requested if i not in valid_ids]
-    if bad:
-        return None, sorted(bad)
-    return list(valid_qs.order_by("id")), None
-
-
 @login_required
 @require_POST
 def supplier_contact_set_categories(request, pk, contact_id):

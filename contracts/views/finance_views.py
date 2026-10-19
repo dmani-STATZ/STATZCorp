@@ -27,15 +27,6 @@ logger = logging.getLogger(__name__)
 PAYMENT_ACTIVITY_PAGE_SIZE = 50
 
 
-def safe_float(value):
-    """Convert a value to float, returning 0.0 if the value is None."""
-    try:
-        return float(value) if value is not None else 0.0
-    except (TypeError, ValueError) as e:
-        logger.warning(f"Error converting value to float: {value}, Error: {str(e)}")
-        return 0.0
-
-
 def build_finance_audit_supplier_groups(clins_list, level_charges):
     """Group Finance Audit CLINs and level charges by supplier with subtotals."""
     main_supplier = None

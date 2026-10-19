@@ -97,16 +97,6 @@ def build_idiq_path(contract, do_number: Optional[str] = None) -> str:
     return build_regular_path(contract)
 
 
-def build_default_path(contract, do_number: Optional[str] = None) -> str:
-    """Resolve the best default SharePoint folder path for a contract."""
-    stored_path = normalize_legacy_path(getattr(contract, "files_url", "") or "", contract=contract)
-    if stored_path:
-        return stored_path
-    if getattr(contract, "idiq_contract_id", None):
-        return build_idiq_path(contract, do_number=do_number)
-    return build_regular_path(contract)
-
-
 def normalize_folder_path(folder_path: str) -> str:
     """Normalize user/API paths to Graph's slash-separated drive-root format."""
     path = (folder_path or "").strip().replace("\\", "/")
