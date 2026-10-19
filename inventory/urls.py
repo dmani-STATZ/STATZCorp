@@ -20,7 +20,6 @@ from . import views as Inventoryviews
 app_name = 'inventory'
 
 urlpatterns = [
-    path('delete-item-ajax/<int:pk>/', Inventoryviews.delete_item_ajax, name='delete_item_ajax'),
     path('autocomplete/nsn/', Inventoryviews.autocomplete_nsn, name='autocomplete_nsn'),
     path('autocomplete/description/', Inventoryviews.autocomplete_description, name='autocomplete_description'),
     path('autocomplete/manufacturer/', Inventoryviews.autocomplete_manufacturer, name='autocomplete_manufacturer'),

@@ -26,10 +26,7 @@ urlpatterns = [
     path('switch-company/', views.switch_company, name='switch_company'),
     
     # User settings URLs
-    path('settings/view/', views.user_settings_view, name='settings-view'),
-    path('settings/ajax/get/', views.ajax_get_user_setting, name='settings-get'),
     path('settings/ajax/save/', views.ajax_save_setting, name='settings-save'),
-    path('settings/ajax/types/', views.ajax_get_setting_types, name='settings-types'),
     
     # Password management URLs
     path('password-change/', views.password_change_view, name='password_change'),
@@ -59,12 +56,10 @@ urlpatterns = [
     path('portal/announcements/', views.portal_announcements_page, name='portal_announcements'),
 
     # Portal APIs
-    path('portal/dashboard/', views.portal_dashboard_data, name='portal_dashboard_data'),
     path('portal/sections/', views.portal_sections_api, name='portal_sections_api'),
     path('portal/sections/<int:section_id>/delete/', views.portal_section_delete, name='portal_section_delete'),
     path('portal/resources/upsert/', views.portal_resource_upsert, name='portal_resource_upsert'),
     path('portal/resources/<int:resource_id>/delete/', views.portal_resource_delete, name='portal_resource_delete'),
-    path('portal/tasks/create/', views.portal_task_create, name='portal_task_create'),
     path('portal/events/create/', views.portal_event_create, name='portal_event_create'),
     path('portal/events/import/sharepoint/', views.portal_import_sharepoint_xlsx, name='portal_import_sharepoint_xlsx'),
     path('portal/events/import/ui/', views.sharepoint_import_ui, name='sharepoint_import_ui'),

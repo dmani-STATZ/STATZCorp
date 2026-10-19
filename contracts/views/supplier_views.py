@@ -1067,17 +1067,6 @@ def delete_supplier_certification(request, supplier_id, pk):
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=400)
 
 @conditional_login_required
-def get_supplier_certification(request, pk):
-    certification = get_object_or_404(SupplierCertification, id=pk)
-    return JsonResponse({
-        'id': certification.id,
-        'certification_type': certification.certification_type.id,
-        'compliance_status': certification.compliance_status,
-        'certification_date': certification.certification_date.strftime('%Y-%m-%d') if certification.certification_date else None,
-        'certification_expiration': certification.certification_expiration.strftime('%Y-%m-%d') if certification.certification_expiration else None
-    })
-
-@conditional_login_required
 def update_supplier_certification(request, supplier_id, pk):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=400)
@@ -1208,16 +1197,6 @@ def delete_supplier_classification(request, supplier_id, pk):
         })
     
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=400)
-
-@conditional_login_required
-def get_supplier_classification(request, pk):
-    classification = get_object_or_404(SupplierClassification, id=pk)
-    return JsonResponse({
-        'id': classification.id,
-        'classification_type': classification.classification_type.id,
-        'classification_date': classification.classification_date.strftime('%Y-%m-%d') if classification.classification_date else None,
-        'expiration_date': classification.classification_expiration.strftime('%Y-%m-%d') if classification.classification_expiration else None
-    }) 
 
 @conditional_login_required
 def update_supplier_classification(request, supplier_id, pk):

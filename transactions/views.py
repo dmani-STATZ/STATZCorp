@@ -46,20 +46,6 @@ def transaction_detail(request, pk):
 
 @login_required
 @require_GET
-def field_info_api(request):
-    """Return widget type and choices for a model field. Used by modal form to pick input type."""
-    content_type_id = request.GET.get("content_type_id")
-    field_name = request.GET.get("field_name")
-    if not content_type_id or not field_name:
-        return JsonResponse({"error": "content_type_id and field_name required"}, status=400)
-    info = get_field_info(int(content_type_id), field_name)
-    if not info:
-        return JsonResponse({"error": "Unknown model or field"}, status=404)
-    return JsonResponse(info)
-
-
-@login_required
-@require_GET
 def fk_search(request):
     """
     AJAX endpoint for Tom Select FK autocomplete in the transaction edit modal.

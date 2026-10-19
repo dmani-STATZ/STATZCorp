@@ -273,23 +273,6 @@ def _template_download_url(template):
 
 
 @conditional_login_required
-def get_acknowledgment_letter(request, clin_id):
-    """Get or create an acknowledgment letter for a CLIN (modal JSON API)."""
-    clin = get_object_or_404(Clin, id=clin_id)
-    letter = _get_or_create_acknowledgment_letter(clin, request)
-    form = AcknowledgementLetterForm(instance=letter)
-
-    return JsonResponse({
-        'success': True,
-        'html': render(request, 'contracts/partials/acknowledgment_letter_form.html', {
-            'form': form,
-            'clin': clin,
-            'letter': letter
-        }).content.decode('utf-8')
-    })
-
-
-@conditional_login_required
 def acknowledgment_letter_page(request, clin_id):
     """Dedicated full-page editor for the PO acknowledgment letter."""
     clin = get_object_or_404(

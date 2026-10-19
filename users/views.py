@@ -13,7 +13,6 @@ from .forms import (
     PortalSectionForm,
     PortalResourceForm,
     WorkCalendarEventForm,
-    WorkCalendarTaskForm,
     EventAttachmentForm,
 )
 from django.contrib.auth.signals import user_logged_out
@@ -33,7 +32,6 @@ from .models import (
     ReleaseNoteAcknowledgement,
     ScheduledMicroBreak,
     SystemMessage,
-    UserSetting,
     UserSettingState,
     WorkCalendarEvent,
     WorkCalendarTask,
@@ -63,14 +61,12 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Avg, DateTimeField, Exists, OuterRef, Q, Subquery
 from .portal_services import (
-    build_portal_context,
     get_visible_sections,
     serialize_resource,
     serialize_section,
     serialize_event,
     upcoming_events_for_user,
     active_tasks_for_user,
-    serialize_task,
     upcoming_microbreaks,
     serialize_microbreak,
     outstanding_nlp_requests,
@@ -473,82 +469,6 @@ def ajax_save_setting(request):
             'message': str(e)
         }, status=400)
 
-@login_required
-@require_http_methods(["GET"])
-def ajax_get_user_setting(request):
-    """AJAX endpoint for getting a user's settings."""
-    try:
-        user_id = request.GET.get('user_id')
-        setting_name = request.GET.get('setting_name')
-        
-        logger.debug(f"ajax_get_user_setting called for user_id={user_id}, setting_name={setting_name}")
-        
-        if not user_id:
-            return JsonResponse({
-                'success': False,
-                'message': 'User ID is required'
-            }, status=400)
-        
-        User = get_user_model()
-        user = User.objects.get(id=user_id)
-        
-        if setting_name:
-            # Get specific setting
-            value = UserSettings.get_setting(user, setting_name)
-            logger.debug(f"Returning specific setting {setting_name}={value}")
-            return JsonResponse({
-                'success': True,
-                'value': value
-            })
-        else:
-            # Get all settings
-            settings = UserSettings.get_all_settings(user)
-            logger.debug(f"Returning all settings for user {user.username}: {settings}")
-            return JsonResponse({
-                'success': True,
-                'settings': settings
-            })
-            
-    except User.DoesNotExist:
-        logger.error(f"User not found: {user_id}")
-        return JsonResponse({
-            'success': False,
-            'message': 'User not found'
-        }, status=404)
-    except Exception as e:
-        logger.error(f"Error getting user settings: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'message': f"Error: {str(e)}"
-        }, status=400)
-
-@login_required
-@require_http_methods(["GET"])
-def ajax_get_setting_types(request):
-    """AJAX endpoint for getting all setting types."""
-    try:
-        # Import here to avoid circular imports
-        from .models import UserSetting
-        
-        # Get all settings with their types
-        settings = UserSetting.objects.all()
-        
-        # Create dictionary of setting name to type
-        types_dict = {setting.name: setting.setting_type for setting in settings}
-        
-        logger.debug(f"Returning {len(types_dict)} setting types")
-        
-        return JsonResponse({
-            'success': True,
-            'types': types_dict
-        })
-    except Exception as e:
-        logger.error(f"Error getting setting types: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'message': f"Error: {str(e)}"
-        }, status=400)
-
 class SystemMessageListView(LoginRequiredMixin, ListView):
     """View for displaying all system messages for a user."""
     
@@ -650,23 +570,6 @@ class CreateMessageView(LoginRequiredMixin, View):
         except Exception as e:
             messages.error(request, f'Error sending message: {str(e)}')
             return redirect('users:create-message')
-
-@login_required
-def user_settings_view(request):
-    """View for displaying and managing user settings."""
-    # Get all settings for the current user
-    current_user_settings = UserSettings.get_all_settings(request.user)
-    
-    # Get all possible setting types
-    setting_types = UserSetting.objects.values_list('setting_type', flat=True).distinct()
-    
-    context = {
-        'settings': current_user_settings,
-        'setting_types': list(setting_types),
-    }
-    
-    return render(request, 'users/settings_view.html', context)
-
 
 @login_required
 def password_change_view(request):
@@ -845,25 +748,6 @@ def portal_announcements_page(request):
 
 
 @login_required
-@require_http_methods(["GET"])
-def portal_dashboard_data(request):
-    """Return the aggregated portal context for async refreshes."""
-    portal_context = build_portal_context(request.user)
-    announcements = [
-        {
-            'id': announcement.id,
-            'title': announcement.title,
-            'content': announcement.content,
-            'posted_at': announcement.posted_at.isoformat(),
-            'posted_by': announcement.posted_by.get_full_name() or announcement.posted_by.username,
-        }
-        for announcement in Announcement.objects.select_related('posted_by').order_by('-posted_at')[:10]
-    ]
-    portal_context['announcements'] = announcements
-    return JsonResponse(portal_context)
-
-
-@login_required
 @require_http_methods(["GET", "POST"])
 def portal_sections_api(request):
     """List or create/update portal sections."""
@@ -977,21 +861,6 @@ def portal_resource_delete(request, resource_id):
             return JsonResponse({'error': 'You do not have permission to delete this resource.'}, status=403)
     resource.delete()
     return JsonResponse({'success': True})
-
-
-@login_required
-@require_http_methods(["POST"])
-def portal_task_create(request):
-    """Create a task that can later be dropped onto the calendar."""
-    data = _request_data(request)
-    payload = data.copy() if isinstance(data, QueryDict) else dict(data)
-    form = WorkCalendarTaskForm(payload)
-    if form.is_valid():
-        task = form.save(commit=False)
-        task.owner = request.user
-        task.save()
-        return JsonResponse({'task': serialize_task(task)}, status=201)
-    return JsonResponse({'errors': form.errors}, status=400)
 
 
 @login_required

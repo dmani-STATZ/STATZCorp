@@ -578,20 +578,6 @@ def contract_search(request):
 
 
 @conditional_login_required
-def check_contract_number(request):
-    contract_number = request.GET.get('number')
-    if contract_number:
-        # If we're editing an existing contract, exclude it from the check
-        current_contract_id = request.GET.get('current_id')
-        if current_contract_id:
-            exists = Contract.objects.exclude(id=current_contract_id).filter(contract_number=contract_number).exists()
-        else:
-            exists = Contract.objects.filter(contract_number=contract_number).exists()
-        return JsonResponse({'exists': exists})
-    return JsonResponse({'exists': False})
-
-
-@conditional_login_required
 def toggle_contract_field(request, contract_id):
     """
     Toggle a whitelisted boolean field on the Contract model.

@@ -262,7 +262,7 @@ After editing, verify manually:
 1. **Admin:** open `/admin/products/nsn/` — confirm list display, search, and edit form load without errors.
 2. **NSN edit flow:** navigate to `/products/nsn/<pk>/edit/` — confirm the form renders, saves, and redirects correctly.
 2b. **NSN create flow:** `/products/nsn/create/` (and Observatory / zero-results CTAs) — confirm create, `nsn_normalized` dedup rejection, and redirect to the dossier. Editing description on a known-duplicate dossier row must still save.
-3. **NSN search:** call `/products/nsn/search/?q=<3chars>` — confirm JSON response returns `id`/`text` pairs.
+3. **NSN search:** call `/contracts/nsn/search/?q=<3chars>` — confirm JSON response returns `id`/`text` pairs.
 4. **CLIN form autocomplete:** open a CLIN form in `contracts` and verify the NSN select widget populates.
 5. **IDIQ detail page:** confirm NSN display on an IDIQ contract detail page is intact.
 6. **Processing:** if `Nsn` fields were changed, verify `processing` matching views still filter correctly.

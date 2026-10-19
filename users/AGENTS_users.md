@@ -203,9 +203,8 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 - **Auth flow:** Log in via Microsoft and via username/password. Confirm redirect to `LOGIN_REDIRECT_URL`. Confirm session flags are set.
 - **Permission middleware:** Log in as a user with no `AppPermission` rows and attempt to access a protected app URL. Confirm redirect to `permission_denied`.
 - **Company switching:** Use `switch_company` endpoint. Confirm `active_company` in context changes on next page load.
-- **User settings AJAX:** Open `/users/settings/view/`, change a setting, verify AJAX save succeeds and persists.
+- **User settings AJAX:** Toggle the theme (posts to `/users/settings/ajax/save/`), reload, and verify the setting persisted.
 - **System messages:** Create a message via `/users/messages/create/`. Confirm unread count badge appears. Mark as read and confirm count updates.
-- **Portal dashboard API:** Authenticated GET to `/users/portal/dashboard/` returns 200 with JSON body.
 - **Admin permissions form:** Open `/admin/users/apppermission/`, edit a user's permissions, save, and verify the DB rows match.
 - **New user creation:** Create a new user; verify `UserSettingState` default rows are created via `create_user_settings` signal.
 - **Context processors:** Load any page after editing context processors; confirm no `AttributeError` or `ImportError` on `request.active_company`, unread count, or user preferences.

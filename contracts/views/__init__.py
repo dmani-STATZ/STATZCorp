@@ -39,11 +39,9 @@ from .supplier_views import (
     add_supplier_certification,
     update_supplier_certification,
     delete_supplier_certification,
-    get_supplier_certification,
     add_supplier_classification,
     update_supplier_classification,
     delete_supplier_classification,
-    get_supplier_classification,
     toggle_supplier_flag,
     update_supplier_address,
     update_supplier_notes,
@@ -140,12 +138,11 @@ from .idiq_views import (
     IdiqContractDetailsDeleteView,
 )
 
-from .finance_views import FinanceAuditView, update_contract_level_charge
+from .finance_views import FinanceAuditView
 
 from .api_views import (
     get_select_options,
     update_clin_field,
-    create_buyer,
     create_supplier,
 )
 
@@ -157,7 +154,6 @@ from .snippet_views import (
 )
 
 from .acknowledgment_views import (
-    get_acknowledgment_letter,
     update_acknowledgment_letter,
 )
 
@@ -215,7 +211,6 @@ __all__ = [
     'update_folder_field',
     'search_contracts',
     'FinanceAuditView',
-    'get_acknowledgment_letter',
     'update_acknowledgment_letter',
     'code_table_admin',
     'folder_scan_status',

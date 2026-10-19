@@ -58,10 +58,3 @@ def delete_item(request, pk):
         item.delete()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
-
-def delete_item_ajax(request, pk):
-    item = get_object_or_404(InventoryItem, pk=pk)
-    if request.method == 'POST':
-        item.delete()
-        return JsonResponse({'success': True})
-    return JsonResponse({'success': False})

@@ -19,7 +19,7 @@ Track field-level edits for a handful of auditable models and surface that histo
 ## 4. Key Files and What They Do
 - `models.py`: Declares the single `Transaction` model (fields: `content_type`, `object_id`, `field_name`, `old_value`, `new_value`, `note`, `created_at`, `user`) with `Meta.indexes` tuned for per-record and per-field lookups.
 - `forms.py`: Exposes `TransactionForm` (modal detail view that binds widgets using metadata) and `EditFieldForm` (single `new_value` entry that drives edits); both call `field_types.get_field_info` during `__init__`.
-- `views.py`: Hosts `transaction_list`, `transaction_detail`, `field_info_api`, and `transaction_edit_field` (GET for partials and history, POST to coerce or overwrite a field). Each view is `@login_required` and the edit view returns JSON for the modal.
+- `views.py`: Hosts `transaction_list`, `transaction_detail`, and `transaction_edit_field` (GET for partials and history, POST to coerce or overwrite a field). Each view is `@login_required` and the edit view returns JSON for the modal.
 - `urls.py`: Namespaced `transactions` routes under `/transactions/...` for list, detail, edit, and field-info endpoints.
 - `field_types.py`: Computes widget type (`WIDGET_*` constants) plus optional choices (booleans, ForeignKeys, fields with `choices`), limiting FK choice lists to 500 rows for performance.
 - `utils.py`: Provides `get_field_value_display`, `set_field_value` (coercion for dates, FKs, numbers, booleans), and `get_display_value` for rendering updated values.
@@ -41,7 +41,6 @@ Track field-level edits for a handful of auditable models and surface that histo
 3. `GET /transactions/<pk>/` (`transaction_detail`) renders `transaction_detail.html`, using `TransactionForm` so the stored `field_name`, `old_value`, and `new_value` appear with the proper widgets.
 4. `GET /transactions/edit/<content_type_id>/<object_id>/<field_name>/` (`transaction_edit_field`) verifies the model/field exists, reads `get_field_value_display`, prepares `EditFieldForm`, and returns `transaction_edit.html` with the latest 20 transactions for that field.
 5. `POST` to the same edit URL validates `EditFieldForm`, uses `utils.set_field_value` to coerce the raw string, and normalizes the optional note to `None`. Immediately around the primary `instance.save(update_fields=[field_name])`, the view sets `instance._transaction_note` and removes it in `finally`. The post-save signal reads that transient attribute while creating the append-only `Transaction` row. Cleanup occurs before model-specific secondary saves, so derived and synced rows do not inherit the user's note. The response remains `{success, field_name, content_type_id, object_id, display_value}` so the caller can update the page without a full refresh. Model-specific post-save cascades (view-layer, not signals): CLIN `item_value`/`quote_value` reverse-derive per-unit prices; CLIN `order_qty`/`unit_price`/`price_per_unit` forward-derive via `clin_compute.recompute_clin_derived_values` (`derived_updates`); CLIN `clin_po_num` or Contract `po_number` sync across the contract via `clin_po_sync.sync_po_number` (`po_sync_updates`).
-6. `GET /transactions/api/field-info/?content_type_id=...&field_name=...` (`field_info_api`) returns the widget type, choices, and label so page scripts know what input to render before opening the edit modal.
 All views are decorated with `@login_required`, and `transaction_edit_field` uses `JsonResponse` to surface validation errors or unknown fields.
 
 ## 7. Templates and UI Surface Area
@@ -94,7 +93,6 @@ FK fields on models with more than `FK_AJAX_THRESHOLD` (100) records use `WIDGET
 | `GET /transactions/<pk>/` | `transaction_detail` -> renders `transactions/partials/transaction_detail.html` showing one change and typed old/new fields. |
 | `GET /transactions/edit/<content_type_id>/<object_id>/<field_name>/` | `transaction_edit_field` (GET) -> returns `transaction_edit.html` (table, field info, edit form, last 20 field transactions). |
 | `POST /transactions/edit/...` | `transaction_edit_field` (POST) -> validates `EditFieldForm`, coerces and saves the field, and returns JSON with `display_value` so the caller can refresh that field. |
-| `GET /transactions/api/field-info/?content_type_id=...&field_name=...` | `field_info_api` -> JSON describing the widget type/choices/label for the field, or 400/404 on missing/unknown fields. |
 | `GET /transactions/api/fk-search/?content_type_id=&field_name=&q=&limit=` | `fk_search` — JSON `{"results": [{"value", "label"}]}` for Tom Select AJAX autocomplete. Min 3-char query, max 50 results. @login_required. |
 All endpoints require authentication (`@login_required`).
 
@@ -129,7 +127,7 @@ No `tests.py`, `tests/`, or other automated tests exist inside `transactions/`, 
 
 ## 19. Quick Reference
 - **Primary model:** `transactions.models.Transaction` (generic, indexed on `content_type`, `object_id`, `field_name`).
-- **Main URLs:** see `transactions/urls.py` for `list`, `detail`, `edit`, and `api/field-info` endpoints.
+- **Main URLs:** see `transactions/urls.py` for `list`, `detail`, and `edit` endpoints.
 - **Key templates:** `templates/transactions/transaction_modal.html`, `transaction_list.html`, `transaction_detail.html`, `transaction_edit.html`.
 - **Key dependencies:** `contracts.models.Contract`, `contracts.models.Clin`, `suppliers.models.Supplier`, `django.contrib.contenttypes`, `users` auth model, and `STATZWeb/settings.py` for installation/middleware.
 - **Risky files:** `signals.py` (cross-app tracking), `middleware.py` (contextvar lifetimes), `field_types.py`/`forms.py`/`templates/partials/transaction_edit.html` (widget consistency), and `utils.py` (coercion success).

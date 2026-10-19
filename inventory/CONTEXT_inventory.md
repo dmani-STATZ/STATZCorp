@@ -40,7 +40,7 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 - **Dashboard (`/inventory/` or `/inventory/dashboard`):** `dashboard()` pulls all `InventoryItem` rows, sums `item.quantity * item.purchaseprice` in Python, and renders `dashboard.html`. The template shows the list, total value, and renders the modal+buttons for deletion (AJAX) plus column headers that toggle client-side sorting.
 - **Add item (`/inventory/add/`):** `add_item()` instantiates `InventoryItemForm`. On POST, it saves a new row and redirects back to the dashboard; on GET, it renders `item_form.html` with the form.
 - **Edit item (`/inventory/edit/<pk>/`):** `edit_item()` finds the existing row, pre-fills the form, saves changes on POST, and redirects back.
-- **Delete item (`/inventory/delete-item/<pk>/`):** `delete_item()` requires POST, deletes the row, and returns `{'success': True}`. Dashboard JavaScript hits this path via `fetch` (with CSRF token) after a modal confirmation. A separate `delete_item_ajax()` view duplicates the logic without the decorator and is wired to `/delete-item-ajax/<pk>/` (but the dashboard currently targets the non-AJAX path).
+- **Delete item (`/inventory/delete-item/<pk>/`):** `delete_item()` requires POST, deletes the row, and returns `{'success': True}`. Dashboard JavaScript hits this path via `fetch` (with CSRF token) after a modal confirmation.
 - **Autocomplete:** Three JSON endpoints (`/autocomplete/nsn/`, `/autocomplete/description/`, `/autocomplete/manufacturer/`) return up to 10 distinct matches based on the search term; the form template mounts them via jQuery UI to power type-ahead inputs.
 
 ## 7. Templates and UI Surface Area
@@ -62,7 +62,7 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 - All business logic lives in `views.py` and `models.py`. `InventoryItem.save()` ensures `totalcost` always equals `purchaseprice * quantity`.
 - `dashboard()` computes `total_inventory_value` by iterating the queryset client-side rather than using Django aggregates, then passes the raw rows to `dashboard.html`.
 - `add_item()`/`edit_item()` reuse `InventoryItemForm`; the views redirect to the dashboard on success.
-- Deletion is handled by `delete_item()` (decorated with `@conditional_login_required`) and the redundant `delete_item_ajax()`.
+- Deletion is handled by `delete_item()` (decorated with `@conditional_login_required`).
 - Autocomplete helpers (`autocomplete_nsn`, `autocomplete_description`, `autocomplete_manufacturer`) use `.values_list(...).distinct()[:10]` to feed the form widgets.
 - There are no separate service, selectors, or Celery modules; `inventory` keeps its logic grouped around these few functions.
 
@@ -77,7 +77,6 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 
 ## 12. URL Surface / API Surface
 - `POST /inventory/delete-item/<pk>/`: Deletes the item and returns `{'success': True}` (`views.delete_item`).
-- `POST /inventory/delete-item-ajax/<pk>/`: Duplicate path hooked to `delete_item_ajax` (but the dashboard currently hits the non-AJAX view).
 - `GET /inventory/autocomplete/nsn/`: Returns JSON list of matching NSNs for the add/edit form.
 - `GET /inventory/autocomplete/description/`: Returns JSON list of matching descriptions.
 - `GET /inventory/autocomplete/manufacturer/`: Returns JSON list of matching manufacturers.
@@ -87,7 +86,7 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 
 ## 13. Permissions / Security Considerations
 - The key UI flows (`dashboard`, `add_item`, `edit_item`, `delete_item`) are wrapped with `@conditional_login_required`, so they require authentication whenever `settings.REQUIRE_LOGIN` evaluates to `True` (see `STATZWeb/settings.py`).
-- Autocomplete endpoints and `delete_item_ajax()` are **not** decorated, so they respond to any request; the autocomplete views simply read and return data, but `delete_item_ajax` exposes a destructive path without the login guard—a risk if this URL is ever favored by clients.
+- Autocomplete endpoints are **not** decorated, so they respond to any request; they only read and return data.
 - The AJAX delete call in `dashboard.html` posts with `X-CSRFToken` and uses `credentials: 'same-origin'`, so any changes to CSRF middleware configuration must preserve that behavior.
 - `InventoryItem.save()` multiplies `quantity` and `purchaseprice` even though both fields allow `null`, so enforcing non-null input at the form, view, or database level should precede such calculations to avoid `TypeError` explosions.
 
@@ -104,7 +103,6 @@ None. No Celery tasks, management commands, signals, or scheduled jobs exist wit
 ## 17. Known Gaps / Ambiguities
 - The `__str__` method is indented under `Meta` in `models.py`, so Django never registers it; the model prints the default `Model.__str__` unless this is realigned.
 - `delete_form.html` exists but no view renders it anymore; it may be a remnant of a previous POST-confirmation flow.
-- `delete_item_ajax()` duplicates `delete_item()` but lacks authentication; if this endpoint is exposed, it bypasses `conditional_login_required`.
 - Autocomplete views, despite returning only strings, are unauthenticated and could expose the full set of NSNs/manufacturers unless `REQUIRE_LOGIN` is set at the project level.
 - The dashboard’s total value computation (`sum(item.quantity * item.purchaseprice)`) and the `InventoryItem.save()` multiplication both assume non-null numeric inputs even though the form allows blanks.
 
@@ -117,7 +115,7 @@ None. No Celery tasks, management commands, signals, or scheduled jobs exist wit
 
 ## 19. Quick Reference
 - **Primary model:** `InventoryItem` (`inventory/models.py`), tied to `STATZ_WAREHOUSE_INVENTORY_TBL` with computed `totalcost`.
-- **Main URLs:** dashboard (`inventory/dashboard`), add/edit/delete (`inventory/add`, `inventory/edit/<pk>`, `inventory/delete-item/<pk>`), delete AJAX (`inventory/delete-item-ajax/<pk>`), autocomplete endpoints (`inventory/autocomplete/*`).
+- **Main URLs:** dashboard (`inventory/dashboard`), add/edit/delete (`inventory/add`, `inventory/edit/<pk>`, `inventory/delete-item/<pk>`), autocomplete endpoints (`inventory/autocomplete/*`).
 - **Key templates:** `inventory/templates/inventory/dashboard.html`, `inventory/templates/inventory/item_form.html`, `inventory/templates/inventory/delete_form.html`.
 - **Key dependencies:** `STATZWeb/decorators.py` + `settings.REQUIRE_LOGIN`, `templates/base_template.html`, `crispy_forms`, `jQuery UI`, `templatetags/custom_filters.py`.
 - **Risky files to review first:** `inventory/views.py` (decorators, delete + JSON endpoints), `inventory/templates/inventory/dashboard.html` (modal + sorting + AJAX), `inventory/models.py` (save calculation, mis-indented `__str__`).

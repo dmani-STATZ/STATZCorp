@@ -78,10 +78,10 @@ equest.active_company in sync with the session, user setting, or default contrac
 - README.md: Developer-facing notes summarizing the app’s responsibilities and giving hints about the permission decorator/middleware.
 
 ## 5. Data Model / Domain Objects
-- Announcement: Simple any-user post with 	itle, content, posted_by (FK to User), and posted_at; surfaced in portal_dashboard_data.
+- Announcement: Simple any-user post with 	itle, content, posted_by (FK to User), and posted_at.
 - PortalSection & PortalResource: Configurable sections with visibility/layout preferences, editor M2M ties, and JSON/effect data that restrict who can edit/see resources. The resource model enforces required fields per 
 esource_type (ile, link, embed) in its own clean().
-- WorkCalendarTask: Owner, due date, importance/energy metadata, status, and arbitrary metadata; tasks are created via portal_task_create.
+- WorkCalendarTask: Owner, due date, importance/energy metadata, status, and arbitrary metadata.
 - WorkCalendarEvent: Organizer-owned events with privacy flags, predicted attendance, energy/priority, NLP metadata, attachment/task relations, and clean() enforcing end_at > start_at. Attachments link back via EventAttachment.
 - RecurrenceRule: One-to-one with WorkCalendarEvent, stores req/interval and weekday JSON to let _expand_recurrences feed the calendar.
 - EventAttendance/EventReminder: Attendance records with status/confidence_score, and reminders (offsets/message) that staff can edit via admin.
@@ -109,10 +109,10 @@ efresh_token/expires_at per user; is_expired and refresh helpers keep the token 
 ## 6. Request / User Flow
 - **Authentication:** /users/login/ shows Microsoft + password tabs (iews.login_view). The Microsoft flow starts in ms_views.MicrosoftAuthView, runs through zure_auth.MicrosoftAuthBackend, stores tokens in UserOAuthToken, and finishes in MicrosoftCallbackView. Password login uses AdminLoginForm and uthenticate(). /users/register/ simply redirects users to Microsoft. /users/logout/ is the Django auth LogoutView.
 - **Password lifecycle:** /users/password-reset/... reuses Django’s auth views; custom_password_reset reroutes OAuth-only users to /users/oauth_migration/, where EmailLookupForm captures the Microsoft email and sends the user to /users/oauth_password_set/ (OAuthPasswordSetForm) to choose a password. Logged-in users can run /users/password-change/ (PasswordChangeForm) or /users/password-set/ if they currently lack a password.
-- **User settings:** /users/settings/view/ renders manage_settings.html (super user grid + AJAX) and /users/settings/ajax/* endpoints let JS read/write UserSetting values after consulting UserSettingState. /users/settings/view/ itself also shows personal settings via settings_view.html.
+- **User settings:** /users/settings/ajax/save/ (`ajax_save_setting`) lets JS write UserSetting values after consulting UserSettingState (used by the theme toggle). The old settings pages and read endpoints were removed in the 2026-10-19 dead-code cleanup.
 - **Company/context:** The ActiveCompanyMiddleware (with contracts.Company, UserCompanyMembership, and UserSettings) keeps 
 equest.active_company current. /users/switch-company/ enforces membership before writing ctive_company_id to the session and settings. Context processors expose ctive_company, vailable_companies, preferences, and unread message counts to templates.
-- **Portal/dashboard APIs:** /users/portal/dashboard/ returns portal_services.build_portal_context() plus announcements. /users/portal/sections/ lists sections for all users (GET) and permits superusers to create/update (PortalSectionForm). Resources are upserted/deleted via /portal/resources/... respecting section editors and restricting file uploads to superusers. Tasks/events can be created via /portal/tasks/create/ and /portal/events/create/; the portal_event_feed endpoint returns upcoming events (expanding recurrences via _expand_recurrences). Event operations (detail/update/delete, attachments) are organizer-bound, with JSON payloads and forms ensuring validation. /portal/nlp-schedule/ parses natural language text, stores NaturalLanguageScheduleRequest, optionally auto-creates WorkCalendarEvent, and auto-inserts a ScheduledMicroBreak. /portal/microbreaks/*, /portal/events/export/csv/, /portal/events/import/sharepoint/, and /users/sharepoint-import-ui/ round out the async UX for schedule management.
+- **Portal/dashboard APIs:** /users/portal/sections/ lists sections for all users (GET) and permits superusers to create/update (PortalSectionForm). Resources are upserted/deleted via /portal/resources/... respecting section editors and restricting file uploads to superusers. Events can be created via /portal/events/create/; the portal_event_feed endpoint returns upcoming events (expanding recurrences via _expand_recurrences). Event operations (detail/update/delete, attachments) are organizer-bound, with JSON payloads and forms ensuring validation. /portal/nlp-schedule/ parses natural language text, stores NaturalLanguageScheduleRequest, optionally auto-creates WorkCalendarEvent, and auto-inserts a ScheduledMicroBreak. /portal/microbreaks/*, /portal/events/export/csv/, /portal/events/import/sharepoint/, and /users/sharepoint-import-ui/ round out the async UX for schedule management.
 - **System messaging:** /users/messages/ lists SystemMessage rows, /users/messages/create/ lets staff build notifications, /mark-read/ + /mark-all-read/ update statuses, and /unread-count/ powers the badge shown by the context processor.
 - **Permissions:** /users/permission-denied/ renders a reusable error page.
 
@@ -121,7 +121,7 @@ equest.active_company current. /users/switch-company/ enforces membership before
 egister.html, custom_password_reset.html, oauth_migration.html, oauth_password_set.html, password_* templates). login.html uses a tabbed layout with a Microsoft button (static asset static/users/img/ms-logo.svg) and a hidden password form.
 - Settings UIs include manage_settings.html (AJAX-powered grid that fetches/saves settings via /settings/ajax/*), settings_view.html (simple per-user list), and profile.html (a stub rendering users/profile.html). The management page injects vanilla JS that handles input highlighting, etch calls, and dynamic setting creation.
 - System messages are rendered by system_messages.html (uses user_tags.get_username to show senders, includes buttons wired to the JSON APIs for marking read). create_message.html is the form staff use to send messages.
-- Portal interface is entirely JSON-driven; the templates here are only for auth/settings. The portal front-end consumes the JSON from portal_dashboard_data, portal_sections_api, portal_event_feed, etc., and the serialization helpers in portal_services.py guarantee the payload shape.
+- Portal interface is entirely JSON-driven; the templates here are only for auth/settings. The portal front-end consumes the JSON from portal_sections_api, portal_event_feed, etc., and the serialization helpers in portal_services.py guarantee the payload shape.
 - Templatetags: 	emplatetags/user_tags.py provides helper filters used in the system message list and settings modals.
 - Static assets: Minimal—currently just the Microsoft logo plus the Django admin JS reference (dmin/js/app_permissions.js) the custom permission form expects.
 
@@ -160,10 +160,10 @@ equests, openpyxl, and optionally dateutil/python-dateutil (fall-back). The port
 ## 12. URL Surface / API Surface
 - Authentication: /users/register/, /users/login/, /users/logout/, /users/profile/, /users/password-reset/ + Django’s password reset/done/confirm/complete URLs, /users/custom-password-reset/, /users/oauth-migration/, /users/oauth-password-set/, /users/password-change/, /users/password-set/.
 - Permissions: /users/permission-denied/.
-- Company/settings: /users/switch-company/, /users/settings/view/, /users/settings/ajax/get/, /users/settings/ajax/save/, /users/settings/ajax/types/, /users/settings/view/.
+- Company/settings: /users/switch-company/, /users/settings/ajax/save/.
 - Microsoft auth: /users/microsoft/login/, /users/microsoft/auth-callback/.
 - System messages: /users/messages/, /users/messages/create/, /users/messages/mark-read/<pk>/, /users/messages/mark-all-read/, /users/messages/unread-count/.
-- Portal APIs: /users/portal/dashboard/, /users/portal/sections/ (GET lists, POST upserts, /sections/<id>/delete/), /users/portal/resources/ (upsert/delete), /users/portal/tasks/create/, /users/portal/events/create/, /users/portal/events/import/sharepoint/ (POST calls sync_sharepoint_calendar() and returns JSON sync stats: fetched, created, updated, skipped, errors), /users/portal/events/import/ui/, /users/portal/events/export/csv/, /users/portal/events/feed/, /users/portal/events/<id>/detail/, /users/portal/events/<id>/attachments/upsert/, /users/portal/events/attachments/<id>/delete/, /users/portal/events/<id>/update/, /users/portal/events/<id>/delete/, /users/portal/nlp-schedule/, /users/portal/microbreaks/create/, /users/portal/microbreaks/feed/.
+- Portal APIs: /users/portal/sections/ (GET lists, POST upserts, /sections/<id>/delete/), /users/portal/resources/ (upsert/delete), /users/portal/events/create/, /users/portal/events/import/sharepoint/ (POST calls sync_sharepoint_calendar() and returns JSON sync stats: fetched, created, updated, skipped, errors), /users/portal/events/import/ui/, /users/portal/events/export/csv/, /users/portal/events/feed/, /users/portal/events/<id>/detail/, /users/portal/events/<id>/attachments/upsert/, /users/portal/events/attachments/<id>/delete/, /users/portal/events/<id>/update/, /users/portal/events/<id>/delete/, /users/portal/nlp-schedule/, /users/portal/microbreaks/create/, /users/portal/microbreaks/feed/.
 - SharePoint UI: /users/sharepoint-import-ui/ (staff-only, renders a form to call the endpoint above).
 
 ## 13. Permissions / Security Considerations
@@ -209,7 +209,7 @@ egister.html template never renders unless another view uses it.
 
 ## 19. Quick Reference
 - **Primary models:** AppRegistry/AppPermission, UserSetting/UserSettingState, UserOAuthToken, Announcement, PortalSection/PortalResource, WorkCalendarTask, WorkCalendarEvent (+ recurrence/attachments/attendance/reminders), NaturalLanguageScheduleRequest, CalendarAnalyticsSnapshot, ScheduledMicroBreak, UserCompanyMembership, SystemMessage.
-- **Main URLs:** /users/login/, /users/microsoft/login/, /users/permission-denied/, /users/settings/view/, /users/portal/dashboard/, /users/portal/events/feed/, /users/messages/, /users/sharepoint-import-ui/.
+- **Main URLs:** /users/login/, /users/microsoft/login/, /users/permission-denied/, /users/portal/events/feed/, /users/messages/, /users/sharepoint-import-ui/.
 - **Key templates:** 	emplates/users/login.html, manage_settings.html, settings_view.html, system_messages.html, create_message.html, and the password-reset/OAuth templates under 	emplates/users/.
 - **Key dependencies:** Microsoft MSAL (msal + 
 equests), openpyxl for SharePoint import, optional python-dateutil, Django auth/password reset stack, and suppliers.openrouter_config for AI-model defaults.

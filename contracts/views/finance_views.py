@@ -1,11 +1,8 @@
 from collections import defaultdict
-import json
 
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_http_methods
-from django.db import transaction
 from django.db.models import Q, Sum
 from django.views.generic import DetailView
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -562,54 +559,3 @@ def finance_audit_clin_api(request, contract_id, clin_id):
     except Exception as e:
         logger.error(f"Error in finance_audit_clin_api: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
-
-@login_required
-@require_http_methods(["POST"])
-def update_contract_level_charge(request, charge_id):
-    company = getattr(request, 'active_company', None)
-    if not company:
-        return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
-
-    charge = get_object_or_404(
-        ContractLevelCharge.objects.select_related('contract'),
-        id=charge_id,
-        contract__company=company
-    )
-
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'error': 'Invalid JSON payload'}, status=400)
-
-    field = data.get('field')
-    if field != 'billed_paid_amount':
-        return JsonResponse({'success': False, 'error': 'Only billed_paid_amount field can be updated.'}, status=400)
-
-    value_raw = data.get('value')
-    if value_raw in (None, '', 'null'):
-        value = None
-    else:
-        try:
-            value = Decimal(str(value_raw))
-        except (ValueError, TypeError):
-            return JsonResponse({'success': False, 'error': 'Invalid Decimal value format.'}, status=400)
-
-    try:
-        with transaction.atomic():
-            charge.billed_paid_amount = value
-            charge.modified_by = request.user
-            charge.save()
-
-        billed_paid_amount_str = str(charge.billed_paid_amount) if charge.billed_paid_amount is not None else None
-        effective_amount_str = str(charge.effective_amount)
-        variance_str = str(charge.variance) if charge.variance is not None else None
-
-        return JsonResponse({
-            'success': True,
-            'billed_paid_amount': billed_paid_amount_str,
-            'effective_amount': effective_amount_str,
-            'variance': variance_str
-        })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)

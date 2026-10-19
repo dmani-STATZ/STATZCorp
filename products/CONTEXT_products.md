@@ -68,7 +68,7 @@ Approved on / Quoted us / Won / Manual capabilities (`SupplierNSN`). Without `ca
 ### Legacy flows (unchanged)
 - **Creating an NSN:** `/products/nsn/create/` → `contracts.views.NsnCreateView`. Optional `?nsn_code=` prefills the form. Success redirects to `products:nsn_detail`.
 - **Editing an NSN:** `/products/nsn/<int:pk>/edit/` → `contracts.views.NsnUpdateView`.
-- **Widget JSON search:** `/products/nsn/search/` → `contracts.views.NsnSearchView` (min 3 chars).
+- **Widget JSON search:** `/contracts/nsn/search/` (`contracts:nsn_search`) → `contracts.views.NsnSearchView` (min 3 chars).
 
 ## 7. Templates and UI Surface Area
 - Portal templates extend `contracts/contract_base.html` and use the standard site header from `base_template.html` (no custom header/banner overrides). Footer chrome (Contract Menu, Reminders) is inherited unchanged.
@@ -108,7 +108,6 @@ All other logic (search throttles, redirect decisions, JSON responses) lives in 
 - `/products/nsn/create/` (`products:nsn_create`) → `contracts.views.NsnCreateView`.
 - `/products/supplier/<int:pk>/nsns/` (`products:supplier_nsns`) → Supplier NSN View.
 - `/products/nsn/<int:pk>/edit/` (`products:nsn_edit`) → `contracts.views.NsnUpdateView`.
-- `/products/nsn/search/` (`products:nsn_search`) → `contracts.views.NsnSearchView` (widget JSON).
 
 ## 13. Permissions / Security Considerations
 - `NsnCreateView` / `NsnUpdateView` wrap the view in `conditional_login_required`, so login is required whenever `settings.REQUIRE_LOGIN` is true. The views do not enforce additional per-object ACLs, so broader authorization must be handled by the caller or by restricting who can reach the URL.

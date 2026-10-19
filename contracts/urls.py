@@ -67,12 +67,9 @@ from .views import (
     add_supplier_certification,
     update_supplier_certification,
     delete_supplier_certification,
-    get_supplier_certification,
     add_supplier_classification,
     update_supplier_classification,
     delete_supplier_classification,
-    get_supplier_classification,
-    supplier_autocomplete,
     supplier_admin_tools,
     # Contact and Address views
     ContactListView,
@@ -166,13 +163,11 @@ from .views.folder_review_views import (
     folder_review_api_move_do,
 )
 
-from .views.contract_views import check_contract_number
 from .views.api_views import (
     get_select_options,
     update_clin_field,
     clin_copy_defaults,
     clin_ship_qty_api,
-    create_buyer,
     create_supplier,
     contract_day_counts,
 )
@@ -187,7 +182,6 @@ from .views.idiq_views import (
 )
 
 from .views.acknowledgment_views import (
-    get_acknowledgment_letter,
     acknowledgment_letter_page,
     get_existing_acknowledgment_pdf,
     preview_acknowledgment_letter,
@@ -439,9 +433,6 @@ urlpatterns = [
     # NSN and Supplier management
     path("nsn/<int:pk>/edit/", NsnUpdateView.as_view(), name="nsn_edit"),
     path("suppliers/", SupplierListView.as_view(), name="supplier_list"),
-    path(
-        "suppliers/autocomplete/", supplier_autocomplete, name="supplier_autocomplete"
-    ),
     path("suppliers/search/", SupplierSearchView.as_view(), name="supplier_search"),
     path("supplier/<int:pk>/edit/", SupplierUpdateView.as_view(), name="supplier_edit"),
     path("supplier/create/", SupplierCreateView.as_view(), name="supplier_create"),
@@ -518,11 +509,6 @@ urlpatterns = [
         name="supplier_delete_certification",
     ),
     path(
-        "supplier/certification/<int:pk>/",
-        get_supplier_certification,
-        name="supplier_get_certification",
-    ),
-    path(
         "supplier/<int:supplier_id>/classification/add/",
         add_supplier_classification,
         name="supplier_add_classification",
@@ -536,11 +522,6 @@ urlpatterns = [
         "supplier/<int:supplier_id>/classification/<int:pk>/delete/",
         delete_supplier_classification,
         name="supplier_delete_classification",
-    ),
-    path(
-        "supplier/classification/<int:pk>/",
-        get_supplier_classification,
-        name="supplier_get_classification",
     ),
     # Note management
     path("note/add/<int:content_type_id>/<int:object_id>/", add_note, name="add_note"),
@@ -678,11 +659,9 @@ urlpatterns = [
         get_combined_notes,
         name="get_combined_notes_with_clin",
     ),
-    path("api/buyers/create/", create_buyer, name="api_buyer_create"),
     path("api/suppliers/create/", create_supplier, name="api_supplier_create"),
     path("api/nsn/create/", views.api_views.create_nsn, name="api_nsn_create"),
     path("api/day-counts/", contract_day_counts, name="contract_day_counts"),
-    path("check-contract-number/", check_contract_number, name="check_contract_number"),
     # Contact management
     path("contacts/", ContactListView.as_view(), name="contact_list"),
     path("contacts/<int:pk>/", ContactDetailView.as_view(), name="contact_detail"),
@@ -784,7 +763,6 @@ urlpatterns = [
     ),
     path("api/finance-audit/<int:contract_id>/summary/", finance_audit_summary_api, name="finance_audit_summary_api"),
     path("api/finance-audit/<int:contract_id>/clin/<int:clin_id>/", finance_audit_clin_api, name="finance_audit_clin_api"),
-    path('api/contract-level-charge/<int:charge_id>/update/', views.update_contract_level_charge, name='update_contract_level_charge'),
     path(
         "api/contract/<int:contract_pk>/level-charges/add/",
         add_contract_level_charge,
@@ -898,11 +876,6 @@ urlpatterns = [
         "acknowledgment-letter/template/upload/",
         upload_acknowledgment_template,
         name="acknowledgment-template-upload",
-    ),
-    path(
-        "acknowledgment-letter/<int:clin_id>/",
-        get_acknowledgment_letter,
-        name="get_acknowledgment_letter",
     ),
     path(
         "acknowledgment-letter/<int:letter_id>/update/",

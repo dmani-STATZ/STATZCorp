@@ -501,69 +501,6 @@ def create_nsn(request):
 
 @login_required
 @require_http_methods(["POST"])
-def create_buyer(request):
-    """
-    API endpoint to create a new Buyer record.
-    Expects JSON data with:
-    - buyer_text: buyer name/description
-    """
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse(
-            {
-                'success': False,
-                'error': 'Invalid JSON data',
-            },
-            status=400,
-        )
-
-    buyer_text = (data.get('buyer_text') or '').strip()
-
-    if not buyer_text:
-        return JsonResponse(
-            {
-                'success': False,
-                'error': 'Buyer name is required',
-            },
-            status=400,
-        )
-
-    # Re-use existing Buyers when the description matches (case-insensitive)
-    existing_buyer = Buyer.objects.filter(description__iexact=buyer_text).first()
-    if existing_buyer:
-        return JsonResponse(
-            {
-                'success': True,
-                'id': existing_buyer.id,
-                'description': existing_buyer.description,
-                'duplicate': True,
-                'message': 'Buyer already exists; using the existing record.',
-            }
-        )
-
-    try:
-        buyer = Buyer.objects.create(description=buyer_text)
-    except Exception as exc:
-        return JsonResponse(
-            {
-                'success': False,
-                'error': str(exc),
-            },
-            status=500,
-        )
-
-    return JsonResponse(
-        {
-            'success': True,
-            'id': buyer.id,
-            'description': buyer.description,
-        }
-    )
-
-
-@login_required
-@require_http_methods(["POST"])
 def create_supplier(request):
     """
     API endpoint to create a new Supplier record.

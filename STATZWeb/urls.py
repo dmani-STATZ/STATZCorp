@@ -102,7 +102,6 @@ urlpatterns = [
         MicrosoftCallbackView.as_view(),
         name="microsoft_callback",
     ),
-    # path('check-auth-method/', views.check_auth_method, name='check_auth_method'),
     path("inventory/", include("inventory.urls")),
     path("contracts/", include("contracts.urls")),
     path("dibbs/", include("dibbs.urls")),

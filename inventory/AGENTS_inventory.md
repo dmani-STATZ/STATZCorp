@@ -31,7 +31,7 @@ This file tells AI coding agents how to safely modify the `inventory` app. It id
 - `inventory/templates/inventory/item_form.html` — label overrides use raw Django label strings (`"Nsn"`, `"Partnumber"`, `"Itemlocation"`, `"Purchaseprice"`) which derive from field names
 
 ### Before changing views
-- `inventory/views.py` — note which views have `@conditional_login_required` and which do not (`autocomplete_*`, `delete_item_ajax`)
+- `inventory/views.py` — note which views have `@conditional_login_required` and which do not (`autocomplete_*`)
 - `STATZWeb/decorators.py` — understand `conditional_login_required` behavior before adding or removing the decorator
 - `inventory/urls.py` — confirm URL names used in JS (`inventory:delete_item`, `inventory:edit_item`, `inventory:add_item`, autocomplete endpoints)
 
@@ -94,7 +94,6 @@ This app is a flat, legacy-style Django app with no service layer:
 ## 7. Security / Permissions Rules
 
 - `dashboard`, `add_item`, `edit_item`, and `delete_item` are protected by `@conditional_login_required`. Do not remove this decorator without understanding `settings.REQUIRE_LOGIN`.
-- `delete_item_ajax` (`/inventory/delete-item-ajax/<pk>/`) has **no authentication decorator**. It is a live destructive endpoint accessible without login. Do not route clients to it; do not add features to it without first adding the decorator.
 - The three autocomplete endpoints are also unauthenticated. They return data from the live database. If `REQUIRE_LOGIN` is not set project-wide, they expose all NSN, description, and manufacturer values publicly.
 - The AJAX delete in `dashboard.html` posts with `X-CSRFToken` using `credentials: 'same-origin'`. Any CSRF middleware changes must preserve this contract.
 
@@ -113,7 +112,7 @@ This app is a flat, legacy-style Django app with no service layer:
 
 ## 9. View / URL / Template Change Rules
 
-- URL names `dashboard`, `add_item`, `edit_item`, `delete_item`, `autocomplete_nsn`, `autocomplete_description`, `autocomplete_manufacturer`, `delete_item_ajax` are all referenced by string in templates. Renaming any of them requires searching templates and `base_template.html`.
+- URL names `dashboard`, `add_item`, `edit_item`, `delete_item`, `autocomplete_nsn`, `autocomplete_description`, `autocomplete_manufacturer` are all referenced by string in templates. Renaming any of them requires searching templates and `base_template.html`.
 - `dashboard.html` builds the AJAX delete URL at render time using `{% url 'inventory:delete_item' 0 %}` with a `.replace('0', deleteItemId)` pattern in JavaScript. If the URL pattern for `delete_item` changes its integer argument position, this breaks.
 - Client-side sorting in `dashboard.html` uses `data-sort` attribute values that must exactly match model field names (`nsn`, `description`, `partnumber`, `manufacturer`, `itemlocation`, `quantity`, `purchaseprice`, `totalcost`). Adding a column requires adding both the `<th data-sort="fieldname">` header and the matching `<td>` in the row loop.
 - `item_form.html` applies label overrides using exact string comparisons against Django's auto-generated labels (`"Nsn"`, `"Partnumber"`, `"Itemlocation"`, `"Purchaseprice"`). If field names change, these comparisons must be updated.
@@ -155,7 +154,6 @@ None. No Celery tasks, signals, management commands, or scheduled jobs exist in 
 
 - **`__str__` is dead code.** `InventoryItem.__str__` is inside `Meta`. Django admin and shell will show the default `InventoryItem object (pk)`. Fixing requires moving it out of `Meta`. Do not add code that depends on `str(item)` producing a useful value until this is fixed.
 - **`save()` crashes on null inputs.** `self.totalcost = self.purchaseprice * self.quantity` raises `TypeError` if either is `None`. The form allows both fields to be blank. This is an existing risk — do not make it worse by loosening validation elsewhere.
-- **`delete_item_ajax` is an unauthenticated destructive endpoint.** It exists at a real URL and accepts POST. No client currently uses it, but it is live.
 - **Dashboard JS column sorting is position-sensitive.** `getColumnIndex` counts `th[data-sort]` headers in DOM order. Inserting or removing a column without updating both the header and the row `<td>` order will silently sort the wrong column.
 - **Autocomplete endpoints are unauthenticated.** They read from the live database. This is low-risk for read operations but leaks data if the app is exposed publicly.
 - **`base_template.html` has two hardcoded `inventory:dashboard` links.** If you change the app_name or rename the view, navigation breaks globally for all users.
@@ -196,7 +194,7 @@ None. No Celery tasks, signals, management commands, or scheduled jobs exist in 
 
 **Main cross-app dependencies:** `STATZWeb/decorators.py` (auth), `templates/base_template.html` (nav), `STATZWeb/urls.py` (include)
 
-**Security-sensitive areas:** `@conditional_login_required` on CRUD views; `delete_item_ajax` and autocomplete endpoints lack it
+**Security-sensitive areas:** `@conditional_login_required` on CRUD views; autocomplete endpoints lack it
 
 **Riskiest edit types:**
 - Renaming model fields (cascades into migrations, templates, JS sort keys, label comparisons)
