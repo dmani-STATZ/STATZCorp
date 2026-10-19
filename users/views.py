@@ -435,67 +435,6 @@ def switch_company(request):
     return redirect(next_url)
 
 @login_required
-def save_user_setting(request):
-    """Handle saving user settings via AJAX"""
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Invalid request method'})
-    
-    try:
-        data = json.loads(request.body)
-        print(f"Received setting data: {data}")  # Debug print
-        setting_type = data.get('setting_type')
-        value = data.get('value')
-        
-        if not setting_type or value is None:
-            print(f"Missing required fields: setting_type={setting_type}, value={value}")  # Debug print
-            return JsonResponse({'success': False, 'error': 'Missing required fields'})
-        
-        success = UserSettings.save_setting(
-            user=request.user,
-            name=setting_type,
-            value=value
-        )
-        
-        print(f"Save result: {success}")  # Debug print
-        return JsonResponse({
-            'success': success,
-            'message': 'Setting saved successfully' if success else 'Failed to save setting'
-        })
-        
-    except json.JSONDecodeError:
-        print("Invalid JSON data received")  # Debug print
-        return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
-    except Exception as e:
-        print(f"Error saving setting: {str(e)}")  # Debug print
-        return JsonResponse({'success': False, 'error': str(e)})
-
-@login_required
-def manage_settings(request):
-    """View for managing user settings."""
-    User = get_user_model()
-    
-    # Only get active users
-    users = User.objects.filter(is_active=True)
-    
-    # Get all settings for the current user
-    current_user_settings = UserSettings.get_all_settings(request.user)
-    
-    # Get all possible setting names from the database
-    all_settings = UserSetting.objects.all().values_list('name', flat=True).distinct()
-    
-    # Add debug info
-    logger.debug(f"Manage settings view: Found {users.count()} active users, {len(current_user_settings)} settings for current user, and {len(all_settings)} total unique settings")
-    
-    context = {
-        'users': users,
-        'current_user_settings': current_user_settings,
-        'all_settings': list(all_settings),
-        'setting_types': ['string', 'boolean', 'integer', 'float'],  # Available setting types
-    }
-    
-    return render(request, 'users/manage_settings.html', context)
-
-@login_required
 @require_http_methods(["POST"])
 def ajax_save_setting(request):
     """AJAX endpoint for saving user settings."""

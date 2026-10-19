@@ -221,28 +221,6 @@ def delete_shipment(request, shipment_id):
             'error': str(e)
         }, status=400)
 
-@require_http_methods(["GET"])
-def get_shipment(request, clin_id, shipment_id):
-    """Get a specific shipment's details."""
-    try:
-        shipment = get_object_or_404(ClinShipment, id=shipment_id, clin_id=clin_id)
-        return JsonResponse({
-            'success': True,
-            'shipment': {
-                'id': shipment.id,
-                'ship_qty': shipment.ship_qty,
-                'uom': shipment.uom,
-                'ship_date': shipment.ship_date.isoformat() if shipment.ship_date else None,
-                'comments': shipment.comments,
-                'pod_date': shipment.pod_date.isoformat() if shipment.pod_date else None,
-            }
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
-
 # Optional: View for loading shipments via AJAX
 @require_http_methods(["GET"])
 def get_clin_shipments(request, clin_id):
