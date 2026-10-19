@@ -68,7 +68,6 @@ Defines how to safely modify the `suppliers` Django app. Every rule here is grou
 - **`openrouter_config.py`** is a standalone config/serialization module; keep `OpenRouterModelSetting` access through `get_default()` and `get_openrouter_model_info()` rather than direct ORM queries.
 - **Templates are not thin** — `supplier_enrich.html` and `supplier_detail.html` contain substantial inline JS and logic. Be especially careful with inline JS in `supplier_enrich.html`.
 - **No signals, no Celery tasks** — all processing is synchronous. Enrichment happens in-request.
-- **`utils.py`** (`scrape_supplier_site`) is not wired into any view or URL. Treat it as dead code until confirmed otherwise.
 - **Admin** is important for staff; `SupplierAdmin` fieldsets group compliance/status fields and are the primary staff management UI for supplier records.
 
 ---
@@ -209,7 +208,6 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - **No Celery tasks, no cron jobs, no Django signals defined in this app.**
 - `transactions/signals.py` imports `Supplier` — changes to `Supplier` may affect signal handlers defined outside this app. Check `transactions/signals.py` before renaming or removing `Supplier` fields.
 - All OpenRouter calls are synchronous in-request — timeouts in `fetch_website_html` (default 10s) block the HTTP response.
-- `utils.scrape_supplier_site` is not wired to any view or URL. It runs only when manually invoked.
 - **`Write a Release Note`** If your change is user-facing or significant, create a release note in the `release_notes/` directory following the strict frontmatter rules in Section 16.
 
 ---
@@ -235,7 +233,6 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 6. **`OpenRouterModelSetting` singleton** — direct ORM delete or bulk_create operations can destroy the singleton. Always use `get_default()`.
 7. **`contracts/forms.py` owns `SupplierForm`** — adding a field to `Supplier` and forgetting to update `SupplierForm` will silently drop that field from the edit UI.
 8. **`supplier_detail` URL has two names** (`supplier_detail` and `supplier_detail_page`) pointing to the same view. Reversals using either name exist in the codebase — removing one breaks callers of that name.
-9. **`utils.scrape_supplier_site` prints debug output** — if wired into a view, it will leak crawl logs to stdout in production.
 10. **`transactions` signals depend on `Supplier`** — renaming or removing `Supplier` fields without checking `transactions/signals.py` can silently break transaction processing.
 11. **`Supplier.prime` is an IntegerField storing a `SalesClass.id`** — it is rendered in `SupplierForm` as a `ModelChoiceField` with a `clean_prime` override that converts the selected instance back to an integer on save. There is no FK constraint at the database level. Do not change this to a real FK without a coordinated migration.
 12. **`Contact.categories` M2M** — category assignment for a contact must go through `supplier_contact_set_categories` (`POST /suppliers/<pk>/contact/<contact_id>/categories/`) or Django admin. The endpoint validates that every submitted category id exists and is `is_active=True`, and that the contact belongs to the supplier in the URL. Use `prefetch_related("categories")` when listing contacts with their categories.

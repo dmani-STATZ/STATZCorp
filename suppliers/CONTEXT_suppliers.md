@@ -14,7 +14,7 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 - Drive the supplier dashboard and type-by-type count pages that aggregate `Contract`/`Clin` data, identify top manufacturers/distributors, and expose quick search/autocomplete data.
 - Render the supplier detail report that shows contacts, docs, certifications, classifications, contracts, and status flags.
 - Implement the OpenRouter-backed enrichment pipeline (fetch HTML, build prompts, normalize JSON, and apply approved values) plus the global AI model configuration endpoint.
-- Provide scraper/address/contact normalization helpers for enrichment flows (`_parse_address_text`, `_normalize_*`, `utils.scrape_supplier_site`) and UI wiring.
+- Provide scraper/address/contact normalization helpers for enrichment flows (`_parse_address_text`, `_normalize_*`) and UI wiring.
 - Expose the supplier portal HTTP API at `/api/supplier-portal/v1/` (API key + HMAC) for profile/contact/document read-write used by the public site, plus `POST …/send-email/` for HTML Graph mail via `GRAPH_MAIL_SENDER_CONTRACT`.
 
 ## 4. Key Files and What They Do
@@ -25,7 +25,6 @@ Hosts the supplier domain model plus the dashboards/enrichment UI that sits on t
 | `views.py` | Hosts `DashboardView`, `SupplierDetailView`, `SuppliersInfoByType`, the AI enrichment views (`SupplierEnrichView`, `SupplierApplyEnrichmentView`, `SupplierEnrichPageView`, `GlobalAIModelConfigView`), the `supplier_search_api`, and the helper functions that fetch HTML, query OpenRouter, and normalize addresses/contacts. |
 | `urls.py` | Declares the `suppliers` namespace routes (dashboard, detail, info-by-type, search/autocomplete, create/edit aliases, enrichment/run/apply, AI model config). |
 | `openrouter_config.py` | Serializes `OpenRouterModelSetting`, falls back to environment defaults, and exposes `get_model_for_request` plus `save_openrouter_model_config`. |
-| `utils.py` | Contains the older BeautifulSoup/requests-based `scrape_supplier_site` helper, along with regex constants for phone/email/address/CAGE detection used by enrichment experiments. |
 | `admin.py` | Registers `Supplier` (with `SupplierAlias` TabularInline) and `Contact` with tailored `list_display`, search, filters, and grouped `fieldsets` for compliance metadata. |
 | `templates/suppliers/...` | Server-rendered templates for the dashboard, detail page, info-by-type page, enrichment console, edit form (for `contracts` views), list/search screens, and include partials (`address_picker`, `toggle_switch`). |
 | `static/suppliers/js` | `supplier_edit.js` (change-tracking/highlight helpers for the edit form) and `supplier_enrich.js` (AJAX apply-suggestion bindings) that are bundled into the templates. |
@@ -112,7 +111,6 @@ The **Copy Category** control in the Contacts section header (`supplier_detail.h
 - `fetch_website_html` normalizes URLs, enforces HTTP/HTTPS, and raises `RuntimeError` when requests fail; `normalize` functions are reused by the enrichment view to pre-fill the page before persisting.
 - `DashboardView`, `SupplierDetailView`, and `SuppliersInfoByType` compute counts/sums (`Count`, `Sum`, `Coalesce`) over `Supplier`, `Contract`, and `Clin` to show top suppliers and performance flags; `SupplierDetailView` also maps documents to certifications/classifications before rendering.
 - **Supplier Health Score (added April 29, 2026):** `SupplierDetailView.get_context_data()` in `suppliers/views.py` now computes `health_score` and `health_score_alternate` dicts and passes them to `supplier_detail.html`. Logic lives in the standalone `compute_health_data(supplier, contracts_qs)` helper defined above the class. Friction signals: Notes (weight 1), GovActions (weight 3), ClinShipment corrections (weight 2, defined as `modified_on > created_on + 60s`), PaymentHistory entries (weight 1). Band thresholds: green ≥ 50 ratio, amber ≥ 15, red < 15. Data window: 24 months if ≥5 contracts in window, else all-time fallback. Both windows always computed. All weights and thresholds are hardcoded constants (`HEALTH_WEIGHTS`, `HEALTH_THRESHOLDS`) at module level in `suppliers/views.py` — TODO to make configurable per company.
-- `utils.scrape_supplier_site` is a fallback scraper that crawls up to three pages, prints the crawl/debug info, and aggregates phone/email/address/logo/CAGE hints via regex/JSON-LD heuristics—it is not referenced elsewhere but may still be useful for manual data gathering.
 
 ## 11. Integrations and Cross-App Dependencies
 - Depends on `contracts.models` (`Contract`, `Clin`, `Address`, `SpecialPaymentTerms`) for metrics, address creation, and the `SupplierForm` that drives the edit/create flows defined in `contracts.views.supplier_views`.
@@ -153,7 +151,7 @@ No Celery/RQ tasks, cron jobs, or scheduled imports live here—the AI enrichmen
 
 ## 17. Known Gaps / Ambiguities
 - `tests.py` is empty and no app-level tests exist—coverage lives upstream in `contracts`.
-- `templates/suppliers/legacy_supplier_detail.html` and `utils.scrape_supplier_site` are not referenced by any view/URL; confirm whether they are dead code before touching them.
+- `templates/suppliers/legacy_supplier_detail.html` is not referenced by any view/URL; confirm whether it is dead code before touching it.
 - The enrichment template relies on inline JS (lines 760–860) to POST both field updates and global model config updates; if the JS changes, mirror those updates in `static/suppliers/js` (currently only used for the edit page).
 - `SupplierApplyEnrichmentView` creates new `contracts.Address` rows for suggested addresses but does not dedupe; multiple enrichments could rapidly add nearly identical addresses unless upstream cleanup occurs elsewhere.
 
