@@ -119,7 +119,7 @@ equest.active_company current. /users/switch-company/ enforces membership before
 ## 7. Templates and UI Surface Area
 - Authentication UIs live in 	emplates/users/ (login.html, logout.html, 
 egister.html, custom_password_reset.html, oauth_migration.html, oauth_password_set.html, password_* templates). login.html uses a tabbed layout with a Microsoft button (static asset static/users/img/ms-logo.svg) and a hidden password form.
-- Settings UIs include manage_settings.html (AJAX-powered grid that fetches/saves settings via /settings/ajax/*), settings_view.html (simple per-user list), and profile.html (a stub rendering users/profile.html). The management page injects vanilla JS that handles input highlighting, etch calls, and dynamic setting creation.
+- Settings UI is profile.html (a stub rendering users/profile.html); settings are written via /settings/ajax/save/.
 - System messages are rendered by system_messages.html (uses user_tags.get_username to show senders, includes buttons wired to the JSON APIs for marking read). create_message.html is the form staff use to send messages.
 - Portal interface is entirely JSON-driven; the templates here are only for auth/settings. The portal front-end consumes the JSON from portal_sections_api, portal_event_feed, etc., and the serialization helpers in portal_services.py guarantee the payload shape.
 - Templatetags: 	emplatetags/user_tags.py provides helper filters used in the system message list and settings modals.
@@ -201,7 +201,7 @@ egister.html template never renders unless another view uses it.
 
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
 - Before renaming or deleting AppRegistry/AppPermission, update STATZWeb/middleware.py, the admin form, the management commands, and sql_fix.py, and be ready to rebuild the permission rows because middleware rejects access if the registry entry is missing.
-- When touching UserSetting keys, search user_settings.py, the AJAX endpoints (jax_*), and manage_settings.html for string literals; the JavaScript relies on matching setting_name attributes.
+- When touching UserSetting keys, search user_settings.py, the AJAX endpoints (jax_*) for string literals; the JavaScript relies on matching setting_name attributes.
 - Portal payload shapes emerge from portal_services.serialize_* helpers and the JSON responses in iews.portal_*. Coordinate front-end expectations (fields like predicted_attendance, can_edit, metadata) with model changes, and keep recurrence logic in _upsert_recurrence_for_event/_expand_recurrences in sync.
 - ActiveCompanyMiddleware and switch_company assume contracts.Company and UserCompanyMembership exist; migrating company logic requires updating contracts forms/views that import UserCompanyMembership.
 - Azure auth touches settings.AZURE_AD_CONFIG, ms_views, zure_auth, and UserOAuthToken. Rotating secrets, altering scopes, or adding new providers should keep token-refresh logic, session flags, and the login view’s microsoft_login_url URLs aligned.
@@ -210,7 +210,7 @@ egister.html template never renders unless another view uses it.
 ## 19. Quick Reference
 - **Primary models:** AppRegistry/AppPermission, UserSetting/UserSettingState, UserOAuthToken, Announcement, PortalSection/PortalResource, WorkCalendarTask, WorkCalendarEvent (+ recurrence/attachments/attendance/reminders), NaturalLanguageScheduleRequest, CalendarAnalyticsSnapshot, ScheduledMicroBreak, UserCompanyMembership, SystemMessage.
 - **Main URLs:** /users/login/, /users/microsoft/login/, /users/permission-denied/, /users/portal/events/feed/, /users/messages/, /users/sharepoint-import-ui/.
-- **Key templates:** 	emplates/users/login.html, manage_settings.html, settings_view.html, system_messages.html, create_message.html, and the password-reset/OAuth templates under 	emplates/users/.
+- **Key templates:** 	emplates/users/login.html, system_messages.html, create_message.html, and the password-reset/OAuth templates under 	emplates/users/.
 - **Key dependencies:** Microsoft MSAL (msal + 
 equests), openpyxl for SharePoint import, optional python-dateutil, Django auth/password reset stack, and suppliers.openrouter_config for AI-model defaults.
 - **Risky files to inspect first:** users/views.py (large and handles virtually every user flow), portal_services.py (central serialization), users/models.py (dozens of intertwined models), zure_auth.py (token lifecycle), and dmin.py/management/commands when changing the permission registry.

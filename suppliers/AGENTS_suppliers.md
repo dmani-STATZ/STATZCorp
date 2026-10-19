@@ -149,7 +149,6 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 
 ### URL namespace `suppliers:` used in
 - `contracts/templates/contracts/` (multiple templates)
-- `reports/templates/reports/admin_dashboard.html`
 - `templates/base_template.html`
 - `contracts/views/supplier_views.py`, `contracts/views/contacts_views.py` (Python reverse)
 
@@ -217,7 +216,7 @@ For `name`, `supplier_type`, `prime`, and `is_packhouse`, the supplier detail pa
 - Portal API tests live in `suppliers/tests/test_supplier_portal_api.py`. Run `python manage.py test suppliers.tests.test_supplier_portal_api` after portal auth/serializer/view changes.
 - After model changes: verify Django admin loads for `Supplier` and `Contact`, check that `contracts` supplier views (create, edit, list) function, run any existing `contracts` tests.
 - After enrichment pipeline changes: manually trigger enrichment for a known supplier via `/suppliers/<pk>/enrich/run/`, confirm the JSON response shape, verify the apply flow POSTs and saves correctly.
-- After URL changes: spot-check `contracts` templates that reverse `suppliers:` URLs (contract management page, contact detail page) and the `reports/admin_dashboard.html`.
+- After URL changes: spot-check `contracts` templates that reverse `suppliers:` URLs (contract management page, contact detail page).
 - After template changes to `supplier_detail.html`: open a supplier detail page with contacts, aliases, certifications, classifications, and documents present. After layout changes, verify scroll spy activates the correct sidebar link for all nine sections, status flag banners render only when probation/conditional/archived are true, and sidebar supplier search returns results and navigates to `/suppliers/<id>/detail/`.
 - After changes to `openrouter_config.py`: GET `/suppliers/ai-model/config/` and verify the response fields match what `supplier_enrich.html` JS expects.
 

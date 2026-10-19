@@ -158,7 +158,6 @@ None. No Celery tasks, signals, management commands, or scheduled jobs exist in 
 - **Autocomplete endpoints are unauthenticated.** They read from the live database. This is low-risk for read operations but leaks data if the app is exposed publicly.
 - **`base_template.html` has two hardcoded `inventory:dashboard` links.** If you change the app_name or rename the view, navigation breaks globally for all users.
 - **`item_form.html` label comparisons are fragile.** They check `field.label == "Nsn"` etc. Django generates labels from field names; this works until a `verbose_name` is added to the field, at which point the comparison silently fails and the label reverts to Django's auto-value.
-- **`delete_form.html` is orphaned.** No view renders it. Do not mistake it for the active delete flow; the real delete is AJAX via `delete_item`.
 
 ---
 

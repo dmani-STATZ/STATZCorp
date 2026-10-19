@@ -166,7 +166,7 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 - **Portal endpoint URL names** are likely used in JavaScript. Before renaming portal URLs, search static JS files and template `<script>` blocks for the URL names.
 - **Templates use `{% url 'users:...' %}`** — grep templates across the whole project before renaming URL names.
 - **`sharepoint_import_ui`** renders `import_sharepoint.html`, which does not exist. Do not rely on this view being functional.
-- **`register.html`** is never rendered — `register()` immediately redirects to Microsoft auth. Do not add logic to `register.html` expecting it to display.
+- **`register()`** immediately redirects to Microsoft auth; there is no registration template.
 - **Template tag `get_username`** in `users/templatetags/user_tags.py` performs a DB query per call. If used in loops, it can cause N+1 problems.
 - **`base_no.html`** is the base layout for all auth-screen templates. Changes to its structure affect login, password reset, and OAuth migration flows.
 

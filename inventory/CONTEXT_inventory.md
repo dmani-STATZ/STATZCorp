@@ -25,7 +25,6 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 - `admin.py`: Registers `InventoryItem` so it appears in Django admin with default options.
 - `templates/inventory/dashboard.html`: Bootstrap-styled dashboard page that lists every inventory row, shows total value, formats money with `custom_currency`, and bundles inline JS for modal deletion + client-side sorting/clear-sorting controls.
 - `templates/inventory/item_form.html`: Custom-styled add/edit form that reuses the same `InventoryItemForm`, applies bespoke row/label markup, and wires jQuery UI autocomplete to the three AJAX endpoints.
-- `templates/inventory/delete_form.html`: Simple confirmation page (currently unused by any view but still in repo).
 - `templatetags/custom_filters.py`: Defines `custom_currency` filter used to format `purchaseprice`, `totalcost`, and the dashboard total value.
 - `Inventory Application.md`: App-level write-up already describes the CRUD/autocomplete/modals flows—useful reference when revisiting requirements.
 - `migrations/`: Track schema history (initial create, then `0002`/`0003`/`0004` renamed/altered description/purchase price/total cost columns).
@@ -47,7 +46,6 @@ The `inventory` app owns the warehouse stock ledger described in `inventory/Inve
 - Templates extend `base_template.html`, so the app inherits the global navigation, scripts, and styles defined in `templates/base_template.html` (which already links to `inventory:dashboard` from the main nav and mobile menu).
 - `dashboard.html` renders a Bootstrap-styled table with columns for every inventory field, a large total value display, and a modal for confirm deletions. Inline `<style>` defines sort-state indicators, and `<script>` handles the modal lifecycle, AJAX delete, and client-side sorting/ordering with a `Clear Sorting` toggle.
 - `item_form.html` renders the same form for both adds and edits. It writes per-field labels (with manual overrides for NSN/Part Number/Location/Purchase Price), styles inputs with custom `.input-field` classes, and initializes autocomplete widgets inside a jQuery `$(document).ready()` block, which implies the base template must load jQuery/jQuery UI.
-- `delete_form.html` is a legacy form-only confirmation screen that is not referenced in any view, suggesting either retired logic or a shortcut for manual testing.
 
 ## 8. Admin / Staff Functionality
 `admin.site.register(InventoryItem)` exposes the table through Django’s default admin interface with no customizations beyond the registration listed in `admin.py`.
@@ -102,7 +100,6 @@ None. No Celery tasks, management commands, signals, or scheduled jobs exist wit
 
 ## 17. Known Gaps / Ambiguities
 - The `__str__` method is indented under `Meta` in `models.py`, so Django never registers it; the model prints the default `Model.__str__` unless this is realigned.
-- `delete_form.html` exists but no view renders it anymore; it may be a remnant of a previous POST-confirmation flow.
 - Autocomplete views, despite returning only strings, are unauthenticated and could expose the full set of NSNs/manufacturers unless `REQUIRE_LOGIN` is set at the project level.
 - The dashboard’s total value computation (`sum(item.quantity * item.purchaseprice)`) and the `InventoryItem.save()` multiplication both assume non-null numeric inputs even though the form allows blanks.
 
@@ -116,7 +113,7 @@ None. No Celery tasks, management commands, signals, or scheduled jobs exist wit
 ## 19. Quick Reference
 - **Primary model:** `InventoryItem` (`inventory/models.py`), tied to `STATZ_WAREHOUSE_INVENTORY_TBL` with computed `totalcost`.
 - **Main URLs:** dashboard (`inventory/dashboard`), add/edit/delete (`inventory/add`, `inventory/edit/<pk>`, `inventory/delete-item/<pk>`), autocomplete endpoints (`inventory/autocomplete/*`).
-- **Key templates:** `inventory/templates/inventory/dashboard.html`, `inventory/templates/inventory/item_form.html`, `inventory/templates/inventory/delete_form.html`.
+- **Key templates:** `inventory/templates/inventory/dashboard.html`, `inventory/templates/inventory/item_form.html`.
 - **Key dependencies:** `STATZWeb/decorators.py` + `settings.REQUIRE_LOGIN`, `templates/base_template.html`, `crispy_forms`, `jQuery UI`, `templatetags/custom_filters.py`.
 - **Risky files to review first:** `inventory/views.py` (decorators, delete + JSON endpoints), `inventory/templates/inventory/dashboard.html` (modal + sorting + AJAX), `inventory/models.py` (save calculation, mis-indented `__str__`).
 
