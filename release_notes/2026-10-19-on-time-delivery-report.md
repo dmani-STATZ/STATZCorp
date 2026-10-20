@@ -9,12 +9,12 @@ critical: false
 
 The On-Time Delivery Report replaces the old Access report. Open it from the **Contract Menu → On-Time Delivery Report**.
 
-**What it shows.** Every fully shipped CLIN whose supplier due date falls in the range you pick. Results are grouped by Buyer, CLIN Type, and IA (Origin / Destination). Each row counts:
+**What it shows.** Every CLIN whose contract (government) due date falls in the range you pick. Results are grouped by Buyer, CLIN Type, and IA (Origin / Destination). Each row counts:
 
-- **Late QDD / On-Time QDD**: whether the shipment that completed the CLIN went out after the supplier due date.
-- **Late / On-Time**: the same check against the CLIN's contract due date.
+- **Late / On-Time**: whether the shipment that completed the CLIN went out after the contract due date.
+- **Late QDD / On-Time QDD**: the same check against the CLIN's supplier due date. If a CLIN has no supplier due date, it's left out of this pair and a note under the table tells you how many.
 
-Cancelled contracts and CLINs that are not fully shipped are left out. A Totals row and a Percent row sit at the bottom. If some CLINs have no contract due date, a note under the table tells you how many were left out of Late / On-Time.
+Cancelled contracts are left out. A Totals row and a Percent row sit at the bottom.
 
 **Filters.** Buyers, CLIN types, and IA are checkbox lists (none selected means all). Type in the buyer box to narrow the list. **Clear** unchecks a list, and **Select All DLA** checks every DLA buyer, even ones the search box is hiding. The page opens on last month with Primary checked and both Origin and Destination on. The date range can be up to a year. Nothing runs until you click **Run Report**. The page URL saves your filters, so you can bookmark a run.
 

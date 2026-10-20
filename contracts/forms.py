@@ -866,7 +866,7 @@ class OnTimeDeliveryFilterForm(forms.Form):
         widget=forms.CheckboxSelectMultiple(),
     )
     start_date = forms.DateField(
-        label='Supplier Due Date — Start',
+        label='Contract Due Date — Start',
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}, format='%Y-%m-%d'),
     )
     end_date = forms.DateField(

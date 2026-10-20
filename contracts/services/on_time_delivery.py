@@ -1,4 +1,4 @@
-"""On-Time Delivery Report: delivery performance of CLINs by supplier due date.
+"""On-Time Delivery Report: delivery performance of CLINs by contract due date.
 
 Completion dates and shipped quantities come only from
 ``contracts.services.due_status``. Classifying a not-shipped CLIN as late once
@@ -34,10 +34,10 @@ COUNT_KEYS = (
     "late_qdd",
     "ontime_qdd",
     "not_yet_due_qdd",
+    "unclassified_qdd",
     "late",
     "ontime",
     "not_yet_due_due",
-    "unclassified",
 )
 PERCENT_QUANTUM = decimal.Decimal("0.0001")
 EARLY_SHIP_DAYS = 180
@@ -108,8 +108,8 @@ def build_otd_queryset(company, filters: OtdFilters) -> QuerySet:
     qs = (
         Clin.objects.filter(
             contract__company=company,
-            supplier_due_date__gte=filters.start_date,
-            supplier_due_date__lte=filters.end_date,
+            due_date__gte=filters.start_date,
+            due_date__lte=filters.end_date,
         )
         .exclude(contract__status_id__in=cancelled_status_ids)
         .select_related("contract", "contract__buyer", "contract__status")
@@ -125,6 +125,8 @@ def build_otd_queryset(company, filters: OtdFilters) -> QuerySet:
 
 
 def _qdd_bucket(clin, completion: datetime.date | None, as_of: datetime.date) -> str:
+    if clin.supplier_due_date is None:
+        return "unclassified_qdd"
     if completion is not None:
         late = is_late(due_date=clin.supplier_due_date, completion_date=completion)
         return "late_qdd" if late else "ontime_qdd"
@@ -132,8 +134,8 @@ def _qdd_bucket(clin, completion: datetime.date | None, as_of: datetime.date) ->
 
 
 def _due_bucket(clin, completion: datetime.date | None, as_of: datetime.date) -> str:
-    if clin.due_date is None:
-        return "unclassified"
+    # ``due_date`` is always non-null in the population (it is the range filter
+    # in ``build_otd_queryset``), so there is no contract-due unclassified bucket.
     if completion is not None:
         late = is_late(due_date=clin.due_date, completion_date=completion)
         return "late" if late else "ontime"
@@ -141,8 +143,10 @@ def _due_bucket(clin, completion: datetime.date | None, as_of: datetime.date) ->
 
 
 def _check_identities(counts: dict) -> None:
-    qdd_sum = counts["late_qdd"] + counts["ontime_qdd"] + counts["not_yet_due_qdd"]
-    due_sum = counts["late"] + counts["ontime"] + counts["not_yet_due_due"] + counts["unclassified"]
+    qdd_sum = (
+        counts["late_qdd"] + counts["ontime_qdd"] + counts["not_yet_due_qdd"] + counts["unclassified_qdd"]
+    )
+    due_sum = counts["late"] + counts["ontime"] + counts["not_yet_due_due"]
     if counts["clins"] != qdd_sum or counts["clins"] != due_sum:
         raise ValueError(f"On-Time Delivery count identity violated: {counts}")
 
@@ -189,7 +193,11 @@ def compute_otd_report(company, filters: OtdFilters, *, as_of: datetime.date) ->
         row[qdd_bucket] += 1
         row[due_bucket] += 1
 
-        early = shipped and (clin.supplier_due_date - completion).days > EARLY_SHIP_DAYS
+        early = (
+            shipped
+            and clin.supplier_due_date is not None
+            and (clin.supplier_due_date - completion).days > EARLY_SHIP_DAYS
+        )
         detail.append(
             {
                 "contract_number": contract.contract_number or "",
@@ -216,8 +224,8 @@ def compute_otd_report(company, filters: OtdFilters, *, as_of: datetime.date) ->
         _check_identities(row)
     totals = {key: sum(r[key] for r in rows) for key in COUNT_KEYS}
     _check_identities(totals)
-    qdd_base = totals["clins"] - totals["not_yet_due_qdd"]
-    due_base = totals["clins"] - totals["not_yet_due_due"] - totals["unclassified"]
+    qdd_base = totals["clins"] - totals["not_yet_due_qdd"] - totals["unclassified_qdd"]
+    due_base = totals["clins"] - totals["not_yet_due_due"]
     percents = {
         "not_shipped": _fraction(totals["not_shipped"], totals["clins"]),
         "late_qdd": _fraction(totals["late_qdd"], qdd_base),
@@ -232,16 +240,16 @@ def compute_otd_report(company, filters: OtdFilters, *, as_of: datetime.date) ->
         "rows": rows,
         "totals": totals,
         "percents": percents,
-        "unclassified": totals["unclassified"],
+        "unclassified_qdd": totals["unclassified_qdd"],
         "notes": report_notes(totals),
         "as_of": as_of,
         "detail": detail,
     }
 
 
-def unclassified_note(count: int) -> str:
+def unclassified_qdd_note(count: int) -> str:
     return (
-        f"{count} CLIN(s) have no contract due date and are excluded from Late / On-Time."
+        f"{count} CLIN(s) have no supplier due date — excluded from Late QDD / On-Time QDD."
     )
 
 
@@ -257,8 +265,8 @@ def report_notes(totals: dict) -> list[str]:
             f"{totals['not_yet_due_due']} CLIN(s) not shipped and not yet past their contract due date"
             " — excluded from Late / On-Time."
         )
-    if totals["unclassified"]:
-        notes.append(unclassified_note(totals["unclassified"]))
+    if totals["unclassified_qdd"]:
+        notes.append(unclassified_qdd_note(totals["unclassified_qdd"]))
     return notes
 
 
@@ -273,23 +281,23 @@ DETAIL_HEADERS = (
     "Buyer",
     "CLIN Type",
     "IA",
+    "Contract Due Date",
+    "Supplier Due Date",
+    "Completion Date",
     "Status",
     "Shipped Qty / Order Qty",
-    "Supplier Due Date",
-    "Contract Due Date",
-    "Completion Date",
-    "Late vs QDD",
     "Late vs Due Date",
+    "Late vs QDD",
     "Early Ship Flag",
 )
 BUCKET_TEXT = {
     "late_qdd": "Yes",
     "ontime_qdd": "No",
     "not_yet_due_qdd": "Not Yet Due",
+    "unclassified_qdd": "N/A",
     "late": "Yes",
     "ontime": "No",
     "not_yet_due_due": "Not Yet Due",
-    "unclassified": "N/A",
 }
 LATE_FILL_RGB = "F8CBAD"
 ONTIME_FILL_RGB = "C6E0B4"
@@ -352,7 +360,7 @@ def build_otd_workbook(
         ("Report", "On-Time Delivery Report"),
         ("Company", company_name),
         (
-            "Supplier Due Date Range",
+            "Contract Due Date Range",
             f"{filters.start_date:%m/%d/%Y} – {filters.end_date:%m/%d/%Y}",
         ),
         ("Buyers", ", ".join(buyer_labels) or "All"),
@@ -409,13 +417,13 @@ def build_otd_workbook(
             item["buyer"],
             item["type_label"],
             item["ia_label"],
+            item["due_date"],
+            item["supplier_due_date"],
+            item["completion_date"],
             item["status"],
             item["qty_text"],
-            item["supplier_due_date"],
-            item["due_date"],
-            item["completion_date"],
-            BUCKET_TEXT[item["qdd_bucket"]],
             BUCKET_TEXT[item["due_bucket"]],
+            BUCKET_TEXT[item["qdd_bucket"]],
             "Check" if item["early_ship_flag"] else None,
         )
         for col, value in enumerate(values, start=1):
