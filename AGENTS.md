@@ -53,6 +53,10 @@
  never add a delete path that skips this check. Delete / Close / Reopen are POST-only.
 - Do not add a DB unique constraint on `IdiqContract.contract_number` until `find_duplicate_idiqs`
  reports 0 groups in production.
+- IDIQs appear in Contract search (`contracts:contract_search`) only via `search_idiq_contracts` in
+ `contracts/services/idiq_search.py`. Match through `normalize_idiq_number` / `idiq_number_expression`.
+ Never `union()` IDIQs with contracts. Keep the delivery-order count a subquery (a join + GROUP BY on
+ the number expression breaks on MSSQL). Keep the JSON `results` key: three pages read `data.results || data`.
 
 ## CSS (when touching `static/css/app-core.css` or any date field)
 - Date inputs use the native browser calendar indicator only. Never add a

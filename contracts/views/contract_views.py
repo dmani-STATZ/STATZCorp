@@ -40,6 +40,7 @@ from contracts.services.sharepoint_paths import (
     build_explorer_uri,
     resolve_contract_folder_path,
 )
+from contracts.services.idiq_search import IDIQ_SEARCH_LIMIT, search_idiq_contracts
 from contracts.services.split_breakdown import build_split_breakdown_context
 from contracts.services.due_status import (
     late_status_clin_prefetch,
@@ -560,6 +561,8 @@ def contract_search(request):
         'contract_number',
         'po_number',
         'status__description',
+        'idiq_contract_id',
+        'idiq_contract__contract_number',
     ).order_by('status_sort', 'contract_number')[:10]
 
     results = []
@@ -569,12 +572,39 @@ def contract_search(request):
             'contract_number': contract['contract_number'],
             'status': contract['status__description'] or '',
             'po_numbers': [],
+            'idiq': None,
         }
         if contract['po_number'] and query.lower() in contract['po_number'].lower():
             contract_data['po_numbers'].append(contract['po_number'])
+        if contract['idiq_contract_id']:
+            contract_data['idiq'] = {
+                'id': contract['idiq_contract_id'],
+                'contract_number': contract['idiq_contract__contract_number'] or '',
+                'url': reverse('contracts:idiq_contract_detail', args=[contract['idiq_contract_id']]),
+            }
         results.append(contract_data)
 
-    return JsonResponse(results, safe=False)
+    idiq_rows, idiq_total = search_idiq_contracts(
+        query, include_closed=True, company=getattr(request, 'active_company', None),
+    )
+    idiqs = [
+        {
+            'id': row['id'],
+            'contract_number': row['contract_number'] or '',
+            'status': 'Closed' if row['closed'] else 'Open',
+            'award_date': row['award_date'].strftime('%m/%d/%Y') if row['award_date'] else '',
+            'delivery_order_count': row['delivery_order_count'],
+            'url': reverse('contracts:idiq_contract_detail', args=[row['id']]),
+        }
+        for row in idiq_rows
+    ]
+
+    return JsonResponse({
+        'results': results,
+        'idiqs': idiqs,
+        'idiq_total': idiq_total,
+        'idiq_limit': IDIQ_SEARCH_LIMIT,
+    })
 
 
 @conditional_login_required

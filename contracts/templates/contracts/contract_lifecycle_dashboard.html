@@ -538,8 +538,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     // Handle the response format
                     const results = data.results || data;
+                    const idiqs = data.idiqs || [];
 
-                    if (results.length > 0) {
+                    if (idiqs.length > 0) {
+                        const header = document.createElement('h6');
+                        header.className = 'dropdown-header text-uppercase';
+                        header.textContent = 'IDIQ Contracts';
+                        searchResults.appendChild(header);
+
+                        idiqs.forEach(idiq => {
+                            const a = document.createElement('a');
+                            a.className = 'dropdown-item d-flex justify-content-between align-items-center gap-2';
+                            a.href = idiq.url;
+
+                            const left = document.createElement('div');
+                            const num = document.createElement('div');
+                            num.className = 'small fw-medium text-primary';
+                            num.textContent = idiq.contract_number;
+                            const meta = document.createElement('div');
+                            meta.className = 'text-body-tertiary mt-1';
+                            meta.style.fontSize = '0.75rem';
+                            meta.textContent = 'Delivery orders: ' + idiq.delivery_order_count +
+                                (idiq.award_date ? ' · Awarded ' + idiq.award_date : '');
+                            left.appendChild(num);
+                            left.appendChild(meta);
+
+                            const badge = document.createElement('span');
+                            badge.className = 'badge ' + (idiq.status === 'Closed' ? 'bg-secondary' : 'bg-success');
+                            badge.textContent = idiq.status;
+
+                            a.appendChild(left);
+                            a.appendChild(badge);
+                            searchResults.appendChild(a);
+                        });
+
+                        if (data.idiq_total > idiqs.length) {
+                            const more = document.createElement('div');
+                            more.className = 'px-3 py-1 small text-body-secondary';
+                            more.textContent = `Showing first ${data.idiq_limit} of ${data.idiq_total} IDIQ matches`;
+                            searchResults.appendChild(more);
+                        }
+
+                        if (results.length > 0) {
+                            const divider = document.createElement('hr');
+                            divider.className = 'dropdown-divider';
+                            searchResults.appendChild(divider);
+                        }
+                    }
+
+                    if (results.length > 0 || idiqs.length > 0) {
                         results.forEach(contract => {
                             const a = document.createElement('a');
                             a.className = 'dropdown-item text-primary';
@@ -553,7 +600,21 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
 
                             a.innerHTML = inner;
-                            searchResults.appendChild(a);
+
+                            if (contract.idiq) {
+                                const row = document.createElement('div');
+                                row.className = 'd-flex align-items-center';
+                                a.classList.add('flex-grow-1');
+                                const idiqBadge = document.createElement('a');
+                                idiqBadge.className = 'badge rounded-pill bg-info-subtle text-info-emphasis text-decoration-none me-2';
+                                idiqBadge.href = contract.idiq.url;
+                                idiqBadge.textContent = 'IDIQ ' + contract.idiq.contract_number;
+                                row.appendChild(a);
+                                row.appendChild(idiqBadge);
+                                searchResults.appendChild(row);
+                            } else {
+                                searchResults.appendChild(a);
+                            }
                         });
                         searchResults.classList.remove('d-none');
                     } else {

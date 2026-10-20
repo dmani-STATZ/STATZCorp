@@ -67,6 +67,7 @@ python manage.py import_release_notes --verbose   # extra logging
 
 ## Recent release notes
 
+- [2026-10-20-idiq-contract-search](2026-10-20-idiq-contract-search.md) — Improved: Jump to Contract and the Contracts Dashboard search show matching IDIQs (Open / Closed badge, delivery order count, award date) above contract results, and delivery orders show an IDIQ badge linking to the parent. (`published: false` until shipped.)
 - [2026-10-20-idiq-duplicate-guard](2026-10-20-idiq-duplicate-guard.md) — Fixed: duplicate IDIQ numbers (ignoring dashes, spaces, case; closed IDIQs included) are blocked on create and edit. IDIQs with nothing linked can be deleted; Close asks for confirmation; closed IDIQs can be reopened. (`published: false` until shipped.)
 - [2026-10-20-on-time-delivery-open-clins](2026-10-20-on-time-delivery-open-clins.md) — Improved: On-Time Delivery Report counts unshipped and partially shipped CLINs against today's date, adds a Not Shipped column, and adds Status / Qty / Early Ship Flag to the Detail export. (`published: false` until shipped.)
 - [2026-10-19-on-time-delivery-report](2026-10-19-on-time-delivery-report.md) — New: On-Time Delivery Report (Contract Menu). Late / On-Time counts for fully shipped CLINs against supplier and contract due dates, grouped by Buyer, CLIN Type, and IA, with checkbox filters and a Summary + Detail Excel export.

@@ -236,10 +236,61 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(function (data) {
                     searchResults.innerHTML = '';
                     const results = data.results || data;
+                    const idiqs = data.idiqs || [];
 
-                    if (!results.length) {
+                    if (!results.length && !idiqs.length) {
                         searchResults.classList.add('hidden');
                         return;
+                    }
+
+                    if (idiqs.length) {
+                        const header = document.createElement('div');
+                        header.className = 'px-3 pt-2 pb-1 small fw-semibold text-body-secondary text-uppercase';
+                        header.textContent = 'IDIQ Contracts';
+                        searchResults.appendChild(header);
+
+                        idiqs.forEach(function (idiq) {
+                            const item = document.createElement('a');
+                            item.className = 'contract-search-item text-decoration-none';
+                            item.href = idiq.url;
+
+                            const left = document.createElement('div');
+                            left.className = 'contract-search-item-left';
+
+                            const num = document.createElement('span');
+                            num.className = 'contract-search-item-number';
+                            num.textContent = idiq.contract_number;
+                            left.appendChild(num);
+
+                            const meta = document.createElement('span');
+                            meta.className = 'contract-search-item-po';
+                            meta.textContent = 'Delivery orders: ' + idiq.delivery_order_count +
+                                (idiq.award_date ? ' · Awarded ' + idiq.award_date : '');
+                            left.appendChild(meta);
+
+                            const pill = document.createElement('span');
+                            pill.className = 'status-pill ' + statusPillClass(idiq.status);
+                            pill.textContent = idiq.status;
+
+                            item.appendChild(left);
+                            item.appendChild(pill);
+                            item.addEventListener('click', closeContractSearchModal);
+                            searchResults.appendChild(item);
+                        });
+
+                        if (data.idiq_total > idiqs.length) {
+                            const more = document.createElement('div');
+                            more.className = 'px-3 py-1 small text-body-secondary';
+                            more.textContent = 'Showing first ' + data.idiq_limit + ' of ' + data.idiq_total + ' IDIQ matches';
+                            searchResults.appendChild(more);
+                        }
+
+                        if (results.length) {
+                            const contractsHeader = document.createElement('div');
+                            contractsHeader.className = 'px-3 pt-2 pb-1 small fw-semibold text-body-secondary text-uppercase border-top';
+                            contractsHeader.textContent = 'Contracts';
+                            searchResults.appendChild(contractsHeader);
+                        }
                     }
 
                     results.forEach(function (contract) {
@@ -261,6 +312,16 @@ document.addEventListener('DOMContentLoaded', function () {
                             po.className = 'contract-search-item-po';
                             po.textContent = 'PO: ' + contract.po_numbers.join(', ');
                             left.appendChild(po);
+                        }
+
+                        if (contract.idiq) {
+                            const idiqBadge = document.createElement('a');
+                            idiqBadge.className = 'badge rounded-pill bg-info-subtle text-info-emphasis text-decoration-none align-self-start';
+                            idiqBadge.href = contract.idiq.url;
+                            idiqBadge.textContent = 'IDIQ ' + contract.idiq.contract_number;
+                            idiqBadge.addEventListener('click', function (e) { e.stopPropagation(); });
+                            idiqBadge.addEventListener('keydown', function (e) { e.stopPropagation(); });
+                            left.appendChild(idiqBadge);
                         }
 
                         const pill = document.createElement('span');
