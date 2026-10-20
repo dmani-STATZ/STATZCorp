@@ -8,6 +8,12 @@
 <style>
 .otd-filters [data-otd-list="buyer"] { max-height: 280px; overflow-y: auto; }
 .otd-filters fieldset .form-check:hover { background-color: var(--bs-secondary-bg); }
+.otd-results .otd-col-warn { background-color: var(--bs-warning-bg-subtle) !important; color: var(--bs-warning-text-emphasis) !important; }
+.otd-results .otd-col-late { background-color: var(--bs-danger-bg-subtle) !important; color: var(--bs-danger-text-emphasis) !important; }
+.otd-results .otd-col-ok   { background-color: var(--bs-success-bg-subtle) !important; color: var(--bs-success-text-emphasis) !important; }
+.otd-results thead .otd-col-warn,
+.otd-results thead .otd-col-late,
+.otd-results thead .otd-col-ok { font-weight: 600; }
 </style>
 <div class="container-fluid px-3 px-md-4 py-4">
     <h1 class="h3 mb-3">On-Time Delivery Report</h1>
@@ -113,7 +119,7 @@
             <div class="alert alert-secondary">No CLINs match these parameters.</div>
         {% else %}
             <p class="small text-body-secondary mb-2">Open CLINs evaluated as of {{ report.as_of|date:"m/d/Y" }}.</p>
-            <div class="table-responsive">
+            <div class="table-responsive otd-results">
                 <table class="table table-sm table-striped align-middle">
                     <thead>
                         <tr>
@@ -121,11 +127,11 @@
                             <th>CLIN Type</th>
                             <th>IA</th>
                             <th class="text-end">CLINs</th>
-                            <th class="text-end table-warning">Not Shipped</th>
-                            <th class="text-end table-danger">Late QDD</th>
-                            <th class="text-end table-success">On-Time QDD</th>
-                            <th class="text-end table-danger">Late</th>
-                            <th class="text-end table-success">On-Time</th>
+                            <th class="text-end otd-col-warn">Not Shipped</th>
+                            <th class="text-end otd-col-late">Late QDD</th>
+                            <th class="text-end otd-col-ok">On-Time QDD</th>
+                            <th class="text-end otd-col-late">Late</th>
+                            <th class="text-end otd-col-ok">On-Time</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -147,19 +153,19 @@
                         <tr>
                             <td colspan="3">Total</td>
                             <td class="text-end">{{ report.totals.clins }}</td>
-                            <td class="text-end table-warning">{{ report.totals.not_shipped }}</td>
-                            <td class="text-end table-danger">{{ report.totals.late_qdd }}</td>
-                            <td class="text-end table-success">{{ report.totals.ontime_qdd }}</td>
-                            <td class="text-end table-danger">{{ report.totals.late }}</td>
-                            <td class="text-end table-success">{{ report.totals.ontime }}</td>
+                            <td class="text-end otd-col-warn">{{ report.totals.not_shipped }}</td>
+                            <td class="text-end otd-col-late">{{ report.totals.late_qdd }}</td>
+                            <td class="text-end otd-col-ok">{{ report.totals.ontime_qdd }}</td>
+                            <td class="text-end otd-col-late">{{ report.totals.late }}</td>
+                            <td class="text-end otd-col-ok">{{ report.totals.ontime }}</td>
                         </tr>
                         <tr>
                             <td colspan="4">Percent</td>
-                            <td class="text-end table-warning">{{ report.percent_labels.not_shipped }}</td>
-                            <td class="text-end table-danger">{{ report.percent_labels.late_qdd }}</td>
-                            <td class="text-end table-success">{{ report.percent_labels.ontime_qdd }}</td>
-                            <td class="text-end table-danger">{{ report.percent_labels.late }}</td>
-                            <td class="text-end table-success">{{ report.percent_labels.ontime }}</td>
+                            <td class="text-end otd-col-warn">{{ report.percent_labels.not_shipped }}</td>
+                            <td class="text-end otd-col-late">{{ report.percent_labels.late_qdd }}</td>
+                            <td class="text-end otd-col-ok">{{ report.percent_labels.ontime_qdd }}</td>
+                            <td class="text-end otd-col-late">{{ report.percent_labels.late }}</td>
+                            <td class="text-end otd-col-ok">{{ report.percent_labels.ontime }}</td>
                         </tr>
                     </tfoot>
                 </table>
