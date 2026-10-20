@@ -49,8 +49,10 @@
 - IDIQ numbers are compared via `normalize_idiq_number` (Python) / `idiq_number_expression` (ORM) in
  `contracts/services/contract_number.py`. Never add another IDIQ number normalizer.
 - Every IDIQ create or rename must go through `find_duplicate_idiq` (closed IDIQs count).
-- Delete is blocked while `get_idiq_dependents(idiq)` is non-empty. `Contract.idiq_contract` is CASCADE;
- never add a delete path that skips this check. Delete / Close / Reopen are POST-only.
+- Delete is blocked while `get_idiq_dependents(idiq)` is non-empty. `ScannedFolder` is the only
+ model in `IDIQ_DEPENDENT_EXEMPT_MODELS`; do not add user-entered data to that list.
+ `Contract.idiq_contract` is CASCADE; never add a delete path that skips this check.
+ Delete / Close / Reopen are POST-only.
 - Do not add a DB unique constraint on `IdiqContract.contract_number` until `find_duplicate_idiqs`
  reports 0 groups in production.
 - IDIQs appear in Contract search (`contracts:contract_search`) only via `search_idiq_contracts` in

@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from contracts.models import Company, Contract, IdiqContract, get_idiq_dependents
+from contracts.models_folder_scan import FolderScanRun, ScannedFolder
 from contracts.services.contract_create import ContractCreationError, create_idiq_from_payload
 from contracts.services.contract_number import normalize_idiq_number
 from transactions.models import Transaction
@@ -96,7 +97,21 @@ class DeleteGuardTests(IdiqGuardTestBase):
         )
         self.assertTrue(IdiqContract.objects.filter(pk=self.idiq.pk).exists())
         self.assertContains(response, 'Delivery orders (1)')
-        self.assertContains(response, 'If it is a duplicate, ask Dion to merge it.')
+        self.assertContains(response, 'merged into the other record first')
+        self.assertNotContains(response, 'ask Dion')
+
+    def test_scanned_folders_do_not_block_delete(self):
+        run = FolderScanRun.objects.create(root_path='test-root')
+        folder = ScannedFolder.objects.create(
+            run=run, drive_item_id='drive-1', name='Contract SPE7L1-23-D-0099',
+            idiq_contract=self.idiq,
+        )
+        self.assertEqual(get_idiq_dependents(self.idiq), [])
+        response = self.client.post(reverse('contracts:idiq_contract_delete', args=[self.idiq.pk]))
+        self.assertRedirects(response, reverse('contracts:idiq_list'), fetch_redirect_response=False)
+        self.assertFalse(IdiqContract.objects.filter(pk=self.idiq.pk).exists())
+        folder.refresh_from_db()
+        self.assertIsNone(folder.idiq_contract_id)
 
     def test_delete_succeeds_without_dependents(self):
         pk = self.idiq.pk

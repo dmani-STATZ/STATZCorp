@@ -1353,14 +1353,19 @@ class IdiqContract(AuditModel):
 _IDIQ_DEPENDENT_LABELS = {
     'contract_set': 'Delivery orders',
     'idiqcontractdetails_set': 'NSN / supplier pairs',
-    'scanned_folders': 'Scanned folders',
     'scan_filing_logs': 'Scan filing logs',
     'notes': 'Notes',
 }
 
+# Scanner snapshots only. The FK is SET_NULL, so deleting the IDIQ unlinks the
+# row and leaves the folder for the next scan. Never add a user-entered model here.
+from contracts.models_folder_scan import ScannedFolder  # noqa: E402
+
+IDIQ_DEPENDENT_EXEMPT_MODELS = (ScannedFolder,)
+
 IDIQ_DELETE_BLOCKED_SUFFIX = (
     'Close this IDIQ only if it is genuinely finished. '
-    'If it is a duplicate, ask Dion to merge it.'
+    'If it is a duplicate, it needs to be merged into the other record first.'
 )
 
 
@@ -1368,9 +1373,15 @@ def get_idiq_dependents(idiq):
     """Return [(label, count)] for every relation to this IDIQ with count > 0.
 
     Walks ``_meta.related_objects`` plus GenericRelations so a new FK to
-    IdiqContract blocks delete automatically.
+    IdiqContract blocks delete automatically. Scanner snapshots in
+    ``IDIQ_DEPENDENT_EXEMPT_MODELS`` are skipped.
     """
-    accessors = [rel.get_accessor_name() for rel in IdiqContract._meta.related_objects]
+    exempt = set(IDIQ_DEPENDENT_EXEMPT_MODELS)
+    accessors = [
+        rel.get_accessor_name()
+        for rel in IdiqContract._meta.related_objects
+        if rel.related_model not in exempt
+    ]
     accessors += [
         f.name for f in IdiqContract._meta.private_fields
         if isinstance(f, GenericRelation)
