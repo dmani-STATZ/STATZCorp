@@ -45,6 +45,15 @@
 - `normalize_piid` slices on length only. Do not strip a `P` with a regex.
 - No company scoping on the contract lookup. Never write `Contract`, `IdiqContract`, `PaymentHistory`, or `files_url`.
 
+## IDIQ contracts (when touching `IdiqContract` create / edit / close / delete)
+- IDIQ numbers are compared via `normalize_idiq_number` (Python) / `idiq_number_expression` (ORM) in
+ `contracts/services/contract_number.py`. Never add another IDIQ number normalizer.
+- Every IDIQ create or rename must go through `find_duplicate_idiq` (closed IDIQs count).
+- Delete is blocked while `get_idiq_dependents(idiq)` is non-empty. `Contract.idiq_contract` is CASCADE;
+ never add a delete path that skips this check. Delete / Close / Reopen are POST-only.
+- Do not add a DB unique constraint on `IdiqContract.contract_number` until `find_duplicate_idiqs`
+ reports 0 groups in production.
+
 ## CSS (when touching `static/css/app-core.css` or any date field)
 - Date inputs use the native browser calendar indicator only. Never add a
   background-image calendar icon or an `input-group-text` calendar icon next to a

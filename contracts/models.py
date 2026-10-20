@@ -1350,6 +1350,45 @@ class IdiqContract(AuditModel):
         return f'{base}?id={quote(folder_path)}&viewid={viewid}'
 
 
+_IDIQ_DEPENDENT_LABELS = {
+    'contract_set': 'Delivery orders',
+    'idiqcontractdetails_set': 'NSN / supplier pairs',
+    'scanned_folders': 'Scanned folders',
+    'scan_filing_logs': 'Scan filing logs',
+    'notes': 'Notes',
+}
+
+IDIQ_DELETE_BLOCKED_SUFFIX = (
+    'Close this IDIQ only if it is genuinely finished. '
+    'If it is a duplicate, ask Dion to merge it.'
+)
+
+
+def get_idiq_dependents(idiq):
+    """Return [(label, count)] for every relation to this IDIQ with count > 0.
+
+    Walks ``_meta.related_objects`` plus GenericRelations so a new FK to
+    IdiqContract blocks delete automatically.
+    """
+    accessors = [rel.get_accessor_name() for rel in IdiqContract._meta.related_objects]
+    accessors += [
+        f.name for f in IdiqContract._meta.private_fields
+        if isinstance(f, GenericRelation)
+    ]
+    dependents = []
+    for accessor in accessors:
+        count = getattr(idiq, accessor).count()
+        if count:
+            label = _IDIQ_DEPENDENT_LABELS.get(accessor, accessor.replace('_', ' ').capitalize())
+            dependents.append((label, count))
+    return dependents
+
+
+def idiq_delete_blocked_message(dependents):
+    parts = ', '.join(f'{label} ({count})' for label, count in dependents)
+    return f"This IDIQ can't be deleted because it still has: {parts}. {IDIQ_DELETE_BLOCKED_SUFFIX}"
+
+
 class IdiqContractDetails(models.Model):
     idiq_contract = models.ForeignKey(IdiqContract, on_delete=models.CASCADE)
     nsn = models.ForeignKey(Nsn, on_delete=models.CASCADE)

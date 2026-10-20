@@ -88,3 +88,15 @@ DFAS payment notices in the finance@ mailbox are filed as PDFs in the matching c
 In-scope mail is from `disa.ogden.eis.mbx.wawfnoreply@mail.mil` with subject `Notification of new DFAS payment action` (no FW:/RE:). The live job reads Inbox only. Filed messages are marked read and moved to `Inbox/WAWF/DFAS Receipts`. Unmatched messages are marked unread and moved to `Inbox/WAWF/Unmatched`.
 
 `DfasPaymentNotice` records the parse and the SharePoint item. Contract data is read-only, and the lookup is not company-scoped. `python manage.py dfas_receipts_backfill` is a dry run; add `--apply` to write. Drag an unmatched email back to the Inbox, or pass `--folder "Inbox/WAWF/Unmatched" --apply`, after the contract or folder is fixed.
+
+---
+
+## IDIQ Duplicate Guard + Safe Close / Delete (`contracts` app)
+
+**Duplicate guard.** IDIQ numbers are compared with `normalize_idiq_number()` in `contracts/services/contract_number.py` (trim, drop every `-` and space, uppercase). Its ORM twin `idiq_number_expression()` is used for lookups. `find_duplicate_idiq()` in `contracts/services/contract_create.py` checks every IDIQ, closed ones included. It runs in `create_idiq_from_payload` (Intake finalize, raises `ContractCreationError`) and in `IdiqContractForm.clean_contract_number` (edit, excludes the record itself). There is no DB unique constraint; existing duplicates would break one.
+
+**Delete rules.** `get_idiq_dependents(idiq)` in `contracts/models.py` returns `(label, count)` for every reverse relation (`_meta.related_objects` plus the `notes` GenericRelation). `IdiqContractDeleteView` is POST-only and deletes only when that list is empty. `Contract.idiq_contract` is `CASCADE`, so this guard is the only thing stopping a delete from wiping delivery orders. Close and Reopen are POST-only views (`idiq_contract_close` / `idiq_contract_reopen`). The edit form no longer has a `closed` field.
+
+**Audit.** `IdiqContract` edits (including `closed`) are in `transactions.signals.TRACKED`. Create and delete write one `Transaction` row on `contract_number` via `record_lifecycle_transaction`.
+
+**Report.** `python manage.py find_duplicate_idiqs` is read-only. It lists every group of IDIQs sharing a normalized number with pk, status, created date, drive item flag, and dependent counts.

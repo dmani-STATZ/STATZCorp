@@ -33,7 +33,9 @@ from .models import (
     Company,
     GovAction,
     ClinSplit,
+    IdiqContract,
 )
+from .services.contract_create import duplicate_idiq_message, find_duplicate_idiq
 from .services.due_status import today
 from .services.on_time_delivery import OtdFilters
 
@@ -921,4 +923,20 @@ class OnTimeDeliveryFilterForm(forms.Form):
             item_types=tuple(cd['item_type']),
             ia_codes=ia_codes,
         )
+
+
+class IdiqContractForm(forms.ModelForm):
+    """IDIQ edit form. Close/Reopen are separate confirmed actions, not a field here."""
+
+    class Meta:
+        model = IdiqContract
+        fields = ['contract_number', 'buyer', 'award_date', 'term_length',
+                  'option_length', 'tab_num', 'alert_note']
+
+    def clean_contract_number(self):
+        value = (self.cleaned_data.get('contract_number') or '').strip()
+        existing = find_duplicate_idiq(value, exclude_pk=self.instance.pk)
+        if existing is not None:
+            raise forms.ValidationError(duplicate_idiq_message(existing))
+        return value
 

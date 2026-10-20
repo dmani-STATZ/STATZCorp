@@ -159,6 +159,22 @@
     </div>
     {% endif %}
 
+    <div class="d-flex justify-content-end gap-2 mb-4">
+        {% if idiq_contract.closed %}
+        <form method="post" action="{% url 'contracts:idiq_contract_reopen' idiq_contract.id %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-success">Reopen IDIQ</button>
+        </form>
+        {% else %}
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#idiqCloseModal">
+            Close IDIQ
+        </button>
+        {% endif %}
+        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#idiqDeleteModal">
+            Delete IDIQ
+        </button>
+    </div>
+
 
         <!-- Contract Details -->
         <div class="grid grid-cols-2 gap-x-8 gap-y-4 mb-8">
@@ -387,6 +403,67 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+{% if not idiq_contract.closed %}
+<div class="modal fade" id="idiqCloseModal" tabindex="-1" aria-labelledby="idiqCloseModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="idiqCloseModalLabel">Close IDIQ {{ idiq_contract.contract_number }}?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>IDIQ:</strong> {{ idiq_contract.contract_number }}</p>
+                <p class="mb-2"><strong>Current status:</strong> Open</p>
+                <p class="mb-1"><strong>Linked records:</strong></p>
+                <ul class="mb-3">
+                    {% for label, count in idiq_dependents %}
+                    <li>{{ label }}: {{ count }}</li>
+                    {% empty %}
+                    <li>None</li>
+                    {% endfor %}
+                </ul>
+                <div class="alert alert-warning mb-0">Closing keeps this record forever. If this is a duplicate, delete it instead.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'contracts:idiq_contract_close' idiq_contract.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary">Close IDIQ</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="modal fade" id="idiqDeleteModal" tabindex="-1" aria-labelledby="idiqDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="idiqDeleteModalLabel">Delete IDIQ {{ idiq_contract.contract_number }}?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>IDIQ:</strong> {{ idiq_contract.contract_number }}</p>
+                {% if idiq_dependents %}
+                <div class="alert alert-danger mb-0">{{ idiq_delete_blocked_message }}</div>
+                {% else %}
+                <p class="mb-0">This permanently deletes the IDIQ. Nothing else is linked to it.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                {% if not idiq_dependents %}
+                <form method="post" action="{% url 'contracts:idiq_contract_delete' idiq_contract.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete IDIQ</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
 

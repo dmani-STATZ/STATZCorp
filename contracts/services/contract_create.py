@@ -37,6 +37,7 @@ from contracts.models import (
     SalesClass,
     SpecialPaymentTerms,
 )
+from contracts.services.contract_number import idiq_number_expression, normalize_idiq_number
 from products.models import Nsn
 from suppliers.models import Supplier
 
@@ -163,6 +164,10 @@ def create_idiq_from_payload(payload: dict, user: User) -> IdiqContract:
     if not contract_number:
         raise ContractCreationError('contract_number is required.')
 
+    existing = find_duplicate_idiq(contract_number)
+    if existing is not None:
+        raise ContractCreationError(duplicate_idiq_message(existing))
+
     buyer = _resolve_buyer(payload.get('buyer_id'), required=False)
 
     idiq = IdiqContract.objects.create(
@@ -194,7 +199,34 @@ def create_idiq_from_payload(payload: dict, user: User) -> IdiqContract:
                 supplier_part_number=pair.get('supplier_part_number') or None,
             )
 
+    from transactions.signals import record_lifecycle_transaction
+    record_lifecycle_transaction(idiq, None, idiq.contract_number, 'IDIQ created', user)
+
     return idiq
+
+
+def find_duplicate_idiq(contract_number, exclude_pk=None) -> Optional[IdiqContract]:
+    """Return an existing IDIQ (open or closed) whose normalized number matches."""
+    normalized = normalize_idiq_number(contract_number)
+    if not normalized:
+        return None
+    qs = IdiqContract.objects.annotate(
+        normalized_number=idiq_number_expression('contract_number'),
+    ).filter(normalized_number=normalized)
+    if exclude_pk is not None:
+        qs = qs.exclude(pk=exclude_pk)
+    return qs.order_by('pk').first()
+
+
+def duplicate_idiq_message(existing: IdiqContract) -> str:
+    status = 'Closed' if existing.closed else 'Open'
+    message = (
+        f'IDIQ {existing.contract_number} already exists (status: {status}). '
+        'Open that record instead of creating a duplicate.'
+    )
+    if existing.closed:
+        message += ' Reopen it if this IDIQ is still active.'
+    return message
 
 
 # ---------------------------------------------------------------------------

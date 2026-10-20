@@ -7,7 +7,7 @@ from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 
-from contracts.models import ClinSplit, ClinShipment, Clin, Contract, ContractLevelCharge
+from contracts.models import ClinSplit, ClinShipment, Clin, Contract, ContractLevelCharge, IdiqContract
 from suppliers.models import Supplier
 from .models import Transaction
 from .middleware import get_current_user
@@ -50,6 +50,14 @@ TRACKED = [
     (ContractLevelCharge, "billed_paid_amount"),
     (ContractLevelCharge, "payment_date"),
     (ContractLevelCharge, "invoice_number"),
+    (IdiqContract, "contract_number"),
+    (IdiqContract, "buyer"),
+    (IdiqContract, "award_date"),
+    (IdiqContract, "term_length"),
+    (IdiqContract, "option_length"),
+    (IdiqContract, "closed"),
+    (IdiqContract, "tab_num"),
+    (IdiqContract, "alert_note"),
     # Supplier (supplier detail page)
     (Supplier, "name"),
     (Supplier, "cage_code"),
@@ -195,6 +203,25 @@ def store_old_state(sender, instance, **kwargs):
                 }
         except Exception:
             pass
+    elif sender is IdiqContract:
+        try:
+            row = IdiqContract.objects.filter(pk=instance.pk).values(
+                "contract_number", "buyer_id", "award_date", "term_length",
+                "option_length", "closed", "tab_num", "alert_note",
+            ).first()
+            if row is not None:
+                old_state[key] = {
+                    "contract_number": _serialize(row.get("contract_number")),
+                    "buyer": _serialize(row.get("buyer_id")),
+                    "award_date": _serialize(row.get("award_date")),
+                    "term_length": _serialize(row.get("term_length")),
+                    "option_length": _serialize(row.get("option_length")),
+                    "closed": _serialize(row.get("closed")),
+                    "tab_num": _serialize(row.get("tab_num")),
+                    "alert_note": _serialize(row.get("alert_note")),
+                }
+        except Exception:
+            pass
     elif sender is Supplier:
         try:
             row = Supplier.objects.filter(pk=instance.pk).values(
@@ -258,3 +285,16 @@ def record_transactions(sender, instance, **kwargs):
             user=user,
             note=getattr(instance, "_transaction_note", None),
         )
+
+
+def record_lifecycle_transaction(instance, old_value, new_value, note, user=None):
+    """Record a create/delete on ``contract_number``; post_save only sees edits."""
+    Transaction.objects.create(
+        content_type=ContentType.objects.get_for_model(type(instance)),
+        object_id=instance.pk,
+        field_name="contract_number",
+        old_value=_serialize(old_value),
+        new_value=_serialize(new_value),
+        user=user or get_current_user(),
+        note=note,
+    )

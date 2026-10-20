@@ -6,12 +6,21 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views import View
 from django.views.generic.edit import UpdateView
+from django.db import transaction
 from django.db.models import Q, Count
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.contenttypes.models import ContentType
 
-from contracts.models import IdiqContract, IdiqContractDetails, Contract, Note
+from contracts.forms import IdiqContractForm
+from contracts.models import (
+    IdiqContract,
+    IdiqContractDetails,
+    Contract,
+    Note,
+    get_idiq_dependents,
+    idiq_delete_blocked_message,
+)
 from products.models import Nsn
 from suppliers.models import Supplier
 
@@ -77,23 +86,68 @@ class IdiqContractDetailView(LoginRequiredMixin, DetailView):
         
         # Add content type for notes functionality
         context['content_type_id'] = ContentType.objects.get_for_model(IdiqContract).id
+
+        dependents = get_idiq_dependents(self.object)
+        context['idiq_dependents'] = dependents
+        context['idiq_delete_blocked_message'] = (
+            idiq_delete_blocked_message(dependents) if dependents else ''
+        )
         
         return context
 
 class IdiqContractUpdateView(LoginRequiredMixin, UpdateView):
     model = IdiqContract
-    fields = ['contract_number', 'buyer', 'award_date', 'term_length', 
-              'option_length', 'closed', 'tab_num', 'alert_note']
+    form_class = IdiqContractForm
     template_name = 'contracts/idiq_contract_edit.html'
     
     def get_success_url(self):
         return reverse('contracts:idiq_contract_detail', kwargs={'pk': self.object.pk})
 
     def form_valid(self, form):
+        form.instance.modified_by = self.request.user
         response = super().form_valid(form)
-        if self.request.is_ajax():
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'success': True})
         return response
+
+
+class IdiqContractCloseView(LoginRequiredMixin, View):
+    """POST-only. Reopen subclasses this so both share one guard."""
+    closed = True
+    verb = 'closed'
+
+    def post(self, request, pk):
+        idiq = get_object_or_404(IdiqContract, pk=pk)
+        if bool(idiq.closed) != self.closed:
+            idiq.closed = self.closed
+            idiq.modified_by = request.user
+            idiq.save(update_fields=['closed', 'modified_by', 'modified_on'])
+            messages.success(request, f'IDIQ {idiq.contract_number} {self.verb}.')
+        return redirect('contracts:idiq_contract_detail', pk=idiq.pk)
+
+
+class IdiqContractReopenView(IdiqContractCloseView):
+    closed = False
+    verb = 'reopened'
+
+
+class IdiqContractDeleteView(LoginRequiredMixin, View):
+    """POST-only. Refuses while any dependent row exists."""
+
+    def post(self, request, pk):
+        from transactions.signals import record_lifecycle_transaction
+
+        idiq = get_object_or_404(IdiqContract, pk=pk)
+        with transaction.atomic():
+            dependents = get_idiq_dependents(idiq)
+            if dependents:
+                messages.error(request, idiq_delete_blocked_message(dependents))
+                return redirect('contracts:idiq_contract_detail', pk=idiq.pk)
+            number = idiq.contract_number
+            record_lifecycle_transaction(idiq, number, None, 'IDIQ deleted', request.user)
+            idiq.delete()
+        messages.success(request, f'IDIQ {number} deleted.')
+        return redirect('contracts:idiq_list')
 
 class IdiqContractDetailsCreateView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):

@@ -75,13 +75,11 @@
                     {% endif %}
                 </div>
 
-                <!-- IDIQ Closed -->
+                <!-- IDIQ Status -->
                 <div class="form-group">
-                    <label for="{{ form.closed.id_for_label }}" class="form-label">IDIQ Closed</label>
-                    {{ form.closed }}
-                    {% if form.closed.errors %}
-                    <div class="field-error">{{ form.closed.errors|join:", " }}</div>
-                    {% endif %}
+                    <span class="form-label">IDIQ Status</span>
+                    <div>{% if object.closed %}Closed{% else %}Open{% endif %}</div>
+                    <small class="text-muted">Use Close / Reopen on the IDIQ page.</small>
                 </div>
             </div>
 

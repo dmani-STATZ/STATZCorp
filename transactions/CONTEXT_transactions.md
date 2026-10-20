@@ -1,7 +1,7 @@
 ﻿# Transactions Context
 
 ## 1. Purpose
-Track field-level edits for a handful of auditable models and surface that history in the UI while also letting staff overwrite a single field without leaving the page. The `transactions` app records every change to fields listed in `signals.TRACKED` (`Contract`, `Clin`, `ClinShipment`, `ClinSplit`, `ContractLevelCharge`, and `Supplier`) and exposes an AJAX-powered modal plus edit flow that reads from `Transaction` rows, shows typed values and optional change notes, and lets the user submit a new value that reuses the same history recording logic.
+Track field-level edits for a handful of auditable models and surface that history in the UI while also letting staff overwrite a single field without leaving the page. The `transactions` app records every change to fields listed in `signals.TRACKED` (`Contract`, `Clin`, `ClinShipment`, `ClinSplit`, `ContractLevelCharge`, `IdiqContract`, and `Supplier`) and exposes an AJAX-powered modal plus edit flow that reads from `Transaction` rows, shows typed values and optional change notes, and lets the user submit a new value that reuses the same history recording logic.
 
 ## 2. App Identity
 - **Django app name:** `transactions`

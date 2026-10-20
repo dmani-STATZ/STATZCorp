@@ -18,6 +18,9 @@ import logging
 import re
 from typing import Optional
 
+from django.db.models import F, Value
+from django.db.models.functions import Replace, Trim, Upper
+
 logger = logging.getLogger(__name__)
 
 # PIID structure: 6-char activity code, 2-digit FY, 1-letter type, 4-char serial.
@@ -78,6 +81,25 @@ def canonicalize_contract_number(contract_number: Optional[str]) -> Optional[str
 
 # Alias for backward compatibility with processing.services.contract_utils
 normalize_contract_number = canonicalize_contract_number
+
+
+def normalize_idiq_number(value: Optional[str]) -> str:
+    """Comparison key for IDIQ numbers: trimmed, no dashes or spaces, uppercased.
+
+    Must stay in step with ``idiq_number_expression`` so Python and SQL agree.
+    """
+    return (value or '').strip().replace('-', '').replace(' ', '').upper()
+
+
+def idiq_number_expression(field: str = 'contract_number'):
+    """ORM twin of ``normalize_idiq_number`` for annotations."""
+    return Upper(
+        Replace(
+            Replace(Trim(F(field)), Value('-'), Value('')),
+            Value(' '),
+            Value(''),
+        )
+    )
 
 
 # Map of position-9 characters (the type indicator after removing dashes) to

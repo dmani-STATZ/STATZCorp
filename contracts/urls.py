@@ -176,6 +176,9 @@ from .views.idiq_views import (
     IdiqContractListView,
     IdiqContractDetailView,
     IdiqContractUpdateView,
+    IdiqContractCloseView,
+    IdiqContractReopenView,
+    IdiqContractDeleteView,
     IdiqContractDetailsCreateView,
     IdiqContractDetailsDeleteView,
     NsnSearchView,
@@ -724,6 +727,21 @@ urlpatterns = [
         "idiq/<int:pk>/update/",
         IdiqContractUpdateView.as_view(),
         name="idiq_contract_update",
+    ),
+    path(
+        "idiq/<int:pk>/close/",
+        IdiqContractCloseView.as_view(),
+        name="idiq_contract_close",
+    ),
+    path(
+        "idiq/<int:pk>/reopen/",
+        IdiqContractReopenView.as_view(),
+        name="idiq_contract_reopen",
+    ),
+    path(
+        "idiq/<int:pk>/delete/",
+        IdiqContractDeleteView.as_view(),
+        name="idiq_contract_delete",
     ),
     path(
         "idiq/<int:pk>/details/create/",
