@@ -110,8 +110,9 @@
         </div>
 
         {% if not report.rows %}
-            <div class="alert alert-secondary">No completed CLINs match these parameters.</div>
+            <div class="alert alert-secondary">No CLINs match these parameters.</div>
         {% else %}
+            <p class="small text-body-secondary mb-2">Open CLINs evaluated as of {{ report.as_of|date:"m/d/Y" }}.</p>
             <div class="table-responsive">
                 <table class="table table-sm table-striped align-middle">
                     <thead>
@@ -120,6 +121,7 @@
                             <th>CLIN Type</th>
                             <th>IA</th>
                             <th class="text-end">CLINs</th>
+                            <th class="text-end table-warning">Not Shipped</th>
                             <th class="text-end table-danger">Late QDD</th>
                             <th class="text-end table-success">On-Time QDD</th>
                             <th class="text-end table-danger">Late</th>
@@ -133,6 +135,7 @@
                                 <td>{{ row.type_label }}</td>
                                 <td>{{ row.ia_label }}</td>
                                 <td class="text-end">{{ row.clins }}</td>
+                                <td class="text-end">{{ row.not_shipped }}</td>
                                 <td class="text-end">{{ row.late_qdd }}</td>
                                 <td class="text-end">{{ row.ontime_qdd }}</td>
                                 <td class="text-end">{{ row.late }}</td>
@@ -144,6 +147,7 @@
                         <tr>
                             <td colspan="3">Total</td>
                             <td class="text-end">{{ report.totals.clins }}</td>
+                            <td class="text-end table-warning">{{ report.totals.not_shipped }}</td>
                             <td class="text-end table-danger">{{ report.totals.late_qdd }}</td>
                             <td class="text-end table-success">{{ report.totals.ontime_qdd }}</td>
                             <td class="text-end table-danger">{{ report.totals.late }}</td>
@@ -151,6 +155,7 @@
                         </tr>
                         <tr>
                             <td colspan="4">Percent</td>
+                            <td class="text-end table-warning">{{ report.percent_labels.not_shipped }}</td>
                             <td class="text-end table-danger">{{ report.percent_labels.late_qdd }}</td>
                             <td class="text-end table-success">{{ report.percent_labels.ontime_qdd }}</td>
                             <td class="text-end table-danger">{{ report.percent_labels.late }}</td>
@@ -159,9 +164,9 @@
                     </tfoot>
                 </table>
             </div>
-            {% if report.unclassified %}
-                <p class="small text-body-secondary mb-0">{{ report.unclassified_note }}</p>
-            {% endif %}
+            {% for note in report.notes %}
+                <p class="small text-body-secondary mb-1">{{ note }}</p>
+            {% endfor %}
         {% endif %}
     {% endif %}
 </div>

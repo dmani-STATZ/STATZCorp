@@ -30,6 +30,7 @@ from users.models import UserCompanyMembership
 
 START = datetime.date(2026, 4, 1)
 END = datetime.date(2026, 4, 30)
+AS_OF = datetime.date(2026, 5, 15)
 
 
 class OnTimeDeliveryTestBase(TestCase):
@@ -77,8 +78,20 @@ class OnTimeDeliveryTestBase(TestCase):
             ClinShipment.objects.create(clin=clin, ship_date=ship_date, ship_qty=shipped)
         return clin
 
-    def report(self, **kwargs):
-        return compute_otd_report(self.company, OtdFilters(start_date=START, end_date=END, **kwargs))
+    def report(self, as_of=AS_OF, **kwargs):
+        return compute_otd_report(
+            self.company, OtdFilters(start_date=START, end_date=END, **kwargs), as_of=as_of
+        )
+
+    def assert_identities(self, counts):
+        self.assertEqual(
+            counts["clins"],
+            counts["late_qdd"] + counts["ontime_qdd"] + counts["not_yet_due_qdd"],
+        )
+        self.assertEqual(
+            counts["clins"],
+            counts["late"] + counts["ontime"] + counts["not_yet_due_due"] + counts["unclassified"],
+        )
 
 
 class ComputeOtdReportTests(OnTimeDeliveryTestBase):
@@ -91,9 +104,77 @@ class ComputeOtdReportTests(OnTimeDeliveryTestBase):
         self.assertEqual(totals["late"], 0)
         self.assertEqual(totals["ontime"], 1)
 
-    def test_incomplete_clin_excluded(self):
+    def test_shipped_on_time_unchanged(self):
+        totals = self.report()["totals"]
+        self.assertEqual(totals["clins"], 0)
+        self.make_clin()
+        totals = self.report()["totals"]
+        self.assertEqual(totals["not_shipped"], 0)
+        self.assertEqual(totals["ontime_qdd"], 1)
+        self.assertEqual(totals["ontime"], 1)
+
+    def test_not_shipped_past_supplier_due_is_late_qdd(self):
+        self.make_clin(shipped=0)
+        totals = self.report()["totals"]
+        self.assertEqual(totals["clins"], 1)
+        self.assertEqual(totals["not_shipped"], 1)
+        self.assertEqual(totals["late_qdd"], 1)
+        self.assertEqual(totals["not_yet_due_qdd"], 0)
+
+    def test_not_shipped_supplier_due_on_or_after_as_of_is_not_yet_due(self):
+        self.make_clin(shipped=0)
+        report = self.report(as_of=datetime.date(2026, 4, 10))
+        totals = report["totals"]
+        self.assertEqual(totals["not_yet_due_qdd"], 1)
+        self.assertEqual(totals["late_qdd"], 0)
+        self.assertIsNone(report["percents"]["late_qdd"])
+        self.assertEqual(report["detail"][0]["qdd_bucket"], "not_yet_due_qdd")
+
+    def test_not_shipped_against_contract_due_date(self):
+        self.make_clin(shipped=0)
+        before_due = self.report(as_of=datetime.date(2026, 4, 15))["totals"]
+        self.assertEqual(before_due["late_qdd"], 1)
+        self.assertEqual(before_due["not_yet_due_due"], 1)
+        self.assertEqual(before_due["late"], 0)
+        after_due = self.report(as_of=datetime.date(2026, 4, 21))["totals"]
+        self.assertEqual(after_due["late"], 1)
+        self.assertEqual(after_due["not_yet_due_due"], 0)
+
+    def test_partial_shipment_is_not_shipped(self):
         self.make_clin(shipped=4)
-        self.assertEqual(self.report()["totals"]["clins"], 0)
+        report = self.report()
+        totals = report["totals"]
+        self.assertEqual(totals["not_shipped"], 1)
+        self.assertEqual(totals["late_qdd"], 1)
+        self.assertEqual(totals["late"], 1)
+        self.assertEqual(report["detail"][0]["status"], "Not Shipped")
+        self.assertEqual(report["detail"][0]["qty_text"], "4 / 10")
+        self.assertIsNone(report["detail"][0]["completion_date"])
+
+    def test_complete_but_undated_is_not_shipped(self):
+        self.make_clin(ship_date=None)
+        totals = self.report()["totals"]
+        self.assertEqual(totals["not_shipped"], 1)
+        self.assertEqual(totals["late_qdd"], 1)
+
+    def test_identities_hold_on_mixed_fixture(self):
+        self.make_clin()
+        self.make_clin(ship_date=datetime.date(2026, 4, 25))
+        self.make_clin(shipped=0, ia="D")
+        self.make_clin(shipped=4, supplier_due=datetime.date(2026, 4, 28), due=datetime.date(2026, 6, 1))
+        self.make_clin(shipped=0, due=None)
+        report = self.report(as_of=datetime.date(2026, 4, 20))
+        for row in report["rows"]:
+            self.assert_identities(row)
+        self.assert_identities(report["totals"])
+        self.assertEqual(report["totals"]["clins"], 5)
+
+    def test_early_ship_flag_threshold(self):
+        supplier_due = datetime.date(2026, 4, 10)
+        self.make_clin(ship_date=supplier_due - datetime.timedelta(days=181), due=None)
+        self.make_clin(ship_date=supplier_due - datetime.timedelta(days=180), due=None)
+        flags = sorted(d["early_ship_flag"] for d in self.report()["detail"])
+        self.assertEqual(flags, [False, True])
 
     def test_cancelled_contract_excluded(self):
         self.make_clin(status=self.cancelled_status)
@@ -113,7 +194,7 @@ class ComputeOtdReportTests(OnTimeDeliveryTestBase):
         self.assertEqual(totals["late"], 0)
         self.assertEqual(totals["ontime"], 0)
         self.assertEqual(report["unclassified"], 1)
-        self.assertIsNone(report["detail"][0]["late"])
+        self.assertEqual(report["detail"][0]["due_bucket"], "unclassified")
 
     def test_grouping_splits_origin_and_destination(self):
         self.make_clin(ia="O")
@@ -147,6 +228,7 @@ class ComputeOtdReportTests(OnTimeDeliveryTestBase):
         empty = compute_otd_report(
             self.company,
             OtdFilters(start_date=datetime.date(2020, 1, 1), end_date=datetime.date(2020, 1, 31)),
+            as_of=AS_OF,
         )
         self.assertIsNone(empty["percents"]["late_qdd"])
 
@@ -295,6 +377,12 @@ class OnTimeDeliveryViewTests(OnTimeDeliveryTestBase):
         workbook = load_workbook()(io.BytesIO(response.content))
         self.assertEqual(workbook.sheetnames, ["Summary", "Detail"])
         self.assertEqual(workbook["Detail"].max_row, 2)
+        summary_values = [cell.value for row in workbook["Summary"].iter_rows() for cell in row]
+        self.assertIn("As Of", summary_values)
+        self.assertIn("Not Shipped", summary_values)
+        detail_headers = [cell.value for cell in workbook["Detail"][1]]
+        self.assertIn("Early Ship Flag", detail_headers)
+        self.assertIn("Status", detail_headers)
 
     def test_export_invalid_returns_400(self):
         response = self.client.get(

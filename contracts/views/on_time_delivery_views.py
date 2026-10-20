@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView, View
 
@@ -8,7 +9,6 @@ from ..services.on_time_delivery import (
     build_otd_workbook,
     compute_otd_report,
     format_percent,
-    unclassified_note,
 )
 from .mixins import ActiveCompanyQuerysetMixin
 
@@ -27,11 +27,10 @@ class OnTimeDeliveryReportView(ActiveCompanyQuerysetMixin, TemplateView):
         if "start_date" in self.request.GET:
             form = OnTimeDeliveryFilterForm(self.request.GET, company=company)
             if form.is_valid():
-                report = compute_otd_report(company, form.to_filters())
+                report = compute_otd_report(company, form.to_filters(), as_of=timezone.localdate())
                 report["percent_labels"] = {
                     key: format_percent(value) for key, value in report["percents"].items()
                 }
-                report["unclassified_note"] = unclassified_note(report["unclassified"])
         else:
             form = OnTimeDeliveryFilterForm(company=company)
         context.update(
@@ -53,7 +52,7 @@ class OnTimeDeliveryExportView(ActiveCompanyQuerysetMixin, View):
             return HttpResponseBadRequest(form.errors.as_text(), content_type="text/plain")
 
         filters = form.to_filters()
-        report = compute_otd_report(company, filters)
+        report = compute_otd_report(company, filters, as_of=timezone.localdate())
         content = build_otd_workbook(
             report,
             company_name=company.name,

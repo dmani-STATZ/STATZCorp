@@ -124,6 +124,19 @@ def clin_completion_ship_date(clin: typing.Any) -> datetime.date | None:
     )
 
 
+def clin_shipped_qty(clin: typing.Any) -> decimal.Decimal:
+    """Return cumulative shipped quantity using the same row rules as completion."""
+    rows = _shipment_values(clin)
+    if not rows:
+        if clin.ship_qty is None:
+            return decimal.Decimal("0")
+        return decimal.Decimal(str(clin.ship_qty))
+    return sum(
+        (decimal.Decimal(str(row.ship_qty)) for row in rows if row.ship_qty is not None),
+        decimal.Decimal("0"),
+    )
+
+
 def clin_is_late_for(clin: typing.Any, due_date: datetime.date | None) -> bool:
     """Evaluate one CLIN against the supplied due date."""
     return is_late(

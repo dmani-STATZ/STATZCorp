@@ -67,6 +67,7 @@ python manage.py import_release_notes --verbose   # extra logging
 
 ## Recent release notes
 
+- [2026-10-20-on-time-delivery-open-clins](2026-10-20-on-time-delivery-open-clins.md) — Improved: On-Time Delivery Report counts unshipped and partially shipped CLINs against today's date, adds a Not Shipped column, and adds Status / Qty / Early Ship Flag to the Detail export. (`published: false` until shipped.)
 - [2026-10-19-on-time-delivery-report](2026-10-19-on-time-delivery-report.md) — New: On-Time Delivery Report (Contract Menu). Late / On-Time counts for fully shipped CLINs against supplier and contract due dates, grouped by Buyer, CLIN Type, and IA, with checkbox filters and a Summary + Detail Excel export.
 - [2026-10-12-dfas-payment-receipts](2026-10-12-dfas-payment-receipts.md) — DFAS payment notices are saved as PDFs in the contract folder. Filed mail moves to WAWF / DFAS Receipts; unmatched mail stays unread in WAWF / Unmatched. (`published: false` until the job is turned on.)
 - [2026-10-05-quotes-supplier-research](2026-10-05-quotes-supplier-research.md) — New: Supplier Research page (Quotes → Supplier Research). Enter a CAGE code to see SAM.gov data, approved-source capabilities, and DLA award history, and download it all as a three-tab Excel workbook.

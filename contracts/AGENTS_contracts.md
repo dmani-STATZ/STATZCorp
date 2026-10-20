@@ -35,6 +35,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - The properties can fetch child rows. Use `late_status_shipment_prefetch()` for CLIN loops and `late_status_clin_prefetch()` for Contract loops.
 - `get_clin_details` intentionally emits legacy JSON keys `due_date_late` and `supplier_due_date_late` as wire-format aliases. Do not rename them without updating the inline JS in `contract_management.html`.
 - The On-Time Delivery Report (`contracts/services/on_time_delivery.py`) consumes `due_status.py`; do not fork its completion logic.
+- The On-Time Delivery Report classifies open CLINs against an as-of date in `on_time_delivery.py`; this is report-specific and intentionally differs from `Clin.is_late` (which never marks incomplete CLINs late). Do not push this rule into `due_status.py`.
 
 ### Navigation / redirect rules
 
