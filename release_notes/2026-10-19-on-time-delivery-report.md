@@ -1,7 +1,7 @@
 ---
 id: 2026-10-19-on-time-delivery-report
 title: New On-Time Delivery Report
-published: false
+published: true
 publish_date: 2026-10-19
 tags: [new, contracts]
 critical: false
