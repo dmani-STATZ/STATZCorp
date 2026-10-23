@@ -39,8 +39,20 @@ fi
 # window of several minutes — more than enough for install-deps to complete.
 (
   echo "[startup:bg] Installing Playwright system dependencies"
-  $PYTHON_EXE -m playwright install-deps chromium 2>/dev/null || true
-  echo "[startup:bg] Playwright system dependencies ready"
+  # bullseye-security's InRelease has gone stale upstream (Debian 11 is EOL), so
+  # apt-get update aborts on the expiry check before it ever installs anything.
+  # Tell apt to skip that freshness check so install-deps can actually run.
+  mkdir -p /etc/apt/apt.conf.d 2>/dev/null || true
+  echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99-allow-expired-release 2>/dev/null || true
+  # A couple of bullseye-security packages (libglx-mesa0, libnss3) 404 on the
+  # live mirror — confirmed reproducible, not transient, and archive.debian.org
+  # doesn't carry a debian-security component at all. apt installs atomically,
+  # so those 2 permanently-missing packages take out the whole batch, including
+  # libglib2.0-0 which downloads fine every time. --fix-missing lets apt install
+  # everything it actually can instead of discarding the lot.
+  echo 'APT::Get::Fix-Missing "true";' >> /etc/apt/apt.conf.d/99-allow-expired-release 2>/dev/null || true
+  $PYTHON_EXE -m playwright install-deps chromium || echo "[startup:bg] WARNING: install-deps failed (see error above) — Chromium launch may fail"
+  echo "[startup:bg] Playwright system dependencies step complete"
 ) &
 
 echo "[startup] Starting Gunicorn"
