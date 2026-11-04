@@ -3,6 +3,7 @@ import json
 import logging
 import math
 import re
+import threading
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
@@ -11,6 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
+import pypdfium2 as pdfium
 from pypdf import PdfReader, PdfWriter
 from pypdf.errors import PdfReadError
 from pypdf.generic import ContentStream, DictionaryObject, NameObject
@@ -28,6 +30,13 @@ FILL_MAX_TEXT_CHARS = 2000
 FILL_MAX_LINES = 30
 FILL_FONT_RESOURCE = "/STZHelv"
 _FILL_TEXT_MATRIX = {0: "1 0 0 1", 90: "0 1 -1 0", 180: "-1 0 0 -1", 270: "0 -1 1 0"}
+
+SHRINK_MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
+SHRINK_MAX_PAGES = 150
+SHRINK_DPI_CHOICES = (200, 300)
+SHRINK_DEFAULT_DPI = 200
+_SHRINK_LUT = [0] * 161 + [255] * 95
+_PDFIUM_LOCK = threading.Lock()
 
 
 @login_required
@@ -279,13 +288,18 @@ def split_pdf(request):
     return response
 
 
-def _filled_pdf_filename(original_name: str) -> str:
-    """Sanitize the upload stem and append ``_filled.pdf``."""
-    stem = Path(original_name or "").stem
+def _sanitize_pdf_stem(name: str) -> str:
+    """Keep an upload stem safe for a Content-Disposition filename."""
+    stem = Path(name or "").stem
     sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", stem)[:100]
     if not sanitized:
         sanitized = "filled"
-    return f"{sanitized}_filled.pdf"
+    return sanitized
+
+
+def _filled_pdf_filename(original_name: str) -> str:
+    """Sanitize the upload stem and append ``_filled.pdf``."""
+    return f"{_sanitize_pdf_stem(original_name)}_filled.pdf"
 
 
 def _validate_fill_items(raw_json: str, reader: PdfReader) -> dict[int, list[dict]]:
@@ -469,5 +483,119 @@ def pdf_fill_save(request):
 
     filename = _filled_pdf_filename(upload.name)
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+def _human_size(num_bytes: int) -> str:
+    """Format a byte count as ``164 KB`` or ``1.5 MB`` (base 1024)."""
+    if num_bytes < 1024 * 1024:
+        return f"{num_bytes / 1024:.0f} KB"
+    return f"{num_bytes / 1024 / 1024:.1f} MB"
+
+
+def _shrink_pdf(source, dpi: int) -> bytes:
+    """Re-render each page as a 1-bit image and rebuild the PDF.
+
+    ``source`` is a filesystem path or raw PDF bytes. pdfium is not
+    thread-safe, so the open/render/close sequence holds ``_PDFIUM_LOCK``.
+    Only one page image is alive at a time.
+    """
+    with _PDFIUM_LOCK:
+        doc = pdfium.PdfDocument(source)
+        try:
+            page_count = len(doc)
+            if page_count == 0:
+                raise ValueError("That PDF has no pages.")
+            if page_count > SHRINK_MAX_PAGES:
+                raise ValueError(
+                    f"That PDF has {page_count} pages. Shrink handles up to {SHRINK_MAX_PAGES}."
+                )
+            writer = PdfWriter()
+            for index in range(page_count):
+                page = doc[index]
+                try:
+                    image = page.render(scale=dpi / 72, grayscale=True).to_pil().convert("L").point(
+                        _SHRINK_LUT, mode="1"
+                    )
+                finally:
+                    page.close()
+                buf = io.BytesIO()
+                image.save(buf, "PDF", resolution=dpi)
+                image.close()
+                writer.append(PdfReader(io.BytesIO(buf.getvalue())))
+        finally:
+            doc.close()
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
+@login_required
+def pdf_shrink(request):
+    """Render the Shrink PDF tool. Nothing is stored."""
+    return render(
+        request,
+        "tools/pdf_shrink.html",
+        {
+            "title": "Shrink PDF",
+            "max_file_size_mb": SHRINK_MAX_FILE_SIZE_BYTES // (1024 * 1024),
+            "max_pages": SHRINK_MAX_PAGES,
+            "dpi_choices": SHRINK_DPI_CHOICES,
+            "default_dpi": SHRINK_DEFAULT_DPI,
+        },
+    )
+
+
+@login_required
+@require_POST
+def pdf_shrink_save(request):
+    """Rasterize an uploaded PDF to a smaller black-and-white file. Nothing is stored."""
+    file = request.FILES.get("file")
+    if not file:
+        return JsonResponse({"error": "Choose a PDF first."}, status=400)
+    if not (file.name or "").lower().endswith(".pdf"):
+        return JsonResponse({"error": "Only PDF files are supported."}, status=400)
+    if file.size > SHRINK_MAX_FILE_SIZE_BYTES:
+        return JsonResponse(
+            {"error": f"That file is larger than {SHRINK_MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB."},
+            status=413,
+        )
+
+    raw_dpi = request.POST.get("dpi", str(SHRINK_DEFAULT_DPI))
+    try:
+        dpi = int(raw_dpi)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Unsupported quality setting."}, status=400)
+    if dpi not in SHRINK_DPI_CHOICES:
+        return JsonResponse({"error": "Unsupported quality setting."}, status=400)
+
+    source = file.temporary_file_path() if hasattr(file, "temporary_file_path") else file.read()
+    try:
+        result = _shrink_pdf(source, dpi)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except pdfium.PdfiumError:
+        return JsonResponse(
+            {"error": "Could not open that PDF. If it's password-protected, remove the password first."},
+            status=400,
+        )
+    except Exception:
+        logger.exception("Shrink PDF failed")
+        return JsonResponse({"error": "Could not shrink the PDF. Try again."}, status=500)
+
+    if len(result) >= file.size:
+        return JsonResponse(
+            {
+                "error": (
+                    f"This PDF is already compact ({_human_size(file.size)} → shrinking would make it "
+                    f"{_human_size(len(result))}). Use it as is. If it's a DIBBS original, fill it with Fill PDF instead."
+                )
+            },
+            status=422,
+        )
+
+    filename = f"{_sanitize_pdf_stem(file.name)}_shrunk.pdf"
+    response = HttpResponse(result, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response

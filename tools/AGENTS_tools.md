@@ -14,9 +14,9 @@ This file tells a coding agent how to modify the `tools` app safely. It identifi
 ## 2. App Scope
 
 **Owns:**
-- The `/tools/` PDF URL surface and all six endpoints: `index`, `merge_pdfs`, `delete_pages`, `split_pdf`, `pdf_fill`, `pdf_fill_save`
-- All PDF processing logic (`PdfReader`/`PdfWriter` via `pypdf`), including Fill PDF stamping in `views.py`
-- The PDF Merger UI in `templates/tools/pdf_merger.html` and the Fill PDF UI in `templates/tools/pdf_fill.html`, each with its inline JavaScript
+- The `/tools/` PDF URL surface and all eight endpoints: `index`, `merge_pdfs`, `delete_pages`, `split_pdf`, `pdf_fill`, `pdf_fill_save`, `pdf_shrink`, `pdf_shrink_save`
+- All PDF processing logic (`PdfReader`/`PdfWriter` via `pypdf`), including Fill PDF stamping and Shrink PDF rasterizing in `views.py`
+- The PDF Merger UI in `templates/tools/pdf_merger.html`, the Fill PDF UI in `templates/tools/pdf_fill.html`, and the Shrink PDF UI in `templates/tools/pdf_shrink.html`, each with its inline JavaScript
 - Vendored PDF.js 4.10.38 at `static/vendor/pdfjs/4.10.38/`
 
 **Does not own:**
@@ -71,6 +71,8 @@ This is a **self-contained utility app**. It is thin in structure but non-trivia
 | Change `_parse_page_ranges` signature or exceptions | `views.py` (both `delete_pages` and `split_pdf` callers) |
 | Change response filename (`merged.pdf`, `modified.pdf`, `split_parts.zip`) | `views.py` `Content-Disposition` header + any documentation/user-facing text in the template |
 | Fill PDF endpoint/URL | `views.py` + `urls.py` + `pdf_fill.html` `SAVE_URL` |
+| Shrink limits | `views.py` constants (`SHRINK_MAX_FILE_SIZE_BYTES`, `SHRINK_MAX_PAGES`, `SHRINK_DPI_CHOICES`) + the limit text in `pdf_shrink.html` |
+| Upgrade pypdfium2/Pillow | re-run `tools/tests/test_pdf_shrink.py` (the CCITT `/Filter` assertion) |
 | Upgrade pdfjs | vendor folder + both static paths in `pdf_fill.html` + `.mjs` MIME check |
 
 ---
@@ -80,7 +82,7 @@ This is a **self-contained utility app**. It is thin in structure but non-trivia
 **This app depends on:**
 - `templates/base_template.html` — template inheritance; the PDF Merger page uses `{% extends 'base_template.html' %}` and `{% block body %}`
 - Django's `auth` framework — `@login_required` protects all views
-- `pypdf==6.7.1` — the only external library; pinned in `requirements.txt`; API changes on upgrade will break views
+- `pypdf` (pinned in `requirements.txt` as `pypdf>=6.13.3`) — PDF read/write. Shrink PDF also depends on `pypdfium2==5.13.0` and Pillow (`pillow>=12.2.0`). API changes on upgrade will break views.
 
 **Other apps that depend on this app:**
 - `templates/base_template.html` line 317 contains `{% url 'tools:index' %}` — this is the global nav reference. Renaming or removing the `index` URL name breaks the navigation for the entire site.
@@ -114,8 +116,8 @@ Do not add models to this app without a deliberate architectural decision. If a 
 
 ## 9. View / URL / Template Change Rules
 
-- **Do not rename `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, `tools:split_pdf`, `tools:pdf_fill`, or `tools:pdf_fill_save`** without updating the templates that reverse them (`pdf_merger.html`, `pdf_fill.html`, and `templates/base_template.html` for `tools:index`).
-- URL names: `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, `tools:split_pdf`, `tools:pdf_fill`, `tools:pdf_fill_save`.
+- **Do not rename `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, `tools:split_pdf`, `tools:pdf_fill`, `tools:pdf_fill_save`, `tools:pdf_shrink`, or `tools:pdf_shrink_save`** without updating the templates that reverse them (`pdf_merger.html`, `pdf_fill.html`, `pdf_shrink.html`, and `templates/base_template.html` for `tools:index`).
+- URL names: `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, `tools:split_pdf`, `tools:pdf_fill`, `tools:pdf_fill_save`, `tools:pdf_shrink`, `tools:pdf_shrink_save`.
 - The template's `mergeUrl`, `deleteUrl`, and `splitUrl` JS constants are resolved server-side via `{% url %}` tags at lines 102–104 of `pdf_merger.html`. They are not configurable at runtime.
 - The `iframe` preview uses `URL.createObjectURL` on in-memory `File` objects. If a new endpoint returns a file, follow the same pattern as the existing download flows (blob fetch → `<a>` click).
 - `{% block body %}` and `{% block extra_scripts %}` are the two template blocks used. If `base_template.html` renames these blocks, the tool page will silently break.
@@ -181,6 +183,10 @@ If tests are added, place them in `tools/tests.py` and target `merge_pdfs`, `del
 - **`BASELINE_RATIO` / `LINE_HEIGHT` in `pdf_fill.html` must stay in sync with the server's `TL = 1.2 × size`.** `BASELINE_RATIO` (0.95) is the only knob if stamped text sits uniformly high or low.
 - **Re-saves always stamp onto the in-memory original.** The browser keeps the uploaded `File` and sends it again. Do not replace it with the downloaded output.
 - **The `"✓"`-style non-cp1252 rejection is intentional.** The stamp font is standard-14 Helvetica with WinAnsiEncoding. Characters outside cp1252 cannot be drawn.
+- **pdfium is not thread-safe.** `_PDFIUM_LOCK` must wrap the whole open → render → close sequence in `_shrink_pdf`. Do not render pages outside that lock.
+- **Never switch Shrink PDF to Pillow `save_all` / `append_images`.** That holds every page image at once. Encode one page, append it, then drop the image.
+- **The HTTP 422 growth guard is intentional.** Shrinking a compact DIBBS original (about 164 KB) produces a larger file (about 1.5 MB). Refuse that instead of handing the user a bigger PDF.
+- **Shrink limits stay separate from `MAX_FILE_SIZE_BYTES`.** `SHRINK_MAX_FILE_SIZE_BYTES` (100 MB) and `SHRINK_MAX_PAGES` (150) apply only to `pdf_shrink_save`. Do not fold them into the merge/delete/split/fill limits.
 
 ---
 
@@ -203,14 +209,16 @@ If tests are added, place them in `tools/tests.py` and target `merge_pdfs`, `del
 
 | | |
 |---|---|
-| **Primary files** | `tools/views.py`, `templates/tools/pdf_merger.html`, `templates/tools/pdf_fill.html`, `tools/urls.py` |
-| **Shared utility** | `_parse_page_ranges` in `views.py` — used by delete and split. Fill PDF uses `_validate_fill_items` and `_stamp_text_items` |
-| **Cross-app surface** | `templates/base_template.html` — `tools:index` in global nav. Do not edit that file for Fill PDF |
-| **External dependency** | `pypdf` in `requirements.txt`; vendored `pdfjs-dist` 4.10.38 |
-| **Security gates** | `@login_required` on every PDF view; `@require_POST` on merge, delete, split, and `pdf_fill_save`; CSRF via cookie in JS |
+| **Primary files** | `tools/views.py`, `templates/tools/pdf_merger.html`, `templates/tools/pdf_fill.html`, `templates/tools/pdf_shrink.html`, `tools/urls.py` |
+| **Shared utility** | `_parse_page_ranges` in `views.py` — used by delete and split. Fill PDF uses `_validate_fill_items` and `_stamp_text_items`. Shrink PDF uses `_shrink_pdf`, `_human_size`, and `_sanitize_pdf_stem` |
+| **Cross-app surface** | `templates/base_template.html` — `tools:index` in global nav. Do not edit that file for Fill PDF or Shrink PDF |
+| **External dependency** | `pypdf` and `pypdfium2==5.13.0` in `requirements.txt`; Pillow (`pillow>=12.2.0`); vendored `pdfjs-dist` 4.10.38 |
+| **Security gates** | `@login_required` on every PDF view; `@require_POST` on merge, delete, split, `pdf_fill_save`, and `pdf_shrink_save`; CSRF via cookie in JS |
 | **Fill PDF storage** | None. No model, no migration, no temp file |
-| **Riskiest edits** | Renaming URL names, changing `_parse_page_ranges`, upgrading `pypdf` or pdfjs, `PdfWriter(incremental=True)`, modifying upload limits |
+| **Shrink PDF storage** | None. No model, no migration. Uploads over `FILE_UPLOAD_MAX_MEMORY_SIZE` are Django's own spool file, read via `temporary_file_path()` and not kept |
+| **Riskiest edits** | Renaming URL names, changing `_parse_page_ranges`, upgrading `pypdf`, `pypdfium2`, Pillow, or pdfjs, `PdfWriter(incremental=True)`, Pillow `save_all` for shrink, dropping `_PDFIUM_LOCK`, modifying upload limits |
 | **Fill PDF tests** | `python manage.py test tools.tests.test_pdf_fill` |
+| **Shrink PDF tests** | `python manage.py test tools.tests.test_pdf_shrink` |
 
 ## 16. Release Notes (Changelog) Rules
 

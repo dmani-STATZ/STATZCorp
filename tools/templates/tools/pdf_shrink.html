@@ -1,0 +1,190 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block body %}
+<div class="shrink-pdf">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <h1 class="h3 mb-1">Shrink PDF</h1>
+            <p class="text-body-secondary mb-0">Cut bloated Print-to-PDF files down to size.</p>
+        </div>
+        <div class="ms-auto d-flex flex-wrap gap-3">
+            <a href="{% url 'tools:index' %}">← PDF tools</a>
+            <a href="{% url 'tools:pdf_fill' %}">Fill PDF</a>
+        </div>
+    </div>
+
+    <div class="alert alert-warning" role="note">
+        <strong>Use this only on files that were saved with Print to PDF.</strong>
+        Shrinking turns every page into a black-and-white image: everything you typed stays, and it prints and reads the same, but the text can't be selected or searched afterward, and gray or color areas become solid black or white.
+        Starting a new RFQ? Download the original from DIBBS and use <a href="{% url 'tools:pdf_fill' %}"><strong>Fill PDF</strong></a> instead.
+    </div>
+
+    <div id="shrinkDropZone" class="shrink-dropzone">
+        Drop a PDF here or click Choose PDF (max {{ max_file_size_mb }} MB, {{ max_pages }} pages).
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+        <input id="shrinkFileInput" type="file" accept="application/pdf" class="d-none">
+        <button id="shrinkChooseBtn" type="button" class="btn btn-outline-brand">Choose PDF</button>
+        <span id="shrinkFileName" class="small text-body-secondary"></span>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+        <label for="shrinkDpi" class="small mb-0">Quality</label>
+        <select id="shrinkDpi" class="form-select form-select-sm w-auto">
+            {% for dpi in dpi_choices %}
+            <option value="{{ dpi }}"{% if dpi == default_dpi %} selected{% endif %}>{% if dpi == 200 %}Standard — 200 dpi (smallest file){% elif dpi == 300 %}Sharper — 300 dpi (about 50% larger){% endif %}</option>
+            {% endfor %}
+        </select>
+        <button id="shrinkBtn" type="button" class="btn btn-success" disabled>Shrink PDF</button>
+    </div>
+
+    <div id="shrinkStatus" class="hidden text-sm px-4 py-3 rounded border mt-3"></div>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+<script>
+const SAVE_URL = "{% url 'tools:pdf_shrink_save' %}";
+const MAX_BYTES = {{ max_file_size_mb }} * 1024 * 1024;
+
+const shrinkDropZone = document.getElementById("shrinkDropZone");
+const shrinkFileInput = document.getElementById("shrinkFileInput");
+const shrinkChooseBtn = document.getElementById("shrinkChooseBtn");
+const shrinkFileName = document.getElementById("shrinkFileName");
+const shrinkDpi = document.getElementById("shrinkDpi");
+const shrinkBtn = document.getElementById("shrinkBtn");
+const shrinkStatus = document.getElementById("shrinkStatus");
+
+let selectedFile = null;
+let busy = false;
+
+shrinkChooseBtn.addEventListener("click", () => {
+    if (!busy) shrinkFileInput.click();
+});
+shrinkDropZone.addEventListener("click", () => {
+    if (!busy) shrinkFileInput.click();
+});
+shrinkFileInput.addEventListener("change", () => {
+    const file = shrinkFileInput.files && shrinkFileInput.files[0];
+    if (file) chooseFile(file);
+    shrinkFileInput.value = "";
+});
+shrinkDropZone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    if (!busy) shrinkDropZone.classList.add("is-over");
+});
+shrinkDropZone.addEventListener("dragleave", () => {
+    shrinkDropZone.classList.remove("is-over");
+});
+shrinkDropZone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    shrinkDropZone.classList.remove("is-over");
+    if (busy) return;
+    const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+    if (file) chooseFile(file);
+});
+shrinkBtn.addEventListener("click", shrinkPdf);
+
+function humanSize(n) {
+    if (n < 1024 * 1024) return (n / 1024).toFixed(0) + " KB";
+    return (n / 1024 / 1024).toFixed(1) + " MB";
+}
+
+function chooseFile(file) {
+    const name = file.name || "";
+    if (!name.toLowerCase().endsWith(".pdf")) {
+        showStatus("Please choose a PDF file.", "error");
+        return;
+    }
+    if (file.size > MAX_BYTES) {
+        showStatus("That file is larger than {{ max_file_size_mb }} MB.", "error");
+        return;
+    }
+    selectedFile = file;
+    shrinkFileName.textContent = file.name + " — " + humanSize(file.size);
+    hideStatus();
+    shrinkBtn.disabled = busy;
+}
+
+function setBusy(next) {
+    busy = next;
+    shrinkChooseBtn.disabled = next;
+    shrinkFileInput.disabled = next;
+    shrinkDpi.disabled = next;
+    shrinkDropZone.classList.toggle("is-disabled", next);
+    shrinkBtn.disabled = next || !selectedFile;
+}
+
+async function shrinkPdf() {
+    if (!selectedFile || busy) return;
+    showStatus("Shrinking… large files can take up to a minute.", "info");
+    setBusy(true);
+    const body = new FormData();
+    body.append("file", selectedFile);
+    body.append("dpi", shrinkDpi.value);
+    try {
+        const response = await fetch(SAVE_URL, {
+            method: "POST",
+            body,
+            headers: { "X-CSRFToken": getCsrfToken() },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            let message = "Shrink failed.";
+            try {
+                const data = await response.json();
+                if (data && data.error) message = data.error;
+            } catch (_) { /* keep fallback */ }
+            showStatus(message, response.status === 422 ? "warn" : "error");
+            return;
+        }
+        const blob = await response.blob();
+        const header = response.headers.get("Content-Disposition") || "";
+        const match = /filename="([^"]+)"/.exec(header);
+        const filename = match ? match[1] : "shrunk.pdf";
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        showStatus(humanSize(selectedFile.size) + " → " + humanSize(blob.size) + ". Saved " + filename + ".", "success");
+    } catch (_) {
+        showStatus("Shrink failed.", "error");
+    } finally {
+        setBusy(false);
+    }
+}
+
+function getCsrfToken() {
+    const name = "csrftoken";
+    const cookies = document.cookie ? document.cookie.split("; ") : [];
+    for (const cookie of cookies) {
+        const [key, value] = cookie.split("=");
+        if (key === name) return decodeURIComponent(value);
+    }
+    return "";
+}
+
+function showStatus(message, variant) {
+    shrinkStatus.textContent = message;
+    shrinkStatus.classList.remove("hidden");
+    shrinkStatus.className = "text-sm px-4 py-3 rounded border mt-3 " + (
+        variant === "success"
+            ? "bg-green-50 border-green-200 text-green-800"
+            : variant === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : variant === "warn"
+                    ? "bg-yellow-50 border-yellow-200 text-yellow-800"
+                    : "bg-blue-50 border-blue-200 text-blue-800"
+    );
+}
+
+function hideStatus() {
+    shrinkStatus.textContent = "";
+    shrinkStatus.className = "hidden text-sm px-4 py-3 rounded border mt-3";
+}
+</script>
+{% endblock extra_scripts %}

@@ -5400,3 +5400,25 @@ main {
     color: var(--bs-black);
     background: transparent;
 }
+
+/* === tools: Shrink PDF === */
+.shrink-pdf {
+    padding-bottom: 2rem;
+}
+.shrink-dropzone {
+    border: 1px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background: var(--bs-body-bg);
+    color: var(--bs-secondary-color);
+    text-align: center;
+    padding: 3rem 1rem;
+    cursor: pointer;
+}
+.shrink-dropzone.is-over {
+    border-color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+}
+.shrink-dropzone.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
