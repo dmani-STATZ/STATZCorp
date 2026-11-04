@@ -434,6 +434,7 @@ def pdf_fill(request):
         {
             "title": "Fill PDF",
             "max_file_size_mb": MAX_FILE_SIZE_BYTES // (1024 * 1024),
+            "shrink_max_file_size_mb": SHRINK_MAX_FILE_SIZE_BYTES // (1024 * 1024),
             "font_sizes": FILL_FONT_SIZES,
             "default_font_size": 10,
         },

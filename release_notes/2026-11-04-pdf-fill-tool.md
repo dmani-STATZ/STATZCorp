@@ -14,3 +14,5 @@ Save filled PDF downloads `<name>_filled.pdf`. The file stays small because the 
 You can change the boxes and save again. Each save starts from the PDF you uploaded, so the file does not grow every time.
 
 Stop using Microsoft Print to PDF for these forms.
+
+If you pick a file that was saved with Print to PDF, Fill PDF will tell you — and point you to the DIBBS original or the new **Shrink PDF** tool.

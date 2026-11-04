@@ -44,6 +44,14 @@
 
     <div id="fillStatus" class="hidden text-sm px-4 py-3 rounded border"></div>
 
+    <div id="fillPrintToPdfNotice" class="alert alert-warning alert-dismissible d-none" role="alert">
+        <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle"></i> <span id="fillNoticeReason"></span></div>
+        <div>For a clean, small file, download the original RFQ from DIBBS and fill that here — it'll be a few hundred KB.</div>
+        <div class="mt-1">Already filled this one out and don't want to redo it? Run it through
+            <a href="{% url 'tools:pdf_shrink' %}" class="alert-link">Shrink PDF</a> first (up to {{ shrink_max_file_size_mb }} MB), then come back.</div>
+        <button type="button" class="btn-close" id="fillNoticeClose" aria-label="Dismiss"></button>
+    </div>
+
     <div id="fillDropZone" class="fill-dropzone">
         Drop a PDF here or click Choose PDF (max {{ max_file_size_mb }} MB).
     </div>
@@ -58,6 +66,8 @@ import * as pdfjsLib from "{% static 'vendor/pdfjs/4.10.38/pdf.min.mjs' %}";
 pdfjsLib.GlobalWorkerOptions.workerSrc = "{% static 'vendor/pdfjs/4.10.38/pdf.worker.min.mjs' %}";
 const SAVE_URL = "{% url 'tools:pdf_fill_save' %}";
 const MAX_BYTES = {{ max_file_size_mb }} * 1024 * 1024;
+const MAX_MB = {{ max_file_size_mb }};
+const humanSizeMB = n => (n / 1024 / 1024).toFixed(1) + " MB";
 const BASELINE_RATIO = 0.95;
 const LINE_HEIGHT = 1.2;
 const ZOOM_STEPS = [0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -77,6 +87,19 @@ const fillSaveBtn = document.getElementById("fillSaveBtn");
 const fillStatus = document.getElementById("fillStatus");
 const fillDropZone = document.getElementById("fillDropZone");
 const fillPages = document.getElementById("fillPages");
+const NOTICE = document.getElementById("fillPrintToPdfNotice");
+const NOTICE_REASON = document.getElementById("fillNoticeReason");
+const PRINT_TO_PDF_RE = /print\s*to\s*pdf/i;
+
+function showPrintToPdfNotice(reason) {
+    NOTICE_REASON.textContent = reason;
+    NOTICE.classList.remove("d-none");
+}
+function hidePrintToPdfNotice() {
+    NOTICE.classList.add("d-none");
+    NOTICE_REASON.textContent = "";
+}
+document.getElementById("fillNoticeClose").addEventListener("click", hidePrintToPdfNotice);
 
 let originalFile = null;
 let pdfDoc = null;
@@ -154,13 +177,15 @@ updateEnablement();
 fillZoomLabel.textContent = Math.round(zoom * 100) + "%";
 
 async function loadFile(file) {
+    hidePrintToPdfNotice();
     const name = file.name || "";
     if (!name.toLowerCase().endsWith(".pdf")) {
         showStatus("Please choose a PDF file.", "error");
         return;
     }
     if (file.size > MAX_BYTES) {
-        showStatus("That file is larger than {{ max_file_size_mb }} MB.", "error");
+        showPrintToPdfNotice(`This file is ${humanSizeMB(file.size)} — over the ${MAX_MB} MB limit for Fill PDF. Files this big are almost always Print-to-PDF copies.`);
+        showStatus("File too large for Fill PDF — see the note below.", "error");
         return;
     }
     if (items.length && dirty) {
@@ -187,6 +212,14 @@ async function loadFile(file) {
         fillFileName.textContent = file.name;
         fillDropZone.classList.add("d-none");
         hideStatus();
+        try {
+            const { info } = await doc.getMetadata();
+            const producer = `${info?.Producer || ""} ${info?.Creator || ""}`;
+            if (token === loadToken && PRINT_TO_PDF_RE.test(producer)) {
+                showPrintToPdfNotice("Heads up: this file was saved with Microsoft Print to PDF — that's what makes these files huge. You can still fill it, but the saved file will stay large.");
+            }
+        } catch (_) { /* metadata unavailable: no notice */ }
+        if (token !== loadToken) return;
         await renderPages();
     } catch (err) {
         if (token !== loadToken) return;

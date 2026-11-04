@@ -187,6 +187,8 @@ If tests are added, place them in `tools/tests.py` and target `merge_pdfs`, `del
 - **Never switch Shrink PDF to Pillow `save_all` / `append_images`.** That holds every page image at once. Encode one page, append it, then drop the image.
 - **The HTTP 422 growth guard is intentional.** Shrinking a compact DIBBS original (about 164 KB) produces a larger file (about 1.5 MB). Refuse that instead of handing the user a bigger PDF.
 - **Shrink limits stay separate from `MAX_FILE_SIZE_BYTES`.** `SHRINK_MAX_FILE_SIZE_BYTES` (100 MB) and `SHRINK_MAX_PAGES` (150) apply only to `pdf_shrink_save`. Do not fold them into the merge/delete/split/fill limits.
+- **The Fill PDF notice links with `{% url 'tools:pdf_shrink' %}`.** Renaming that URL breaks the Fill page render.
+- **The Fill PDF notice must stay `textContent`-only.** Do not build its markup in script, and do not put `data-bs-dismiss` on it. Bootstrap dismiss removes the node, and the notice has to be shown again for the next file.
 
 ---
 

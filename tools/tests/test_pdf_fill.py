@@ -211,3 +211,31 @@ class PdfFillTests(TestCase):
             ],
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_fill_page_has_print_to_pdf_notice(self):
+        response = self.client.get(self.page_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="fillPrintToPdfNotice"')
+        self.assertContains(response, 'id="fillNoticeReason"')
+        self.assertContains(response, 'href="/tools/shrink/"')
+        self.assertContains(response, "Shrink PDF")
+        self.assertContains(
+            response,
+            'id="fillPrintToPdfNotice" class="alert alert-warning alert-dismissible d-none"',
+        )
+
+    def test_fill_context_has_shrink_limit(self):
+        response = self.client.get(self.page_url)
+        self.assertEqual(response.context["shrink_max_file_size_mb"], 100)
+
+    def test_fill_template_has_no_innerhtml(self):
+        # renderPages and renderItems already assign innerHTML. Guard the notice only.
+        response = self.client.get(self.page_url)
+        html = response.content.decode()
+        notice = html[html.index('<div id="fillPrintToPdfNotice"'):html.index('<div id="fillDropZone"')]
+        helpers = html[html.index("const NOTICE = "):html.index("async function loadFile")]
+        load_file = html[html.index("async function loadFile"):html.index("async function renderPages")]
+        self.assertNotIn("innerHTML", notice)
+        self.assertNotIn("innerHTML", helpers)
+        self.assertNotIn("innerHTML", load_file)
+        self.assertNotIn("data-bs-dismiss", notice)
