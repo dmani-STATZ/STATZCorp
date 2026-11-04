@@ -14,9 +14,10 @@ This file tells a coding agent how to modify the `tools` app safely. It identifi
 ## 2. App Scope
 
 **Owns:**
-- The `/tools/` URL surface and all four endpoints: `index`, `merge_pdfs`, `delete_pages`, `split_pdf`
-- All PDF processing logic (`PdfReader`/`PdfWriter` via `pypdf`)
-- The single-page UI in `templates/tools/pdf_merger.html` with all its inline JavaScript
+- The `/tools/` PDF URL surface and all six endpoints: `index`, `merge_pdfs`, `delete_pages`, `split_pdf`, `pdf_fill`, `pdf_fill_save`
+- All PDF processing logic (`PdfReader`/`PdfWriter` via `pypdf`), including Fill PDF stamping in `views.py`
+- The PDF Merger UI in `templates/tools/pdf_merger.html` and the Fill PDF UI in `templates/tools/pdf_fill.html`, each with its inline JavaScript
+- Vendored PDF.js 4.10.38 at `static/vendor/pdfjs/4.10.38/`
 
 **Does not own:**
 - Scan Inbox Graph credentials — uses project-wide **`GRAPH_MAIL_*`** settings (same app registration as RFQ mail); do not duplicate token logic in the command.
@@ -69,6 +70,8 @@ This is a **self-contained utility app**. It is thin in structure but non-trivia
 | Change upload limits | `views.py` constants (`MAX_FILES`, `MAX_FILE_SIZE_BYTES`, `MAX_TOTAL_SIZE_BYTES`) + client-side limit warnings in `pdf_merger.html` |
 | Change `_parse_page_ranges` signature or exceptions | `views.py` (both `delete_pages` and `split_pdf` callers) |
 | Change response filename (`merged.pdf`, `modified.pdf`, `split_parts.zip`) | `views.py` `Content-Disposition` header + any documentation/user-facing text in the template |
+| Fill PDF endpoint/URL | `views.py` + `urls.py` + `pdf_fill.html` `SAVE_URL` |
+| Upgrade pdfjs | vendor folder + both static paths in `pdf_fill.html` + `.mjs` MIME check |
 
 ---
 
@@ -111,7 +114,8 @@ Do not add models to this app without a deliberate architectural decision. If a 
 
 ## 9. View / URL / Template Change Rules
 
-- **Do not rename `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, or `tools:split_pdf`** without updating both `templates/tools/pdf_merger.html` and `templates/base_template.html` simultaneously.
+- **Do not rename `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, `tools:split_pdf`, `tools:pdf_fill`, or `tools:pdf_fill_save`** without updating the templates that reverse them (`pdf_merger.html`, `pdf_fill.html`, and `templates/base_template.html` for `tools:index`).
+- URL names: `tools:index`, `tools:merge_pdfs`, `tools:delete_pages`, `tools:split_pdf`, `tools:pdf_fill`, `tools:pdf_fill_save`.
 - The template's `mergeUrl`, `deleteUrl`, and `splitUrl` JS constants are resolved server-side via `{% url %}` tags at lines 102–104 of `pdf_merger.html`. They are not configurable at runtime.
 - The `iframe` preview uses `URL.createObjectURL` on in-memory `File` objects. If a new endpoint returns a file, follow the same pattern as the existing download flows (blob fetch → `<a>` click).
 - `{% block body %}` and `{% block extra_scripts %}` are the two template blocks used. If `base_template.html` renames these blocks, the tool page will silently break.
@@ -171,7 +175,12 @@ If tests are added, place them in `tools/tests.py` and target `merge_pdfs`, `del
 - **`split_pdf` re-parses the range string.** The view calls `_parse_page_ranges` once for validation, then re-parses the raw string a second time with a manual loop to build `parts`. These two parsing passes must stay consistent — a divergence causes silent wrong-page splits.
 - **`pypdf` version pinned at 6.7.1.** The `PdfReader`, `PdfWriter`, `PdfReadError`, and `reader.decrypt` API surface are pinned. Upgrading `pypdf` requires re-validating all three views against the new API.
 - **No MIME sniffing.** Only `.endswith(".pdf")` (case-insensitive) is checked. A renamed non-PDF file can pass validation and cause `PdfReadError`. The current error handling catches this, but it's worth knowing the gate is shallow.
-- **Inline JS has no unit tests.** UI behavior (drag-drop, reorder, preview, CSRF, blob download) is entirely in the template script block with no coverage.
+- **Inline JS has no unit tests.** UI behavior (drag-drop, reorder, preview, CSRF, blob download) is entirely in the template script block with no coverage. Fill PDF's server path is covered by `tools/tests/test_pdf_fill.py`; the page script is not.
+- **`.mjs` must serve as `text/javascript`**, or the Fill PDF module import fails silently with a MIME error in the console.
+- **Never use `PdfWriter(incremental=True)`.** A second fill reused an existing object number and corrupted the font resource. Stamp with `clone_from` instead.
+- **`BASELINE_RATIO` / `LINE_HEIGHT` in `pdf_fill.html` must stay in sync with the server's `TL = 1.2 × size`.** `BASELINE_RATIO` (0.95) is the only knob if stamped text sits uniformly high or low.
+- **Re-saves always stamp onto the in-memory original.** The browser keeps the uploaded `File` and sends it again. Do not replace it with the downloaded output.
+- **The `"✓"`-style non-cp1252 rejection is intentional.** The stamp font is standard-14 Helvetica with WinAnsiEncoding. Characters outside cp1252 cannot be drawn.
 
 ---
 
@@ -194,14 +203,14 @@ If tests are added, place them in `tools/tests.py` and target `merge_pdfs`, `del
 
 | | |
 |---|---|
-| **Primary files** | `tools/views.py`, `templates/tools/pdf_merger.html`, `tools/urls.py` |
-| **Shared utility** | `_parse_page_ranges` in `views.py` — used by two views |
-| **Cross-app surface** | `templates/base_template.html:317` — `tools:index` in global nav |
-| **External dependency** | `pypdf==6.7.1` in `requirements.txt` |
-| **Security gates** | `@login_required` + `@require_POST` on all non-UI views; CSRF via cookie in JS |
-| **No models** | No migrations, no admin, no persistent state |
-| **Riskiest edits** | Renaming URL names, changing `_parse_page_ranges`, upgrading `pypdf`, modifying upload limits |
-| **Biggest blind spot** | No automated tests; all verification is manual |
+| **Primary files** | `tools/views.py`, `templates/tools/pdf_merger.html`, `templates/tools/pdf_fill.html`, `tools/urls.py` |
+| **Shared utility** | `_parse_page_ranges` in `views.py` — used by delete and split. Fill PDF uses `_validate_fill_items` and `_stamp_text_items` |
+| **Cross-app surface** | `templates/base_template.html` — `tools:index` in global nav. Do not edit that file for Fill PDF |
+| **External dependency** | `pypdf` in `requirements.txt`; vendored `pdfjs-dist` 4.10.38 |
+| **Security gates** | `@login_required` on every PDF view; `@require_POST` on merge, delete, split, and `pdf_fill_save`; CSRF via cookie in JS |
+| **Fill PDF storage** | None. No model, no migration, no temp file |
+| **Riskiest edits** | Renaming URL names, changing `_parse_page_ranges`, upgrading `pypdf` or pdfjs, `PdfWriter(incremental=True)`, modifying upload limits |
+| **Fill PDF tests** | `python manage.py test tools.tests.test_pdf_fill` |
 
 ## 16. Release Notes (Changelog) Rules
 

@@ -1,4 +1,10 @@
+import io
+import json
+import logging
+import math
+import re
 from io import BytesIO
+from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.contrib.auth.decorators import login_required
@@ -7,11 +13,21 @@ from django.shortcuts import render
 from django.views.decorators.http import require_POST
 from pypdf import PdfReader, PdfWriter
 from pypdf.errors import PdfReadError
+from pypdf.generic import ContentStream, DictionaryObject, NameObject
 
+
+logger = logging.getLogger(__name__)
 
 MAX_FILES = 20
 MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB per file
 MAX_TOTAL_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB per merge job
+
+FILL_FONT_SIZES = (8, 9, 10, 11, 12, 14)
+FILL_MAX_ITEMS = 1000
+FILL_MAX_TEXT_CHARS = 2000
+FILL_MAX_LINES = 30
+FILL_FONT_RESOURCE = "/STZHelv"
+_FILL_TEXT_MATRIX = {0: "1 0 0 1", 90: "0 1 -1 0", 180: "-1 0 0 -1", 270: "0 -1 1 0"}
 
 
 @login_required
@@ -260,4 +276,198 @@ def split_pdf(request):
     response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
     response["Content-Disposition"] = 'attachment; filename="split_parts.zip"'
     response["Content-Length"] = str(zip_buffer.getbuffer().nbytes)
+    return response
+
+
+def _filled_pdf_filename(original_name: str) -> str:
+    """Sanitize the upload stem and append ``_filled.pdf``."""
+    stem = Path(original_name or "").stem
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", stem)[:100]
+    if not sanitized:
+        sanitized = "filled"
+    return f"{sanitized}_filled.pdf"
+
+
+def _validate_fill_items(raw_json: str, reader: PdfReader) -> dict[int, list[dict]]:
+    """Group stamped text boxes by 0-based page index.
+
+    Raises ValueError with a user-facing message on the first problem.
+    Blank text boxes are skipped. Submission order is preserved.
+    """
+    try:
+        payload = json.loads(raw_json)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        raise ValueError("Could not read the text boxes. Reload the page and try again.") from None
+    if not isinstance(payload, list):
+        raise ValueError("Could not read the text boxes. Reload the page and try again.")
+    if not payload:
+        raise ValueError("Add at least one text box before saving.")
+    if len(payload) > FILL_MAX_ITEMS:
+        raise ValueError(f"Too many text boxes (max {FILL_MAX_ITEMS}).")
+
+    required = {"page", "x", "y", "size", "text"}
+    page_count = len(reader.pages)
+    grouped: dict[int, list[dict]] = {}
+
+    for item in payload:
+        if not isinstance(item, dict) or set(item.keys()) != required:
+            raise ValueError("Could not read the text boxes. Reload the page and try again.")
+
+        page = item["page"]
+        if isinstance(page, bool) or not isinstance(page, int) or not 1 <= page <= page_count:
+            raise ValueError(
+                f"Text box refers to page {page}, but this PDF has {page_count} pages."
+            )
+
+        x = item["x"]
+        y = item["y"]
+        coords_ok = (
+            not isinstance(x, bool)
+            and isinstance(x, (int, float))
+            and math.isfinite(x)
+            and not isinstance(y, bool)
+            and isinstance(y, (int, float))
+            and math.isfinite(y)
+        )
+        if coords_ok:
+            box = reader.pages[page - 1].mediabox
+            left, bottom = float(box.left), float(box.bottom)
+            right, top = float(box.right), float(box.top)
+            coords_ok = left <= float(x) <= right and bottom <= float(y) <= top
+        if not coords_ok:
+            raise ValueError(f"A text box on page {page} is outside the page.")
+
+        size = item["size"]
+        if isinstance(size, bool) or not isinstance(size, (int, float)) or size not in FILL_FONT_SIZES:
+            raise ValueError("Unsupported font size.")
+
+        text = item["text"]
+        if not isinstance(text, str):
+            raise ValueError("Could not read the text boxes. Reload the page and try again.")
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        if text.strip() == "":
+            continue
+        if len(text) > FILL_MAX_TEXT_CHARS or text.count("\n") + 1 > FILL_MAX_LINES:
+            raise ValueError(f"A text box on page {page} is too long.")
+        if any(ord(ch) < 32 and ch != "\n" for ch in text):
+            raise ValueError(f"A text box on page {page} contains an unsupported character.")
+        try:
+            text.encode("cp1252")
+        except UnicodeEncodeError as exc:
+            bad_char = text[exc.start]
+            raise ValueError(
+                f'A text box on page {page} contains a character that can\'t be printed: "{bad_char}"'
+            ) from None
+
+        grouped.setdefault(page - 1, []).append(
+            {"page": page, "x": x, "y": y, "size": size, "text": text}
+        )
+
+    if not grouped:
+        raise ValueError("Add at least one text box before saving.")
+    return grouped
+
+
+def _pdf_literal(line: str) -> bytes:
+    return b"(" + line.encode("cp1252").replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)") + b")"
+
+
+def _stamp_text_items(reader: PdfReader, items_by_page: dict[int, list[dict]]) -> bytes:
+    writer = PdfWriter(clone_from=reader)
+    for page_index, items in items_by_page.items():
+        page = writer.pages[page_index]
+        rotation = page.rotation % 360
+        matrix = _FILL_TEXT_MATRIX.get(rotation, _FILL_TEXT_MATRIX[0]).encode()
+        if "/Resources" not in page:
+            page[NameObject("/Resources")] = DictionaryObject()
+        resources = page["/Resources"].get_object()
+        if "/Font" not in resources:
+            resources[NameObject("/Font")] = DictionaryObject()
+        fonts = resources["/Font"].get_object()
+        if FILL_FONT_RESOURCE not in fonts:
+            fonts[NameObject(FILL_FONT_RESOURCE)] = DictionaryObject({
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+                NameObject("/Encoding"): NameObject("/WinAnsiEncoding"),
+            })
+        ops = [b"q 0 g BT"]
+        for item in items:
+            size = float(item["size"])
+            ops.append(b"%s %.2f Tf %.2f TL %s %.2f %.2f Tm" % (
+                FILL_FONT_RESOURCE.encode(), size, size * 1.2, matrix, float(item["x"]), float(item["y"])))
+            for i, line in enumerate(item["text"].split("\n")):
+                ops.append((b"T* " if i else b"") + _pdf_literal(line) + b" Tj")
+        ops.append(b"ET Q")
+        existing = page.get_contents()
+        original = existing.get_data() if existing is not None else b""
+        stream = ContentStream(None, writer)
+        stream.set_data(b"q\n" + original + b"\nQ\n" + b"\n".join(ops) + b"\n")
+        page.replace_contents(stream)
+        page.compress_content_streams()
+    writer.compress_identical_objects()
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
+@login_required
+def pdf_fill(request):
+    """Render the Fill PDF tool. Nothing is stored."""
+    return render(
+        request,
+        "tools/pdf_fill.html",
+        {
+            "title": "Fill PDF",
+            "max_file_size_mb": MAX_FILE_SIZE_BYTES // (1024 * 1024),
+            "font_sizes": FILL_FONT_SIZES,
+            "default_font_size": 10,
+        },
+    )
+
+
+@login_required
+@require_POST
+def pdf_fill_save(request):
+    """Stamp text onto the uploaded PDF and return the file. Nothing is stored."""
+    upload = request.FILES.get("file")
+    if not upload:
+        return JsonResponse({"error": "Choose a PDF first."}, status=400)
+    if not (upload.name or "").lower().endswith(".pdf"):
+        return JsonResponse({"error": "Only PDF files are supported."}, status=400)
+    if upload.size > MAX_FILE_SIZE_BYTES:
+        return JsonResponse({"error": "File is too large (25 MB limit)."}, status=413)
+
+    try:
+        reader = PdfReader(upload)
+    except PdfReadError:
+        return JsonResponse({"error": "Could not read the PDF file."}, status=400)
+    except Exception:
+        return JsonResponse({"error": "Unexpected error reading the PDF."}, status=400)
+
+    if reader.is_encrypted:
+        try:
+            reader.decrypt("")
+        except Exception:
+            return JsonResponse(
+                {"error": "PDF is encrypted or password-protected."}, status=400
+            )
+
+    try:
+        items_by_page = _validate_fill_items(request.POST.get("items", ""), reader)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    try:
+        pdf_bytes = _stamp_text_items(reader, items_by_page)
+    except Exception:
+        logger.exception("Fill PDF save failed")
+        return JsonResponse(
+            {"error": "Could not save the PDF. Try again or use the original file."},
+            status=500,
+        )
+
+    filename = _filled_pdf_filename(upload.name)
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response

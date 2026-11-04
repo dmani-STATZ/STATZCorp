@@ -1,0 +1,542 @@
+{% extends 'base_template.html' %}
+{% load static %}
+
+{% block body %}
+<div class="fill-pdf">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <h1 class="h3 mb-1">Fill PDF</h1>
+            <p class="text-body-secondary mb-0">Type onto any PDF and save it — no more Print to PDF.</p>
+        </div>
+        <a href="{% url 'tools:index' %}" class="ms-auto">← PDF tools</a>
+    </div>
+
+    <div class="fill-toolbar d-flex flex-wrap gap-2 align-items-center mb-3">
+        <input id="fillFileInput" type="file" accept="application/pdf" class="d-none">
+        <button id="fillChooseBtn" type="button" class="btn btn-outline-brand btn-sm">Choose PDF</button>
+        <span id="fillFileName" class="small text-body-secondary"></span>
+
+        <div class="btn-group" role="group" aria-label="Mode">
+            <input type="radio" class="btn-check" name="fillMode" id="fillModeText" autocomplete="off" checked disabled>
+            <label class="btn btn-outline-brand btn-sm" for="fillModeText">Text</label>
+            <input type="radio" class="btn-check" name="fillMode" id="fillModeX" autocomplete="off" disabled>
+            <label class="btn btn-outline-brand btn-sm" for="fillModeX">✕ Mark</label>
+        </div>
+
+        <label for="fillFontSize" class="small mb-0">Size</label>
+        <select id="fillFontSize" class="form-select form-select-sm w-auto" disabled>
+            {% for size in font_sizes %}
+            <option value="{{ size }}"{% if size == default_font_size %} selected{% endif %}>{{ size }}</option>
+            {% endfor %}
+        </select>
+
+        <div class="btn-group" role="group" aria-label="Zoom">
+            <button id="fillZoomOut" type="button" class="btn btn-outline-secondary btn-sm" disabled>−</button>
+            <span id="fillZoomLabel" class="btn btn-outline-secondary btn-sm disabled pe-none">125%</span>
+            <button id="fillZoomIn" type="button" class="btn btn-outline-secondary btn-sm" disabled>+</button>
+        </div>
+
+        <button id="fillUndoBtn" type="button" class="btn btn-secondary btn-sm" disabled>Undo</button>
+        <button id="fillClearBtn" type="button" class="btn btn-danger btn-sm" disabled>Clear all</button>
+        <button id="fillSaveBtn" type="button" class="btn btn-success" disabled>Save filled PDF</button>
+        <span class="small text-body-secondary">Click on the page to add text. Drag the grip to move. Empty boxes are removed.</span>
+    </div>
+
+    <div id="fillStatus" class="hidden text-sm px-4 py-3 rounded border"></div>
+
+    <div id="fillDropZone" class="fill-dropzone">
+        Drop a PDF here or click Choose PDF (max {{ max_file_size_mb }} MB).
+    </div>
+
+    <div id="fillPages" class="fill-pages"></div>
+</div>
+{% endblock body %}
+
+{% block extra_scripts %}
+<script type="module">
+import * as pdfjsLib from "{% static 'vendor/pdfjs/4.10.38/pdf.min.mjs' %}";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "{% static 'vendor/pdfjs/4.10.38/pdf.worker.min.mjs' %}";
+const SAVE_URL = "{% url 'tools:pdf_fill_save' %}";
+const MAX_BYTES = {{ max_file_size_mb }} * 1024 * 1024;
+const BASELINE_RATIO = 0.95;
+const LINE_HEIGHT = 1.2;
+const ZOOM_STEPS = [0.75, 1, 1.25, 1.5, 1.75, 2];
+
+const fillFileInput = document.getElementById("fillFileInput");
+const fillChooseBtn = document.getElementById("fillChooseBtn");
+const fillFileName = document.getElementById("fillFileName");
+const fillModeText = document.getElementById("fillModeText");
+const fillModeX = document.getElementById("fillModeX");
+const fillFontSize = document.getElementById("fillFontSize");
+const fillZoomOut = document.getElementById("fillZoomOut");
+const fillZoomLabel = document.getElementById("fillZoomLabel");
+const fillZoomIn = document.getElementById("fillZoomIn");
+const fillUndoBtn = document.getElementById("fillUndoBtn");
+const fillClearBtn = document.getElementById("fillClearBtn");
+const fillSaveBtn = document.getElementById("fillSaveBtn");
+const fillStatus = document.getElementById("fillStatus");
+const fillDropZone = document.getElementById("fillDropZone");
+const fillPages = document.getElementById("fillPages");
+
+let originalFile = null;
+let pdfDoc = null;
+let pageViews = [];
+let items = [];
+let undoStack = [];
+let zoom = 1.25;
+let dirty = false;
+let saving = false;
+let rendering = false;
+let nextId = 1;
+let loadToken = 0;
+let pendingSizeItemId = null;
+
+fillChooseBtn.addEventListener("click", () => fillFileInput.click());
+fillFileInput.addEventListener("change", () => {
+    const file = fillFileInput.files && fillFileInput.files[0];
+    fillFileInput.value = "";
+    if (file) loadFile(file);
+});
+fillUndoBtn.addEventListener("click", undo);
+fillClearBtn.addEventListener("click", clearAll);
+fillSaveBtn.addEventListener("click", saveFilled);
+fillZoomOut.addEventListener("click", () => stepZoom(-1));
+fillZoomIn.addEventListener("click", () => stepZoom(1));
+fillFontSize.addEventListener("pointerdown", () => {
+    const active = document.activeElement;
+    if (active && active.classList.contains("fill-item-text")) {
+        const host = active.closest(".fill-item");
+        pendingSizeItemId = host ? Number(host.dataset.id) : null;
+    } else {
+        pendingSizeItemId = null;
+    }
+});
+fillFontSize.addEventListener("change", () => {
+    const id = pendingSizeItemId;
+    pendingSizeItemId = null;
+    if (id == null) return;
+    const item = items.find((entry) => entry.id === id);
+    if (!item) return;
+    item.size = Number(fillFontSize.value);
+    dirty = true;
+    renderItems();
+    const textarea = document.querySelector('.fill-item[data-id="' + id + '"] .fill-item-text');
+    if (textarea) textarea.focus();
+});
+
+["dragenter", "dragover"].forEach((name) => {
+    fillDropZone.addEventListener(name, (event) => {
+        event.preventDefault();
+        fillDropZone.classList.add("is-over");
+    });
+});
+["dragleave", "dragend"].forEach((name) => {
+    fillDropZone.addEventListener(name, (event) => {
+        event.preventDefault();
+        fillDropZone.classList.remove("is-over");
+    });
+});
+fillDropZone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    fillDropZone.classList.remove("is-over");
+    const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+    if (file) loadFile(file);
+});
+
+window.addEventListener("beforeunload", (event) => {
+    if (dirty && items.length) {
+        event.preventDefault();
+        event.returnValue = "";
+    }
+});
+
+updateEnablement();
+fillZoomLabel.textContent = Math.round(zoom * 100) + "%";
+
+async function loadFile(file) {
+    const name = file.name || "";
+    if (!name.toLowerCase().endsWith(".pdf")) {
+        showStatus("Please choose a PDF file.", "error");
+        return;
+    }
+    if (file.size > MAX_BYTES) {
+        showStatus("That file is larger than {{ max_file_size_mb }} MB.", "error");
+        return;
+    }
+    if (items.length && dirty) {
+        if (!window.confirm("Discard the text you've added to the current PDF?")) return;
+    }
+    const token = ++loadToken;
+    try {
+        const data = new Uint8Array(await file.arrayBuffer());
+        const doc = await pdfjsLib.getDocument({
+            data: data,
+            isEvalSupported: false,
+            enableXfa: false,
+        }).promise;
+        if (token !== loadToken) {
+            doc.destroy();
+            return;
+        }
+        if (pdfDoc) pdfDoc.destroy();
+        pdfDoc = doc;
+        originalFile = file;
+        items = [];
+        undoStack = [];
+        dirty = false;
+        fillFileName.textContent = file.name;
+        fillDropZone.classList.add("d-none");
+        hideStatus();
+        await renderPages();
+    } catch (err) {
+        if (token !== loadToken) return;
+        showStatus("Could not open that PDF.", "error");
+    }
+}
+
+async function renderPages() {
+    if (!pdfDoc) return;
+    rendering = true;
+    updateEnablement();
+    fillPages.innerHTML = "";
+    pageViews = [];
+    const dpr = window.devicePixelRatio || 1;
+    const total = pdfDoc.numPages;
+    try {
+        for (let n = 1; n <= total; n++) {
+            const page = await pdfDoc.getPage(n);
+            const viewport = page.getViewport({ scale: zoom });
+            const block = document.createElement("div");
+            block.className = "fill-page-block";
+            const label = document.createElement("div");
+            label.className = "fill-page-label";
+            label.textContent = "Page " + n + " of " + total;
+            const wrapper = document.createElement("div");
+            wrapper.className = "fill-page shadow-sm";
+            wrapper.style.width = viewport.width + "px";
+            wrapper.style.height = viewport.height + "px";
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.floor(viewport.width * dpr);
+            canvas.height = Math.floor(viewport.height * dpr);
+            canvas.style.width = viewport.width + "px";
+            canvas.style.height = viewport.height + "px";
+            const layer = document.createElement("div");
+            layer.className = "fill-layer";
+            wrapper.appendChild(canvas);
+            wrapper.appendChild(layer);
+            block.appendChild(label);
+            block.appendChild(wrapper);
+            fillPages.appendChild(block);
+            const ctx = canvas.getContext("2d");
+            await page.render({
+                canvasContext: ctx,
+                viewport: viewport,
+                transform: [dpr, 0, 0, dpr, 0, 0],
+            }).promise;
+            layer.addEventListener("pointerdown", (event) => onLayerPointerDown(event, layer, viewport, n));
+            pageViews.push({ pageNumber: n, viewport: viewport, wrapper: wrapper, layer: layer });
+        }
+        renderItems();
+    } finally {
+        rendering = false;
+        updateEnablement();
+    }
+}
+
+function onLayerPointerDown(event, layer, viewport, pageNumber) {
+    if (event.target !== layer || event.button !== 0) return;
+    event.preventDefault();
+    const rect = layer.getBoundingClientRect();
+    const vx = event.clientX - rect.left;
+    const vy = event.clientY - rect.top;
+    const size = Number(fillFontSize.value);
+    const fontPx = size * zoom;
+    const mark = fillModeX.checked;
+    const top = vy - 0.6 * fontPx;
+    const left = mark ? vx - 0.33 * fontPx : vx;
+    const [x, y] = viewport.convertToPdfPoint(left, top + BASELINE_RATIO * fontPx);
+    const item = {
+        id: nextId++,
+        page: pageNumber,
+        x: x,
+        y: y,
+        size: size,
+        text: mark ? "X" : "",
+    };
+    items.push(item);
+    undoStack.push(item.id);
+    dirty = true;
+    renderItems();
+    if (!mark) {
+        const textarea = document.querySelector('.fill-item[data-id="' + item.id + '"] .fill-item-text');
+        if (textarea) textarea.focus();
+    }
+}
+
+function renderItems() {
+    pageViews.forEach((view) => {
+        view.layer.innerHTML = "";
+        items.forEach((item) => {
+            if (item.page !== view.pageNumber) return;
+            const element = buildItemElement(item, view);
+            view.layer.appendChild(element);
+            autosize(element.querySelector(".fill-item-text"), item.size * zoom);
+        });
+    });
+    updateEnablement();
+}
+
+function buildItemElement(item, view) {
+    const fontPx = item.size * zoom;
+    const point = view.viewport.convertToViewportPoint(item.x, item.y);
+    const element = document.createElement("div");
+    element.className = "fill-item";
+    element.dataset.id = String(item.id);
+    element.style.left = point[0] + "px";
+    element.style.top = (point[1] - BASELINE_RATIO * fontPx) + "px";
+
+    const handle = document.createElement("i");
+    handle.className = "bi bi-grip-vertical fill-item-handle";
+    handle.title = "Drag to move";
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "fill-item-text";
+    textarea.rows = 1;
+    textarea.spellcheck = false;
+    textarea.value = item.text;
+    textarea.style.fontSize = fontPx + "px";
+    textarea.style.lineHeight = String(LINE_HEIGHT);
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "fill-item-delete";
+    removeBtn.setAttribute("aria-label", "Remove text box");
+    const removeIcon = document.createElement("i");
+    removeIcon.className = "bi bi-x";
+    removeBtn.appendChild(removeIcon);
+
+    element.appendChild(handle);
+    element.appendChild(textarea);
+    element.appendChild(removeBtn);
+
+    textarea.addEventListener("input", () => {
+        item.text = textarea.value;
+        dirty = true;
+        autosize(textarea, item.size * zoom);
+        updateEnablement();
+    });
+    textarea.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            textarea.blur();
+        }
+    });
+    textarea.addEventListener("blur", () => {
+        if (item.text.trim() === "") removeItem(item.id);
+    });
+    removeBtn.addEventListener("pointerdown", (event) => event.stopPropagation());
+    removeBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        removeItem(item.id);
+    });
+    handle.addEventListener("pointerdown", (event) => startDrag(event, element, item, view));
+    return element;
+}
+
+function autosize(textarea, fontPx) {
+    if (!textarea) return;
+    textarea.style.width = "1px";
+    textarea.style.width = Math.max(fontPx, textarea.scrollWidth + 2) + "px";
+    textarea.style.height = "auto";
+    textarea.style.height = textarea.scrollHeight + "px";
+}
+
+function startDrag(event, element, item, view) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const origLeft = parseFloat(element.style.left) || 0;
+    const origTop = parseFloat(element.style.top) || 0;
+    const layer = view.layer;
+
+    function onMove(moveEvent) {
+        let left = origLeft + (moveEvent.clientX - startX);
+        let top = origTop + (moveEvent.clientY - startY);
+        left = Math.min(Math.max(0, left), layer.clientWidth);
+        top = Math.min(Math.max(0, top), layer.clientHeight);
+        element.style.left = left + "px";
+        element.style.top = top + "px";
+    }
+
+    function onUp() {
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
+        const fontPx = item.size * zoom;
+        const left = parseFloat(element.style.left) || 0;
+        const top = parseFloat(element.style.top) || 0;
+        const pdfPoint = view.viewport.convertToPdfPoint(left, top + BASELINE_RATIO * fontPx);
+        item.x = pdfPoint[0];
+        item.y = pdfPoint[1];
+        dirty = true;
+        const snapped = view.viewport.convertToViewportPoint(item.x, item.y);
+        element.style.left = snapped[0] + "px";
+        element.style.top = (snapped[1] - BASELINE_RATIO * fontPx) + "px";
+        updateEnablement();
+    }
+
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+}
+
+function removeItem(id) {
+    const index = items.findIndex((entry) => entry.id === id);
+    if (index === -1) return;
+    items.splice(index, 1);
+    const undoIndex = undoStack.indexOf(id);
+    if (undoIndex !== -1) undoStack.splice(undoIndex, 1);
+    dirty = true;
+    renderItems();
+}
+
+function undo() {
+    while (undoStack.length) {
+        const id = undoStack.pop();
+        const index = items.findIndex((entry) => entry.id === id);
+        if (index !== -1) {
+            items.splice(index, 1);
+            dirty = true;
+            renderItems();
+            return;
+        }
+    }
+    updateEnablement();
+}
+
+function clearAll() {
+    if (!items.length) return;
+    if (!window.confirm("Remove all text boxes?")) return;
+    items = [];
+    undoStack = [];
+    dirty = true;
+    renderItems();
+}
+
+function stepZoom(direction) {
+    if (!pdfDoc || rendering || saving) return;
+    const index = ZOOM_STEPS.indexOf(zoom);
+    const next = ZOOM_STEPS[index + direction];
+    if (next == null) return;
+    zoom = next;
+    fillZoomLabel.textContent = Math.round(zoom * 100) + "%";
+    renderPages();
+}
+
+function updateEnablement() {
+    const loaded = !!pdfDoc;
+    const locked = saving || rendering;
+    fillModeText.disabled = !loaded;
+    fillModeX.disabled = !loaded;
+    fillFontSize.disabled = !loaded;
+    fillZoomOut.disabled = !loaded || locked || zoom === ZOOM_STEPS[0];
+    fillZoomIn.disabled = !loaded || locked || zoom === ZOOM_STEPS[ZOOM_STEPS.length - 1];
+    const actionsDisabled = !originalFile || !items.length || saving;
+    fillUndoBtn.disabled = actionsDisabled;
+    fillClearBtn.disabled = actionsDisabled;
+    fillSaveBtn.disabled = actionsDisabled;
+}
+
+async function saveFilled() {
+    const active = document.activeElement;
+    if (active && typeof active.blur === "function") active.blur();
+    if (!originalFile || saving) return;
+    if (!items.length) {
+        showStatus("Add at least one text box before saving.", "error");
+        updateEnablement();
+        return;
+    }
+    saving = true;
+    fillSaveBtn.textContent = "Saving…";
+    updateEnablement();
+    const payload = items.map(({ page, x, y, size, text }) => ({
+        page: page,
+        x: +x.toFixed(2),
+        y: +y.toFixed(2),
+        size: size,
+        text: text,
+    }));
+    const body = new FormData();
+    body.append("file", originalFile, originalFile.name);
+    body.append("items", JSON.stringify(payload));
+    try {
+        const response = await fetch(SAVE_URL, {
+            method: "POST",
+            body: body,
+            headers: { "X-CSRFToken": getCsrfToken() },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            let message = "Save failed.";
+            try {
+                const data = await response.json();
+                if (data && data.error) message = data.error;
+            } catch (_) { /* keep fallback */ }
+            showStatus(message, "error");
+            return;
+        }
+        const blob = await response.blob();
+        const header = response.headers.get("Content-Disposition") || "";
+        const match = /filename="([^"]+)"/.exec(header);
+        const filename = match ? match[1] : "filled.pdf";
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        dirty = false;
+        showStatus("Saved " + filename + ".", "success");
+    } catch (_) {
+        showStatus("Save failed.", "error");
+    } finally {
+        saving = false;
+        fillSaveBtn.textContent = "Save filled PDF";
+        updateEnablement();
+    }
+}
+
+function getCsrfToken() {
+    const name = "csrftoken";
+    const cookies = document.cookie ? document.cookie.split("; ") : [];
+    for (const cookie of cookies) {
+        const [key, value] = cookie.split("=");
+        if (key === name) return decodeURIComponent(value);
+    }
+    return "";
+}
+
+function showStatus(message, variant) {
+    fillStatus.textContent = message;
+    fillStatus.classList.remove("hidden");
+    fillStatus.className = "text-sm px-4 py-3 rounded border " + (
+        variant === "success"
+            ? "bg-green-50 border-green-200 text-green-800"
+            : variant === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : variant === "warn"
+                    ? "bg-yellow-50 border-yellow-200 text-yellow-800"
+                    : "bg-blue-50 border-blue-200 text-blue-800"
+    );
+}
+
+function hideStatus() {
+    fillStatus.textContent = "";
+    fillStatus.className = "hidden text-sm px-4 py-3 rounded border";
+}
+</script>
+{% endblock extra_scripts %}

@@ -5293,3 +5293,110 @@ main {
 [data-bs-theme="dark"] .quote-status-dot.is-unmatched { background-color: var(--bs-secondary-color); }
 [data-bs-theme="dark"] .quote-status-dot.is-matched { background-color: var(--bs-success); }
 [data-bs-theme="dark"] .quote-status-dot.is-rfq-sent { background-color: var(--bs-info); }
+
+/* === tools: Fill PDF === */
+.fill-pdf {
+    padding-bottom: 2rem;
+}
+.fill-dropzone {
+    border: 1px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background: var(--bs-body-bg);
+    color: var(--bs-secondary-color);
+    text-align: center;
+    padding: 3rem 1rem;
+}
+.fill-dropzone.is-over {
+    border-color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+}
+.fill-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+.fill-page-block {
+    max-width: 100%;
+}
+.fill-page-label {
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.25rem;
+}
+.fill-page {
+    position: relative;
+    background: var(--bs-white);
+    color-scheme: light;
+    max-width: 100%;
+}
+.fill-page canvas {
+    display: block;
+    background: var(--bs-white);
+}
+.fill-layer {
+    position: absolute;
+    inset: 0;
+    cursor: text;
+}
+.fill-item {
+    position: absolute;
+}
+.fill-item-handle {
+    position: absolute;
+    left: -16px;
+    top: 0;
+    cursor: move;
+    opacity: 0;
+    color: var(--bs-secondary-color);
+    line-height: 1;
+    touch-action: none;
+}
+.fill-item-text {
+    display: block;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    resize: none;
+    overflow: hidden;
+    white-space: pre;
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.2;
+    color: var(--bs-black);
+    outline: none;
+    box-shadow: none;
+    color-scheme: light;
+}
+.fill-item:hover .fill-item-text,
+.fill-item:focus-within .fill-item-text {
+    box-shadow: 0 0 0 1px var(--bs-primary);
+}
+.fill-item-delete {
+    position: absolute;
+    top: 0;
+    right: -18px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--bs-danger);
+    line-height: 1;
+    opacity: 0;
+    cursor: pointer;
+}
+.fill-item:hover .fill-item-handle,
+.fill-item:focus-within .fill-item-handle,
+.fill-item:hover .fill-item-delete,
+.fill-item:focus-within .fill-item-delete {
+    opacity: 1;
+}
+[data-bs-theme="dark"] .fill-page,
+[data-bs-theme="dark"] .fill-page canvas {
+    background: var(--bs-white);
+}
+[data-bs-theme="dark"] .fill-item-text {
+    color: var(--bs-black);
+    background: transparent;
+}
