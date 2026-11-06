@@ -1,16 +1,20 @@
 import json
-import os
+import logging
 import re
 
-from anthropic import Anthropic
+from core.anthropic_client import (
+    CLAUDE_HAIKU_MODEL,
+    CLAUDE_SONNET_MODEL,
+    call_anthropic,
+    extract_text,
+)
 
 from .dibbs_pdf import extract_pdf_text
 
-MODELS = {
-    "haiku45":  "claude-haiku-4-5-20251001",
-    "sonnet46": "claude-sonnet-4-6",
-    "opus46":   "claude-opus-4-6",
-}
+logger = logging.getLogger(__name__)
+
+MODELS = {"haiku55": CLAUDE_HAIKU_MODEL, "sonnet55": CLAUDE_SONNET_MODEL}
+DEFAULT_MODEL_KEY = "haiku55"
 
 SYSTEM_PROMPT = """You are a government procurement analyst specializing in DLA (Defense Logistics Agency) solicitations.
 Your job is to extract specific bid-critical information from DIBBS solicitation documents.
@@ -109,40 +113,45 @@ def _extract_sections_ab(pdf_text: str) -> str:
     return extracted
 
 
-def analyze_solicitation_pdf(pdf_blob_bytes: bytes, solicitation_number: str, model_key: str) -> dict:
+def analyze_solicitation_pdf(
+    pdf_blob_bytes: bytes, solicitation_number: str, model_key: str = DEFAULT_MODEL_KEY
+) -> dict:
     """
     Extract bid-critical requirements from a DIBBS solicitation PDF
     using the specified Claude model.
 
-    model_key must be one of: haiku35, haiku45, sonnet45, opus45
+    model_key is a key of MODELS (haiku55, sonnet55). Unknown keys log a
+    warning and fall back to DEFAULT_MODEL_KEY.
 
     Returns a dict of extracted fields plus _usage and _model_key metadata.
     Raises ValueError on bad input, Exception on API failure.
     """
-    if model_key not in MODELS:
-        raise ValueError(
-            f"Unknown model_key '{model_key}'. Must be one of: {list(MODELS.keys())}"
+    model = MODELS.get(model_key)
+    if model is None:
+        logger.warning(
+            "Unknown sol_analysis model_key %r; falling back to %r", model_key, DEFAULT_MODEL_KEY
         )
+        model_key = DEFAULT_MODEL_KEY
+        model = MODELS[DEFAULT_MODEL_KEY]
 
     pdf_text = extract_pdf_text(pdf_blob_bytes)
     if not pdf_text:
         raise ValueError("No text could be extracted from the PDF blob.")
-
-    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     user_prompt = USER_PROMPT_TEMPLATE.format(
         sol_number=solicitation_number,
         pdf_text=_extract_sections_ab(pdf_text),
     )
 
-    message = client.messages.create(
-        model=MODELS[model_key],
-        max_tokens=1500,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
+    payload = {
+        "model": model,
+        "max_tokens": 1500,
+        "system": SYSTEM_PROMPT,
+        "messages": [{"role": "user", "content": user_prompt}],
+    }
+    body = call_anthropic(payload, "dibbs.sol_analysis.analyze_solicitation_pdf")
 
-    raw = message.content[0].text.strip()
+    raw = extract_text(body).strip()
 
     # Strip markdown fences if model returns them despite instructions
     if raw.startswith("```"):
@@ -153,10 +162,11 @@ def analyze_solicitation_pdf(pdf_blob_bytes: bytes, solicitation_number: str, mo
 
     result = json.loads(raw)
 
+    usage = body.get("usage") or {}
     result["_usage"] = {
-        "input_tokens": message.usage.input_tokens,
-        "output_tokens": message.usage.output_tokens,
-        "model": message.model,
+        "input_tokens": usage.get("input_tokens", 0),
+        "output_tokens": usage.get("output_tokens", 0),
+        "model": body.get("model", model),
         "model_key": model_key,
     }
 

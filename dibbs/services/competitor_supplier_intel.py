@@ -30,6 +30,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from core.anthropic_client import CLAUDE_HAIKU_MODEL
 from dibbs.models import (
     CompanyCAGE,
     CompetitorAwardEntity,
@@ -62,7 +63,7 @@ _DIBBS_WWW_BASE = "https://www.dibbs.bsm.dla.mil"
 
 # Haiku for structured entity classification (cheaper than Sonnet used by
 # intake CLIN/IDIQ/CMMC extractors — see core/anthropic_client.MODEL_PRICING).
-_ENTITY_LLM_MODEL = "claude-haiku-4-5-20251001"
+_ENTITY_LLM_MODEL = CLAUDE_HAIKU_MODEL
 _ENTITY_LLM_MAX_DOC_CHARS = 40_000
 _SOURCE_NOTE_MAX_WORDS = 10
 
@@ -165,7 +166,7 @@ def _extract_award_entities_via_claude_api(
         text = text[:_ENTITY_LLM_MAX_DOC_CHARS]
 
     try:
-        from core.anthropic_client import call_anthropic
+        from core.anthropic_client import call_anthropic, extract_text
 
         prompt = f"""You are extracting every CAGE code and DoDAAC from a US Government DD Form 1155 award document.
 
@@ -207,12 +208,7 @@ DOCUMENT TEXT:
             payload, "dibbs.competitor_supplier_intel._extract_award_entities_via_claude_api"
         )
 
-        raw_text = ""
-        for block in body.get("content", []):
-            if block.get("type") == "text":
-                raw_text += block.get("text", "")
-
-        raw_text = raw_text.strip()
+        raw_text = extract_text(body).strip()
         if raw_text.startswith("```"):
             raw_text = re.sub(r"^```[a-z]*\n?", "", raw_text)
             raw_text = re.sub(r"\n?```$", "", raw_text)

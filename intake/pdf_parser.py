@@ -16,7 +16,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import BinaryIO, List, Optional, Union
 from contracts.services.contract_number import canonicalize_contract_number
-from core.anthropic_client import call_anthropic
+from core.anthropic_client import CLAUDE_SONNET_MODEL, call_anthropic, extract_text
 
 try:
     import pdfplumber
@@ -1031,18 +1031,13 @@ SECTION B TEXT:
 {section_text}"""
 
         payload = {
-            "model": "claude-sonnet-4-6",
+            "model": CLAUDE_SONNET_MODEL,
             "max_tokens": 1000,
             "messages": [{"role": "user", "content": prompt}],
         }
         body = call_anthropic(payload, "intake.pdf_parser._extract_clins_via_claude_api")
 
-        raw_text = ""
-        for block in body.get("content", []):
-            if block.get("type") == "text":
-                raw_text += block.get("text", "")
-
-        raw_text = raw_text.strip()
+        raw_text = extract_text(body).strip()
         if raw_text.startswith("```"):
             raw_text = re.sub(r"^```[a-z]*\n?", "", raw_text)
             raw_text = re.sub(r"\n?```$", "", raw_text)
@@ -1090,18 +1085,13 @@ SECTION B TEXT:
 {section_b_text}"""
 
         payload = {
-            "model": "claude-sonnet-4-6",
+            "model": CLAUDE_SONNET_MODEL,
             "max_tokens": 500,
             "messages": [{"role": "user", "content": prompt}],
         }
         body = call_anthropic(payload, "intake.pdf_parser._extract_idiq_supplier_via_claude_api")
 
-        raw_text = ""
-        for block in body.get("content", []):
-            if block.get("type") == "text":
-                raw_text += block.get("text", "")
-
-        raw_text = raw_text.strip()
+        raw_text = extract_text(body).strip()
         if raw_text.startswith("```"):
             raw_text = re.sub(r"^```[a-z]*\n?", "", raw_text)
             raw_text = re.sub(r"\n?```$", "", raw_text)
@@ -1147,18 +1137,13 @@ DOCUMENT TEXT:
 {document_text}"""
 
         payload = {
-            "model": "claude-sonnet-4-6",
+            "model": CLAUDE_SONNET_MODEL,
             "max_tokens": 200,
             "messages": [{"role": "user", "content": prompt}],
         }
         body = call_anthropic(payload, "intake.pdf_parser._detect_cmmc_via_claude_api")
 
-        raw_text = ""
-        for block in body.get("content", []):
-            if block.get("type") == "text":
-                raw_text += block.get("text", "")
-
-        raw_text = raw_text.strip()
+        raw_text = extract_text(body).strip()
         if raw_text.startswith("```"):
             raw_text = re.sub(r"^```[a-z]*\n?", "", raw_text)
             raw_text = re.sub(r"\n?```$", "", raw_text)

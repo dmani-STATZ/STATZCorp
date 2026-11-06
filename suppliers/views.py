@@ -57,7 +57,7 @@ from suppliers.models import (
     SupplierContactCategory,
 )
 import requests
-from core.anthropic_client import call_anthropic
+from core.anthropic_client import call_anthropic, extract_text
 
 from .openrouter_config import (
     get_model_for_request,
@@ -344,7 +344,6 @@ def call_openrouter_for_supplier(
     payload = {
         "model": model,
         "max_tokens": 2048,
-        "temperature": 0.2,
         "system": prompt_bundle["system"],
         "messages": [
             {"role": "user", "content": prompt_bundle["user"]},
@@ -356,12 +355,7 @@ def call_openrouter_for_supplier(
     except Exception as exc:
         raise RuntimeError(f"Anthropic request failed: {exc}") from exc
 
-    blocks = data.get("content") or []
-    text_content = ""
-    for block in blocks:
-        if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):
-            text_content = block["text"].strip()
-            break
+    text_content = extract_text(data).strip()
     if not text_content:
         raise RuntimeError("Anthropic API returned no text content.")
 

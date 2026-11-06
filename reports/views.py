@@ -3,7 +3,7 @@ import logging
 import os
 import re
 from django.contrib import messages
-from core.anthropic_client import call_anthropic
+from core.anthropic_client import CLAUDE_HAIKU_MODEL, call_anthropic, extract_text
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction
@@ -93,18 +93,13 @@ def _call_ai_sql_builder(prompt, admin_notes="", existing_sql=""):
     )
 
     payload = {
-        "model": "claude-haiku-4-5-20251001",
+        "model": CLAUDE_HAIKU_MODEL,
         "max_tokens": 1200,
         "system": system_prompt,
         "messages": [{"role": "user", "content": prompt}],
     }
     data = call_anthropic(payload, "reports.views.admin_ai_generate")
-    blocks = data.get("content") or []
-    text_content = ""
-    for block in blocks:
-        if isinstance(block, dict) and block.get("type") == "text" and block.get("text"):
-            text_content = block["text"].strip()
-            break
+    text_content = extract_text(data).strip()
     if not text_content:
         raise RuntimeError("Claude API returned no text content.")
 

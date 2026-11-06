@@ -778,6 +778,7 @@ def parse_pdf_data_backlog(log=None) -> int:
                 sol = Solicitation.objects.get(solicitation_number=key)
                 if not SolAnalysis.objects.filter(solicitation=sol).exists():
                     from dibbs.services.sol_analysis import (
+                        DEFAULT_MODEL_KEY,
                         analyze_solicitation_pdf,
                         save_analysis_result,
                     )
@@ -785,9 +786,9 @@ def parse_pdf_data_backlog(log=None) -> int:
                     _result = analyze_solicitation_pdf(
                         pdf_blob_bytes,
                         sol.solicitation_number,
-                        "haiku45",
+                        DEFAULT_MODEL_KEY,
                     )
-                    save_analysis_result(sol, _result, "haiku45")
+                    save_analysis_result(sol, _result, _result["_usage"]["model_key"])
             except Exception as _e:
                 logger.error(
                     "Loop C SolAnalysis failed for %s: %s",

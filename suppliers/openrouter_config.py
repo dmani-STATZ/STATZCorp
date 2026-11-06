@@ -3,9 +3,11 @@ from typing import Dict, Tuple, Optional
 
 from django.conf import settings
 
+from core.anthropic_client import CLAUDE_HAIKU_MODEL
+
 from .models import OpenRouterModelSetting
 
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+DEFAULT_MODEL = CLAUDE_HAIKU_MODEL
 
 
 def _env_default_model() -> str:

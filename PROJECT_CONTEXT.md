@@ -566,8 +566,16 @@ The `tags` array will fail validation if it does not contain exactly two items:
 ## Anthropic API Budget Tracker
 - Model: `core.APIBudget` (singleton, pk=1) tracks estimated running balance. `core.APIUsageLog` logs every call with model, tokens, cost, and call site.
 - Central wrapper: `core.anthropic_client.call_anthropic(payload, call_site)` — all Anthropic API calls must route through this. It has no budget/rate-limit context manager and no `with` statement; the only retry logic is an HTTP-429 backoff loop. Callers are expected to wrap it in their own `except Exception`.
-- Callers as of 2026-09-14: `intake/pdf_parser.py` (×3, each locally guarded), `reports/views.py::_call_ai_sql_builder` (guarded by all three of its callers), `mailer/tasks/generate_ai.py::process_ai_snippets` (per-campaign `try/except Exception`), `dibbs/services/competitor_supplier_intel.py::_extract_award_entities_via_claude_api` (guarded). All are adequately guarded.
-- Pricing constants in `core/anthropic_client.py` — update `MODEL_PRICING` when adding new models.
+- Callers as of 2026-11-06: `intake/pdf_parser.py` (×3, each locally guarded), `reports/views.py::_call_ai_sql_builder` (guarded by all three of its callers), `mailer/tasks/generate_ai.py::process_ai_snippets` (per-campaign `try/except Exception`), `dibbs/services/competitor_supplier_intel.py::_extract_award_entities_via_claude_api` (guarded), `suppliers/views.py::call_openrouter_for_supplier`, `dibbs/services/sol_analysis.py::analyze_solicitation_pdf` (guarded by `parse_pdf_data_backlog`). All are adequately guarded.
+- Models: Claude Haiku 5.5 (`CLAUDE_HAIKU_MODEL`) and Claude Sonnet 5.5 (`CLAUDE_SONNET_MODEL`). Model IDs live ONLY as these constants in `core/anthropic_client.py`.
+- Pricing constants in `core/anthropic_client.py` — update `MODEL_PRICING` when adding new models. Haiku 5.5 switches both input and output to the long-context rate when `input_tokens > 100_000`. Legacy model keys stay in `MODEL_PRICING` for rollback.
+- Rules:
+  - Every Claude call goes through `core.anthropic_client.call_anthropic()`; the `anthropic` SDK is not used.
+  - Never hardcode a Claude model string. Import `CLAUDE_HAIKU_MODEL` / `CLAUDE_SONNET_MODEL`.
+  - Never send `temperature`, `top_p`, `top_k`, `budget_tokens`, forced `tool_choice`, `thinking: {"type": "disabled"}`, or an assistant prefill (each returns a 400 on the 5.5 models).
+  - Always read response text with `extract_text()`, never `content[0]` (responses can start with `thinking` blocks).
+  - Per-model thinking and effort live in `MODEL_REQUEST_DEFAULTS`, applied by `prepare_payload()` inside `call_anthropic()`. Change them there, not at call sites.
+  - The supplier-enrich model is stored in the database (`suppliers.models.OpenRouterModelSetting.model_name`) and must be updated by hand when models change.
 - Context processor `core.context_processors.api_budget` injects `api_budget` and `api_budget_calls_today` into superuser requests only.
 - Budget card partial: `core/templates/core/partials/api_budget_card.html` — included on Intake Queue, Processing Queue, Reports hub, and Index pages inside `{% if request.user.is_superuser %}`.
 - Sync URL: `core:sync_api_budget` (POST) — superuser only, sets balance to match Anthropic console.

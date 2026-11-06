@@ -6,11 +6,20 @@ from types import SimpleNamespace
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import connection
-from django.test import Client, RequestFactory, TestCase, override_settings
+from decimal import Decimal
+
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from contracts.models import Clin, Company, Contract, IdiqContract, IdiqContractDetails, PurchaseOrder
+from core.anthropic_client import (
+    CLAUDE_HAIKU_MODEL,
+    CLAUDE_SONNET_MODEL,
+    calculate_cost,
+    extract_text,
+    prepare_payload,
+)
 from core.views import (
     _build_search_terms,
     _search_querysets,
@@ -435,3 +444,83 @@ class GlobalSearchTests(TestCase):
         self.assertEqual(context["suppliers"], [supplier])
         self.assertEqual(context["contracts"], [contract])
         self.assertEqual(context["nsns"], [nsn])
+
+
+class AnthropicClientTests(SimpleTestCase):
+    def _payload(self, model, **extra):
+        payload = {
+            "model": model,
+            "max_tokens": 1000,
+            "messages": [{"role": "user", "content": "hi"}],
+        }
+        payload.update(extra)
+        return payload
+
+    def test_prepare_payload_haiku(self):
+        original = self._payload(CLAUDE_HAIKU_MODEL, temperature=0.2, top_p=0.9, top_k=5)
+        snapshot = json.loads(json.dumps(original))
+
+        prepared = prepare_payload(original)
+
+        for param in ("temperature", "top_p", "top_k"):
+            self.assertNotIn(param, prepared)
+        self.assertEqual(prepared["output_config"]["effort"], "low")
+        self.assertNotIn("thinking", prepared)
+        self.assertEqual(prepared["max_tokens"], 4096)
+        self.assertEqual(original, snapshot)
+
+    def test_prepare_payload_sonnet_defaults(self):
+        prepared = prepare_payload(self._payload(CLAUDE_SONNET_MODEL))
+
+        self.assertEqual(prepared["thinking"], {"type": "between_tools"})
+        self.assertEqual(prepared["output_config"]["effort"], "medium")
+
+    def test_prepare_payload_sonnet_preserves_explicit_values(self):
+        prepared = prepare_payload(
+            self._payload(CLAUDE_SONNET_MODEL, max_tokens=8000, output_config={"effort": "high"})
+        )
+
+        self.assertEqual(prepared["output_config"]["effort"], "high")
+        self.assertEqual(prepared["max_tokens"], 8000)
+
+    def test_prepare_payload_legacy_model_passes_through(self):
+        original = self._payload("claude-haiku-4-5-20251001", temperature=0.2)
+
+        prepared = prepare_payload(original)
+
+        self.assertEqual(prepared, original)
+        self.assertEqual(prepared["temperature"], 0.2)
+
+    def test_calculate_cost_sonnet(self):
+        self.assertEqual(
+            calculate_cost(CLAUDE_SONNET_MODEL, 1_000_000, 1_000_000), Decimal("12.000000")
+        )
+
+    def test_calculate_cost_haiku_at_threshold(self):
+        self.assertEqual(
+            calculate_cost(CLAUDE_HAIKU_MODEL, 100_000, 1_000_000), Decimal("0.510000")
+        )
+
+    def test_calculate_cost_haiku_long_context(self):
+        self.assertEqual(calculate_cost(CLAUDE_HAIKU_MODEL, 100_001, 0), Decimal("0.050001"))
+
+    def test_calculate_cost_unknown_model_uses_sonnet_rates(self):
+        self.assertEqual(
+            calculate_cost("unknown-model", 1234, 5678),
+            calculate_cost(CLAUDE_SONNET_MODEL, 1234, 5678),
+        )
+
+    def test_extract_text_skips_thinking(self):
+        body = {
+            "content": [
+                {"type": "thinking", "thinking": "", "signature": "x"},
+                {"type": "text", "text": "A"},
+                {"type": "text", "text": "B"},
+            ]
+        }
+        self.assertEqual(extract_text(body), "AB")
+
+    def test_extract_text_empty(self):
+        self.assertEqual(extract_text({}), "")
+        self.assertEqual(extract_text({"content": []}), "")
+        self.assertEqual(extract_text({"content": None}), "")

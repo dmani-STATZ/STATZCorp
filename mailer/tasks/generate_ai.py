@@ -2,7 +2,7 @@ import json
 import logging
 import math
 from mailer.models import Campaign
-from core.anthropic_client import call_anthropic
+from core.anthropic_client import CLAUDE_SONNET_MODEL, call_anthropic, extract_text
 
 logger = logging.getLogger("mailer.background_tasks")
 
@@ -58,7 +58,7 @@ def process_ai_snippets():
                 user_prompt = f"Instruction: {campaign.ai_instruction}\n\nRecipients:\n{json.dumps(recipients_data)}"
                 
                 payload = {
-                    "model": "claude-sonnet-4-6",
+                    "model": CLAUDE_SONNET_MODEL,
                     "max_tokens": 4096,
                     "system": system_prompt,
                     "messages": [
@@ -70,11 +70,9 @@ def process_ai_snippets():
                 response = call_anthropic(payload, call_site=f"mailer.campaign_{campaign.pk}.ai")
                 
                 # Parse response
-                content = response.get("content", [])
-                if not content:
+                text_response = extract_text(response)
+                if not text_response:
                     raise ValueError("Anthropic returned empty content.")
-                
-                text_response = content[0].get("text", "")
                 
                 try:
                     generated_items = json.loads(text_response)

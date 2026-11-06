@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
+from core.anthropic_client import CLAUDE_HAIKU_MODEL
 from suppliers.openrouter_config import (
     DEFAULT_MODEL,
     get_model_for_request,
@@ -13,11 +14,11 @@ from suppliers.views import call_openrouter_for_supplier
 
 class SupplierEnrichmentAnthropicTests(TestCase):
     def test_default_model_is_haiku(self):
-        self.assertEqual(DEFAULT_MODEL, "claude-haiku-4-5-20251001")
+        self.assertEqual(DEFAULT_MODEL, CLAUDE_HAIKU_MODEL)
         info = get_openrouter_model_info()
-        self.assertEqual(info["effective_model"], "claude-haiku-4-5-20251001")
+        self.assertEqual(info["effective_model"], CLAUDE_HAIKU_MODEL)
         model, _ = get_model_for_request()
-        self.assertEqual(model, "claude-haiku-4-5-20251001")
+        self.assertEqual(model, CLAUDE_HAIKU_MODEL)
 
     @patch("suppliers.views.call_anthropic")
     def test_call_supplier_enrich_calls_anthropic(self, mock_call_anthropic):
@@ -46,7 +47,7 @@ class SupplierEnrichmentAnthropicTests(TestCase):
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
             result, model_used = call_openrouter_for_supplier("<html><body>Acme</body></html>")
 
-        self.assertEqual(model_used, "claude-haiku-4-5-20251001")
+        self.assertEqual(model_used, CLAUDE_HAIKU_MODEL)
         self.assertEqual(result["company_name"], "Test Acme Corp")
         self.assertEqual(result["logo_url"], "https://example.com/logo.png")
         self.assertEqual(result["cage_code"], "12345")
@@ -56,6 +57,6 @@ class SupplierEnrichmentAnthropicTests(TestCase):
         payload = args[0]
         call_site = args[1]
         self.assertEqual(call_site, "suppliers.supplier_enrich")
-        self.assertEqual(payload["model"], "claude-haiku-4-5-20251001")
+        self.assertEqual(payload["model"], CLAUDE_HAIKU_MODEL)
         self.assertEqual(payload["max_tokens"], 2048)
-        self.assertEqual(payload["temperature"], 0.2)
+        self.assertNotIn("temperature", payload)

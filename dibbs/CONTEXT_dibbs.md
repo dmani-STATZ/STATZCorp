@@ -61,6 +61,14 @@ spec is archived at `docs/legacy/sales_DIBBS_System_Spec.md`.
 - `SAMEntityCache`: 30-day TTL for good rows (`fetch_error=False`, found or not
   found). Error rows go stale after 24 h. A failed refresh keeps the previously
   cached data. A missing `SAM_API_KEY` is never written.
+- `SolAnalysis.model_key`: keys are `MODELS` in `services/sol_analysis.py` —
+  `haiku55` (default, `DEFAULT_MODEL_KEY` → Claude Haiku 5.5) and `sonnet55`
+  (Claude Sonnet 5.5). Model IDs come from the `core/anthropic_client.py`
+  constants. Legacy keys on existing rows (`haiku45`, …) are history only; an
+  unknown key logs a warning and falls back to `haiku55`. The call goes through
+  `core.anthropic_client.call_anthropic()` (no `anthropic` SDK). The feature is
+  gated by `SOL_ANALYSIS_ENABLED` (currently unset = off) in
+  `dibbs_pdf.parse_pdf_data_backlog`.
 
 ## 5. Flows
 **Daily import (interactive):** `/dibbs/import/` upload or "fetch from DIBBS" →

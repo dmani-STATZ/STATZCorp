@@ -19,7 +19,7 @@ The app stores report library items, immutable versions, sharing state, and requ
 - Provide superuser queue workflow for request triage, SQL preview, and version publishing.
 - Provide `is_staff` prototype builder flow for draft creation, iteration, promotion, and discard.
 - Preserve SQL execution safety via `run_select` and CSV export via `rows_to_csv` from `reports/utils.py`.
-- Generate SQL/title/tags JSON using Anthropic `claude-haiku-4-5-20251001` with schema context from `contracts.utils.contracts_schema.generate_db_schema_snapshot()`.
+- Generate SQL/title/tags JSON using Claude Haiku 5.5 (`CLAUDE_HAIKU_MODEL` from `core/anthropic_client.py`, the only place model IDs live) with schema context from `contracts.utils.contracts_schema.generate_db_schema_snapshot()`.
 
 ## 4. Key Files and What They Do
 - `reports/models.py`: six persistence models with UUID PKs and workflow relations.
