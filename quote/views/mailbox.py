@@ -24,7 +24,7 @@ from quote.models import (
     QuoteEmailAttachment,
     QuoteSupplierQuote,
 )
-from quote.services import cost, graph_inbox, mailbox, mailbox_ai, packhouse
+from quote.services import cost, email_scan, graph_inbox, mailbox, mailbox_ai, packhouse
 from quote.services.drawer import drawer_payload
 from quote.services.quotes import saved_cards, via_text
 from quote.views.quote_save import save_response
@@ -175,6 +175,7 @@ def email_detail(request, email_id):
         ),
         'linked': grouped,
         'suggestion': suggestion,
+        'scan_enabled': email_scan.enabled(),
         'drawer_json': drawer_payload(grouped, cards),
         'quotes': quotes,
         'packhouse_replies': [

@@ -68,6 +68,7 @@
 <script src="{% static 'quote/js/packhouse.js' %}?v={{ cache_version }}"></script>
 <script src="{% static 'quote/js/attachment-viewer.js' %}?v={{ cache_version }}"></script>
 <script src="{% static 'quote/js/quote-drawer.js' %}?v={{ cache_version }}"></script>
+<script src="{% static 'quote/js/email-scan.js' %}?v={{ cache_version }}"></script>
 <script>
 (function () {
   const DETAIL_URL = '{% url "quote:email_detail" 0 %}';
@@ -398,7 +399,9 @@
       root: root, container: container, data: data, post: post, esc: esc, debounce: debounce,
       searchUrl: SUPPLIER_SEARCH_URL, phCtx: phCtx,
       onSaved: () => window.quoteMailbox.reload(),
+      scanPrefillUrl: root.dataset.scanPrefillUrl || '',
     }) : null;
+    if (window.QuoteEmailScan) window.QuoteEmailScan.init(root, { csrf: CSRF, drawer: drawer });
     if (!drawer) return;
 
     // Finish a "Log supplier quote" that had to ask for a SOL / supplier first.

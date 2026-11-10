@@ -5,7 +5,7 @@ Every message in the mailbox is persisted -- linked or not -- with its raw
 Graph payload, headers and attachments, because the mailbox workspace needs all
 three.
 
-Tables: quote_email, quote_email_attachment, quote_email_sol_link.
+Tables: quote_email, quote_email_attachment, quote_email_sol_link, quote_email_scan.
 """
 from datetime import timedelta
 
@@ -206,3 +206,56 @@ class QuoteEmailSolLink(models.Model):
 
     def __str__(self):
         return f'Email {self.email_id} → line {self.line_id}'
+
+
+class QuoteEmailScan(models.Model):
+    """
+    One Claude pass over a message's text and attachments (services/email_scan.py). Audit only:
+    a scan never writes a quote; the tray prefills from ``result_json`` and the rep saves.
+    """
+
+    LEVEL_NORMAL = 'normal'
+    LEVEL_DEEP = 'deep'
+    LEVEL_CHOICES = [(LEVEL_NORMAL, 'Normal'), (LEVEL_DEEP, 'Deep')]
+
+    STATUS_RUNNING = 'running'
+    STATUS_COMPLETED = 'completed'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_RUNNING, 'Running'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    email = models.ForeignKey(QuoteEmail, on_delete=models.CASCADE, related_name='scans')
+    level = models.CharField(max_length=8, choices=LEVEL_CHOICES)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_RUNNING)
+    model_name = models.CharField(max_length=100, blank=True, default='')
+    content_hash = models.CharField(
+        max_length=64, blank=True, default='', db_index=True,
+        help_text='SHA-256 over the body text and the attachment hashes: byte-identical content '
+                  'reuses an earlier result.',
+    )
+    result_json = models.TextField(blank=True, default='')
+    flags_json = models.TextField(blank=True, default='')
+    error_text = models.TextField(blank=True, default='')
+    input_tokens = models.PositiveIntegerField(default=0)
+    output_tokens = models.PositiveIntegerField(default=0)
+    from_cache = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'quote_email_scan'
+        ordering = ['-id']
+        verbose_name = 'Quote email scan'
+        verbose_name_plural = 'Quote email scans'
+
+    def __str__(self):
+        return f'Email {self.email_id} {self.level} scan ({self.status})'

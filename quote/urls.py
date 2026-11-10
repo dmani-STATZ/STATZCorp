@@ -48,6 +48,8 @@ urlpatterns = [
     path('mailbox/<int:email_id>/unlink/', views.email_unlink, name='email_unlink'),
     path('mailbox/<int:email_id>/supplier/', views.email_set_supplier, name='email_set_supplier'),
     path('mailbox/<int:email_id>/quote/', views.save_quote, name='save_quote'),
+    path('mailbox/<int:email_id>/scan/', views.scan_email, name='email_scan'),
+    path('mailbox/<int:email_id>/scan/prefill/', views.scan_prefill, name='email_scan_prefill'),
     path('mailbox/attachments/<int:attachment_id>/', views.attachment_download, name='attachment_download'),
     path('mailbox/attachments/<int:attachment_id>/view/', views.attachment_view, name='attachment_view'),
     # Phase 2 -- packhouse packaging-quote requests (drawer packaging section + message pane)

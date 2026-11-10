@@ -127,8 +127,9 @@ def _log_http_error(response, call_site: str, payload: dict) -> None:
     )
 
 
-def call_anthropic(payload: dict, call_site: str) -> dict:
+def call_anthropic(payload: dict, call_site: str, timeout: float | None = None) -> dict:
     payload = prepare_payload(payload)
+    timeout = timeout or ANTHROPIC_TIMEOUT_SECONDS
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     headers = {
         "Content-Type": "application/json",
@@ -140,7 +141,7 @@ def call_anthropic(payload: dict, call_site: str) -> dict:
     response = None
 
     for attempt in range(_RATE_LIMIT_MAX_ATTEMPTS):
-        response = requests.post(url, json=payload, headers=headers, timeout=ANTHROPIC_TIMEOUT_SECONDS)
+        response = requests.post(url, json=payload, headers=headers, timeout=timeout)
 
         if response.status_code == 429:
             if attempt < _RATE_LIMIT_MAX_ATTEMPTS - 1:

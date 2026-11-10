@@ -225,6 +225,32 @@ permission gating silently stops applying.
   Don't call `window.quoteMailbox.reload()` after a send: it re-fetches the fragment and wipes the
   rep's half-entered quote.
 
+### Email scan (`services/email_scan.py`, `services/email_scan_schema.py`)
+- **The scan never saves a quote.** It writes only `QuoteEmailScan`. Never call `save_supplier_quote` /
+  `update_supplier_quote` or touch `QuoteSupplierQuote.objects` in the `email_scan*` files or
+  `views/email_scan.py`. The rep reviews the prefilled tray and presses Save.
+- **Claude only through `core.anthropic_client`**, imported lazily inside functions; models from
+  `CLAUDE_HAIKU_MODEL` (Normal) / `CLAUDE_SONNET_MODEL` (Deep); call site `quote_email_scan`;
+  `timeout=SCAN_TIMEOUT_SECONDS`. No `import anthropic` anywhere in `quote`.
+- **Structured output is text JSON, not tools.** Forced `tool_choice`, `temperature`, prefill etc. 400 on
+  the 5.5 models. Read with `extract_text`, parse with `json.loads(parse_float=Decimal)`, then
+  `validate_extraction` (drops unknown keys, non-string leaves, oversize lists). Never use a raw model
+  value that did not pass the schema. Money is `Decimal`; unit cost is quantized to 5 dp.
+- **Supplier content is untrusted.** Send only this message's body text and its sniffed PDF / PNG / JPEG
+  attachments, framed by `<email_body>` / `<attachment>` tags with `UNTRUSTED_SENTENCE` in the system
+  prompt. Never send other messages, supplier records or SOL data to the model. Log only email id,
+  level, status, tokens and duration — never the body or extracted values at INFO or above.
+- **Budget is read-only:** `APIBudget.objects.filter(pk=1)`; a missing row means no budget. Don't call
+  `APIBudget.get()` (it creates the row, a `core` write).
+- **Load attachment bytes one at a time** (`values_list('content').first()` per row after a metadata
+  pass); never pull every `content` column at once, and no `transaction.atomic` around the call.
+- **Tray changes go through the draft machinery**: `applyScanPrefill` builds a `snapshot()`, sets values,
+  `applyDraft()`s it, then `renderLines()`. `resetForm()` clears scan marks. A prefill never fills over a
+  saved card, a draft (unless the rep pressed Scan), or a field the rep typed in.
+- Adding a tray target means changing `SCAN_TARGET_FIELDS` + `TRAY_INPUTS` (schema) and `SCAN_INPUTS`
+  (`quote-drawer.js`) together.
+- Feature flag `QUOTE_EMAIL_SCAN_ENABLED` hides the button and 404s both endpoints. Keep it that way.
+
 ## 5. Files That Commonly Need to Change Together
 
 ### Changing the packhouse request flow

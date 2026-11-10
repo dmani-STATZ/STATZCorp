@@ -4183,6 +4183,42 @@ main {
 
 .quote-msg-heading { min-width: 0; }
 
+/* Message-pane actions: Scan quote + Log supplier quote, with the scan's status line under them */
+.quote-msg-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  max-width: 28rem;
+}
+.quote-scan-status {
+  font-size: 0.8rem;
+  text-align: right;
+}
+.quote-scan-status:empty { display: none; }
+.quote-scan-flags { color: var(--bs-warning-text-emphasis); }
+
+/* Log quote tray inputs filled by a scan (DOM-only marks; the rep's own typing clears them) */
+.quote-drawer .quote-scan-filled {
+  border-color: var(--bs-info);
+  box-shadow: 0 0 0 0.12rem rgba(var(--bs-info-rgb), 0.2);
+}
+.quote-drawer .quote-scan-warn {
+  border-color: var(--bs-warning);
+  box-shadow: 0 0 0 0.12rem rgba(var(--bs-warning-rgb), 0.3);
+}
+.quote-scan-note {
+  margin-bottom: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--bs-info-text-emphasis);
+  background-color: var(--bs-info-bg-subtle);
+  border-left: 3px solid var(--bs-info);
+  border-radius: var(--bs-border-radius-sm);
+}
+[data-bs-theme="dark"] .quote-drawer .quote-scan-filled { box-shadow: 0 0 0 0.12rem rgba(var(--bs-info-rgb), 0.35); }
+[data-bs-theme="dark"] .quote-drawer .quote-scan-warn { box-shadow: 0 0 0 0.12rem rgba(var(--bs-warning-rgb), 0.45); }
+
 .quote-msg-sols,
 .quote-msg-attachments {
   display: flex;

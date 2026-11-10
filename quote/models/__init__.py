@@ -18,6 +18,7 @@ from .email import (
     CLAIM_DURATION,
     QuoteEmail,
     QuoteEmailAttachment,
+    QuoteEmailScan,
     QuoteEmailSolLink,
 )
 from .outcomes import BidOutcome
@@ -34,6 +35,7 @@ __all__ = [
     'QuoteCapabilityImport',
     'QuoteEmail',
     'QuoteEmailAttachment',
+    'QuoteEmailScan',
     'QuoteEmailSolLink',
     'QuotePackhouseRFQ',
     'QuoteRFQ',

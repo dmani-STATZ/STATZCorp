@@ -19,6 +19,7 @@ from .capabilities import (
     capability_supplier,
 )
 from .dashboard import dashboard
+from .email_scan import scan_email, scan_prefill
 from .our_bids import our_bids, outcome_detail, reconcile_now
 from .mailbox import (
     attachment_download,
@@ -94,6 +95,8 @@ __all__ = [
     'mailbox_page',
     'mailbox_sync',
     'save_quote',
+    'scan_email',
+    'scan_prefill',
     'solicitation_search',
     'add_match',
     'cage_names',

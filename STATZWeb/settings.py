@@ -780,6 +780,10 @@ SAM_OUR_CAGE = os.environ.get(
 TYPESAFE_ENABLED = os.environ.get("TYPESAFE_ENABLED", "False").strip().lower() == "true"
 TYPESAFE_API_KEY = os.environ.get("TYPESAFE_API_KEY", "")
 
+# Quotes mailbox "Scan quote": Claude reads a supplier email + attachments to prefill the Log quote tray.
+# Off = no button and every scan endpoint 404s.
+QUOTE_EMAIL_SCAN_ENABLED = os.environ.get("QUOTE_EMAIL_SCAN_ENABLED", "False").strip().lower() == "true"
+
 # Speed up password hashing in tests (reduces test duration dramatically)
 if IS_TESTING:
     PASSWORD_HASHERS = [

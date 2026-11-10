@@ -46,7 +46,9 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `models/quotes.py` | `QuoteSupplierQuote` (`quote_supplier_quote`) — cost, both adders, packhouse FK, markup, `final_government_unit_price`, `is_selected_for_bid`, `source_email` FK back to the reply it was typed from. `entry` = shared key of the rows one drawer save wrote (a quote as the rep sees it; blank on rows saved before 0010). `landed_unit_cost` is Decimal-only. |
 | `models/packhouse.py` | `QuotePackhouseRFQ` (`quote_packhouse_rfq`) — one row per packhouse per request. `SENT → RESPONDED`. `line` null = every line on the SOL (Combined). Snapshot of what was sent (qty, weight / L / W / H, subject, note, recipients) + what came back (`quoted_unit`, `quoted_total`, `quoted_lead_days`, `response_email`). Deliberately **not** `QuoteRFQ`: it never moves the solicitation status. |
 | `models/bids.py` | `QuoteBid` (`quote_bid`) — OneToOne on `dibbs.SolicitationLine`; the solicitation is reached via `line.solicitation` (no duplicate FK). Every BQ overlay column + `clin_group`. |
-| `models/email.py` | `QuoteEmail` (raw payload, headers, claim), `QuoteEmailAttachment` (bytes), `QuoteEmailSolLink` (many-to-many email ↔ line). |
+| `models/email.py` | `QuoteEmail` (raw payload, headers, claim), `QuoteEmailAttachment` (bytes), `QuoteEmailSolLink` (many-to-many email ↔ line), `QuoteEmailScan` (`quote_email_scan`: one row per Scan quote run: level, status, content hash, validated result / flags JSON, tokens; the feature's only write). |
+| `services/email_scan.py`, `services/email_scan_schema.py` | Mailbox **Scan quote**: `scan_state`, `run_scan` (Normal = Haiku, Deep = Sonnet, through `core.anthropic_client`), `build_prefill` (scan → tray values + flags). The schema file holds the JSON shape, prompts, `validate_extraction` and the tray field map. |
+| `views/email_scan.py`, `static/quote/js/email-scan.js` | `scan_email` (GET state / POST run) and `scan_prefill`; the message-header button + status line. The tray side lives in `quote-drawer.js` (`loadScanPrefill` / `applyScanPrefill`). |
 | `models/outcomes.py` | `BidOutcome` — OneToOne on `QuoteBid`, nullable FK to `dibbs.DibbsAward`, derived deltas, frozen bid snapshot. |
 | `services/matching.py` | `seed_solicitation_states`, `match_solicitations`, `process_import_batch`, `add_manual_match` (+ capability learning and sibling re-match), `remove_manual_match`, `rematch_open_solicitations`. Also `preview_matches` (dry run: what would these capability pairs link?) and `prune_derived_matches` (drop NSN/FSC links no capability supports any more). `_index_lines` / `_wanted_matches` are shared by the real run and the dry run, so a preview can never disagree with the commit. |
 | `services/capabilities.py` | Everything a rep can do to capability lists: `find_items` (NSN/FSC extraction), `read_text` / `read_upload` (paste, CSV, TXT, XLSX -> `Table`), `SupplierResolver` (CAGE / name / alias -> supplier), `detect_mapping`, `build_plan` (dry run, never writes), `plan_to_preview`, `commit_plan`, `remove_capabilities`, `undo_import`, `capability_overview`, `export_rows`. |
@@ -318,6 +320,22 @@ modal). They are now first-class, reachable from both directions:
 9. Back in the part supplier's drawer, a recorded price gets a **Use** button: it selects the
    packhouse and fills the per-unit packaging price (total follows from the normal
    unit ⇄ total wiring). Saving the quote is unchanged (`packaging_vendor`, `packaging_adder_unit`).
+10. **Scan quote** (behind `QUOTE_EMAIL_SCAN_ENABLED`, off by default). A button in the message header
+   sends *this* message's body text plus up to 5 PDF / PNG / JPEG attachments (type sniffed from the
+   bytes; ≤ 10 MB each, 25 MB total) to Claude through `core.anthropic_client` (call site
+   `quote_email_scan`, 100 s timeout, synchronous). First press = **Normal** (Haiku), second = **Deep**
+   (Sonnet, told which tray fields Normal missed), then the button reads "Scanned (Deep)". A failed scan
+   does not advance the level. The reply is JSON text (no tools: forced `tool_choice` is banned on the
+   5.5 models), parsed with `Decimal` and validated against the schema before anything is used.
+   Byte-identical content reuses an earlier completed result at that level (no call). No budget row or a
+   balance ≤ 0 refuses the call. Every run writes one `QuoteEmailScan` row; nothing else is written —
+   **the scan never saves a quote**. When the tray opens on a SOL with no saved quote from that supplier and
+   no draft, `scan_prefill` fills Part #, CAGE, Unit cost (5 dp), Days ARO, MOQ and Terms from the best
+   line item (deep beats normal; the item naming this SOL, else the only item, else on a multi-line SOL
+   the one NSN match) and adds a `Scan: …` line to Notes (validity, FOB, condition, BAA, Mfr / Dealer).
+   Scan-filled fields get a blue ring (amber + tooltip when flagged: line maths, odd CAGE, lead time not
+   plain days, quoted qty ≠ SOL qty, other SOL, NSN mismatch); typing in one clears its marker, and a
+   later scan only fills fields that are empty or still hold the scan value. FOB Origin always warns.
 
 Pricing is **markup on cost**: `price = landed × (1 + pct)`, rounded to cents
 (the approved mockup's formula). In Combined mode packaging/freight totals are
@@ -426,6 +444,9 @@ precedence); reconciliation never calls the SAM API.
 - `quote.services.graph_inbox` — `fetch_inbox_messages()`, `fetch_message_body(id)`,
   `mark_message_read(id)`. On demand, not polled.
 - `dibbs.services.competitor_stats.get_competitor_stats()` — canonical; do not duplicate.
+- `core.anthropic_client.call_anthropic(..., timeout=100)` / `extract_text` and the Haiku / Sonnet
+  constants (lazy import in `services/email_scan.py`); `core.APIBudget` is read, never written, by `quote`.
+  `products.nsn_utils.nsn_query_variants` for the scan's NSN comparison.
 - Packhouse lookup: `Q(is_packhouse=True) | Q(supplier_type__description__iexact='packhouse')`
   as a sort hint, not a filter.
 
@@ -463,6 +484,8 @@ precedence); reconciliation never calls the SAM API.
 | `quote:email_detail` | `/quote/mailbox/<id>/` | XHR fragment (non-XHR redirects to the inbox) |
 | `quote:email_link` / `email_unlink` / `email_set_supplier` / `save_quote` | `/quote/mailbox/<id>/...` | POST, JSON. `save_quote` with `entry=<key>` updates that logged quote (404 if it is not this message's, 409 `{locked: true}` once sent to DIBBS); without `entry` it creates one |
 | `quote:mailbox_sol_search` | `/quote/mailbox/solicitations/?q=` | JSON |
+| `quote:email_scan` | `/quote/mailbox/<id>/scan/` | GET JSON state `{next_level, latest}`; POST `{level: normal\|deep}` → 200 completed, 202 already running, 409 level not allowed, 502 failed `{ok: false, error}`. 404 while `QUOTE_EMAIL_SCAN_ENABLED` is off |
+| `quote:email_scan_prefill` | `/quote/mailbox/<id>/scan/prefill/?sol=&supplier=` | GET JSON tray values; 404 if the SOL is not linked to the message or the flag is off; empty `fields` + `saved_quote: true` when the supplier already quoted that SOL |
 | `quote:bid_board` | `/quote/bids/?tab=needs\|ready\|submitted` | |
 | `quote:compare_quotes` | `/quote/bids/<sol>/compare/` | XHR fragment |
 | `quote:select_quote` | `/quote/quotes/<id>/select/` | POST, JSON |
@@ -580,6 +603,10 @@ remove, enter-a-quote picker, login required),
 rows, in-place update over the quote's own lines, rejected edits change nothing, the lock, bid follow /
 demote rules, re-pick, `save_quote` update path 404 / 409 / 400, Edit buttons, no template syntax
 leaking to the page),
+`test_email_scan.py` (Normal → Deep state machine, failed / in-flight / stale runs, content-hash cache,
+budget refusal, attachment sniffing + skip reasons, the Echelon quote end to end, normalization, flags,
+prefill line picking, prompt-injection framing, endpoints + permission gate, button markup; the wrapper
+is mocked — tests must never call Anthropic),
 `test_mailbox_drawer.py` (attachment sniffing + `attachment_view` rules, View buttons, multi-SOL
 `logged` markers, draft owner, docked drawer markup),
 `test_packhouse.py` (dimension parsing, requirements lookup, message, preview never sends,
@@ -621,6 +648,7 @@ Run `python manage.py test quote dibbs`.
   backfill: older key-less rows are grouped at read time and pinned with a real key on their first edit.
 - `0011_quote_source_channel` — `QuoteSupplierQuote.source_channel` (default EMAIL), `received_on`,
   `contact_name`. Additive only; existing rows read as email quotes with no date.
+- `0012_email_scan` — `QuoteEmailScan` (`quote_email_scan`). Additive only.
 - `products/migrations/0005` added the NSN dimension provenance fields.
 
 ## 17. Known Gaps
@@ -695,6 +723,11 @@ Run `python manage.py test quote dibbs`.
 24. The bid follows an edit only for price, days, margin and status. Other bid fields derived from the
    quote when the bid was created (offered code, manufacturer / dealer, vendor quote #) are not
    re-derived; a changed part number / CAGE is flagged in the save message instead.
+25. Scan quote: the request is base64, so attachments near the 25 MB total exceed Anthropic's ~32 MB
+   request limit and that scan fails ("try again"). Scanned / image-only PDFs depend on the model's
+   vision. The scan is synchronous (up to 100 s holding a worker) and is not exercised on SQL Server
+   yet. Values are read, not computed: a lead time in weeks is converted, anything else (stock, ranges,
+   business days) leaves Days ARO blank with a flag. Freight is never filled.
 
 ## 20. CSS
 Three files repo-wide: `theme-vars.css`, `app-core.css` (shared `.app-shell` /

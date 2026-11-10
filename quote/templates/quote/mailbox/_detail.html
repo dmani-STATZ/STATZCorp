@@ -13,7 +13,8 @@
      data-draft-owner="{{ draft_owner }}"
      data-packhouse-preview-url="{% url 'quote:packhouse_preview' '_SOL_' %}"
      data-packhouse-send-url="{% url 'quote:packhouse_send' '_SOL_' %}"
-     data-packhouse-reply-url="{% url 'quote:packhouse_record_reply' 0 %}">
+     data-packhouse-reply-url="{% url 'quote:packhouse_record_reply' 0 %}"
+     {% if scan_enabled %}data-scan-prefill-url="{% url 'quote:email_scan_prefill' email.pk %}"{% endif %}>
 
   {% if claimed_by_other %}
   <div class="alert alert-warning py-2 mb-2 small">
@@ -40,13 +41,24 @@
         {% endif %}
       </div>
     </div>
-    <div>
-      {# Never disabled: when something is missing, clicking says what and opens the right picker. #}
-      <button type="button" class="btn btn-primary btn-sm" data-action="open-drawer"
-              data-needs="{% if not linked %}sol{% elif not email.supplier %}supplier{% endif %}"
-              title="Log this supplier's quote">
-        <i class="bi bi-lightning-charge-fill"></i> Log supplier quote
-      </button>
+    <div class="quote-msg-actions"{% if scan_enabled %} data-scan-url="{% url 'quote:email_scan' email.pk %}" data-scan-email="{{ email.pk }}"{% endif %}>
+      <div class="d-flex flex-wrap justify-content-end gap-2">
+        {% if scan_enabled %}
+        {# Label and state come from quote:email_scan (static/quote/js/email-scan.js). A scan never saves a quote. #}
+        <button type="button" class="btn btn-outline-primary btn-sm" data-scan-button disabled
+                title="Read this message and its attachments, then fill the quote tray">
+          <span class="spinner-border spinner-border-sm d-none" data-scan-spinner aria-hidden="true"></span>
+          <i class="bi bi-stars" data-scan-icon></i> <span data-scan-label>Scan quote</span>
+        </button>
+        {% endif %}
+        {# Never disabled: when something is missing, clicking says what and opens the right picker. #}
+        <button type="button" class="btn btn-primary btn-sm" data-action="open-drawer"
+                data-needs="{% if not linked %}sol{% elif not email.supplier %}supplier{% endif %}"
+                title="Log this supplier's quote">
+          <i class="bi bi-lightning-charge-fill"></i> Log supplier quote
+        </button>
+      </div>
+      {% if scan_enabled %}<div class="quote-scan-status" data-scan-status aria-live="polite"></div>{% endif %}
     </div>
   </header>
 

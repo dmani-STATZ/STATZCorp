@@ -16,6 +16,7 @@
  *      searchUrl supplier search endpoint
  *      phCtx     shared context for the packhouse panel (see packhouse.js)
  *      onSaved(body) called after a successful save (the page reloads its list / message)
+ *      scanPrefillUrl  (mailbox only) quote:email_scan_prefill for this message; unset = no scan prefill
  */
 (function () {
   'use strict';
@@ -188,8 +189,91 @@
       form.querySelectorAll('.quote-tip').forEach(p => p.classList.toggle('active', p.dataset.pct === pct));
       $('#qCustomWrap').classList.toggle('d-none', pct !== 'custom');
     }
+    // ── Scan prefill (mailbox only, cfg.scanPrefillUrl) ─────────────────────────────────
+    // A message's scan fills a *new* quote for the SOL on screen, never a saved quote or a draft, and
+    // only inputs that are empty (or still hold an earlier, untouched scan value: a deep scan upgrades a
+    // normal one). The marks are DOM-only: not in snapshot(), cleared by resetForm() like everything else.
+    const SCAN_INPUTS = { offered_part_number: '#qPart', offered_cage: '#qCage', unit_cost: '#qCost',
+      lead_time_days: '#qLead', min_order_qty: '#qMoq', payment_terms: '#qTerms' };
+    let scanToken = 0;          // bumped on every reset: a prefill answer for an older form state is dropped
+    let applyingScan = false;
+    function clearScanMarks() {
+      scanToken++;
+      form.querySelectorAll('.quote-scan-filled').forEach(el => {
+        el.classList.remove('quote-scan-filled', 'quote-scan-warn');
+        el.removeAttribute('title');
+        delete el.dataset.scanValue;
+      });
+      const note = $('#qScanNote');
+      if (note) { note.textContent = ''; note.classList.add('d-none'); }
+    }
+    function markScan(el, info) {
+      el.classList.add('quote-scan-filled');
+      el.classList.toggle('quote-scan-warn', !!info.flagged);
+      el.title = info.flagged ? info.message : 'Filled by scan — please verify';
+      el.dataset.scanValue = el.value;
+    }
+    function scanReplaceable(el) {
+      if (el.classList.contains('quote-scan-filled')) return el.value === el.dataset.scanValue;
+      return !el.value.trim() || (el === $('#qCage') && el.value === el.defaultValue);
+    }
+    // Goes in the way a restored draft does (snapshot -> applyDraft -> renderLines), so the preview and
+    // every derived figure follow.
+    function applyScanPrefill(p) {
+      const s = snapshot();
+      const marks = [];
+      Object.keys(SCAN_INPUTS).forEach(name => {
+        const info = (p.fields || {})[name];
+        const sel = SCAN_INPUTS[name];
+        if (!info || !scanReplaceable($(sel))) return;
+        s.f[sel] = info.value;
+        marks.push([sel, info]);
+      });
+      const notes = s.f['#qNotes'] || '';
+      if (p.notes_line) {
+        if (scanReplaceable($('#qNotes'))) { s.f['#qNotes'] = p.notes_line; marks.push(['#qNotes', {}]); }
+        else if (!notes.split('\n').some(l => l.indexOf('Scan:') === 0)) s.f['#qNotes'] = notes.replace(/\s+$/, '') + '\n' + p.notes_line;
+      }
+      const filled = marks.length || s.f['#qNotes'] !== notes;
+      applyingScan = true;
+      applyDraft(s);
+      marks.forEach(([sel, info]) => markScan($(sel), info));
+      renderLines();
+      applyingScan = false;
+      const bits = [];
+      if (filled) bits.push('Filled from the ' + (p.level === 'deep' ? 'deep' : 'normal') + ' scan; check every value before saving.');
+      (p.flags || []).forEach(msg => bits.push(msg));
+      const note = $('#qScanNote');
+      if (!note) return;
+      note.textContent = bits.join(' ');
+      note.classList.toggle('d-none', !bits.length);
+    }
+    // force: re-run after a scan finishes with the tray already in use (a draft may exist; empty inputs
+    // and untouched scan values are still fair game, a saved quote never is).
+    function loadScanPrefill(force) {
+      if (!cfg.scanPrefillUrl || !activeSol || currentCard()) return;
+      if (!force && drafts[activeKey()]) return;
+      const sol = activeSol, token = scanToken;
+      const supplier = form.querySelector('[name="supplier_id"]').value;
+      fetch(cfg.scanPrefillUrl + '?sol=' + encodeURIComponent(sol) + '&supplier=' + encodeURIComponent(supplier),
+        { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => (r.ok && !r.redirected ? r.json() : null))
+        .then(p => {
+          if (!p || token !== scanToken || sol !== activeSol || activeEntry || currentCard()) return;
+          applyScanPrefill(p);
+        })
+        .catch(() => { /* prefill is a convenience: the rep can always type */ });
+    }
+    form.addEventListener('input', e => {
+      if (applyingScan || !e.target.classList || !e.target.classList.contains('quote-scan-filled')) return;
+      e.target.classList.remove('quote-scan-filled', 'quote-scan-warn');
+      e.target.removeAttribute('title');
+      delete e.target.dataset.scanValue;
+    });
+
     // Back to a blank quote for whichever SOL / quote is about to be shown.
     function resetForm() {
+      clearScanMarks();
       TEXT_FIELDS.forEach(sel => { $(sel).value = ''; });
       $('#qCage').value = $('#qCage').defaultValue;
       ['#qPackUnit', '#qPackTotal', '#qFreightUnit', '#qFreightTotal'].forEach(sel => { $(sel).dataset.derived = ''; });
@@ -333,6 +417,7 @@
       applyCardState(card);
       draftNote(draft ? (card ? 'Your unsaved changes were kept' : 'Draft restored') : '');
       if (packhousePanel) packhousePanel.refresh();
+      if (!draft && !card) loadScanPrefill(false);
     }
     // Switching SOL: keep what was typed for the one being left, then show the other's.
     function onSolChange() {
@@ -619,6 +704,7 @@
     return {
       form: form,
       openQuote: openQuote,
+      applyScan: () => loadScanPrefill(true),
       show: () => bootstrap.Offcanvas.getOrCreateInstance(drawerEl).show(),
       hide: () => bootstrap.Offcanvas.getOrCreateInstance(drawerEl).hide(),
     };
