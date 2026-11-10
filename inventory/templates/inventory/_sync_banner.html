@@ -1,0 +1,6 @@
+{% if sync_banner %}
+<div class="alert alert-info inv-sync-banner d-flex align-items-start gap-2" role="status">
+    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+    <div>Inventory is synced from {{ sync_banner.owner }} (last sync {{ sync_banner.applied_at|date:"M j, Y" }}). Changes made here to existing items are overwritten by the next sync unless the spreadsheet is updated too. New items added here are kept.</div>
+</div>
+{% endif %}

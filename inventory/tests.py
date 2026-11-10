@@ -173,8 +173,8 @@ class InventoryDashboardTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         kpis = resp.context['kpis']
         self.assertEqual(kpis['item_count'], 2)
-        self.assertEqual(kpis['total_units'], 2)
-        self.assertAlmostEqual(kpis['total_value'], 20.0)
+        self.assertEqual(kpis['on_hand_units'], 2)
+        self.assertAlmostEqual(kpis['on_hand_value'], 20.0)
         self.assertEqual(kpis['public_count'], 1)
 
     def test_hostile_sort_falls_back_to_default(self):

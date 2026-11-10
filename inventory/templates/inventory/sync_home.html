@@ -1,0 +1,75 @@
+{% extends 'base_template.html' %}
+{% load humanize %}
+
+{% block body %}
+<div class="container-fluid px-3 px-md-4 py-3 inv-sync-page">
+    <div class="page-heading">
+        <div class="d-flex align-items-center gap-3">
+            <span class="icon-tile icon-tile-primary"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
+            <div>
+                <h1 class="page-title">Spreadsheet Sync</h1>
+                <p class="page-subtitle mb-0">Upload the inventory workbook, review the changes, then apply them.</p>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'inventory:sync_export' %}" class="btn btn-outline-brand"><i class="bi bi-file-earmark-arrow-down me-1" aria-hidden="true"></i>Download spreadsheet</a>
+            <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-brand"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Inventory</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <form method="post" action="{% url 'inventory:sync_upload' %}" enctype="multipart/form-data" class="card-body inv-sync-upload">
+            {% csrf_token %}
+            <label for="invSyncFile" class="form-label fw-semibold">Inventory workbook (.xlsx, up to {{ max_upload_mb }} MB)</label>
+            <div class="input-group">
+                <input type="file" id="invSyncFile" name="workbook" class="form-control" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+                <button type="submit" class="btn btn-success"><i class="bi bi-upload me-1" aria-hidden="true"></i>Upload &amp; preview</button>
+            </div>
+            <p class="form-text mb-0">Nothing changes until you review the preview and press Apply. Items added on the Inventory page after your last download are kept.</p>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-header inv-sync-card-header">Recent syncs</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 inv-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">User</th>
+                        <th scope="col">File</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-end">Add</th>
+                        <th scope="col" class="text-end">Update</th>
+                        <th scope="col" class="text-end">Remove</th>
+                        <th scope="col" class="text-end">Kept</th>
+                        <th scope="col" class="text-end">Unchanged</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in runs %}
+                    <tr>
+                        <td class="text-nowrap"><a href="{% url 'inventory:sync_preview' entry.run.id %}">{{ entry.run.created_at|date:"M j, Y g:i A" }}</a></td>
+                        <td>{% if entry.run.created_by %}{{ entry.run.created_by.get_full_name|default:entry.run.created_by.username }}{% else %}—{% endif %}</td>
+                        <td class="inv-desc">{{ entry.run.original_filename|default:"—" }}</td>
+                        <td>{% include 'inventory/_sync_status.html' with status=entry.run.status label=entry.run.get_status_display %}</td>
+                        <td class="text-end inv-num">{{ entry.counts.adds|intcomma }}</td>
+                        <td class="text-end inv-num">{{ entry.counts.updates|intcomma }}</td>
+                        <td class="text-end inv-num">{{ entry.counts.removes|intcomma }}</td>
+                        <td class="text-end inv-num">{{ entry.counts.kept|intcomma }}</td>
+                        <td class="text-end inv-num">{{ entry.counts.unchanged|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-body-secondary py-5">
+                            <i class="bi bi-inbox fs-3 d-block mb-2" aria-hidden="true"></i>
+                            No syncs yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock body %}

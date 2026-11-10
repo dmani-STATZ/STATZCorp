@@ -1,0 +1,249 @@
+{% extends 'base_template.html' %}
+{% load humanize custom_filters %}
+
+{% block body %}
+<div class="container-fluid px-3 px-md-4 py-3 inv-sync-page">
+    <div class="page-heading">
+        <div class="d-flex align-items-center gap-3">
+            <span class="icon-tile icon-tile-primary"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
+            <div>
+                <h1 class="page-title">Spreadsheet Sync</h1>
+                <p class="page-subtitle mb-0">
+                    {{ run.original_filename|default:"Uploaded workbook" }} · {{ run.created_at|date:"M j, Y g:i A" }}
+                    · {% include 'inventory/_sync_status.html' with status=run.status label=run.get_status_display %}
+                </p>
+            </div>
+        </div>
+        <a href="{% url 'inventory:sync_home' %}" class="btn btn-outline-brand"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Spreadsheet Sync</a>
+    </div>
+
+    {% if run.errors %}
+    <div class="alert alert-danger" role="alert">
+        <h2 class="alert-heading fs-6 fw-bold">This file can't be synced. Fix these rows and upload again; nothing was changed.</h2>
+        <ul class="mb-0 inv-sync-messages">
+            {% for error in run.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+    </div>
+    <a href="{% url 'inventory:sync_home' %}" class="btn btn-success"><i class="bi bi-upload me-1" aria-hidden="true"></i>Upload a corrected file</a>
+    {% else %}
+
+    {% if run.status == 'applied' %}
+    <div class="card mb-3 inv-sync-complete">
+        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fs-5 fw-bold mb-1"><i class="bi bi-check-circle-fill inv-sync-complete-icon me-1" aria-hidden="true"></i>Sync complete</h2>
+                <p class="mb-0 text-body-secondary">Applied {{ run.applied_at|date:"M j, Y g:i A" }}. Work from the updated spreadsheet from now on.</p>
+            </div>
+            <a href="{% url 'inventory:sync_export' %}" class="btn btn-success btn-lg"><i class="bi bi-file-earmark-arrow-down me-1" aria-hidden="true"></i>Download updated spreadsheet</a>
+        </div>
+    </div>
+    {% elif run.status == 'discarded' %}
+    <div class="alert alert-secondary d-flex flex-wrap align-items-center justify-content-between gap-2" role="status">
+        <span>This preview was cancelled or replaced by a newer upload. Nothing was changed.</span>
+        <a href="{% url 'inventory:sync_home' %}" class="btn btn-sm btn-outline-secondary">Upload again</a>
+    </div>
+    {% endif %}
+
+    <div class="row row-cols-2 row-cols-md-5 g-3 mb-3">
+        <div class="col">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-success"><i class="bi bi-plus-lg" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Add</span>
+                <span class="kpi-tile-value">{{ counts.adds|intcomma }}</span>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-info"><i class="bi bi-pencil" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Update</span>
+                <span class="kpi-tile-value">{{ counts.updates|intcomma }}</span>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-warning"><i class="bi bi-trash" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Remove</span>
+                <span class="kpi-tile-value">{{ counts.removes|intcomma }}</span>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-primary"><i class="bi bi-shield-check" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Kept</span>
+                <span class="kpi-tile-value">{{ counts.kept|intcomma }}</span>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-primary"><i class="bi bi-dash-circle" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Unchanged</span>
+                <span class="kpi-tile-value">{{ counts.unchanged|intcomma }}</span>
+            </div>
+        </div>
+    </div>
+
+    {% if run.warnings %}
+    <div class="alert alert-warning" role="alert">
+        <ul class="mb-0 inv-sync-messages">
+            {% for warning in run.warnings %}<li>{{ warning }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if run.status == 'preview' %}
+    {% if plan.adds %}
+    <div class="card mb-3">
+        <div class="card-header inv-sync-card-header">Add ({{ counts.adds|intcomma }})</div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 inv-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Row</th>
+                        <th scope="col">NSN</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Part #</th>
+                        <th scope="col" class="text-end">Qty</th>
+                        <th scope="col" class="text-end">Remaining</th>
+                        <th scope="col" class="text-end">Price</th>
+                        <th scope="col">Location</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for add in plan.adds %}
+                    <tr>
+                        <td class="inv-num text-body-secondary">{{ add.row }}</td>
+                        <th scope="row" class="inv-mono text-nowrap">{{ add.nsn|default:"—" }}</th>
+                        <td class="inv-desc">{{ add.description|default:"—" }}</td>
+                        <td class="text-nowrap">{{ add.partnumber|default:"—" }}</td>
+                        <td class="text-end inv-num">{% if add.quantity is None %}—{% else %}{{ add.quantity|intcomma }}{% endif %}</td>
+                        <td class="text-end inv-num">{% if add.quantity_remaining is None %}—{% else %}{{ add.quantity_remaining|intcomma }}{% endif %}</td>
+                        <td class="text-end inv-num">{% if add.purchaseprice is None %}—{% else %}{{ add.purchaseprice|custom_currency }}{% endif %}</td>
+                        <td class="text-nowrap">{{ add.itemlocation|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if updates %}
+    <div class="card mb-3">
+        <div class="card-header inv-sync-card-header">Update ({{ counts.updates|intcomma }})</div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 inv-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Row</th>
+                        <th scope="col">NSN</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Changes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for update in updates %}
+                    <tr>
+                        <td class="inv-num text-body-secondary">{{ update.row }}</td>
+                        <th scope="row" class="inv-mono text-nowrap">{{ update.nsn|default:"—" }}</th>
+                        <td class="inv-desc">{{ update.description|default:"—" }}</td>
+                        <td>
+                            <ul class="inv-sync-changes">
+                                {% for change in update.change_list %}
+                                <li><span class="inv-sync-change-label">{{ change.label }}:</span> {{ change.old }} <i class="bi bi-arrow-right" aria-hidden="true"></i><span class="visually-hidden">to</span> <strong>{{ change.new }}</strong></li>
+                                {% endfor %}
+                            </ul>
+                            {% if update.conflict %}
+                            <span class="badge text-bg-warning mt-1">Changed in STATZWeb after this file was downloaded; the spreadsheet will overwrite it.</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if plan.removes %}
+    <div class="card mb-3">
+        <div class="card-header inv-sync-card-header">Remove ({{ counts.removes|intcomma }})</div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 inv-table">
+                <thead>
+                    <tr>
+                        <th scope="col">NSN</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Part #</th>
+                        <th scope="col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for remove in plan.removes %}
+                    <tr>
+                        <th scope="row" class="inv-mono text-nowrap">{{ remove.nsn|default:"—" }}</th>
+                        <td class="inv-desc">{{ remove.description|default:"—" }}</td>
+                        <td class="text-nowrap">{{ remove.partnumber|default:"—" }}</td>
+                        <td>{% if remove.is_public %}<span class="badge text-bg-danger" title="Currently shown on the public website.">Public</span> <span class="small text-body-secondary">Currently shown on the public website.</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if plan.kept %}
+    <div class="card mb-3">
+        <div class="card-header inv-sync-card-header">Kept ({{ counts.kept|intcomma }})</div>
+        <p class="inv-sync-caption">Added or changed in STATZWeb after this file was downloaded. Kept, and included in your next download.</p>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 inv-table">
+                <thead>
+                    <tr>
+                        <th scope="col">NSN</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Part #</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in plan.kept %}
+                    <tr>
+                        <th scope="row" class="inv-mono text-nowrap">{{ item.nsn|default:"—" }}</th>
+                        <td class="inv-desc">{{ item.description|default:"—" }}</td>
+                        <td class="text-nowrap">{{ item.partnumber|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not has_changes %}
+    <p class="text-body-secondary">The spreadsheet matches the inventory. Applying records this sync and changes no items.</p>
+    {% endif %}
+
+    <div class="card inv-sync-footer">
+        <div class="card-body">
+            {% if ack_required %}
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="invSyncAck" name="acknowledge_removals" value="1" form="invSyncApplyForm" required>
+                <label class="form-check-label fw-semibold" for="invSyncAck">I understand {{ counts.removes|intcomma }} items will be removed.</label>
+            </div>
+            {% endif %}
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+                <form method="post" action="{% url 'inventory:sync_discard' run.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary">Cancel</button>
+                </form>
+                <form method="post" action="{% url 'inventory:sync_apply' run.id %}" id="invSyncApplyForm">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Apply changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock body %}

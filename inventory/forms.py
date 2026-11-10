@@ -47,11 +47,16 @@ class InventoryItemForm(BaseModelForm):
             'manufacturer': 'Manufacturer',
             'itemlocation': 'Location',
             'quantity': 'Quantity',
+            'quantity_remaining': 'Qty Remaining',
             'purchaseprice': 'Unit Price',
             'is_public': 'Show on public website',
         }
+        help_texts = {
+            'quantity_remaining': 'For bulk lots drawn down over time. Leave blank if Quantity is the on-hand count.',
+        }
         widgets = {
             'quantity': forms.NumberInput(attrs={'min': '0', 'step': '1'}),
+            'quantity_remaining': forms.NumberInput(attrs={'min': '0', 'step': '1'}),
             'purchaseprice': forms.NumberInput(attrs={'min': '0', 'step': '0.01'}),
         }
 
@@ -71,6 +76,12 @@ class InventoryItemForm(BaseModelForm):
         value = self.cleaned_data.get('quantity')
         if value is not None and value < 0:
             raise ValidationError('Quantity cannot be negative.')
+        return value
+
+    def clean_quantity_remaining(self):
+        value = self.cleaned_data.get('quantity_remaining')
+        if value is not None and value < 0:
+            raise ValidationError('Qty remaining cannot be negative.')
         return value
 
     def clean_purchaseprice(self):

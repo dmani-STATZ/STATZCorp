@@ -4,15 +4,21 @@ from STATZWeb.decorators import conditional_login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
 from inventory.forms import InventoryItemForm
-from inventory.models import InventoryItem
+from inventory.models import InventoryItem, InventorySyncRun
 from inventory.selectors import (
     VISIBILITY_CHOICES,
     build_item_queryset,
     inventory_kpis,
     normalize_sort,
 )
-from django.http import JsonResponse
+from inventory.sync.apply import apply_run, create_run, discard_run
+from inventory.sync.banner import sync_banner
+from inventory.sync.exporter import XLSX_CONTENT_TYPE, build_export
+from inventory.sync.matcher import display_updates, plan_counts, removal_ack_required
+from inventory.sync.parser import MAX_UPLOAD_BYTES, SyncFileError
+from django.http import HttpResponse, JsonResponse
 
 PER_PAGE_CHOICES = (25, 50, 100)
 DEFAULT_PER_PAGE = 25
@@ -24,6 +30,7 @@ DASHBOARD_COLUMNS = (
     ('manufacturer', 'Manufacturer', ''),
     ('itemlocation', 'Location', ''),
     ('quantity', 'Qty', 'text-end'),
+    ('quantity_remaining', 'Remaining', 'text-end'),
     ('purchaseprice', 'Unit Price', 'text-end'),
     ('totalcost', 'Total', 'text-end'),
     ('is_public', 'Public', 'text-center'),
@@ -102,6 +109,15 @@ def dashboard(request):
         'per_page': per_page,
         'per_page_choices': PER_PAGE_CHOICES,
         'filters_active': bool(q) or vis != 'all',
+        'sync_banner': sync_banner(),
+    })
+
+
+def _render_item_form(request, form, is_edit):
+    return render(request, 'inventory/item_form.html', {
+        'form': form,
+        'is_edit': is_edit,
+        'sync_banner': sync_banner(),
     })
 
 @conditional_login_required
@@ -117,7 +133,7 @@ def add_item(request):
     else:
         form = InventoryItemForm()
     form.fields['nsn'].widget.attrs['autofocus'] = True
-    return render(request, 'inventory/item_form.html', {'form': form, 'is_edit': False})
+    return _render_item_form(request, form, is_edit=False)
 
 @conditional_login_required
 def edit_item(request, pk):
@@ -130,7 +146,7 @@ def edit_item(request, pk):
             return redirect('inventory:dashboard')
     else:
         form = InventoryItemForm(instance=item)
-    return render(request, 'inventory/item_form.html', {'form': form, 'is_edit': True})
+    return _render_item_form(request, form, is_edit=True)
 
 @conditional_login_required
 def delete_item(request, pk):
@@ -139,3 +155,76 @@ def delete_item(request, pk):
         item.delete()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
+
+
+def _sync_runs():
+    return InventorySyncRun.objects.select_related('created_by').defer('file_bytes')
+
+
+@conditional_login_required
+def sync_home(request):
+    runs = list(_sync_runs()[:10])
+    return render(request, 'inventory/sync_home.html', {
+        'runs': [{'run': run, 'counts': plan_counts(run.plan)} for run in runs],
+        'max_upload_mb': MAX_UPLOAD_BYTES // (1024 * 1024),
+    })
+
+
+@conditional_login_required
+@require_POST
+def sync_upload(request):
+    upload = request.FILES.get('workbook')
+    if upload is None:
+        messages.error(request, 'Choose your inventory .xlsx file to upload.')
+        return redirect('inventory:sync_home')
+    try:
+        run = create_run(upload, request.user)
+    except SyncFileError as exc:
+        messages.error(request, str(exc))
+        return redirect('inventory:sync_home')
+    return redirect('inventory:sync_preview', run_id=run.id)
+
+
+@conditional_login_required
+def sync_preview(request, run_id):
+    run = get_object_or_404(_sync_runs(), pk=run_id)
+    plan = run.plan
+    counts = plan_counts(plan)
+    return render(request, 'inventory/sync_preview.html', {
+        'run': run,
+        'plan': plan,
+        'counts': counts,
+        'updates': display_updates(plan),
+        'ack_required': run.status == InventorySyncRun.STATUS_PREVIEW and removal_ack_required(plan),
+        'has_changes': any(counts[key] for key in ('adds', 'updates', 'removes')),
+    })
+
+
+@conditional_login_required
+@require_POST
+def sync_apply(request, run_id):
+    run = get_object_or_404(_sync_runs(), pk=run_id)
+    ok, message = apply_run(run.id, acknowledged=request.POST.get('acknowledge_removals') == '1')
+    if ok:
+        messages.success(request, message)
+    else:
+        messages.error(request, message)
+    return redirect('inventory:sync_preview', run_id=run.id)
+
+
+@conditional_login_required
+@require_POST
+def sync_discard(request, run_id):
+    run = get_object_or_404(_sync_runs(), pk=run_id)
+    discard_run(run)
+    messages.info(request, 'Sync cancelled. Nothing was changed.')
+    return redirect('inventory:sync_home')
+
+
+@conditional_login_required
+def sync_export(request):
+    filename, data = build_export()
+    response = HttpResponse(data, content_type=XLSX_CONTENT_TYPE)
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Cache-Control'] = 'no-store'
+    return response

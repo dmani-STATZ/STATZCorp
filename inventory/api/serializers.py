@@ -1,6 +1,6 @@
 """Explicit allowlist serializer for public inventory items.
 
-Price, cost, and location columns are intentionally never serialized.
+Price, cost, and location columns are intentionally never serialized. `quantity` is on hand.
 """
 
 
@@ -15,5 +15,5 @@ def serialize_public_item(item):
         'description': _text(item.description),
         'part_number': _text(item.partnumber),
         'manufacturer': _text(item.manufacturer),
-        'quantity': item.quantity if item.quantity is not None else 0,
+        'quantity': item.on_hand,
     }

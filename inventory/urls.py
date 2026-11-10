@@ -28,4 +28,10 @@ urlpatterns = [
     path('add/', Inventoryviews.add_item, name='add_item'),
     path('edit/<int:pk>/', Inventoryviews.edit_item, name='edit_item'),
     path('delete-item/<int:pk>/', Inventoryviews.delete_item, name='delete_item'),
+    path('sync/', Inventoryviews.sync_home, name='sync_home'),
+    path('sync/upload/', Inventoryviews.sync_upload, name='sync_upload'),
+    path('sync/export/', Inventoryviews.sync_export, name='sync_export'),
+    path('sync/<int:run_id>/', Inventoryviews.sync_preview, name='sync_preview'),
+    path('sync/<int:run_id>/apply/', Inventoryviews.sync_apply, name='sync_apply'),
+    path('sync/<int:run_id>/discard/', Inventoryviews.sync_discard, name='sync_discard'),
 ]

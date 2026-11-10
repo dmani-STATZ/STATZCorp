@@ -857,6 +857,59 @@ button.bg-transparent.border-none:focus {
     border: 0;
 }
 
+/* Inventory spreadsheet sync */
+.inv-sync-banner .bi {
+    margin-top: 0.125rem;
+}
+
+.inv-sync-card-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.inv-sync-caption {
+    margin: 0;
+    padding: 0.6rem 1rem;
+    color: var(--bs-secondary-color);
+    border-bottom: 1px solid var(--statz-border);
+}
+
+.inv-sync-messages {
+    padding-left: 1.25rem;
+}
+
+.inv-sync-changes {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.inv-sync-change-label {
+    color: var(--bs-secondary-color);
+    font-weight: 600;
+}
+
+.inv-sync-complete {
+    border-color: var(--bs-success-border-subtle);
+    background-color: var(--bs-success-bg-subtle);
+}
+
+.inv-sync-complete-icon {
+    color: var(--bs-success-text-emphasis);
+}
+
+.inv-sync-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background-color: var(--bs-tertiary-bg);
+    border-top: 1px solid var(--statz-border);
+}
+
 .btn-caution {
     --bs-btn-color: var(--bs-body-color);
     --bs-btn-bg: var(--statz-surface);

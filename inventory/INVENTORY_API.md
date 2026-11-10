@@ -55,7 +55,7 @@ resp = requests.get(
 |---|---|---|---|
 | `q` | string | — | Search NSN (dash-agnostic), description, part number, manufacturer |
 | `nsn` | string | — | Exact NSN match, with or without dashes |
-| `in_stock` | `true` | — | `true` → only items with quantity > 0 |
+| `in_stock` | `true` | — | `true` → only items with an on-hand quantity > 0 |
 | `page` | int ≥ 1 | 1 | Pages past the end return an empty `results` list |
 | `page_size` | int ≥ 1 | 50 | Clamped to 200 |
 
@@ -73,7 +73,9 @@ Response `200`:
 }
 ```
 
-Results are ordered by `id`.
+Results are ordered by `nsn`, then `id`, with blank-NSN items last, so rows with the same NSN are adjacent. The order is stable across pages.
+
+**NSN is not unique.** Each row is a separate lot (for example the same part bought at different prices), so one NSN can appear on several results with different `id`s. Use `id` as the key; sum `quantity` across rows if you need a per-NSN total.
 
 ### `GET /api/inventory/v1/items/<id>/`
 
@@ -84,11 +86,11 @@ Response `200`: a single item object (same shape as a `results` entry).
 | Key | Type | Notes |
 |---|---|---|
 | `id` | int | Stable STATZWeb id |
-| `nsn` | string | `""` when unknown |
+| `nsn` | string | `""` when unknown. Not unique (see above) |
 | `description` | string | `""` when unknown |
 | `part_number` | string | `""` when unknown |
 | `manufacturer` | string | `""` when unknown |
-| `quantity` | int | `0` when unknown |
+| `quantity` | int | Quantity **on hand** for this lot (what is left of a bulk lot that is drawn down over time, otherwise the stocked quantity). `0` when unknown |
 
 No pricing, cost, or location data is ever returned.
 

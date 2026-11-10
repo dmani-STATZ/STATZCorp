@@ -382,11 +382,11 @@ File format and validation rules are in `release_notes/README-rn.md`.
 ---
 
 ### `inventory` — Warehouse Stock Ledger
-**Purpose:** Inventory catalog by NSN/description/location/quantity; server-side filtered/sorted/paginated dashboard with KPI cards; AJAX autocomplete; read-only public inventory API for `statzcorp-com`.
+**Purpose:** Inventory catalog by NSN/description/location/quantity (NSN is not unique: each row is a lot); server-side filtered/sorted/paginated dashboard with On-Hand Value KPIs; AJAX autocomplete; two-way spreadsheet sync with Cori's `Inventory_Tracker.xlsx` (upload → preview → apply → download, `/inventory/sync/`); read-only public inventory API for `statzcorp-com` (`quantity` = on hand).
 
-**Owns:** `InventoryItem` (incl. `is_public` opt-in flag), `inventory/selectors.py`, `inventory/api/`
+**Owns:** `InventoryItem` (incl. `is_public` opt-in flag, `quantity_remaining`, `last_modified`), `InventorySyncRun`, `inventory/selectors.py`, `inventory/sync/`, `inventory/api/`
 
-**Consumes from other apps:** `custom_currency` template filter (shared global); `products.nsn_utils.nsn_query_variants` (lazy import in selectors)
+**Consumes from other apps:** `custom_currency` template filter (shared global); `products.nsn_utils.nsn_query_variants` (lazy import in selectors); `contracts.utils.excel_utils` (lazy openpyxl wrapper, imported inside `inventory/sync/` functions)
 
 **Other apps consume from it:** Nothing in-repo. External: `statzcorp-com` calls the API server-to-server.
 

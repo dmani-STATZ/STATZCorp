@@ -18,6 +18,8 @@
         </a>
     </div>
 
+    {% include 'inventory/_sync_banner.html' %}
+
     <div class="row justify-content-center">
         <div class="col-12 col-lg-9 col-xl-8">
             <form method="post" novalidate class="card inv-form" id="invItemForm">
@@ -65,14 +67,14 @@
 
                     <h2 class="inv-form-section">Stock</h2>
                     <div class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label" for="{{ form.itemlocation.id_for_label }}">{{ form.itemlocation.label }}</label>
                             <input type="text" name="itemlocation" id="{{ form.itemlocation.id_for_label }}"
                                    class="form-control{% if form.itemlocation.errors %} is-invalid{% endif %}"
                                    value="{{ form.itemlocation.value|default_if_none:'' }}">
                             {% for error in form.itemlocation.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label" for="{{ form.quantity.id_for_label }}">{{ form.quantity.label }}</label>
                             <input type="number" name="quantity" id="{{ form.quantity.id_for_label }}"
                                    class="form-control{% if form.quantity.errors %} is-invalid{% endif %}"
@@ -80,7 +82,17 @@
                                    value="{{ form.quantity.value|default_if_none:'' }}">
                             {% for error in form.quantity.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label" for="{{ form.quantity_remaining.id_for_label }}">{{ form.quantity_remaining.label }}</label>
+                            <input type="number" name="quantity_remaining" id="{{ form.quantity_remaining.id_for_label }}"
+                                   class="form-control{% if form.quantity_remaining.errors %} is-invalid{% endif %}"
+                                   min="0" step="1" inputmode="numeric"
+                                   aria-describedby="{{ form.quantity_remaining.id_for_label }}_help"
+                                   value="{{ form.quantity_remaining.value|default_if_none:'' }}">
+                            {% for error in form.quantity_remaining.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                            <div class="form-text" id="{{ form.quantity_remaining.id_for_label }}_help">{{ form.quantity_remaining.help_text }}</div>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label" for="{{ form.purchaseprice.id_for_label }}">{{ form.purchaseprice.label }}</label>
                             <div class="input-group has-validation">
                                 <span class="input-group-text">$</span>

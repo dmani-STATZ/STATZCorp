@@ -11,15 +11,21 @@
                 <p class="page-subtitle mb-0">Showing {{ paginator.count|intcomma }} of {{ kpis.item_count|intcomma }} items</p>
             </div>
         </div>
-        <a href="{% url 'inventory:add_item' %}" class="btn btn-outline-brand"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Item</a>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'inventory:sync_home' %}" class="btn btn-outline-brand"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Sync spreadsheet</a>
+            <a href="{% url 'inventory:sync_export' %}" class="btn btn-outline-brand"><i class="bi bi-file-earmark-arrow-down me-1" aria-hidden="true"></i>Download spreadsheet</a>
+            <a href="{% url 'inventory:add_item' %}" class="btn btn-outline-brand"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Item</a>
+        </div>
     </div>
+
+    {% include 'inventory/_sync_banner.html' %}
 
     <div class="row g-3 mb-3">
         <div class="col-6 col-xl-3">
             <div class="card kpi-tile inv-kpi h-100">
                 <span class="icon-tile icon-tile-success"><i class="bi bi-currency-dollar" aria-hidden="true"></i></span>
-                <span class="kpi-tile-label">Total Value</span>
-                <span class="kpi-tile-value">{{ kpis.total_value|custom_currency }}</span>
+                <span class="kpi-tile-label">On-Hand Value</span>
+                <span class="kpi-tile-value">{{ kpis.on_hand_value|custom_currency }}</span>
             </div>
         </div>
         <div class="col-6 col-xl-3">
@@ -32,8 +38,8 @@
         <div class="col-6 col-xl-3">
             <div class="card kpi-tile inv-kpi h-100">
                 <span class="icon-tile icon-tile-info"><i class="bi bi-boxes" aria-hidden="true"></i></span>
-                <span class="kpi-tile-label">Total Units</span>
-                <span class="kpi-tile-value">{{ kpis.total_units|intcomma }}</span>
+                <span class="kpi-tile-label">On-Hand Units</span>
+                <span class="kpi-tile-value">{{ kpis.on_hand_units|intcomma }}</span>
             </div>
         </div>
         <div class="col-6 col-xl-3">
@@ -106,6 +112,7 @@
                         <td>{{ item.manufacturer|default:"—" }}</td>
                         <td class="text-nowrap">{{ item.itemlocation|default:"—" }}</td>
                         <td class="text-end inv-num">{% if item.quantity is None %}—{% else %}{{ item.quantity|intcomma }}{% endif %}</td>
+                        <td class="text-end inv-num">{% if item.quantity_remaining is None %}—{% else %}{{ item.quantity_remaining|intcomma }}{% endif %}</td>
                         <td class="text-end inv-num">{% if item.purchaseprice is None %}—{% else %}{{ item.purchaseprice|custom_currency }}{% endif %}</td>
                         <td class="text-end inv-num">{% if item.totalcost is None %}—{% else %}{{ item.totalcost|custom_currency }}{% endif %}</td>
                         <td class="text-center">
@@ -126,7 +133,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center text-body-secondary py-5">
+                        <td colspan="11" class="text-center text-body-secondary py-5">
                             <i class="bi bi-inbox fs-3 d-block mb-2" aria-hidden="true"></i>
                             {% if filters_active %}No items match your filters.{% else %}No inventory items yet.{% endif %}
                         </td>
