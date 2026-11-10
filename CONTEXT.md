@@ -102,3 +102,11 @@ In-scope mail is from `disa.ogden.eis.mbx.wawfnoreply@mail.mil` with subject `No
 **Report.** `python manage.py find_duplicate_idiqs` is read-only. It lists every group of IDIQs sharing a normalized number with pk, status, created date, drive item flag, and dependent counts.
 
 **Contract search.** `contract_search` (`/contracts/search/`, JSON) also returns IDIQs from `search_idiq_contracts()` in `contracts/services/idiq_search.py`. Matching is `idiq_number_expression()` contains `normalize_idiq_number(query)`, scoped to the active company. Closed IDIQs are included (the contract search has no open/closed filter). Max 25 rows, exact match first, then number; `idiq_total` is the uncapped count. Delivery-order counts come from a subquery, not a join + GROUP BY. There is no `union()` across models. The response is `{results, idiqs, idiq_total, idiq_limit}`; every contract row has `idiq` (`None` or `{id, contract_number, url}`) read through the `idiq_contract` join. The Jump to Contract modal (`contract_base.html`) and the lifecycle dashboard box render an IDIQ panel above the contract rows. The DFAS review picker reads `results` only.
+
+---
+
+## Inventory Dashboard + Public Inventory API (`inventory` app)
+
+**Dashboard.** `/inventory/` is server-side: search (`q`), visibility (`vis` = `all|public|private`), whitelisted sort (`sort`, `dir`), pagination (`page`, `per_page` in 25/50/100). Query logic lives in `inventory/selectors.py` (`build_item_queryset`, `inventory_kpis`). KPI cards come from one `aggregate()` over the whole table. JS is `inventory/static/inventory/js/inventory_dashboard.js`; no inline scripts.
+
+**Public API.** `GET /api/inventory/v1/items/` and `/items/<pk>/` (`inventory/api/`, namespace `inventory_api`) serve `statzcorp-com` server-to-server. Same HMAC scheme as the supplier portal API, separate secrets `INVENTORY_API_KEY` / `INVENTORY_API_HMAC_SECRET`; unset secrets fail closed (401). Only `InventoryItem.is_public=True` rows, and only `id, nsn, description, part_number, manufacturer, quantity`. `/api/inventory/v1/` is in the `LoginRequiredMiddleware` public URL list (`STATZWeb/middleware.py`). Consumer contract: `inventory/INVENTORY_API.md`.

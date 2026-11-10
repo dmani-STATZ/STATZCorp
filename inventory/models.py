@@ -11,13 +11,17 @@ class InventoryItem(models.Model):
     quantity = models.IntegerField(db_column='Quantity', blank=True, null=True)  # Field name made lowercase.
     purchaseprice = models.FloatField(db_column='PurchasePrice', blank=True, null=True)  # Field name made lowercase.
     totalcost = models.FloatField(db_column='TotalCost', blank=True, null=True, editable=False)  # Field name made lowercase.
+    is_public = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'STATZ_WAREHOUSE_INVENTORY_TBL'
 
-        def __str__(self):
-            return self.db_table
+    def __str__(self):
+        return self.nsn or self.description or f'Inventory item {self.pk}'
 
     def save(self, *args, **kwargs):
-        self.totalcost = self.purchaseprice * self.quantity
+        if self.quantity is not None and self.purchaseprice is not None:
+            self.totalcost = self.purchaseprice * self.quantity
+        else:
+            self.totalcost = None
         super().save(*args, **kwargs)

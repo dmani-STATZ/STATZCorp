@@ -121,6 +121,10 @@ urlpatterns = [
         "api/supplier-portal/v1/",
         include("suppliers.portal.urls", namespace="supplier_portal"),
     ),
+    path(
+        "api/inventory/v1/",
+        include("inventory.api.urls", namespace="inventory_api"),
+    ),
     path("reports/", include("reports.urls")),
     path("transactions/", include("transactions.urls")),
     path("core/", include("core.urls")),

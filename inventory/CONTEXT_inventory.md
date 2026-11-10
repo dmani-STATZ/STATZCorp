@@ -1,121 +1,116 @@
 ﻿# Inventory Context
 
 ## 1. Purpose
-The `inventory` app owns the warehouse stock ledger described in `inventory/Inventory Application.md`: it lets staff catalog every part by NSN, description, part number, manufacturer, location, quantity, and purchase price, then keep that catalog up to date with adds, edits, deletions, and autocomplete-assisted data entry while surfacing a single dashboard that shows total inventory value.
+The `inventory` app owns the warehouse stock ledger described in `inventory/Inventory Application.md`: staff catalog every part by NSN, description, part number, manufacturer, location, quantity, and purchase price, keep it current with adds, edits, deletions, and autocomplete-assisted entry, and work from a server-side dashboard with KPI cards. It also serves a read-only, HMAC-signed JSON API so the public site (`statzcorp-com`) can display items staff have opted in. STATZWeb is the only place inventory is maintained.
 
 ## 2. App Identity
 - **Django app name:** `inventory` (see `inventory/apps.py`).
-- **AppConfig:** `InventoryConfig` (inherits from `AppConfig`, sets `verbose_name = 'Inventory Management'`).
+- **AppConfig:** `InventoryConfig` (`verbose_name = 'Inventory Management'`).
 - **Filesystem path:** `inventory/` under the project root.
-- **Classification:** Feature/operational app that powers an end-user inventory management UI anchored at `/inventory/` (included from `STATZWeb/urls.py`).
+- **Classification:** Feature/operational app. UI at `/inventory/`; public API at `/api/inventory/v1/` (both included from `STATZWeb/urls.py`).
 
 ## 3. High-Level Responsibilities
-- Persist the `InventoryItem` row (mapped to the legacy `STATZ_WAREHOUSE_INVENTORY_TBL`) and recalculate `totalcost` whenever a record is saved (`inventory/models.py`).
-- Render an authenticated dashboard that lists every row, formats money via `custom_currency`, lets staff open add/edit forms, and triggers AJAX deletes and client-side sorting (`inventory/views.py`, `inventory/templates/inventory/dashboard.html`).
-- Provide add/edit/delete views with a single `InventoryItemForm` (styling/placeholder mixin) plus jQuery UI autocomplete helpers to populate NSN, description, and manufacturer fields (`inventory/forms.py`, `inventory/templates/inventory/item_form.html`, `inventory/views.py`).
-- Expose autocomplete and delete endpoints that return JSON so the dashboard and form templates can behave smoothly without full page reloads (`inventory/views.py`, `inventory/urls.py`).
-- Register `InventoryItem` in the Django admin so staff can browse the raw table in `/admin` (`inventory/admin.py`).
+- Persist `InventoryItem` (legacy table `STATZ_WAREHOUSE_INVENTORY_TBL`) and recompute `totalcost` on save, null-safe (`inventory/models.py`).
+- Shared query logic for the dashboard and the API (`inventory/selectors.py`).
+- Server-side dashboard: search, visibility filter, whitelisted sort, pagination, KPI cards, modal delete (`inventory/views.py`, `templates/inventory/dashboard.html`, `static/inventory/js/inventory_dashboard.js`).
+- Add/edit/delete views with `InventoryItemForm` plus jQuery UI autocomplete (`forms.py`, `templates/inventory/item_form.html`).
+- Read-only public API for `statzcorp-com` (`inventory/api/`, contract in `inventory/INVENTORY_API.md`).
+- Register `InventoryItem` in Django admin (`admin.py`).
 
 ## 4. Key Files and What They Do
-- `apps.py`: Defines `inventory.apps.InventoryConfig` so the app appears as Inventory Management in admin and config.
-- `models.py`: Declares `InventoryItem` (AutoField `id`, nullable text fields, integer quantity, float purchase price, computed `totalcost`, `Meta.db_table = 'STATZ_WAREHOUSE_INVENTORY_TBL'`, but note `__str__` is indented inside `Meta` and never executes).
-- `forms.py`: Supplies `BaseFormMixin`/`BaseModelForm` for consistent placeholder/class styling plus `InventoryItemForm` that excludes `id`/`totalcost`, wires a `crispy_forms` layout, and tags `nsn`/`description`/`manufacturer` with autocomplete classes.
-- `views.py`: Houses all UI endpoints (dashboard, add/edit/delete, delete AJAX, three autocomplete lookups); most views are wrapped with `@conditional_login_required` from `STATZWeb/decorators.py`.
-- `urls.py`: Maps `/inventory/` to the views above, including separate paths for AJAX deletion plus the autocomplete endpoints.
-- `admin.py`: Registers `InventoryItem` so it appears in Django admin with default options.
-- `templates/inventory/dashboard.html`: Bootstrap-styled dashboard page that lists every inventory row, shows total value, formats money with `custom_currency`, and bundles inline JS for modal deletion + client-side sorting/clear-sorting controls.
-- `templates/inventory/item_form.html`: Custom-styled add/edit form that reuses the same `InventoryItemForm`, applies bespoke row/label markup, and wires jQuery UI autocomplete to the three AJAX endpoints.
-- `templatetags/custom_filters.py`: Defines `custom_currency` filter used to format `purchaseprice`, `totalcost`, and the dashboard total value.
-- `Inventory Application.md`: App-level write-up already describes the CRUD/autocomplete/modals flows—useful reference when revisiting requirements.
-- `migrations/`: Track schema history (initial create, then `0002`/`0003`/`0004` renamed/altered description/purchase price/total cost columns).
+- `models.py`: `InventoryItem` (AutoField `id`, nullable text fields, nullable integer `quantity`, nullable float `purchaseprice`, computed nullable float `totalcost`, `is_public` boolean default `False`). `__str__` returns NSN, else description, else `Inventory item <pk>`.
+- `selectors.py`: `build_item_queryset(q, vis, sort, dir)` (dashboard), `public_items_queryset(q, nsn, in_stock)` (API), `inventory_kpis()` (one `aggregate()`), `normalize_sort()`, and the `SORT_FIELDS` whitelist.
+- `forms.py`: `BaseFormMixin`/`BaseModelForm` plus `InventoryItemForm`. Explicit `Meta.labels`, `form-control` / `form-check-input` widgets (the mixin's placeholders are stripped), and `clean_quantity` / `clean_purchaseprice` rejecting negatives. No crispy helper.
+- `views.py`: dashboard, add/edit/delete, three autocomplete lookups. Every view has `@conditional_login_required`.
+- `urls.py`: UI routes under `/inventory/` (URL names unchanged).
+- `api/auth.py`: `hmac_required` decorator and `authenticate_request` (supplier-portal signing scheme, inventory secrets).
+- `api/serializers.py`: `serialize_public_item` explicit allowlist.
+- `api/views.py`: `item_list`, `item_detail` (GET only, CSRF-exempt, `Cache-Control: no-store`).
+- `api/urls.py`: `app_name = 'inventory_api'`.
+- `templates/inventory/dashboard.html`: Bootstrap 5.3 dashboard (header, KPI cards, GET toolbar, sortable table, pagination, delete modal). No inline JS or CSS.
+- `static/inventory/js/inventory_dashboard.js`: search debounce auto-submit (300 ms), select auto-submit, delete modal + `fetch` POST.
+- `templates/inventory/item_form.html`: add/edit form. Fields are rendered by name (no loop, no label-string comparisons). Autocomplete URLs are `data-autocomplete-url` attributes. No inline script or style.
+- `static/inventory/js/inventory_form.js`: jQuery UI autocomplete (`appendTo` the form) and the live total.
+- `templatetags/custom_filters.py`: `custom_currency`.
+- `INVENTORY_API.md`: consumer contract for the `statzcorp-com` developer.
+- `migrations/`: `0001`–`0004` legacy history; `0005_inventoryitem_is_public` adds `is_public`.
 
 ## 5. Data Model / Domain Objects
-- **`InventoryItem`** maps to the legacy `STATZ_WAREHOUSE_INVENTORY_TBL`. It declares `id` (AutoField), `nsn`, `description`, `partnumber`, `manufacturer`, and `itemlocation` as nullable `CharField`s; `quantity` as nullable `IntegerField`; `purchaseprice` as nullable `FloatField`; and `totalcost` as a nullable `FloatField` that is marked `editable=False` and recalculated in `save()` as `purchaseprice * quantity`.
-- The `save()` override recalculates `totalcost` on every write but does not guard against `None`, so updating with missing `quantity` or `purchaseprice` would raise `TypeError` unless callers validate before saving.
-- The attempted `__str__` method sits inside the `Meta` class definition and therefore never binds to the model; no human-readable string exists unless that indentation is corrected.
-- There are no explicit `ForeignKey`s to other apps; this app solely owns the inventory table and reuses only primitive fields.
+- **`InventoryItem`** → `STATZ_WAREHOUSE_INVENTORY_TBL`. `nsn`, `description`, `partnumber`, `manufacturer`, `itemlocation` are nullable `CharField`s; `quantity` nullable `IntegerField`; `purchaseprice` nullable `FloatField`; `totalcost` nullable `FloatField`, `editable=False`; `is_public` `BooleanField(default=False)` (column `is_public`, no index).
+- `save()` sets `totalcost = purchaseprice * quantity` only when both are non-null; otherwise `totalcost = None`.
+- No foreign keys to other apps.
 
 ## 6. Request / User Flow
-- **Dashboard (`/inventory/` or `/inventory/dashboard`):** `dashboard()` pulls all `InventoryItem` rows, sums `item.quantity * item.purchaseprice` in Python, and renders `dashboard.html`. The template shows the list, total value, and renders the modal+buttons for deletion (AJAX) plus column headers that toggle client-side sorting.
-- **Add item (`/inventory/add/`):** `add_item()` instantiates `InventoryItemForm`. On POST, it saves a new row and redirects back to the dashboard; on GET, it renders `item_form.html` with the form.
-- **Edit item (`/inventory/edit/<pk>/`):** `edit_item()` finds the existing row, pre-fills the form, saves changes on POST, and redirects back.
-- **Delete item (`/inventory/delete-item/<pk>/`):** `delete_item()` requires POST, deletes the row, and returns `{'success': True}`. Dashboard JavaScript hits this path via `fetch` (with CSRF token) after a modal confirmation.
-- **Autocomplete:** Three JSON endpoints (`/autocomplete/nsn/`, `/autocomplete/description/`, `/autocomplete/manufacturer/`) return up to 10 distinct matches based on the search term; the form template mounts them via jQuery UI to power type-ahead inputs.
+- **Dashboard (`/inventory/`, `/inventory/dashboard`):** query params `q` (searches NSN via `nsn_query_variants` plus `icontains` on description, part number, manufacturer, location), `vis` (`all|public|private`), `sort` (whitelist: `nsn, description, partnumber, manufacturer, itemlocation, quantity, purchaseprice, totalcost, is_public`), `dir` (`asc|desc`), `page`, `per_page` (25/50/100, default 25). Unknown values fall back silently (default order `id`; `id` is always the tiebreaker). Invalid `page` → page 1. Page rows are materialized with `list()` before the KPI aggregate runs.
+- **KPIs (whole table):** Total Value (`Sum(quantity * purchaseprice)`), Items, Total Units, Listed Publicly; one `aggregate()`; `None` displays as `0` / `$0.00`.
+- **Add / edit (`/inventory/add/`, `/inventory/edit/<pk>/`):** `InventoryItemForm`. Both pass `is_edit`. A valid save sets the "Item saved." message. Add redirects to the dashboard, or back to the add form when `_addanother` was posted. Edit always returns to the dashboard. Negative quantity or unit price is rejected; blank numbers stay null.
+- **Delete (`POST /inventory/delete-item/<pk>/`):** returns `{'success': True}`; the dashboard modal posts with `X-CSRFToken` and `credentials: 'same-origin'`, reloads on success, shows an inline alert on failure.
+- **Autocomplete:** `/inventory/autocomplete/{nsn,description,manufacturer}/` return up to 10 distinct strings.
+- **Public API:** see section 12 and `INVENTORY_API.md`.
 
 ## 7. Templates and UI Surface Area
-- Templates extend `base_template.html`, so the app inherits the global navigation, scripts, and styles defined in `templates/base_template.html` (which already links to `inventory:dashboard` from the main nav and mobile menu).
-- `dashboard.html` renders a Bootstrap-styled table with columns for every inventory field, a large total value display, and a modal for confirm deletions. Inline `<style>` defines sort-state indicators, and `<script>` handles the modal lifecycle, AJAX delete, and client-side sorting/ordering with a `Clear Sorting` toggle.
-- `item_form.html` renders the same form for both adds and edits. It writes per-field labels (with manual overrides for NSN/Part Number/Location/Purchase Price), styles inputs with custom `.input-field` classes, and initializes autocomplete widgets inside a jQuery `$(document).ready()` block, which implies the base template must load jQuery/jQuery UI.
+- Both templates extend `base_template.html`, which loads Bootstrap 5.3, Bootstrap Icons, jQuery, and jQuery UI globally.
+- `dashboard.html` uses `kpi-tile`/`icon-tile` plus `inv-*` classes in `static/css/app-core.css`. Sort headers and pagination are plain links that preserve all query params. Null cells render `—`. Works in dark mode via Bootstrap/theme variables.
+- The dashboard JS is loaded with `?v={{ cache_version }}` (deployment id). The service worker caches nothing, so no SW bump is needed.
+- `item_form.html` renders every field by name. Labels come from `Meta.labels`. The page header matches the dashboard (`page-heading`, `btn-outline-brand`). `inv-form-*` rules in `app-core.css` style the sections and the autocomplete menu.
 
 ## 8. Admin / Staff Functionality
-`admin.site.register(InventoryItem)` exposes the table through Django’s default admin interface with no customizations beyond the registration listed in `admin.py`.
+`admin.site.register(InventoryItem)` with default options. `is_public` is editable there and on the add/edit form.
 
 ## 9. Forms, Validation, and Input Handling
-- `BaseFormMixin` injects consistent CSS classes and placeholders for text, number, select, textarea, and checkbox widgets when forms instantiate.
-- `InventoryItemForm` extends `BaseModelForm`, excludes `id`/`totalcost`, wires a `crispy_forms.FormHelper` layout that groups fields inside a single `Fieldset` with `Column` widgets, and adds a `Submit` button labeled “Add Item.”
-- The form also tags `nsn`, `description`, and `manufacturer` widgets with `autocomplete-*` CSS classes so the template can attach the correct AJAX source.
-- No custom `clean()` logic exists, so validation relies on the nullable `CharField` and `FloatField` defaults; the save-time multiplication is the only enforcement of `totalcost` integrity.
+- `InventoryItemForm` has no custom `clean()`. Blank quantity/price are allowed and produce `totalcost = None`.
+- Dashboard params are validated in the view/selectors (whitelists). API params are validated in `api/views.py`.
 
 ## 10. Business Logic and Services
-- All business logic lives in `views.py` and `models.py`. `InventoryItem.save()` ensures `totalcost` always equals `purchaseprice * quantity`.
-- `dashboard()` computes `total_inventory_value` by iterating the queryset client-side rather than using Django aggregates, then passes the raw rows to `dashboard.html`.
-- `add_item()`/`edit_item()` reuse `InventoryItemForm`; the views redirect to the dashboard on success.
-- Deletion is handled by `delete_item()` (decorated with `@conditional_login_required`).
-- Autocomplete helpers (`autocomplete_nsn`, `autocomplete_description`, `autocomplete_manufacturer`) use `.values_list(...).distinct()[:10]` to feed the form widgets.
-- There are no separate service, selectors, or Celery modules; `inventory` keeps its logic grouped around these few functions.
+- `selectors.py` holds all list/search/KPI query logic; both the dashboard and the API use it. `nsn_query_variants` is imported lazily inside the selector functions.
 
 ## 11. Integrations and Cross-App Dependencies
-- `STATZWeb/urls.py` includes `inventory.urls` under `/inventory/`, so the app is wired to the main routing tree.
-- Templates extend `templates/base_template.html`, which renders the global navigation entry for Inventory and presumably loads the JS (jQuery, Bootstrap, etc.) that the app’s templates expect.
-- `dashboard`, `add_item`, `edit_item`, and `delete_item` are decorated with `conditional_login_required` from `STATZWeb/decorators.py`, which checks `settings.REQUIRE_LOGIN` before applying Django’s `login_required`. The decorator and views both rely on the `REQUIRE_LOGIN` sentinel documented in `STATZWeb/settings.py`.
-- The form module depends on `crispy_forms` components (`FormHelper`, `Layout`, `Fieldset`, `Column`, `Submit`) to assemble the UI.
-- Templates load `custom_filters` (`custom_currency`), defined locally under `templatetags/custom_filters.py`, to format monetary values.
-- The inline scripts in `item_form.html` assume jQuery UI’s `.autocomplete` is available, so changes to the base template’s JS stack may break the form.
-- AJAX delete code in `dashboard.html` posts to `/inventory/delete-item/<pk>/` and sends the CSRF token, so any changes to CSRF middleware configuration must preserve that contract.
+- `STATZWeb/urls.py` includes `inventory.urls` at `/inventory/` and `inventory.api.urls` at `/api/inventory/v1/` (namespace `inventory_api`).
+- `STATZWeb/middleware.py` `LoginRequiredMiddleware.public_urls` contains `/api/inventory/v1/` (prefix match) so signed API calls are not redirected to login.
+- `STATZWeb/settings.py`: `INVENTORY_API_KEY`, `INVENTORY_API_HMAC_SECRET` (env vars).
+- `products/nsn_utils.py`: `nsn_query_variants()`.
+- `STATZWeb/decorators.py`: `conditional_login_required`.
+- jQuery UI autocomplete. The JS is loaded by `base_template.html` (CDN); this app does not add a script tag for it. `crispy_forms` is not used by this app.
 
 ## 12. URL Surface / API Surface
-- `POST /inventory/delete-item/<pk>/`: Deletes the item and returns `{'success': True}` (`views.delete_item`).
-- `GET /inventory/autocomplete/nsn/`: Returns JSON list of matching NSNs for the add/edit form.
-- `GET /inventory/autocomplete/description/`: Returns JSON list of matching descriptions.
-- `GET /inventory/autocomplete/manufacturer/`: Returns JSON list of matching manufacturers.
-- `GET /inventory/` and `/inventory/dashboard`: Entry dashboard showing the table and total value.
-- `GET /inventory/add/`: Renders the `InventoryItemForm` for new rows; POST saves.
-- `GET /inventory/edit/<pk>/`: Renders the form for an existing row; POST saves edits.
+- `GET /inventory/` and `/inventory/dashboard` — dashboard.
+- `GET|POST /inventory/add/`, `GET|POST /inventory/edit/<pk>/`, `POST /inventory/delete-item/<pk>/`.
+- `GET /inventory/autocomplete/{nsn,description,manufacturer}/`.
+- `GET /api/inventory/v1/items/` — params `q`, `nsn`, `in_stock`, `page`, `page_size` (default 50, max 200). Returns `{count, page, page_size, num_pages, results}`.
+- `GET /api/inventory/v1/items/<pk>/` — one public item, else `404 {"error": "not_found"}`.
+- API errors: 401 `{"error": {"code": "unauthorized", "message": ...}}`; 400 `{"error": "invalid_parameter"}`; 405 `{"error": "method_not_allowed"}` (after auth).
 
 ## 13. Permissions / Security Considerations
-- The key UI flows (`dashboard`, `add_item`, `edit_item`, `delete_item`) are wrapped with `@conditional_login_required`, so they require authentication whenever `settings.REQUIRE_LOGIN` evaluates to `True` (see `STATZWeb/settings.py`).
-- Autocomplete endpoints are **not** decorated, so they respond to any request; they only read and return data.
-- The AJAX delete call in `dashboard.html` posts with `X-CSRFToken` and uses `credentials: 'same-origin'`, so any changes to CSRF middleware configuration must preserve that behavior.
-- `InventoryItem.save()` multiplies `quantity` and `purchaseprice` even though both fields allow `null`, so enforcing non-null input at the form, view, or database level should precede such calculations to avoid `TypeError` explosions.
+- All UI views use `@conditional_login_required`; `LoginRequiredMiddleware` also gates them when `REQUIRE_LOGIN` is on. `inventory` has no `AppRegistry` row, so any logged-in user can open it.
+- API auth: `X-API-Key`, `X-Timestamp`, `X-Signature` = hex HMAC-SHA256 of `METHOD\npath\ntimestamp\nbody` (path without query string; GET signs an empty body). ±300 s window. `hmac.compare_digest` throughout. Unset key or secret → 401 (fail closed). Secrets and signatures are never logged.
+- API exposes only `id, nsn, description, part_number, manufacturer, quantity` for `is_public=True` rows. No CORS headers; `Cache-Control: no-store` on every response.
 
 ## 14. Background Processing / Scheduled Work
-None. No Celery tasks, management commands, signals, or scheduled jobs exist within this app.
+None.
 
 ## 15. Testing Coverage
-`inventory/tests.py` is the default stub with no assertions or test cases, so there is currently zero automated coverage for this app.
+`inventory/tests.py` covers: API public-only filtering, key allowlist, null serialization, auth failures (missing/wrong key, bad signature, stale timestamp → identical 401), fail-closed secrets, 405, 404, page-size clamp / invalid params, `q`/`nsn`/`in_stock` filters, middleware behaviour with `REQUIRE_LOGIN=True` (dashboard + autocomplete redirect, API returns 401), dashboard KPIs / sort fallback / invalid page / visibility filter / param-preserving sort links, null-safe `save()`, `__str__`, the form saving `is_public`, non-negative quantity and price, add vs "Save & add another" redirects, prefilled edit values, and no inline script in the form content.
 
 ## 16. Migrations / Schema Notes
-- Four migrations exist under `inventory/migrations/0001_*` through `0004_*`, showing an initial create plus incremental adjustments to `description`, `purchaseprice`, and `totalcost` columns only a few commits after the initial migration.
-- The schema uses the legacy `STATZ_WAREHOUSE_INVENTORY_TBL`, so any field renames or type changes must maintain compatibility with that table name and the historical migration history.
+- `0001`–`0004` legacy history; `0005_inventoryitem_is_public` is AddField only. Existing rows become `is_public=False`.
+- `purchaseprice`/`totalcost` stay `FloatField`; legacy nullable columns stay as-is.
 
 ## 17. Known Gaps / Ambiguities
-- The `__str__` method is indented under `Meta` in `models.py`, so Django never registers it; the model prints the default `Model.__str__` unless this is realigned.
-- Autocomplete views, despite returning only strings, are unauthenticated and could expose the full set of NSNs/manufacturers unless `REQUIRE_LOGIN` is set at the project level.
-- The dashboard’s total value computation (`sum(item.quantity * item.purchaseprice)`) and the `InventoryItem.save()` multiplication both assume non-null numeric inputs even though the form allows blanks.
+- `purchaseprice`/`totalcost` are floats, so money can carry float rounding; changing to `Decimal` is a schema change on a legacy table.
+- `purchaseprice` and `quantity` are still floats/ints, so the live total is display-only and can differ from a stored `totalcost` by float rounding.
 
 ## 18. Safe Modification Guidance for Future Developers / AI Agents
-- When editing `InventoryItem` fields, keep `totalcost` in sync: update the `save()` override, the form's `exclude`, and any dashboard calculations together.
-- Touching `inventory/templates/inventory/dashboard.html` requires revalidating the inline JS (modal lifecycle, AJAX fetch URL, `clearSort` button) and the `custom_currency` filter; the template relies on the `delete_item` URL name and a CSRF token rendered by Django.
-- The add/edit form depends on jQuery UI’s autocomplete hooks and the three JSON endpoints. If you rename or change those URLs, update the selectors in `item_form.html` and the AJAX views in `views.py` simultaneously.
-- Any changes to authentication should respect `conditional_login_required` and `settings.REQUIRE_LOGIN`; if you need to expose one of the endpoints to other services, decide intentionally whether to decorate it.
-- Because `base_template.html` contributes the navigation entry, update it if you change the app’s URL prefix.
+- Put new list/search logic in `selectors.py` so the dashboard and API stay consistent.
+- Never add price, cost, or location to the API serializer or to `public_items_queryset` search.
+- When adding a sortable dashboard column, add it to `SORT_FIELDS` and `DASHBOARD_COLUMNS` (in `views.py`) and add the matching `<td>` in `dashboard.html`.
+- `base_template.html` links to `inventory:dashboard` twice; keep the URL name.
 
 ## 19. Quick Reference
-- **Primary model:** `InventoryItem` (`inventory/models.py`), tied to `STATZ_WAREHOUSE_INVENTORY_TBL` with computed `totalcost`.
-- **Main URLs:** dashboard (`inventory/dashboard`), add/edit/delete (`inventory/add`, `inventory/edit/<pk>`, `inventory/delete-item/<pk>`), autocomplete endpoints (`inventory/autocomplete/*`).
-- **Key templates:** `inventory/templates/inventory/dashboard.html`, `inventory/templates/inventory/item_form.html`.
-- **Key dependencies:** `STATZWeb/decorators.py` + `settings.REQUIRE_LOGIN`, `templates/base_template.html`, `crispy_forms`, `jQuery UI`, `templatetags/custom_filters.py`.
-- **Risky files to review first:** `inventory/views.py` (decorators, delete + JSON endpoints), `inventory/templates/inventory/dashboard.html` (modal + sorting + AJAX), `inventory/models.py` (save calculation, mis-indented `__str__`).
+- **Model:** `InventoryItem` (`inventory/models.py`).
+- **Selectors:** `inventory/selectors.py`.
+- **API:** `inventory/api/` → `/api/inventory/v1/`; contract `inventory/INVENTORY_API.md`.
+- **Secrets:** `INVENTORY_API_KEY`, `INVENTORY_API_HMAC_SECRET`.
+- **Templates/JS:** `dashboard.html`, `item_form.html`, `static/inventory/js/inventory_dashboard.js`, `static/inventory/js/inventory_form.js`.
 
 
 ## CSS Architecture
@@ -123,7 +118,7 @@ None. No Celery tasks, management commands, signals, or scheduled jobs exist wit
 This project does not use Tailwind in any form. The CSS refactor replaced all Tailwind with Bootstrap 5 and a custom three-file CSS architecture:
 
 - `static/css/theme-vars.css` — CSS custom properties only (color tokens, brand vars, dark mode token overrides when `[data-bs-theme="dark"]` is on `<html>`, as set by `static/js/theme_toggle.js`). Hex values live here. Do not put layout or component styles here.
-- `static/css/app-core.css` — layout, structure, and all component/button/modal styles. References `var()` tokens from `theme-vars.css`. New component classes go here.
+- `static/css/app-core.css` — layout, structure, and all component/button/modal styles. References `var()` tokens from `theme-vars.css`. New component classes go here. Inventory dashboard classes are prefixed `inv-`.
 - `static/css/utilities.css` — utility and helper classes.
 
 **When encountering Tailwind classes in templates:** replace with Bootstrap 5 equivalents or named classes in `app-core.css`. Do not leave Tailwind utility classes in place.

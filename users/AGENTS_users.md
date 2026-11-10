@@ -53,7 +53,7 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 ### Before changing middleware
 - Read `users/middleware.py` completely — `LoginRequiredMiddleware` controls access to every app route
-- Understand the public URL bypass list (`/users/login/`, `/users/microsoft/*`, etc.) before adding to it
+- Understand the public URL bypass list (`/users/login/`, `/users/microsoft/*`, etc.) before adding to it. The list lives in `STATZWeb/middleware.py` (`LoginRequiredMiddleware.public_urls`). Server-to-server HMAC APIs on it: `/api/supplier-portal/` and `/api/inventory/v1/` (entries ending in `/` are prefix matches; keep them that narrow).
 - `ActiveCompanyMiddleware` resolves the active company from settings → session → membership → default; understand the fallback chain before touching it
 
 ### Before changing context processors
@@ -134,7 +134,7 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 - **Never remove `@login_required` or `LoginRequiredMixin`** from any view except the explicitly public auth endpoints (`login_view`, `register`, Microsoft auth views, password reset views).
 - **`permission_denied` view must remain accessible without login** — it is the redirect target for denied access.
-- **`LoginRequiredMiddleware` bypass list is security-critical.** Any addition to the public URL list must be intentional. Wildcard bypasses (`/users/microsoft/*`) exist for a reason — understand the scope before modifying.
+- **`LoginRequiredMiddleware` bypass list is security-critical.** Any addition to the public URL list must be intentional. Wildcard bypasses (`/users/microsoft/*`) exist for a reason — understand the scope before modifying. Current API prefixes: `/api/supplier-portal/` (supplier portal) and `/api/inventory/v1/` (public inventory API); both authenticate with their own HMAC check, so removing either entry turns API calls into login redirects.
 - **`AppPermissionAdmin.save_model()` deletes all existing permissions before recreating them.** This is intentional but dangerous if the form submission is partial. Do not change this flow without understanding the full replace semantics.
 - **`UserOAuthToken` stores access tokens.** Do not add logging, exports, or admin list views that expose `access_token` or `refresh_token` fields.
 - **`portal_events_export_csv`** outputs event data including `is_private` events. Verify the queryset filters correctly by organizer/attendee before changing the export logic.

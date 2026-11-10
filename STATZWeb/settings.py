@@ -499,6 +499,10 @@ SUPPLIER_PORTAL_RATE_LIMIT_PER_MIN = int(
     os.environ.get("SUPPLIER_PORTAL_RATE_LIMIT_PER_MIN", "60") or "60"
 )
 
+# Public inventory API (statzcorp-com server-to-server, read-only)
+INVENTORY_API_KEY = os.environ.get("INVENTORY_API_KEY", "")
+INVENTORY_API_HMAC_SECRET = os.environ.get("INVENTORY_API_HMAC_SECRET", "")
+
 INTERNAL_IPS = ["127.0.0.1", "localhost"]
 
 # Logging configuration - Environment aware

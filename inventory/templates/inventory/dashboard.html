@@ -1,322 +1,197 @@
 {% extends 'base_template.html' %}
-{% load crispy_forms_tags %}
-{% load custom_filters %}
+{% load static humanize custom_filters %}
 
 {% block body %}
-<div class="container-fluid px-3 px-md-4 py-3">
-<div class="page-heading">
-    <div class="d-flex align-items-center gap-3">
-        <span class="icon-tile icon-tile-primary"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
-        <div>
-            <h1 class="page-title">Inventory</h1>
-            <p class="page-subtitle">Stock on hand, locations and value.</p>
+<div class="container-fluid px-3 px-md-4 py-3 inv-dashboard">
+    <div class="page-heading">
+        <div class="d-flex align-items-center gap-3">
+            <span class="icon-tile icon-tile-primary"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
+            <div>
+                <h1 class="page-title">Inventory</h1>
+                <p class="page-subtitle mb-0">Showing {{ paginator.count|intcomma }} of {{ kpis.item_count|intcomma }} items</p>
+            </div>
+        </div>
+        <a href="{% url 'inventory:add_item' %}" class="btn btn-outline-brand"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Item</a>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-xl-3">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-success"><i class="bi bi-currency-dollar" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Total Value</span>
+                <span class="kpi-tile-value">{{ kpis.total_value|custom_currency }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-primary"><i class="bi bi-upc-scan" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Items</span>
+                <span class="kpi-tile-value">{{ kpis.item_count|intcomma }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-info"><i class="bi bi-boxes" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Total Units</span>
+                <span class="kpi-tile-value">{{ kpis.total_units|intcomma }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card kpi-tile inv-kpi h-100">
+                <span class="icon-tile icon-tile-warning"><i class="bi bi-globe2" aria-hidden="true"></i></span>
+                <span class="kpi-tile-label">Listed Publicly</span>
+                <span class="kpi-tile-value">{{ kpis.public_count|intcomma }}</span>
+            </div>
         </div>
     </div>
-    <div class="d-flex align-items-center gap-3 flex-wrap">
-        <div class="inventory-value">
-            <span class="section-kicker d-block mb-0">Total inventory value</span>
-            <span class="inventory-value-amount">{{ total_inventory_value|custom_currency }}</span>
-        </div>
-        <button id="clearSort" class="btn btn-secondary hidden">Clear Sorting</button>
-        <a href="{% url 'inventory:add_item' %}" class="btn btn-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i>Add Item</a>
-    </div>
-</div>
-<div class="card card-padded">
 
-    <div class="overflow-x-auto">
-        <div class="flex justify-end">
-        </div>
-
-        <table class="table table-hover align-middle mb-0 min-w-full">
-            <thead>
-                <tr>
-                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="nsn">
-                        <div class="row">
-                            NSN
-                            <span class="sort-indicator ml-1">↕</span>
-                        </div>
-                    </th>
-                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="description">
-                        <div class="row">
-                            Description
-                            <span class="sort-indicator ml-1">↕</span>
-                        </div>
-                    </th>
-                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="partnumber">
-                        <div class="row">
-                            Part Number
-                            <span class="sort-indicator ml-1">↕</span>
-                        </div>
-                    </th>
-                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="manufacturer">
-                        <div class="row">
-                            Manufacturer
-                            <span class="sort-indicator ml-1">↕</span>
-                        </div>
-                    </th>
-                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="itemlocation">
-                        <div class="row">
-                            Item Location
-                            <span class="sort-indicator ml-1">↕</span>
-                        </div>
-                    </th>
-                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="quantity">
-                        <div class="row">
-                            Quantity
-                            <span class="sort-indicator ml-1">↕</span>
-                        </div>
-                    </th>
-                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="purchaseprice">
-                        <div class="row">
-                            Purchase Price
-                            <span class="sort-indicator ml-1">↕</span>
-                        </div>
-                    </th>
-                    <th class="px-6 py-3 text-left tracking-wider cursor-pointer hover:bg-gray-50 label" scope="col" data-sort="totalcost">
-                        <div class="row">
-                            Total Cost
-                            <span class="sort-indicator ml-1">↕</span>
-                        </div>
-                    </th>
-                    <th class="px-6 py-3 text-left tracking-wider label" scope="col"></th>
-                    <th class="px-6 py-3 text-left tracking-wider label" scope="col"></th>
-                </tr>
-            </thead>
-            <tbody id="inventoryTableBody" class="bg-white divide-y divide-gray-200">
-                {% if items|length == 0 %}
-                <tr class="hover:bg-gray-50">
-                    <th scope="row" class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</th>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
-                </tr>
-                {% endif %}
-
-                {% for item in items %}
-                    <tr class="hover:bg-gray-50">
-                        <th scope="row" class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.nsn }}</th>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.description }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.partnumber }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.manufacturer }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.itemlocation }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.quantity | default:"0" }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.purchaseprice|custom_currency }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.totalcost|custom_currency }}</td>
-                        <td><a href="{% url 'inventory:edit_item' item.id %}" class="btn btn-outline-secondary">Edit</a></td>
-                        <td><button class="btn btn-outline-danger btn-sm" onclick="confirmDelete('{{ item.id }}', '{{ item.nsn }}')">Delete</button></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-</div>
-
-<!-- Modal -->
-<div id="deleteModal" class="fixed z-10 inset-0 overflow-y-auto hidden">
-    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
-        </div>
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
- <div class="card inline-block align-bottom text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                    <div class="mx-auto flex-shrink-0 row h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                        <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </div>
-                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Confirm Deletion</h3>
-                        <div class="mt-2">
-                            <p class="label">Are you sure you want to delete <span id="itemNsn" class="font-bold"></span>? This action cannot be undone.</p>
-                        </div>
-                    </div>
+    <div class="card">
+        <form method="get" action="{% url 'inventory:dashboard' %}" class="inv-toolbar row g-2 align-items-center" id="invFilterForm" role="search">
+            {% for col in columns %}{% if col.active %}
+            <input type="hidden" name="sort" value="{{ col.key }}">
+            <input type="hidden" name="dir" value="{{ col.dir }}">
+            {% endif %}{% endfor %}
+            <div class="col-12 col-md">
+                <label for="invSearch" class="visually-hidden">Search inventory</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                    <input type="search" id="invSearch" name="q" value="{{ q }}" class="form-control" placeholder="Search NSN, description, part #, manufacturer, location" autocomplete="off" data-inv-autosubmit>
                 </div>
             </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button type="button" class="btn btn-delete w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2  text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm" onclick="submitDelete()">Delete</button>
-                <button type="button" class="btn btn-caution mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm" onclick="closeModal()">Cancel</button>
+            <div class="col-6 col-md-auto">
+                <label for="invVis" class="visually-hidden">Visibility</label>
+                <select id="invVis" name="vis" class="form-select" data-inv-autosubmit>
+                    <option value="all" {% if vis == 'all' %}selected{% endif %}>All items</option>
+                    <option value="public" {% if vis == 'public' %}selected{% endif %}>Public only</option>
+                    <option value="private" {% if vis == 'private' %}selected{% endif %}>Private only</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-auto">
+                <label for="invPerPage" class="visually-hidden">Rows per page</label>
+                <select id="invPerPage" name="per_page" class="form-select" data-inv-autosubmit>
+                    {% for n in per_page_choices %}
+                    <option value="{{ n }}" {% if n == per_page %}selected{% endif %}>{{ n }} / page</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-secondary">Apply</button>
+                {% if filters_active %}
+                <a href="{% url 'inventory:dashboard' %}" class="btn btn-link">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 inv-table">
+                <thead>
+                    <tr>
+                        {% for col in columns %}
+                        <th scope="col" class="{{ col.align }}"{% if col.active %} aria-sort="{% if col.dir == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}>
+                            <a href="?{{ col.query }}" class="inv-sort-link{% if col.active %} is-active{% endif %}">
+                                {{ col.label }}
+                                {% if col.active %}<i class="bi bi-caret-{% if col.dir == 'asc' %}up{% else %}down{% endif %}-fill" aria-hidden="true"></i>{% endif %}
+                            </a>
+                        </th>
+                        {% endfor %}
+                        <th scope="col" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <th scope="row" class="inv-mono text-nowrap">{{ item.nsn|default:"—" }}</th>
+                        <td class="inv-desc">{{ item.description|default:"—" }}</td>
+                        <td class="text-nowrap">{{ item.partnumber|default:"—" }}</td>
+                        <td>{{ item.manufacturer|default:"—" }}</td>
+                        <td class="text-nowrap">{{ item.itemlocation|default:"—" }}</td>
+                        <td class="text-end inv-num">{% if item.quantity is None %}—{% else %}{{ item.quantity|intcomma }}{% endif %}</td>
+                        <td class="text-end inv-num">{% if item.purchaseprice is None %}—{% else %}{{ item.purchaseprice|custom_currency }}{% endif %}</td>
+                        <td class="text-end inv-num">{% if item.totalcost is None %}—{% else %}{{ item.totalcost|custom_currency }}{% endif %}</td>
+                        <td class="text-center">
+                            {% if item.is_public %}
+                            <span class="badge text-bg-success">Public</span>
+                            {% else %}
+                            <span class="badge text-bg-secondary">Private</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <a href="{% url 'inventory:edit_item' item.id %}" class="btn btn-sm btn-outline-secondary" title="Edit" aria-label="Edit {{ item.nsn|default:item.id }}"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete {{ item.nsn|default:item.id }}"
+                                    data-inv-delete-url="{% url 'inventory:delete_item' item.id %}"
+                                    data-inv-delete-label="{{ item.nsn|default:item.description|default:item.id }}">
+                                <i class="bi bi-trash" aria-hidden="true"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center text-body-secondary py-5">
+                            <i class="bi bi-inbox fs-3 d-block mb-2" aria-hidden="true"></i>
+                            {% if filters_active %}No items match your filters.{% else %}No inventory items yet.{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if paginator.num_pages > 1 %}
+        <div class="inv-pager d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span class="text-body-secondary small">Rows {{ page_obj.start_index|intcomma }}–{{ page_obj.end_index|intcomma }} of {{ paginator.count|intcomma }}</span>
+            <nav aria-label="Inventory pages">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item{% if not page_obj.has_previous %} disabled{% endif %}">
+                        {% if page_obj.has_previous %}
+                        <a class="page-link" href="?{{ page_query }}&amp;page={{ page_obj.previous_page_number }}" aria-label="Previous"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
+                        {% else %}
+                        <span class="page-link"><i class="bi bi-chevron-left" aria-hidden="true"></i></span>
+                        {% endif %}
+                    </li>
+                    {% for n in page_range %}
+                        {% if n == ellipsis %}
+                        <li class="page-item disabled"><span class="page-link">{{ n }}</span></li>
+                        {% elif n == page_obj.number %}
+                        <li class="page-item active" aria-current="page"><span class="page-link">{{ n }}</span></li>
+                        {% else %}
+                        <li class="page-item"><a class="page-link" href="?{{ page_query }}&amp;page={{ n }}">{{ n }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    <li class="page-item{% if not page_obj.has_next %} disabled{% endif %}">
+                        {% if page_obj.has_next %}
+                        <a class="page-link" href="?{{ page_query }}&amp;page={{ page_obj.next_page_number }}" aria-label="Next"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                        {% else %}
+                        <span class="page-link"><i class="bi bi-chevron-right" aria-hidden="true"></i></span>
+                        {% endif %}
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="invDeleteModal" tabindex="-1" aria-labelledby="invDeleteTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="invDeleteTitle">Delete item</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% csrf_token %}
+                <p class="mb-0">Delete <strong data-inv-delete-name></strong>? This can't be undone.</p>
+                <div class="alert alert-danger mt-3 mb-0 d-none" role="alert" data-inv-delete-error>Couldn't delete the item. Try again.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" data-inv-delete-confirm>Delete</button>
             </div>
         </div>
     </div>
 </div>
 {% endblock body %}
+
 {% block extra_scripts %}
-<style>
-    .sort-indicator {
-        display: inline-block;
-        transition: transform 0.2s;
-    }
-    .sort-asc .sort-indicator {
-        transform: rotate(180deg);
-    }
-    .sort-desc .sort-indicator {
-        transform: rotate(0deg);
-    }
-    th[data-sort] {
-        position: relative;
-    }
-    th[data-sort].sort-asc:after {
-        content: '↑';
-        position: absolute;
-        right: 8px;
-        color: #4A5568;
-    }
-    th[data-sort].sort-desc:after {
-        content: '↓';
-        position: absolute;
-        right: 8px;
-        color: #4A5568;
-    }
-</style>
-
-<script>
-    let deleteItemId = null;
-
-    function confirmDelete(itemId, itemNsn) {
-        console.log("Value passed to confirmDelete:", itemId);
-        deleteItemId = itemId;
-        document.getElementById('itemNsn').innerText = itemNsn;
-        document.getElementById('deleteModal').classList.remove('hidden');
-    }
-
-    function closeModal() {
-        document.getElementById('deleteModal').classList.add('hidden');
-    }
-
-    function submitDelete() {
-        if (deleteItemId) {
-            fetch("{% url 'inventory:delete_item' 0 %}".replace('0', deleteItemId), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                credentials: 'same-origin'
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    location.reload();  // Reload the page to reflect the changes
-                } else {
-                    alert('Failed to delete the item.');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to delete the item.');
-            });
-            closeModal();
-        }
-    }
-
-    // Sorting functionality
-    document.addEventListener('DOMContentLoaded', function() {
-        const tableHeaders = document.querySelectorAll('th[data-sort]');
-        const clearSortButton = document.getElementById('clearSort');
-        let currentSort = null;
-        let originalRows = null;
-
-        // Store the original table order
-        const tbody = document.getElementById('inventoryTableBody');
-        originalRows = Array.from(tbody.querySelectorAll('tr'));
-
-        function clearSortIndicators() {
-            tableHeaders.forEach(header => {
-                header.classList.remove('sort-asc', 'sort-desc');
-            });
-        }
-
-        function restoreOriginalOrder() {
-            const tbody = document.getElementById('inventoryTableBody');
-            tbody.innerHTML = '';
-            originalRows.forEach(row => tbody.appendChild(row.cloneNode(true)));
-            clearSortIndicators();
-            clearSortButton.classList.add('hidden');
-            currentSort = null;
-        }
-
-        function sortTable(column, direction) {
-            const tbody = document.getElementById('inventoryTableBody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-
-            // Skip sorting if there's only one row or it's the empty state row
-            if (rows.length <= 1 || rows[0].querySelector('th').textContent.trim() === '-') {
-                return;
-            }
-
-            const sortedRows = rows.sort((a, b) => {
-                let aVal = a.querySelector(`td:nth-child(${getColumnIndex(column)}), th:nth-child(${getColumnIndex(column)})`).textContent.trim();
-                let bVal = b.querySelector(`td:nth-child(${getColumnIndex(column)}), th:nth-child(${getColumnIndex(column)})`).textContent.trim();
-
-                // Handle numeric values (quantity, prices)
-                if (column === 'quantity') {
-                    aVal = parseInt(aVal) || 0;
-                    bVal = parseInt(bVal) || 0;
-                } else if (column === 'purchaseprice' || column === 'totalcost') {
-                    aVal = parseFloat(aVal.replace(/[^0-9.-]+/g, '')) || 0;
-                    bVal = parseFloat(bVal.replace(/[^0-9.-]+/g, '')) || 0;
-                }
-
-                if (direction === 'asc') {
-                    return aVal > bVal ? 1 : -1;
-                } else {
-                    return aVal < bVal ? 1 : -1;
-                }
-            });
-
-            tbody.innerHTML = '';
-            sortedRows.forEach(row => tbody.appendChild(row));
-        }
-
-        function getColumnIndex(columnName) {
-            const headers = document.querySelectorAll('th[data-sort]');
-            for (let i = 0; i < headers.length; i++) {
-                if (headers[i].getAttribute('data-sort') === columnName) {
-                    return i + 1;
-                }
-            }
-            return 1;
-        }
-
-        tableHeaders.forEach(header => {
-            header.addEventListener('click', () => {
-                const column = header.getAttribute('data-sort');
-                clearSortButton.classList.remove('hidden');
-
-                if (currentSort && currentSort.column === column) {
-                    if (currentSort.direction === 'asc') {
-                        clearSortIndicators();
-                        header.classList.add('sort-desc');
-                        currentSort.direction = 'desc';
-                    } else {
-                        restoreOriginalOrder();
-                        return;
-                    }
-                } else {
-                    clearSortIndicators();
-                    header.classList.add('sort-asc');
-                    currentSort = { column, direction: 'asc' };
-                }
-
-                sortTable(currentSort.column, currentSort.direction);
-            });
-        });
-
-        clearSortButton.addEventListener('click', restoreOriginalOrder);
-    });
-</script>
+<script src="{% static 'inventory/js/inventory_dashboard.js' %}?v={{ cache_version }}"></script>
 {% endblock extra_scripts %}

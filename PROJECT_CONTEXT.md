@@ -382,15 +382,15 @@ File format and validation rules are in `release_notes/README-rn.md`.
 ---
 
 ### `inventory` — Warehouse Stock Ledger
-**Purpose:** Inventory catalog by NSN/description/location/quantity; live value dashboard; AJAX autocomplete.
+**Purpose:** Inventory catalog by NSN/description/location/quantity; server-side filtered/sorted/paginated dashboard with KPI cards; AJAX autocomplete; read-only public inventory API for `statzcorp-com`.
 
-**Owns:** `InventoryItem`
+**Owns:** `InventoryItem` (incl. `is_public` opt-in flag), `inventory/selectors.py`, `inventory/api/`
 
-**Consumes from other apps:** `custom_currency` template filter (shared global)
+**Consumes from other apps:** `custom_currency` template filter (shared global); `products.nsn_utils.nsn_query_variants` (lazy import in selectors)
 
-**Other apps consume from it:** Nothing — standalone
+**Other apps consume from it:** Nothing in-repo. External: `statzcorp-com` calls the API server-to-server.
 
-**URL prefix:** `/inventory/`
+**URL prefix:** `/inventory/`; API `/api/inventory/v1/` (namespace `inventory_api`, HMAC auth, `INVENTORY_API_KEY` / `INVENTORY_API_HMAC_SECRET`, in the `LoginRequiredMiddleware` public URL list). Contract: `inventory/INVENTORY_API.md`.
 
 ---
 

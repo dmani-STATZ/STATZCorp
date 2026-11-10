@@ -64,3 +64,13 @@
 - Date inputs use the native browser calendar indicator only. Never add a
   background-image calendar icon or an `input-group-text` calendar icon next to a
   `type="date"` input.
+
+## Inventory public API (when touching `inventory/api/` or `inventory/selectors.py`)
+- The API serializes only `id`, `nsn`, `description`, `part_number`, `manufacturer`, `quantity` via
+ `serialize_public_item`. Never expand that allowlist without review. Never expose price, cost, or
+ location columns. Never use `model_to_dict` or an all-fields `values()`.
+- Only `is_public=True` rows, via `public_items_queryset()`. It never searches the location column.
+- Auth mirrors `suppliers/portal/auth.py` (same canonical string, 300 s window, 401 body shape) but
+ uses `INVENTORY_API_KEY` / `INVENTORY_API_HMAC_SECRET`. Do not import from `suppliers.*`.
+- No CORS headers. Every API response sends `Cache-Control: no-store`.
+- The `LoginRequiredMiddleware` bypass is the exact prefix `/api/inventory/v1/`. Do not widen it.

@@ -1,177 +1,120 @@
 {% extends 'base_template.html' %}
-{% load crispy_forms_tags %}
-{% block extra_head %}
-    <title>STATZ Corporation - Inventory - Add Item</title>
+{% load static %}
 
-    <style>
-        /* main {
-
-        } */
-
-        .form-container {
-            flex-direction: column;
-            max-width: 800px; /* Set a maximum width */
-            margin: 0 auto; /* Center the container */
-            border-radius: 0.5rem;
-            border: 1px solid #A3BFFA;
-            background-color: #EAEAEA;
-            padding: 1rem;
-        }
-
-        .input-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 2rem;
-            max-width: 800px; /* Set a maximum width */
-            margin: 0 auto; /* Center the container */
-        }
-
-        /* .form-upper-container{
-            height: 50px;
-        } */
-
-        .form-mid-container {
-            background-color: #2268ff;
-            border-radius: 2rem;
-            border: 1px solid #A3BFFA;
-            text-align: center;
-            padding: 1rem;
-        }
-
-        .form-lower-container {
-            padding: 1rem;
-        }
-
-        .input-row {
-            width: 100%;
-            max-width: 600px; /* Ensure rows do not exceed the container's max width */
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            margin-bottom: .5rem;
-        }
-
-        .input-label {
-            color: #1f2937;
-            font-weight: 500;
-            margin-right: 1rem;
-            text-align: right;
-            width: 150px;
-        }
-
-        .input-field {
-            width: 250px;
-            padding: 0.5rem;
-            color: #002561;
-            border: 2px solid #e5e7eb;
-            border-radius: 2rem;
-            transition: all 0.2s;
-        }
-
-        .input-field:focus {
-            outline: none;
-            border-color: #002561;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .input-field:hover {
-            border-color: #60a5fa;
-        }
-
-        .back-button {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.5rem 1rem;
-            margin-bottom: 1rem;
-            color: #374151;
-            background-color: white;
-            border: 1px solid #d1d5db;
-            border-radius: 0.375rem;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-
-        .back-button:hover {
-            color: white;
-            background-color: #374151;
-            border: 1px solid #d1d5db;
-
-        }
-    </style>
-{% endblock %}
 {% block body %}
-<div class="form-container">
-    <div class="form-upper-container">
-        <a href="{% url 'inventory:dashboard' %}" class="back-button">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-            </svg>
-            Go Back
+<div class="container-fluid px-3 px-md-4 py-3 inv-form-page">
+    <div class="page-heading">
+        <div class="d-flex align-items-center gap-3">
+            <span class="icon-tile icon-tile-primary"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
+            <div>
+                <h1 class="page-title">{% if is_edit %}Edit Item{% else %}Add Item{% endif %}</h1>
+                {% if is_edit %}
+                <p class="page-subtitle mb-0">{{ form.instance.nsn|default:"No NSN" }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-brand">
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Inventory
         </a>
     </div>
 
-    <div>
-        <div class=form-mid-container>
-            <h1 class="text-2xl font-bold text-white text-center">Enter New Item</h1>
-        </div>
-
-        <div class="form-lower-container">
-            <form method="POST">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-9 col-xl-8">
+            <form method="post" novalidate class="card inv-form" id="invItemForm">
                 {% csrf_token %}
-                {% for field in form %}
-                <div class="input-row">
-                    <label class="input-label" for="{{ field.id_for_label }}">
-                        {% if field.label == "Nsn" %}
-                            NSN
-                        {% elif field.label == "Partnumber" %}
-                            Part Number
-                        {% elif field.label == "Itemlocation" %}
-                            Item Location
-                        {% elif field.label == "Purchaseprice" %}
-                            Purchase Price
-                        {% else %}
-                            {{ field.label }}
-                        {% endif %} :
-                    </label>
-                    <input type="{% if field.label == 'Purchaseprice' %}number{% else %}{{ field.field.widget.input_type }}{% endif %}"
-                           name="{{ field.name }}"
-                           id="{{ field.id_for_label }}"
-                           class="input-field {% if field.name == 'nsn' %}autocomplete-nsn{% elif field.name == 'description' %}autocomplete-description{% elif field.name == 'manufacturer' %}autocomplete-manufacturer{% endif %}"
-                           {% if field.label == 'Purchaseprice' %}step="0.01"{% endif %}
-                           {% if field.value %}value="{{ field.value }}"{% endif %}>
-                </div>
-                {% endfor %}
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+                    {% endif %}
 
-                <div class="text-center mt-6">
-                    <button type="submit"
-                            class="btn btn-save px-6 py-3 rounded-lg font-medium
-                                   shadow-md hover:shadow-lg transition-all duration-200">
-                        Save Item
-                    </button>
+                    <h2 class="inv-form-section">Part Details</h2>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.nsn.id_for_label }}">{{ form.nsn.label }}</label>
+                            <input type="text" name="nsn" id="{{ form.nsn.id_for_label }}"
+                                   class="form-control autocomplete-nsn{% if form.nsn.errors %} is-invalid{% endif %}"
+                                   value="{{ form.nsn.value|default_if_none:'' }}"
+                                   data-autocomplete-url="{% url 'inventory:autocomplete_nsn' %}"
+                                   {% if not is_edit %}autofocus{% endif %}>
+                            {% for error in form.nsn.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.partnumber.id_for_label }}">{{ form.partnumber.label }}</label>
+                            <input type="text" name="partnumber" id="{{ form.partnumber.id_for_label }}"
+                                   class="form-control{% if form.partnumber.errors %} is-invalid{% endif %}"
+                                   value="{{ form.partnumber.value|default_if_none:'' }}">
+                            {% for error in form.partnumber.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                            <input type="text" name="description" id="{{ form.description.id_for_label }}"
+                                   class="form-control autocomplete-description{% if form.description.errors %} is-invalid{% endif %}"
+                                   value="{{ form.description.value|default_if_none:'' }}"
+                                   data-autocomplete-url="{% url 'inventory:autocomplete_description' %}">
+                            {% for error in form.description.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.manufacturer.id_for_label }}">{{ form.manufacturer.label }}</label>
+                            <input type="text" name="manufacturer" id="{{ form.manufacturer.id_for_label }}"
+                                   class="form-control autocomplete-manufacturer{% if form.manufacturer.errors %} is-invalid{% endif %}"
+                                   value="{{ form.manufacturer.value|default_if_none:'' }}"
+                                   data-autocomplete-url="{% url 'inventory:autocomplete_manufacturer' %}">
+                            {% for error in form.manufacturer.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <h2 class="inv-form-section">Stock</h2>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="{{ form.itemlocation.id_for_label }}">{{ form.itemlocation.label }}</label>
+                            <input type="text" name="itemlocation" id="{{ form.itemlocation.id_for_label }}"
+                                   class="form-control{% if form.itemlocation.errors %} is-invalid{% endif %}"
+                                   value="{{ form.itemlocation.value|default_if_none:'' }}">
+                            {% for error in form.itemlocation.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="{{ form.quantity.id_for_label }}">{{ form.quantity.label }}</label>
+                            <input type="number" name="quantity" id="{{ form.quantity.id_for_label }}"
+                                   class="form-control{% if form.quantity.errors %} is-invalid{% endif %}"
+                                   min="0" step="1" inputmode="numeric"
+                                   value="{{ form.quantity.value|default_if_none:'' }}">
+                            {% for error in form.quantity.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="{{ form.purchaseprice.id_for_label }}">{{ form.purchaseprice.label }}</label>
+                            <div class="input-group has-validation">
+                                <span class="input-group-text">$</span>
+                                <input type="number" name="purchaseprice" id="{{ form.purchaseprice.id_for_label }}"
+                                       class="form-control{% if form.purchaseprice.errors %} is-invalid{% endif %}"
+                                       min="0" step="0.01" inputmode="decimal"
+                                       value="{{ form.purchaseprice.value|default_if_none:'' }}">
+                                {% for error in form.purchaseprice.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <p class="inv-form-total">Total value <strong id="invFormTotal">—</strong></p>
+
+                    <h2 class="inv-form-section">Website</h2>
+                    <div class="form-check form-switch">
+                        {{ form.is_public }}
+                        <label class="form-check-label" for="{{ form.is_public.id_for_label }}">{{ form.is_public.label }}</label>
+                    </div>
+                    {% for error in form.is_public.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    <p class="form-text mb-0">Public listings show NSN, description, part number, manufacturer and quantity. Price and location are never shown.</p>
+                </div>
+                <div class="card-footer inv-form-footer">
+                    <a href="{% url 'inventory:dashboard' %}" class="btn btn-secondary">Cancel</a>
+                    {% if not is_edit %}
+                    <button type="submit" name="_addanother" class="btn btn-outline-brand">Save &amp; add another</button>
+                    {% endif %}
+                    <button type="submit" class="btn btn-success">Save Item</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 {% endblock body %}
+
 {% block extra_scripts %}
-<script>
-    $(document).ready(function() {
-        $(".autocomplete-nsn").autocomplete({
-            source: "{% url 'inventory:autocomplete_nsn' %}",
-            minLength: 1
-        });
-
-        $(".autocomplete-description").autocomplete({
-            source: "{% url 'inventory:autocomplete_description' %}",
-            minLength: 1
-        });
-
-        $(".autocomplete-manufacturer").autocomplete({
-            source: "{% url 'inventory:autocomplete_manufacturer' %}",
-            minLength: 1
-        });
-    });
-</script>
+<script src="{% static 'inventory/js/inventory_form.js' %}?v={{ cache_version }}"></script>
 {% endblock extra_scripts %}
