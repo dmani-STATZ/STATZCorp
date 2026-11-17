@@ -122,6 +122,7 @@ class ClinShipmentAdmin(admin.ModelAdmin):
                     'quote_value', 'item_value', 'paid_amount', 'wawf_payment']
     list_filter = ['ship_date']
     search_fields = ['clin__item_number', 'clin__contract__contract_number']
+    readonly_fields = ['paid_amount', 'wawf_payment', 'quote_value', 'item_value']
 
 
 @admin.register(FinanceLineType)

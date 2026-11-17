@@ -272,12 +272,15 @@ class ShipmentLabelTests(TestCase):
         self.assertEqual(shipment.paid_amount, Decimal("3.00"))
         self.assertEqual(shipment.wawf_payment, Decimal("4.00"))
         ct = ContentType.objects.get_for_model(ClinShipment)
-        self.assertFalse(
-            Transaction.objects.filter(
-                content_type=ct,
-                object_id=shipment.pk,
-                field_name__in=["quote_value", "item_value"],
-            ).exists()
+        self.assertEqual(
+            set(
+                Transaction.objects.filter(
+                    content_type=ct,
+                    object_id=shipment.pk,
+                    field_name__in=["ship_qty", "quote_value", "item_value"],
+                ).values_list("field_name", flat=True)
+            ),
+            {"ship_qty", "quote_value", "item_value"},
         )
 
     def test_unchanged_qty_leaves_stored_money_alone(self):

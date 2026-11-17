@@ -36,6 +36,90 @@ def _format_audit_pod_date(value):
 PAYMENT_ACTIVITY_PAGE_SIZE = 50
 
 
+def payment_activity_queryset(contract):
+    """PaymentHistory rows for the contract, its CLINs, and its CLINs' shipments."""
+    ct_contract = ContentType.objects.get_for_model(Contract)
+    ct_clin = ContentType.objects.get_for_model(Clin)
+    ct_shipment = ContentType.objects.get_for_model(ClinShipment)
+    return PaymentHistory.objects.filter(
+        Q(content_type=ct_contract, object_id=contract.id)
+        | Q(
+            content_type=ct_clin,
+            object_id__in=Clin.objects.filter(contract=contract).values('id'),
+        )
+        | Q(
+            content_type=ct_shipment,
+            object_id__in=ClinShipment.objects.filter(clin__contract=contract).values('id'),
+        )
+    ).order_by('-payment_date', '-created_on')
+
+
+def build_payment_activity(contract, raw_page):
+    """Return (rows, page_obj, total_count) for the Payment Activity panel.
+
+    Query count does not depend on the number of CLINs, shipments, or rows.
+    """
+    ct_contract = ContentType.objects.get_for_model(Contract)
+    ct_clin = ContentType.objects.get_for_model(Clin)
+    ph_base = payment_activity_queryset(contract)
+    total_count = ph_base.count()
+    paginator = Paginator(ph_base, PAYMENT_ACTIVITY_PAGE_SIZE)
+    page_obj = None
+    if paginator.num_pages > 0:
+        try:
+            page_obj = paginator.page(raw_page)
+        except PageNotAnInteger:
+            page_obj = paginator.page(1)
+        except EmptyPage:
+            page_obj = paginator.page(paginator.num_pages)
+
+    rows = []
+    if page_obj is None:
+        return rows, page_obj, total_count
+
+    entries = list(page_obj.object_list)
+    clin_item_by_id = dict(
+        Clin.objects.filter(contract=contract).values_list('id', 'item_number')
+    )
+    shipment_label_by_id = {}
+    if any(e.content_type_id not in (ct_contract.id, ct_clin.id) for e in entries):
+        shipments_by_clin = defaultdict(list)
+        for shipment in ClinShipment.objects.filter(clin__contract=contract):
+            shipments_by_clin[shipment.clin_id].append(shipment)
+        for clin_id, shipments in shipments_by_clin.items():
+            item_no = clin_item_by_id.get(clin_id, '')
+            for shipment in label_shipments(shipments):
+                shipment_label_by_id[shipment.id] = (
+                    f'CLIN {item_no} · {shipment.display_label}'
+                )
+
+    for entry in entries:
+        if entry.content_type_id == ct_contract.id:
+            entity_label = 'Contract'
+            entity_type = 'contract'
+        elif entry.content_type_id == ct_clin.id:
+            item_no = clin_item_by_id.get(entry.object_id, '')
+            entity_label = f'CLIN {item_no}' if item_no != '' else f'CLIN {entry.object_id}'
+            entity_type = 'clin'
+        else:
+            entity_label = shipment_label_by_id.get(
+                entry.object_id, f'Shipment {entry.object_id}'
+            )
+            entity_type = 'clinshipment'
+        rows.append({
+            'entity_label': entity_label,
+            'field_label': entry.get_payment_type_display(),
+            'amount': entry.payment_amount,
+            'payment_date': entry.payment_date,
+            'note_text': entry.payment_info or '',
+            'entity_type': entity_type,
+            'entity_id': entry.object_id,
+            'payment_type': entry.payment_type,
+            'current_value': float(entry.payment_amount),
+        })
+    return rows, page_obj, total_count
+
+
 def build_finance_audit_supplier_groups(clins_list, level_charges):
     """Group Finance Audit CLINs and level charges by supplier with subtotals."""
     main_supplier = None
@@ -280,49 +364,9 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 context['shipments_by_clin'] = shipments_by_clin
                 context['shipment_subtotals_by_clin'] = shipment_subtotals_by_clin
 
-                ct_contract = ContentType.objects.get_for_model(Contract)
-                ct_clin = ContentType.objects.get_for_model(Clin)
-                clin_ids = list(clins_qs.values_list('id', flat=True))
-                clin_item_by_id = dict(clins_qs.values_list('id', 'item_number'))
-
-                ph_base = PaymentHistory.objects.filter(
-                    Q(content_type=ct_contract, object_id=self.object.id)
-                    | Q(content_type=ct_clin, object_id__in=clin_ids)
-                ).order_by('-payment_date', '-created_on')
-
-                total_count = ph_base.count()
-                paginator = Paginator(ph_base, PAYMENT_ACTIVITY_PAGE_SIZE)
-                raw_page = self.request.GET.get('pa_page', '1')
-                page_obj = None
-                if paginator.num_pages > 0:
-                    try:
-                        page_obj = paginator.page(raw_page)
-                    except PageNotAnInteger:
-                        page_obj = paginator.page(1)
-                    except EmptyPage:
-                        page_obj = paginator.page(paginator.num_pages)
-
-                payment_activity_rollup = []
-                if page_obj is not None:
-                    for entry in page_obj.object_list:
-                        if entry.content_type_id == ct_contract.id:
-                            entity_label = 'Contract'
-                            entity_type = 'contract'
-                        else:
-                            item_no = clin_item_by_id.get(entry.object_id, '')
-                            entity_label = f'CLIN {item_no}' if item_no != '' else f'CLIN {entry.object_id}'
-                            entity_type = 'clin'
-                        payment_activity_rollup.append({
-                            'entity_label': entity_label,
-                            'field_label': entry.get_payment_type_display(),
-                            'amount': entry.payment_amount,
-                            'payment_date': entry.payment_date,
-                            'note_text': entry.payment_info or '',
-                            'entity_type': entity_type,
-                            'entity_id': entry.object_id,
-                            'payment_type': entry.payment_type,
-                            'current_value': float(entry.payment_amount),
-                        })
+                payment_activity_rollup, page_obj, total_count = build_payment_activity(
+                    self.object, self.request.GET.get('pa_page', '1'),
+                )
 
                 context['payment_activity_rollup'] = payment_activity_rollup
                 context['payment_activity_page'] = page_obj
@@ -475,16 +519,7 @@ def finance_audit_summary_api(request, contract_id):
 
         grouped = build_finance_audit_supplier_groups(clins_list, level_charges)
 
-        ct_contract = ContentType.objects.get_for_model(Contract)
-        ct_clin = ContentType.objects.get_for_model(Clin)
-        clin_ids = list(Clin.objects.filter(contract=contract).values_list('id', flat=True))
-
-        ph_base = PaymentHistory.objects.filter(
-            Q(content_type=ct_contract, object_id=contract.id)
-            | Q(content_type=ct_clin, object_id__in=clin_ids)
-        ).order_by('-payment_date', '-created_on')
-
-        total_count = ph_base.count()
+        total_count = payment_activity_queryset(contract).count()
 
         return JsonResponse({
             'finance_costs_total': str(finance_costs_total),

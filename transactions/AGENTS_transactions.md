@@ -128,6 +128,8 @@ This is a **glue/audit app** — thin in domain logic, but structurally fragile 
 - `Transaction` records, including their notes, are historical audit data. `TransactionAdmin` has `readonly_fields` — do not convert those to editable without explicit intent.
 - `_fk_choices` queries the database for FK option lists capped at 500 rows. Removing the cap risks slow page loads for large tables.
 - The edit endpoint accepts arbitrary `field_name` via URL but validates it against `model._meta.get_field()` and `get_field_info()` before proceeding — this guard must be preserved.
+- **`EDITABLE_FIELDS` allowlist (Stage 7a):** the first check in `transaction_edit_field` is `(ct.app_label, ct.model, field_name) in EDITABLE_FIELDS`; anything else is 400 "This field cannot be edited here." To expose a new field, add the `openTransactionsEditModal(...)` button and its triple to `EDITABLE_FIELDS` in the same commit. Never build the allowlist dynamically, never widen it to a whole model, and never add `Contract.files_url` or any auth/user field.
+- CLIN `paid_amount` / `wawf_payment` are rejected (400) when the CLIN has shipments. Shipments are the payment source of truth there; do not remove this guard.
 
 ---
 

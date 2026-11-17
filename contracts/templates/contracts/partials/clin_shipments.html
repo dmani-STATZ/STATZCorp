@@ -15,12 +15,7 @@
     <h2 class="section-header cursor-pointer row-between">
         <span>Shipping Information <span class="text-sm text-gray-500">(Click to expand)</span></span>
         {% if mode == 'form' %}
-        <button type="button"
-                class="ml-auto btn btn-sm btn-outline-secondary js-open-clin-shipments-popup"
-                data-clin-id="{{ clin.id }}"
-                data-popup-url="{% url 'contracts:clin_shipments_popup' clin.id %}?add=1">
-            Add New Shipment
-        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary js-open-clin-shipments-popup" data-clin-id="{{ clin.id }}" data-popup-url="{% url 'contracts:clin_shipments_popup' clin.id %}">Manage shipments</button>
         {% endif %}
     </h2>
     <div class="overflow-x-auto">

@@ -1,16 +1,23 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.views.decorators.csrf import csrf_exempt
 import json
 import logging
+from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from django.db.models import Count, Max, Q, Sum
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
 
 from STATZWeb.decorators import conditional_login_required
-from ..models import Clin, ClinShipment
+from ..models import Clin, ClinShipment, PaymentHistory
 from ..services.pod_status import compute_pod_status
+from ..services.shipment_payments import (
+    CENT,
+    recompute_clin_payment_rollup,
+    set_shipment_payment_total,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,20 +125,31 @@ def clin_pod_complete_api(request, clin_id):
     return _pod_complete_success(clin, value)
 
 
-def _recompute_clin_payment_rollup(clin, user):
-    """Set CLIN paid_amount / wawf_payment from the SUM of its shipments' stored
-    columns (Layer A cascade). Only meaningful for CLINs that have shipments;
-    callers invoke this after any shipment paid/customer-pay change. CLINs with
-    no shipments are NOT touched here (their stored columns remain user-managed
-    until conversion)."""
-    agg = clin.shipments.aggregate(
-        paid=Sum('paid_amount'),
-        wawf=Sum('wawf_payment'),
+_recompute_clin_payment_rollup = recompute_clin_payment_rollup
+
+MONEY_TOTAL_FIELDS = {
+    'paid_amount_total': ('paid_amount', 'Paid'),
+    'wawf_payment_total': ('wawf_payment', 'Customer Pay'),
+}
+MAX_MONEY_INTEGER_DIGITS = 13
+
+
+def _parse_money_total(raw, label):
+    """Return a non-negative Decimal with at most 2 places, or raise ValueError."""
+    error = ValueError(
+        f'{label} must be a number of 0 or more with at most 2 decimal places.'
     )
-    clin.paid_amount = agg['paid'] or Decimal('0.00')
-    clin.wawf_payment = agg['wawf'] or Decimal('0.00')
-    clin.modified_by = user
-    clin.save(update_fields=['paid_amount', 'wawf_payment', 'modified_by', 'modified_on'])
+    if isinstance(raw, bool) or raw is None:
+        raise error
+    try:
+        value = Decimal(str(raw).strip())
+    except (InvalidOperation, ValueError):
+        raise error
+    if not value.is_finite() or value < 0 or value.as_tuple().exponent < -2:
+        raise error
+    if value >= Decimal(10) ** MAX_MONEY_INTEGER_DIGITS:
+        raise ValueError(f'{label} is too large.')
+    return value.quantize(CENT)
 
 
 @csrf_exempt
@@ -230,6 +248,10 @@ def update_shipment_name(request, shipment_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+def _money(value):
+    return Decimal(str(value)).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
 def _decimal_qty_differs(old, new):
     """True when two ship quantities are not the same Decimal value."""
     if old is None:
@@ -247,6 +269,17 @@ def update_shipment(request, shipment_id):
         if not company:
             return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
         shipment = get_object_or_404(ClinShipment, id=shipment_id, clin__contract__company=company)
+
+        money_totals = {}
+        for key, (field, label) in MONEY_TOTAL_FIELDS.items():
+            if key in data:
+                try:
+                    money_totals[field] = _parse_money_total(data[key], label)
+                except ValueError as exc:
+                    return JsonResponse(
+                        {'success': False, 'error': str(exc), 'field': key},
+                        status=400,
+                    )
 
         # Update shipment fields
         if 'name' in data:
@@ -270,17 +303,25 @@ def update_shipment(request, shipment_id):
             qv = data['quote_value']
             shipment.quote_value = Decimal(str(qv)) if qv not in (None, '') else None
         elif qty_changed and shipment.clin.price_per_unit is not None:
-            shipment.quote_value = shipment.auto_quote_value
+            shipment.quote_value = _money(shipment.auto_quote_value)
         if 'item_value' in data:
             iv = data['item_value']
             shipment.item_value = Decimal(str(iv)) if iv not in (None, '') else None
         elif qty_changed and shipment.clin.unit_price is not None:
-            shipment.item_value = shipment.auto_item_value
+            shipment.item_value = _money(shipment.auto_item_value)
 
-        shipment.modified_by = request.user
-        shipment.save()
+        with transaction.atomic():
+            shipment.modified_by = request.user
+            shipment.save()
 
-        _sync_clin_ship_fields(shipment.clin, request.user)
+            payment_changed = False
+            for field, target in money_totals.items():
+                if set_shipment_payment_total(shipment, field, target, request.user):
+                    payment_changed = True
+
+            _sync_clin_ship_fields(shipment.clin, request.user)
+            if payment_changed:
+                recompute_clin_payment_rollup(shipment.clin, request.user)
 
         return JsonResponse({
             'success': True
@@ -299,8 +340,16 @@ def delete_shipment(request, shipment_id):
     try:
         shipment = get_object_or_404(ClinShipment, id=shipment_id)
         clin = shipment.clin
-        shipment.delete()
-        _sync_clin_ship_fields(clin, request.user)
+        with transaction.atomic():
+            ledger_rows = list(PaymentHistory.objects.filter(
+                content_type=ContentType.objects.get_for_model(ClinShipment),
+                object_id=shipment.pk,
+            ))
+            for row in ledger_rows:
+                row.delete()
+            shipment.delete()
+            _sync_clin_ship_fields(clin, request.user)
+            recompute_clin_payment_rollup(clin, request.user)
 
         return JsonResponse({
             'success': True

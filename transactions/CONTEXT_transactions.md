@@ -23,7 +23,7 @@ Track field-level edits for a handful of auditable models and surface that histo
 - `urls.py`: Namespaced `transactions` routes under `/transactions/...` for list, detail, edit, and field-info endpoints.
 - `field_types.py`: Computes widget type (`WIDGET_*` constants) plus optional choices (booleans, ForeignKeys, fields with `choices`), limiting FK choice lists to 500 rows for performance.
 - `utils.py`: Provides `get_field_value_display`, `set_field_value` (coercion for dates, FKs, numbers, booleans), and `get_display_value` for rendering updated values.
-- `signals.py`: Defines `TRACKED` `(model_class, field_name)` tuples for `Contract`, `Clin`, `ClinShipment` (currently `pod_date`), and `Supplier`; stores pre-save state via `contextvars` and creates `Transaction` rows post-save when the serialized old value differs from the new.
+- `signals.py`: Defines `TRACKED` `(model_class, field_name)` tuples for `Contract`, `Clin`, `ClinShipment` (`ship_qty`, `ship_date`, `quote_value`, `item_value`, `pod_date`), and `Supplier`; stores pre-save state via `contextvars` and creates `Transaction` rows post-save when the serialized old value differs from the new.
 - `middleware.py`: `TransactionUserMiddleware` writes the authenticated user to a contextvar, clears the `old_state` cache each request, and is wired into `MIDDLEWARE` after authentication (`STATZWeb/settings.py:86/98`).
 - `admin.py`: Registers `Transaction` with read-only fields, filters, search, and `date_hierarchy` to support audits.
 - `templates/transactions/transaction_modal.html` plus `templates/transactions/partials/*`: Provide the Bootstrap 5 modal shell, history table, edit form, and detail view HTML. Modal lifecycle and injected-form event binding live in the shell script.
@@ -66,7 +66,7 @@ FK fields on models with more than `FK_AJAX_THRESHOLD` (100) records use `WIDGET
 - `signals.py` contains the core logic. Current `TRACKED` fields are:
   - `Contract`: `contract_number`, `po_number`, `tab_num`, `buyer`, `due_date`, `award_date`, `sales_class`, `solicitation_type`, `plan_gross`, `files_url`
   - `Clin`: `item_type`, `clin_po_num`, `supplier`, `nsn`, `ia`, `fob`, `special_payment_terms`, `supplier_due_date`, `due_date`, `order_qty`, `ship_qty`, `ship_date`, `item_value`, `quote_value`, `unit_price`, `price_per_unit`, `uom`
-  - `ClinShipment`: `pod_date`
+  - `ClinShipment`: `ship_qty`, `ship_date`, `quote_value`, `item_value`, `pod_date`
   - `ClinSplit`: `split_paid`
   - `ContractLevelCharge`: `label`, `action_type`, `supplier`, `estimated_amount`, `billed_paid_amount`, `payment_date`, `invoice_number`
   - `Supplier`: `name`, `cage_code`, `dodaac`, `allows_gsi`, `probation`, `conditional`, `archived`, `iso`, `ppi`, `special_terms`, `supplier_type`, `prime`, `is_packhouse`, `business_phone`, `primary_phone`, `business_email`, `primary_email`, `website_url`
@@ -80,7 +80,7 @@ FK fields on models with more than `FK_AJAX_THRESHOLD` (100) records use `WIDGET
 - **PO number sync:** After saving `Clin.clin_po_num` or `Contract.po_number`, `transaction_edit_field` calls `contracts.services.clin_po_sync.sync_po_number` so the contract header PO and every CLIN Sub PO # stay identical. Propagation uses per-row `.save(update_fields=...)` (never `QuerySet.update()`) so each change gets its own audit `Transaction`. Do not confuse `Clin.clin_po_num` (tracked, synced) with `Clin.po_number` (legacy, not tracked, never touched) or `contracts.PurchaseOrder.po_number` (PO Generator).
 
 ## 11. Integrations and Cross-App Dependencies
-- `contracts` and `suppliers` are imported directly in `signals.py`; `contracts.models.Contract`, `contracts.models.Clin`, `contracts.models.ClinShipment` (`pod_date`), and `suppliers.models.Supplier` fields listed in `TRACKED` trigger transactions.
+- `contracts` and `suppliers` are imported directly in `signals.py`; `contracts.models.Contract`, `contracts.models.Clin`, `contracts.models.ClinShipment` (`ship_qty`, `ship_date`, `quote_value`, `item_value`, `pod_date`), and `suppliers.models.Supplier` fields listed in `TRACKED` trigger transactions.
 - `users` (via `get_user_model()` in `models.py`) supplies the `user` FK on `Transaction`, and the middleware saves `request.user` into a contextvar consumed by `signals` (`middleware.py`, `signals.py`).
 - `contenttypes` lets each `Transaction` point at any model; `ContentType` lookups appear in `models.py`, `views.py`, and `field_types.py`.
 - `STATZWeb/settings.py` lists `"transactions.apps.TransactionsConfig"` under `INSTALLED_APPS` and adds `"transactions.middleware.TransactionUserMiddleware"` (after authentication) to `MIDDLEWARE`, ensuring the middleware runs every request.
@@ -100,6 +100,8 @@ All endpoints require authentication (`@login_required`).
 - Views are decorated with `@login_required`, and the modal partials should only be included on pages shown to authorized staff.
 - Edit requests run through `TransactionUserMiddleware`, which sets the authenticated user into a contextvar and calls `signals.clear_old_state()` after each request so state does not leak.
 - `transaction_edit_field` returns JSON errors (`400` for invalid value, `404` for unknown model/field) and refuses to save unless `utils.set_field_value` and `form.is_valid()` succeed.
+- **Field allowlist (Stage 7a, 2026-11-17):** `EDITABLE_FIELDS` in `transactions/views.py` is a frozenset of `(app_label, model, field)` triples built from every `openTransactionsEditModal(...)` caller (CLIN detail, contract management, contract review, Finance Audit, the level-charge panel, supplier detail). GET and POST for any other triple return `400 {"success": false, "error": "This field cannot be edited here."}` before the record is loaded. No company scoping (all companies belong to one owner). **To add a field:** add the button in the template, then add its triple to the matching `_triples(...)` group in `EDITABLE_FIELDS` in the same commit, and add a test. `ClinShipment.pod_date` is not on the list (no UI caller since Stage 6); its sync branch in the view is unreachable until a caller is added back.
+- **CLIN money guard:** CLIN `paid_amount` / `wawf_payment` POSTs return 400 "This CLIN has shipments. Edit Paid / Customer Pay on the shipments." when the CLIN has shipments, mirroring the `pod_date` guard.
 - Admin exposure is read-only—`TransactionAdmin.readonly_fields` prevents manual edits of historical values and notes.
 - The modal POST includes `X-CSRFToken`, `X-Requested-With`, and submits with `credentials: 'same-origin'` for security.
 

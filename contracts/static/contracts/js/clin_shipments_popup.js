@@ -13,6 +13,7 @@
     var autoCalcToken = 0;
     var mode = "add";
     var editingRow = null;
+    var editPrefill = { paid_amount: "0.00", wawf_payment: "0.00" };
     var saveInFlight = false;
     var modalEl = document.getElementById("shipmentModal");
     var modal = modalEl && window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
@@ -271,7 +272,27 @@
         setField(modalEl, "uom", row.getAttribute("data-uom") || "");
         setField(modalEl, "comments", row.getAttribute("data-comments") || "");
         setField(modalEl, "pod_date", row.getAttribute("data-pod-date") || "");
+        editPrefill = {
+            paid_amount: row.getAttribute("data-paid-amount") || "0.00",
+            wawf_payment: row.getAttribute("data-wawf-payment") || "0.00",
+        };
+        setField(modalEl, "paid_amount", editPrefill.paid_amount);
+        setField(modalEl, "wawf_payment", editPrefill.wawf_payment);
         openModal();
+    }
+
+    function changedTotal(name) {
+        var parsed = optionalMoney(fieldValue(modalEl, name));
+        if (parsed.error || parsed.skip) {
+            return parsed;
+        }
+        if (Number(parsed.value) < 0) {
+            return { error: "Paid and Customer Pay cannot be negative. Type 0 to clear." };
+        }
+        if (Number(parsed.value) === Number(editPrefill[name])) {
+            return { skip: true };
+        }
+        return parsed;
     }
 
     function setSaveDisabled(disabled) {
@@ -298,6 +319,16 @@
                 showModalAlert("Could not save the shipment.");
                 return;
             }
+            var paidTotal = changedTotal("paid_amount");
+            if (paidTotal.error) {
+                showModalAlert(paidTotal.error);
+                return;
+            }
+            var customerPayTotal = changedTotal("wawf_payment");
+            if (customerPayTotal.error) {
+                showModalAlert(customerPayTotal.error);
+                return;
+            }
             url = editingRow.getAttribute("data-update-url");
             payload = {
                 name: parsed.value.name,
@@ -307,6 +338,12 @@
                 comments: parsed.value.comments,
                 pod_date: parsed.value.pod_date || "",
             };
+            if (!paidTotal.skip) {
+                payload.paid_amount_total = paidTotal.value;
+            }
+            if (!customerPayTotal.skip) {
+                payload.wawf_payment_total = customerPayTotal.value;
+            }
         } else {
             var paid = optionalMoney(fieldValue(modalEl, "paid_amount"));
             if (paid.error) {

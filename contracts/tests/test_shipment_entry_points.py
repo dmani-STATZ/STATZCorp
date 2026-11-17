@@ -106,15 +106,20 @@ class ShipmentEntryPointTests(TestCase):
         self.assertIn("clin_shipments_popup_opener.js", html)
         self.assertIn("fetchClinDetails(clinId)", html)
 
-    def test_clin_detail_add_button_opens_popup_add_panel(self):
+    def test_clin_detail_manage_button_opens_popup_list(self):
         clin = self.make_clin(item_number="0005")
         response = self.client.get(reverse("contracts:clin_detail", args=[clin.id]))
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
         popup_url = reverse("contracts:clin_shipments_popup", args=[clin.id])
-        self.assertIn(f'data-popup-url="{popup_url}?add=1"', html)
-        self.assertIn("Add New Shipment", html)
-        self.assertIn("js-open-clin-shipments-popup", html)
+        self.assertIn(
+            'class="btn btn-sm btn-outline-secondary js-open-clin-shipments-popup" '
+            f'data-clin-id="{clin.id}" data-popup-url="{popup_url}">'
+            'Manage shipments</button>',
+            html,
+        )
+        self.assertNotIn(f'{popup_url}?add=1', html)
+        self.assertNotIn("Add New Shipment", html)
         self.assertNotIn("js-open-add-partial", html)
         self.assertIn("clin_shipments_popup_opener.js", html)
         self.assertIn("__clinShipmentsDirty", html)

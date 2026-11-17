@@ -13,11 +13,15 @@ from django.utils import timezone
 from contracts.models import Clin, ClinShipment, Contract, DfasImportBatch, DfasImportRow, PaymentHistory
 from contracts.services.dfas_matcher import MatchResult, match_dfas_row
 from contracts.services.dfas_parser import parse_dfas_file
+from contracts.services.shipment_payments import recompute_clin_payment_rollup
 
 
 class DfasImportError(Exception):
     """Raised when a DFAS import operation cannot proceed."""
     pass
+
+
+CLIN_HAS_SHIPMENTS_MESSAGE = 'CLIN has shipments — select a shipment and finalize again.'
 
 
 _NON_TERMINAL_ROW_STATUSES = frozenset({
@@ -214,16 +218,10 @@ def _finalize_single_row(*, row: DfasImportRow, user) -> None:
         shipment.modified_by = user
         shipment.save(update_fields=['paid_amount', 'modified_by', 'modified_on'])
 
-        clin = row.matched_clin
-        agg = clin.shipments.aggregate(
-            paid=Sum('paid_amount'),
-            wawf=Sum('wawf_payment'),
-        )
-        clin.paid_amount = agg['paid'] or Decimal('0.00')
-        clin.wawf_payment = agg['wawf'] or Decimal('0.00')
-        clin.modified_by = user
-        clin.save(update_fields=['paid_amount', 'wawf_payment', 'modified_by', 'modified_on'])
+        recompute_clin_payment_rollup(row.matched_clin, user)
     else:
+        if row.matched_clin.shipments.exists():
+            raise DfasImportError(CLIN_HAS_SHIPMENTS_MESSAGE)
         ph = PaymentHistory(
             content_type=clin_ct,
             object_id=row.matched_clin_id,

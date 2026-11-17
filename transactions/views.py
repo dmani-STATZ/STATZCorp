@@ -10,6 +10,41 @@ from .field_types import get_field_info, get_fk_label, WIDGET_FK_AUTOCOMPLETE, F
 from .utils import get_field_value_display, set_field_value, get_display_value
 
 
+def _triples(app_label, model, fields):
+    return {(app_label, model, field) for field in fields}
+
+
+# Every (app_label, model, field) a template opens with openTransactionsEditModal.
+# A field missing here cannot be read or written through transaction_edit_field.
+EDITABLE_FIELDS = frozenset(
+    _triples("contracts", "clin", (
+        "item_number", "item_type", "clin_po_num", "ia", "fob", "nsn",
+        "due_date", "order_qty", "uom", "unit_price", "item_value",
+        "supplier", "supplier_due_date", "special_payment_terms",
+        "price_per_unit", "quote_value", "ship_qty", "ship_date", "pod_date",
+        "paid_amount", "paid_date", "wawf_payment", "wawf_recieved",
+        "wawf_invoice", "special_payment_terms_paid",
+    ))
+    | _triples("contracts", "contract", (
+        "contract_number", "po_number", "buyer", "award_date", "due_date",
+        "sales_class", "solicitation_type", "contract_type", "nist", "status",
+        "contract_value", "plan_gross", "planned_split",
+    ))
+    | _triples("contracts", "contractlevelcharge", (
+        "label", "supplier", "estimated_amount", "billed_paid_amount",
+        "payment_date", "invoice_number",
+    ))
+    | _triples("suppliers", "supplier", (
+        "name", "cage_code", "dodaac", "allows_gsi", "supplier_type", "prime",
+        "is_packhouse", "business_phone", "primary_phone", "business_email",
+        "primary_email", "website_url", "probation", "conditional", "archived",
+        "iso", "ppi", "special_terms",
+    ))
+)
+
+CLIN_SHIPMENT_MONEY_FIELDS = frozenset({"paid_amount", "wawf_payment"})
+
+
 @login_required
 @require_GET
 def transaction_list(request, content_type_id, object_id):
@@ -121,6 +156,11 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
     POST: Validate, update model field, create Transaction, return JSON for page update.
     """
     ct = get_object_or_404(ContentType, pk=content_type_id)
+    if (ct.app_label, ct.model, field_name) not in EDITABLE_FIELDS:
+        return JsonResponse(
+            {"success": False, "error": "This field cannot be edited here."},
+            status=400,
+        )
     model_class = ct.model_class()
     if not model_class:
         return JsonResponse({"success": False, "error": "Unknown model"}, status=404)
@@ -151,6 +191,18 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
                         "POD Date is derived from the shipments. "
                         "Edit the shipment's POD Date in the Shipments popup."
                     ),
+                },
+                status=400,
+            )
+        if (
+            model_class.__name__ == "Clin"
+            and field_name in CLIN_SHIPMENT_MONEY_FIELDS
+            and instance.shipments.exists()
+        ):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "This CLIN has shipments. Edit Paid / Customer Pay on the shipments.",
                 },
                 status=400,
             )

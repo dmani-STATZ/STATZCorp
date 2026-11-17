@@ -27,6 +27,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from STATZWeb.decorators import conditional_login_required
+from contracts.services.shipment_payments import recompute_clin_payment_rollup
 
 from ..models import (
     Clin,
@@ -452,7 +453,53 @@ def _convert_to_partial_shipment(clin, contract, staged_data, parent_clin_id, us
         created_by=user,
         modified_by=user,
     )
+    _repoint_clin_payment_ledger(clin, shipment, user)
+    recompute_clin_payment_rollup(parent_clin, user)
     return shipment.id
+
+
+CLIN_TO_SHIPMENT_LEDGER_TYPES = {
+    'paid_amount': 'partial_paid_amount',
+    'wawf_payment': 'partial_wawf_payment',
+}
+
+
+def _repoint_clin_payment_ledger(clin, shipment, user):
+    """Move the converted CLIN's Paid / Customer Pay ledger rows onto the new
+    shipment, then add one balancing row per field when the moved rows do not
+    sum to the amount copied onto the shipment. ``shipment-ph-*`` rows stay on
+    the CLIN and are deleted with it."""
+    clin_ct = ContentType.objects.get_for_model(Clin)
+    shipment_ct = ContentType.objects.get_for_model(ClinShipment)
+    for clin_type, shipment_type in CLIN_TO_SHIPMENT_LEDGER_TYPES.items():
+        rows = list(
+            PaymentHistory.objects.filter(
+                content_type=clin_ct,
+                object_id=clin.id,
+                payment_type=clin_type,
+            ).exclude(reference_number__startswith='shipment-ph-')
+        )
+        moved = Decimal('0.00')
+        for row in rows:
+            row.content_type = shipment_ct
+            row.object_id = shipment.pk
+            row.payment_type = shipment_type
+            row.modified_by = user
+            row.save()
+            moved += row.payment_amount
+        copied = Decimal(str(getattr(shipment, clin_type) or 0))
+        balance = copied - moved
+        if balance != 0:
+            PaymentHistory(
+                content_type=shipment_ct,
+                object_id=shipment.pk,
+                payment_type=shipment_type,
+                payment_amount=balance,
+                payment_date=timezone.localdate(),
+                payment_info='CLIN Fix conversion: unledgered balance',
+                created_by=user,
+                modified_by=user,
+            ).save()
 
 
 # ---------------------------------------------------------------------------

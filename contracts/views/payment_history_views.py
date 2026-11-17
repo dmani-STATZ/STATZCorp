@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.http import JsonResponse
 from django.contrib.contenttypes.models import ContentType
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from django.db.models import Sum
 from django.views.decorators.http import require_http_methods
 import json
@@ -65,6 +66,26 @@ def _verify_payment_history_company_access(entry, company):
         return None, JsonResponse({'error': 'Unsupported entity type'}, status=400)
 
     return entity_type, None
+
+
+def _clin_shipment_money_guard(entity_type, entry, company):
+    """400 response when a CLIN Paid / Customer Pay ledger row belongs to a CLIN
+    with shipments (shipments are the source of truth), else None."""
+    if entity_type != 'clin' or entry.payment_type not in ('paid_amount', 'wawf_payment'):
+        return None
+    clin = Clin.objects.get(id=entry.object_id, contract__company=company)
+    if not clin.shipments.exists():
+        return None
+    return JsonResponse(
+        {
+            'success': False,
+            'error': (
+                'Paid / Customer Pay for this CLIN is calculated from '
+                'its shipments. Edit the shipment ledger instead.'
+            ),
+        },
+        status=400,
+    )
 
 
 def _sync_entity_total_after_history_change(
@@ -283,84 +304,86 @@ def payment_history_api(request, entity_type, entity_id, payment_type):
                     'error': f'Invalid payment type {payment_type} for {entity_type}',
                 }, status=400)
 
-            payment = PaymentHistory.objects.create(
-                content_type=content_type,
-                object_id=entity_id,
-                payment_type=payment_type,
-                payment_amount=Decimal(str(data['payment_amount'])),
-                payment_date=data['payment_date'],
-                payment_info=data.get('payment_info', ''),
-                reference_number=data.get('reference_number', ''),
-                created_by=request.user,
-                modified_by=request.user,
-            )
-
-            new_total = PaymentHistory.objects.filter(
-                content_type=content_type,
-                object_id=entity_id,
-                payment_type=payment_type,
-            ).aggregate(total=Sum('payment_amount'))['total'] or 0
-
-            if entity_type == 'contract':
-                contract = Contract.objects.select_related('idiq_contract', 'status').get(
-                    id=entity_id, company=company
+            with transaction.atomic():
+                payment = PaymentHistory.objects.create(
+                    content_type=content_type,
+                    object_id=entity_id,
+                    payment_type=payment_type,
+                    payment_amount=Decimal(str(data['payment_amount'])),
+                    payment_date=data['payment_date'],
+                    payment_info=data.get('payment_info', ''),
+                    reference_number=data.get('reference_number', ''),
+                    created_by=request.user,
+                    modified_by=request.user,
                 )
-                if payment_type == 'contract_value':
-                    contract.contract_value = new_total
-                elif payment_type == 'plan_gross':
-                    contract.plan_gross = new_total
-                contract.save()
 
-            elif entity_type == 'clin':
-                clin = Clin.objects.get(id=entity_id, contract__company=company)
-                if payment_type in ('paid_amount', 'wawf_payment') and clin.shipments.exists():
-                    return JsonResponse(
-                        {
-                            'success': False,
-                            'error': (
-                                'Paid / Customer Pay for this CLIN is calculated from '
-                                'its shipments. Edit the shipment instead.'
-                            ),
-                        },
-                        status=400,
+                new_total = PaymentHistory.objects.filter(
+                    content_type=content_type,
+                    object_id=entity_id,
+                    payment_type=payment_type,
+                ).aggregate(total=Sum('payment_amount'))['total'] or 0
+
+                if entity_type == 'contract':
+                    contract = Contract.objects.select_related('idiq_contract', 'status').get(
+                        id=entity_id, company=company
                     )
-                if payment_type == 'item_value':
-                    clin.item_value = new_total
-                elif payment_type == 'quote_value':
-                    clin.quote_value = new_total
-                elif payment_type == 'paid_amount':
-                    clin.paid_amount = new_total
-                elif payment_type == 'wawf_payment':
-                    clin.wawf_payment = new_total
-                clin.save()
-            elif entity_type == 'clinshipment':
-                shipment = ClinShipment.objects.select_related('clin').get(
-                    id=entity_id,
-                    clin__contract__company=company
-                )
-                if payment_type == 'partial_item_value':
-                    shipment.item_value = new_total
-                elif payment_type == 'partial_quote_value':
-                    shipment.quote_value = new_total
-                elif payment_type == 'partial_paid_amount':
-                    shipment.paid_amount = new_total
-                elif payment_type == 'partial_wawf_payment':
-                    shipment.wawf_payment = new_total
-                shipment.save()
-                if _partial_payment_rollup_mapping(payment_type):
-                    _recompute_clin_payment_rollup(shipment.clin, request.user)
-            elif entity_type == 'contract_packaging':
-                pkg = ContractPackaging.objects.get(
-                    id=entity_id, contract__company=company
-                )
-                if payment_type == 'packaging_quote':
-                    pkg.quote_amount = new_total
-                    update_field = 'quote_amount'
-                else:
-                    pkg.amount_paid = new_total
-                    update_field = 'amount_paid'
-                pkg.modified_by = request.user
-                pkg.save(update_fields=[update_field, 'modified_by', 'modified_on'])
+                    if payment_type == 'contract_value':
+                        contract.contract_value = new_total
+                    elif payment_type == 'plan_gross':
+                        contract.plan_gross = new_total
+                    contract.save()
+
+                elif entity_type == 'clin':
+                    clin = Clin.objects.get(id=entity_id, contract__company=company)
+                    if payment_type in ('paid_amount', 'wawf_payment') and clin.shipments.exists():
+                        transaction.set_rollback(True)
+                        return JsonResponse(
+                            {
+                                'success': False,
+                                'error': (
+                                    'Paid / Customer Pay for this CLIN is calculated from '
+                                    'its shipments. Edit the shipment instead.'
+                                ),
+                            },
+                            status=400,
+                        )
+                    if payment_type == 'item_value':
+                        clin.item_value = new_total
+                    elif payment_type == 'quote_value':
+                        clin.quote_value = new_total
+                    elif payment_type == 'paid_amount':
+                        clin.paid_amount = new_total
+                    elif payment_type == 'wawf_payment':
+                        clin.wawf_payment = new_total
+                    clin.save()
+                elif entity_type == 'clinshipment':
+                    shipment = ClinShipment.objects.select_related('clin').get(
+                        id=entity_id,
+                        clin__contract__company=company
+                    )
+                    if payment_type == 'partial_item_value':
+                        shipment.item_value = new_total
+                    elif payment_type == 'partial_quote_value':
+                        shipment.quote_value = new_total
+                    elif payment_type == 'partial_paid_amount':
+                        shipment.paid_amount = new_total
+                    elif payment_type == 'partial_wawf_payment':
+                        shipment.wawf_payment = new_total
+                    shipment.save()
+                    if _partial_payment_rollup_mapping(payment_type):
+                        _recompute_clin_payment_rollup(shipment.clin, request.user)
+                elif entity_type == 'contract_packaging':
+                    pkg = ContractPackaging.objects.get(
+                        id=entity_id, contract__company=company
+                    )
+                    if payment_type == 'packaging_quote':
+                        pkg.quote_amount = new_total
+                        update_field = 'quote_amount'
+                    else:
+                        pkg.amount_paid = new_total
+                        update_field = 'amount_paid'
+                    pkg.modified_by = request.user
+                    pkg.save(update_fields=[update_field, 'modified_by', 'modified_on'])
 
             return JsonResponse({
                 'success': True,
@@ -390,6 +413,10 @@ def delete_payment_history_entry(request, payment_id):
     entity_type, err = _verify_payment_history_company_access(entry, company)
     if err:
         return err
+
+    guard = _clin_shipment_money_guard(entity_type, entry, company)
+    if guard:
+        return guard
 
     object_id = entry.object_id
     payment_type = entry.payment_type
@@ -431,19 +458,9 @@ def update_payment_history_entry(request, payment_id):
     if err:
         return err
 
-    if entity_type == 'clin' and entry.payment_type in ('paid_amount', 'wawf_payment'):
-        clin = Clin.objects.get(id=entry.object_id, contract__company=company)
-        if clin.shipments.exists():
-            return JsonResponse(
-                {
-                    'success': False,
-                    'error': (
-                        'Paid / Customer Pay for this CLIN is calculated from '
-                        'its shipments. Edit the shipment ledger instead.'
-                    ),
-                },
-                status=400,
-            )
+    guard = _clin_shipment_money_guard(entity_type, entry, company)
+    if guard:
+        return guard
 
     try:
         data = json.loads(request.body)
