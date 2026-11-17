@@ -105,6 +105,16 @@ In-scope mail is from `disa.ogden.eis.mbx.wawfnoreply@mail.mil` with subject `No
 
 ---
 
+## POD complete (`contracts` app)
+
+`Clin.pod_complete` is a stored boolean (`default=False`, not null, no index). `Clin.pod_date` is still the MAX of non-null shipment `pod_date` values. Status strings `none` / `partial` / `full` come only from `compute_pod_status` in `contracts/services/pod_status.py`: the flag true means `full`; otherwise `none` when no shipment has a POD date (including zero shipments); otherwise `partial`.
+
+Checking the flag (`POST /contracts/api/clin/<id>/pod-complete/`, name `clin_pod_complete_api`) requires at least one shipment and a POD date on every shipment. Unchecking is always allowed. A short ship quantity (`ship_qty < order_qty`, both set) still saves and returns `qty_warning`. If the flag is on and a shipment change leaves zero shipments or any null `pod_date`, `_sync_clin_ship_fields` clears it. That function and the endpoint are the only writers. Do not compute pod status inline, and do not add `pod_complete` to `ClinForm`.
+
+After deploy, run the hand-run TSQL backfill in `contracts/CONTEXT_contracts.md` (Step 0a, then Step 0b). It is not a Django migration.
+
+---
+
 ## Inventory Dashboard + Public Inventory API (`inventory` app)
 
 **Dashboard.** `/inventory/` is server-side: search (`q`), visibility (`vis` = `all|public|private`), whitelisted sort (`sort`, `dir`), pagination (`page`, `per_page` in 25/50/100). Query logic lives in `inventory/selectors.py` (`build_item_queryset`, `inventory_kpis`). KPI cards come from one `aggregate()` over the whole table. JS is `inventory/static/inventory/js/inventory_dashboard.js`; no inline scripts.

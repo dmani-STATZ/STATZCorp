@@ -46,6 +46,7 @@ from contracts.services.due_status import (
     late_status_clin_prefetch,
     late_status_shipment_prefetch,
 )
+from contracts.services.pod_status import compute_pod_status
 
 logger = logging.getLogger(__name__)
 
@@ -126,14 +127,12 @@ class ContractManagementView(ActiveCompanyQuerysetMixin, DetailView):
             (c for c in clins if c.clin_type_id == 1),
             clins[0] if clins else None,
         )
-        context['pod_status'] = 'none'
+        context['pod_status'] = (
+            compute_pod_status(context['selected_clin'])
+            if context['selected_clin']
+            else 'none'
+        )
         if context['selected_clin']:
-            sc = context['selected_clin'].shipments.aggregate(
-                total=Count('id'),
-                with_pod=Count('id', filter=Q(pod_date__isnull=False)),
-            )
-            if sc['total'] > 0 and sc['with_pod'] > 0:
-                context['pod_status'] = 'full' if sc['with_pod'] >= sc['total'] else 'partial'
             # Get CLIN notes with entity_type for template
             clin_notes_qs = (
                 context['selected_clin'].notes.all()

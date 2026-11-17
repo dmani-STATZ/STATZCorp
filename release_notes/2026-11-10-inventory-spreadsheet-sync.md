@@ -1,7 +1,7 @@
 ---
 id: 2026-11-10-inventory-spreadsheet-sync
 title: Sync the inventory with your spreadsheet
-published: false
+published: true
 publish_date: 2026-11-10
 tags: [new, system]
 critical: false

@@ -1,7 +1,7 @@
 ---
 id: 2026-10-20-idiq-contract-search
 title: IDIQ contracts show up in Contract search
-published: false
+published: true
 publish_date: 2026-10-20
 tags: [improved, contracts]
 critical: false

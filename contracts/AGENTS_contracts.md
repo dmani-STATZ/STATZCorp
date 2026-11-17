@@ -22,7 +22,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `Nsn` (National Stock Number) — owned by `products` app; `Clin` holds an FK to it
 - `SequenceNumber` — owned by `intake` app (table `intake_sequencenumber`); used for PO/TAB number defaults
 - `UserCompanyMembership` — owned by `users` app; `CompanyForm` syncs to it but does not define it
-- The audit transaction trail — written by `transactions` app signals on `Contract`/`Clin` saves and on `ClinShipment` when **`ClinShipment.pod_date`** changes. **`Clin.pod_date`** is an optional CLIN-level `DateField` (null/blank, no late flag), distinct from shipment-level POD. `Clin.ship_date` and `Clin.ship_qty` are tracked in `transactions/signals.py`; do not manually create `Transaction` rows when saving those fields — normal `Clin.save()` (including `save(update_fields=[...])` from views such as `complete_clin_shipping`) is enough for the audit trail.
+- The audit transaction trail — written by `transactions` app signals on `Contract`/`Clin` saves and on `ClinShipment` when **`ClinShipment.pod_date`** changes. **`Clin.pod_date`** is the MAX rollup of shipment POD dates (null/blank, no late flag). **`Clin.pod_complete`** is a separate stored boolean and is in `TRACKED`. `Clin.ship_date`, `Clin.ship_qty`, and `Clin.pod_complete` are tracked in `transactions/signals.py`; do not manually create `Transaction` rows when saving those fields — normal `Clin.save()` (including `save(update_fields=[...])` from views such as `complete_clin_shipping` and `clin_pod_complete_api`) is enough for the audit trail.
 
 **Role:** This is the core domain app of the project. Nearly every other app depends on or integrates with it.
 
@@ -36,6 +36,14 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `get_clin_details` intentionally emits legacy JSON keys `due_date_late` and `supplier_due_date_late` as wire-format aliases. Do not rename them without updating the inline JS in `contract_management.html`.
 - The On-Time Delivery Report (`contracts/services/on_time_delivery.py`) consumes `due_status.py`; do not fork its completion logic.
 - The On-Time Delivery Report classifies open CLINs against an as-of date in `on_time_delivery.py`; this is report-specific and intentionally differs from `Clin.is_late` (which never marks incomplete CLINs late). Do not push this rule into `due_status.py`.
+
+### POD complete footguns
+
+- `pod_status` (`none` / `partial` / `full`) is computed only by `compute_pod_status` in `contracts/services/pod_status.py`. Never compute it inline. `pod_complete` true → `full`; otherwise `none` when no shipment has a `pod_date` (including zero shipments); otherwise `partial`.
+- `Clin.pod_complete` is a stored `BooleanField(default=False)` (not null, no index). `Clin.pod_date` stays the MAX rollup.
+- Check guard (server, `clin_pod_complete_api` only): at least one shipment and every shipment `pod_date` non-null. Uncheck is always allowed. `ship_qty < order_qty` (both non-null) still saves and returns `qty_warning`.
+- Auto-uncheck lives only in `_sync_clin_ship_fields`: if the flag is true and the CLIN has zero shipments or any null `pod_date`, set it false in that same `save(update_fields=...)`.
+- Never write `pod_complete` outside `clin_pod_complete_api` and `_sync_clin_ship_fields`. Do not add it to `ClinForm`. Endpoint: `POST /contracts/api/clin/<id>/pod-complete/` (`contracts:clin_pod_complete_api`), CSRF left on.
 
 ### Navigation / redirect rules
 
@@ -198,6 +206,7 @@ This file defines safe-edit guidance for AI coding agents and future developers 
 - `contracts/views/contract_log_views.py` (if exported)
 - `processing/models.py` `QueueClin` (if imported)
 - `transactions` app tracked-fields list (if auditable)
+- **`pod_complete` exception:** do not add it to `ClinForm` or `clin_form.html`. The only writers are `clin_pod_complete_api` and the auto-uncheck in `_sync_clin_ship_fields`. Status comes only from `compute_pod_status`.
 
 ### Adding a new workflow action (e.g., contract toggle/status change)
 - `contracts/views/contract_views.py` (handler function)
@@ -595,6 +604,8 @@ Partner Commission Reconciliation matching normalizes contract numbers using `st
 17. **`window.__someBoundGuard` guards in scripts that run on page reload will prevent all listeners from registering after the first load.** The `window.__guard = true` pattern is only safe when scripts are injected into an existing DOM via `innerHTML` (where they could run multiple times in one page lifetime without a full reload). For standalone pages that reload normally (like `reminders_popup.html`), this guard causes the entire IIFE to exit on every reload after the first, silently removing all click handlers. Only use `window.__bound` guards in partials that are injected via `innerHTML` — i.e. `notes_popup_tab_panel.html` via `activateScriptsInNotesTabPanel`. Do not copy this pattern into standalone page scripts.
 
 18. **`idiq_list` is a global (non-company-scoped) list view by design.** Do not add `ActiveCompanyQuerysetMixin` to it because `IdiqContract` has no company FK.
+
+19. **Never compute `pod_status` inline, and never write `Clin.pod_complete` outside `clin_pod_complete_api` and `_sync_clin_ship_fields`.** Do not put `pod_complete` on `ClinForm`. See the POD complete footguns in section 2.
 
 ---
 

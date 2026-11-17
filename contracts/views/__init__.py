@@ -171,6 +171,7 @@ from .shipment_views import (
     delete_shipment,
     get_clin_shipments,
     complete_clin_shipping,
+    clin_pod_complete_api,
 )
 
 from .code_table_views import (

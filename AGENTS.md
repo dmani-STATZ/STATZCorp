@@ -60,6 +60,14 @@
  Never `union()` IDIQs with contracts. Keep the delivery-order count a subquery (a join + GROUP BY on
  the number expression breaks on MSSQL). Keep the JSON `results` key: three pages read `data.results || data`.
 
+## POD complete (when touching CLIN pod status or `Clin.pod_complete`)
+- Status is only `compute_pod_status` in `contracts/services/pod_status.py`. Never compute `pod_status` inline.
+- `pod_complete` true → `"full"`. Otherwise `"none"` when no shipment has a `pod_date` (including zero shipments); otherwise `"partial"`.
+- `Clin.pod_complete` is `BooleanField(default=False)` (not null, no index). `Clin.pod_date` stays the MAX rollup.
+- Check guard is server-side on `clin_pod_complete_api` only: at least one shipment and every `pod_date` non-null. Uncheck is always allowed. `ship_qty < order_qty` (both non-null) still saves and returns `qty_warning`.
+- Auto-uncheck lives only in `_sync_clin_ship_fields`. Never write `pod_complete` anywhere else, and never add it to `ClinForm`.
+- Endpoint: `POST /contracts/api/clin/<id>/pod-complete/` (`contracts:clin_pod_complete_api`). CSRF stays on.
+
 ## CSS (when touching `static/css/app-core.css` or any date field)
 - Date inputs use the native browser calendar indicator only. Never add a
   background-image calendar icon or an `input-group-text` calendar icon next to a

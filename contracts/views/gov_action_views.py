@@ -1,12 +1,12 @@
 """Views for Gov Actions and Log Fields (contract management)."""
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
-from django.db.models import Count, Q
 from django.views.decorators.http import require_http_methods
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, GovAction, Contract
 from ..forms import GovActionForm
 from ..services.due_status import late_status_shipment_prefetch
+from ..services.pod_status import compute_pod_status
 from suppliers.contact_categories import PRIMARY_CATEGORY_NAME
 from suppliers.models import Supplier, Contact
 
@@ -30,18 +30,9 @@ def get_clin_details(request, clin_id):
             id=clin_id,
             company=active_company,
         )
-        shipment_counts = clin.shipments.aggregate(
-            total=Count('id'),
-            with_pod=Count('id', filter=Q(pod_date__isnull=False)),
-        )
-        total_shipments = shipment_counts['total']
-        shipments_with_pod = shipment_counts['with_pod']
-        if total_shipments == 0 or shipments_with_pod == 0:
-            pod_status = 'none'
-        elif shipments_with_pod < total_shipments:
-            pod_status = 'partial'
-        else:
-            pod_status = 'full'
+        shipments = list(clin.shipments.all())
+        pod_status = compute_pod_status(clin, shipments)
+        total_shipments = len(shipments)
         ship_qty = clin.ship_qty
         order_qty = clin.order_qty
         is_shipping_complete = bool(
@@ -75,6 +66,7 @@ def get_clin_details(request, clin_id):
             'ship_date': clin.ship_date.strftime('%m/%d/%Y') if clin.ship_date else '—',
             'pod_date': clin.pod_date.strftime('%m/%d/%Y') if clin.pod_date else '—',
             'pod_status': pod_status,
+            'pod_complete': bool(clin.pod_complete),
             'ship_qty': clin.ship_qty if clin.ship_qty is not None else '—',
             'has_shipments': total_shipments > 0,
             'total_shipped': float(clin.ship_qty) if clin.ship_qty is not None else 0,

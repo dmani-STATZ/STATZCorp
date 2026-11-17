@@ -67,6 +67,7 @@ python manage.py import_release_notes --verbose   # extra logging
 
 ## Recent release notes
 
+- [2026-11-17-pod-complete-flag](2026-11-17-pod-complete-flag.md) — Improved: a CLIN can be marked POD complete when every shipment has a POD date. A short ship quantity warns but still saves. The mark clears if a shipment is added without a POD date, a POD date is cleared, or the last shipment is removed. (`published: false` until shipped.)
 - [2026-11-10-inventory-spreadsheet-sync](2026-11-10-inventory-spreadsheet-sync.md) — New: Inventory spreadsheet sync (upload → preview → apply → download), Qty Remaining field, On-Hand Value KPI and spreadsheet row. (`published: false` until shipped.)
 - [2026-11-10-inventory-dashboard-refresh](2026-11-10-inventory-dashboard-refresh.md) — Improved: Inventory dashboard with KPI cards, search / filter / sort / pagination, and icon edit / delete actions. (`published: false` until shipped.)
 - [2026-10-20-idiq-contract-search](2026-10-20-idiq-contract-search.md) — Improved: Jump to Contract and the Contracts Dashboard search show matching IDIQs (Open / Closed badge, delivery order count, award date) above contract results, and delivery orders show an IDIQ badge linking to the parent. (`published: false` until shipped.)

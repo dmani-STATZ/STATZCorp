@@ -1,7 +1,7 @@
 ---
 id: 2026-10-20-idiq-duplicate-guard
 title: Duplicate IDIQs are blocked, and unwanted IDIQs can be deleted
-published: false
+published: true
 publish_date: 2026-10-20
 tags: [fixed, contracts]
 critical: false

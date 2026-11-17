@@ -1,7 +1,7 @@
 ---
 id: 2026-11-10-inventory-dashboard-refresh
 title: Refreshed Inventory dashboard
-published: false
+published: true
 publish_date: 2026-11-10
 tags: [improved, system]
 critical: false

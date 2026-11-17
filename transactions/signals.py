@@ -41,6 +41,7 @@ TRACKED = [
     (Clin, "unit_price"),
     (Clin, "price_per_unit"),
     (Clin, "uom"),
+    (Clin, "pod_complete"),
     (ClinShipment, "pod_date"),
     (ClinSplit, "split_paid"),
     (ContractLevelCharge, "label"),
@@ -143,7 +144,7 @@ def store_old_state(sender, instance, **kwargs):
                 "item_type", "clin_po_num", "supplier_id", "nsn_id", "ia", "fob",
                 "special_payment_terms_id", "supplier_due_date", "due_date",
                 "order_qty", "ship_qty", "ship_date", "item_value", "quote_value",
-                "unit_price", "price_per_unit", "uom",
+                "unit_price", "price_per_unit", "uom", "pod_complete",
             ).first()
             if row is not None:
                 old_state[key] = {
@@ -164,6 +165,7 @@ def store_old_state(sender, instance, **kwargs):
                     "unit_price": _serialize(row.get("unit_price")),
                     "price_per_unit": _serialize(row.get("price_per_unit")),
                     "uom": _serialize(row.get("uom")),
+                    "pod_complete": _serialize(row.get("pod_complete")),
                 }
         except Exception:
             pass

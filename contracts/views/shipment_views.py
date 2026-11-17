@@ -3,13 +3,14 @@ from decimal import Decimal
 from django.views.decorators.csrf import csrf_exempt
 import json
 import logging
-from django.db.models import Max, Sum
+from django.db.models import Count, Max, Q, Sum
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, ClinShipment
+from ..services.pod_status import compute_pod_status
 
 logger = logging.getLogger(__name__)
 
@@ -20,20 +21,101 @@ def _sync_clin_ship_fields(clin, user):
     - ship_qty = SUM of all shipment ship_qty values (None shipments excluded)
     - ship_date = MAX ship_date across all shipments that have a non-null ship_date
     - pod_date = MAX pod_date across shipments with a non-null pod_date, or None if none
+    If pod_complete is set and the CLIN now has zero shipments or any shipment
+    with a null pod_date, clear pod_complete in the same save.
     Transactions signals fire automatically on save.
     """
     agg = clin.shipments.aggregate(
         total_qty=Sum('ship_qty'),
         latest_date=Max('ship_date'),
         latest_pod_date=Max('pod_date'),
+        shipment_count=Count('id'),
+        missing_pod=Count('id', filter=Q(pod_date__isnull=True)),
     )
     clin.ship_qty = agg['total_qty'] or 0
     clin.ship_date = agg['latest_date']
     clin.pod_date = agg['latest_pod_date']
     clin.modified_by = user
-    clin.save(update_fields=[
+    update_fields = [
         'ship_qty', 'ship_date', 'pod_date', 'modified_by', 'modified_on',
-    ])
+    ]
+    if clin.pod_complete and (not agg['shipment_count'] or agg['missing_pod']):
+        clin.pod_complete = False
+        update_fields.append('pod_complete')
+    clin.save(update_fields=update_fields)
+
+
+def _pod_complete_success(clin, requested_true):
+    qty_warning = bool(
+        requested_true
+        and clin.ship_qty is not None
+        and clin.order_qty is not None
+        and clin.ship_qty < clin.order_qty
+    )
+    return JsonResponse({
+        'success': True,
+        'pod_complete': bool(clin.pod_complete),
+        'pod_status': compute_pod_status(clin),
+        'pod_date': clin.pod_date.strftime('%m/%d/%Y') if clin.pod_date else '—',
+        'qty_warning': qty_warning,
+        'shipped_qty': float(clin.ship_qty) if clin.ship_qty is not None else None,
+        'order_qty': float(clin.order_qty) if clin.order_qty is not None else None,
+    })
+
+
+@conditional_login_required
+@require_http_methods(["POST"])
+def clin_pod_complete_api(request, clin_id):
+    """Set Clin.pod_complete. Checking is guarded; unchecking is always allowed."""
+    company = getattr(request, 'active_company', None)
+    if not company:
+        return JsonResponse({'success': False, 'error': 'No active company'}, status=403)
+    clin = get_object_or_404(
+        Clin.objects.filter(contract__company=company),
+        id=clin_id,
+    )
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
+        return JsonResponse(
+            {'success': False, 'error': 'Body must be {"value": true} or {"value": false}.'},
+            status=400,
+        )
+    if (
+        not isinstance(data, dict)
+        or set(data.keys()) != {'value'}
+        or not isinstance(data.get('value'), bool)
+    ):
+        return JsonResponse(
+            {'success': False, 'error': 'Body must be {"value": true} or {"value": false}.'},
+            status=400,
+        )
+    value = data['value']
+    if clin.pod_complete == value:
+        return _pod_complete_success(clin, value)
+
+    if value:
+        rows = list(clin.shipments.values_list('id', 'pod_date'))
+        missing_ids = [shipment_id for shipment_id, pod_date in rows if pod_date is None]
+        if not rows or missing_ids:
+            if not rows:
+                error = 'This CLIN has no shipments, so it cannot be marked POD complete.'
+                missing_ids = []
+            else:
+                error = 'Every shipment must have a POD date before this CLIN can be marked POD complete.'
+            return JsonResponse(
+                {
+                    'success': False,
+                    'error': error,
+                    'missing_shipment_ids': missing_ids,
+                },
+                status=400,
+            )
+
+    clin.pod_complete = value
+    clin.modified_by = request.user
+    clin.save(update_fields=['pod_complete', 'modified_by', 'modified_on'])
+    return _pod_complete_success(clin, value)
 
 
 def _recompute_clin_payment_rollup(clin, user):
