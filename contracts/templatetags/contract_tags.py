@@ -1,6 +1,8 @@
 from django import template
 from django.contrib.contenttypes.models import ContentType
 
+from contracts.services.shipment_labels import label_shipments
+
 register = template.Library()
 
 @register.filter
@@ -19,6 +21,18 @@ def reminder_bell_tooltip(state, pending, overdue):
     if state == 'overdue':
         return f'{overdue} overdue of {pending} reminder(s)'
     return f'{pending} reminder(s)'
+
+
+@register.filter
+def entry_order(shipments):
+    """Materialize a CLIN's shipments and return them in entry order.
+
+    The label helper itself does not query. ``list()`` is the same fetch the
+    template ``for`` loop already performed.
+    """
+    if shipments is None:
+        return []
+    return label_shipments(list(shipments))
 
 
 @register.filter

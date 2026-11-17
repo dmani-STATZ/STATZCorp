@@ -398,32 +398,62 @@ function refreshClinShipQty() {
                 <div class="card-header clin-section-header">Shipping</div>
                 <div class="card-body p-0">
                     <div class="px-3 pt-3 pb-2 border-bottom">
-                        {% if clin_has_shipments %}
-                        <div class="form-group mb-0">
-                            <span class="clin-field-label d-block">SHIP QTY</span>
-                            <p class="font-medium text-sm mt-1 mb-0">
-                                <span id="clin-ship-qty-value">
-                                    {{ clin.ship_qty|default:"0" }}
-                                </span>
-                                <span class="text-body-secondary ms-1"
-                                      style="font-size:0.7rem;"
-                                      title="Sum of shipment quantities — edit via shipments below">
-                                    ∑
-                                </span>
-                            </p>
+                        <div class="d-flex flex-nowrap gap-4">
+                            <div style="width:50%">
+                                {% if clin_has_shipments %}
+                                <div class="form-group mb-0">
+                                    <span class="clin-field-label d-block">SHIP QTY</span>
+                                    <p class="font-medium text-sm mt-1 mb-0">
+                                        <span id="clin-ship-qty-value">
+                                            {{ clin.ship_qty|default:"0" }}
+                                        </span>
+                                        <span class="text-body-secondary ms-1"
+                                              style="font-size:0.7rem;"
+                                              title="Sum of shipment quantities — edit via shipments below">
+                                            ∑
+                                        </span>
+                                    </p>
+                                </div>
+                                {% else %}
+                                <div class="form-group mb-0">
+                                    <button type="button"
+                                        onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'ship_qty')"
+                                        class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                        Ship Qty
+                                    </button>
+                                    <p class="font-medium text-sm mt-1 mb-0">
+                                        <span id="clin-ship-qty-value">{{ clin.ship_qty|default:"0" }}</span>
+                                    </p>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div style="width:50%">
+                                {% if clin_has_shipments %}
+                                <div class="form-group mb-0">
+                                    <span class="clin-field-label d-block">POD DATE</span>
+                                    <p class="font-medium text-sm mt-1 mb-0">
+                                        <span id="clin-pod-date-value">{{ clin.pod_date|date:"m/d/Y"|default:"—" }}</span>
+                                        <span class="text-body-secondary ms-1"
+                                              style="font-size:0.7rem;"
+                                              title="Derived from shipments. Edit in the Shipments popup.">
+                                            ∑
+                                        </span>
+                                    </p>
+                                </div>
+                                {% else %}
+                                <div class="form-group mb-0">
+                                    <button type="button"
+                                        onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'pod_date')"
+                                        class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
+                                        POD Date
+                                    </button>
+                                    <p class="font-medium text-sm mt-1 mb-0">
+                                        <span id="clin-pod-date-value">{{ clin.pod_date|date:"m/d/Y"|default:"—" }}</span>
+                                    </p>
+                                </div>
+                                {% endif %}
+                            </div>
                         </div>
-                        {% else %}
-                        <div class="form-group mb-0">
-                            <button type="button"
-                                onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'ship_qty')"
-                                class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
-                                Ship Qty
-                            </button>
-                            <p class="font-medium text-sm mt-1 mb-0">
-                                <span id="clin-ship-qty-value">{{ clin.ship_qty|default:"0" }}</span>
-                            </p>
-                        </div>
-                        {% endif %}
                     </div>
                     {% include "contracts/partials/clin_shipments.html" with mode="form" %}
                 </div>
@@ -594,6 +624,12 @@ function refreshClinShipQty() {
 {% block extra_scripts %}
 {{ block.super }}
 <script src="{% static 'contracts/js/contract_splits.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'contracts/js/clin_shipments_popup_opener.js' %}?v={% now 'U' %}"></script>
+<script>
+window.onClinShipmentsChanged = function () {
+    window.__clinShipmentsDirty = true;
+};
+</script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     fetch('/transactions/list/' + window.clinContentTypeId + '/' + window.clinId + '/')

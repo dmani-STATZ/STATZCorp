@@ -143,6 +143,7 @@ from .views import (
     get_clin_shipments,
     complete_clin_shipping,
     clin_pod_complete_api,
+    clin_shipments_popup,
     # Code table views
     code_table_admin,
     folder_scan_status,
@@ -883,6 +884,11 @@ urlpatterns = [
         "api/clin/<int:clin_id>/pod-complete/",
         clin_pod_complete_api,
         name="clin_pod_complete_api",
+    ),
+    path(
+        "clin/<int:clin_id>/shipments-popup/",
+        clin_shipments_popup,
+        name="clin_shipments_popup",
     ),
     path(
         "api/clin/<int:clin_id>/update-field/",

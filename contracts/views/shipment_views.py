@@ -230,6 +230,13 @@ def update_shipment_name(request, shipment_id):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+def _decimal_qty_differs(old, new):
+    """True when two ship quantities are not the same Decimal value."""
+    if old is None:
+        return True
+    return Decimal(str(old)) != Decimal(str(new))
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def update_shipment(request, shipment_id):
@@ -244,8 +251,12 @@ def update_shipment(request, shipment_id):
         # Update shipment fields
         if 'name' in data:
             shipment.name = (data['name'] or '').strip() or None
+        qty_changed = False
         if 'ship_qty' in data:
+            old_qty = shipment.ship_qty
             shipment.ship_qty = float(data['ship_qty'])
+            if shipment.ship_qty is not None and _decimal_qty_differs(old_qty, shipment.ship_qty):
+                qty_changed = True
         if 'uom' in data:
             shipment.uom = data['uom']
         if 'ship_date' in data:
@@ -258,15 +269,13 @@ def update_shipment(request, shipment_id):
         if 'quote_value' in data:
             qv = data['quote_value']
             shipment.quote_value = Decimal(str(qv)) if qv not in (None, '') else None
+        elif qty_changed and shipment.clin.price_per_unit is not None:
+            shipment.quote_value = shipment.auto_quote_value
         if 'item_value' in data:
             iv = data['item_value']
             shipment.item_value = Decimal(str(iv)) if iv not in (None, '') else None
-        if 'paid_amount' in data:
-            pa = data['paid_amount']
-            shipment.paid_amount = Decimal(str(pa)) if pa not in (None, '') else None
-        if 'wawf_payment' in data:
-            wp = data['wawf_payment']
-            shipment.wawf_payment = Decimal(str(wp)) if wp not in (None, '') else None
+        elif qty_changed and shipment.clin.unit_price is not None:
+            shipment.item_value = shipment.auto_item_value
 
         shipment.modified_by = request.user
         shipment.save()

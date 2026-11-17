@@ -461,6 +461,7 @@
                             <th class="text-end">Order Qty</th>
                             <th class="text-end">Ship Date</th>
                             <th class="text-end">Ship Qty</th>
+                            <th class="text-end">POD Date</th>
                             <th class="text-end">Quote Value</th>
                             <th class="text-end">Paid</th>
                             <th class="text-end">Item Value</th>
@@ -472,14 +473,14 @@
                     {% if not clins and not level_charges %}
                     <tbody>
                         <tr>
-                            <td colspan="13" class="text-center text-body-secondary py-4">No CLINs found for this contract</td>
+                            <td colspan="14" class="text-center text-body-secondary py-4">No CLINs found for this contract</td>
                         </tr>
                     </tbody>
                     {% else %}
                     {% for group in supplier_groups %}
                     <tbody>
                       <tr class="table-secondary supplier-group-header">
-                        <td colspan="13" class="ps-2 py-1 fw-semibold small">
+                        <td colspan="14" class="ps-2 py-1 fw-semibold small">
                           {% if group.supplier %}
                             {{ group.supplier.name }}
                           {% else %}
@@ -526,6 +527,15 @@
                             <td class="text-end">{{ clin.order_qty|default:"—" }}</td>
                             <td class="text-end">{{ clin.ship_date|date:"m/d/Y"|default:"—" }}</td>
                             <td class="text-end">{{ clin.ship_qty|default:"—" }}</td>
+                            <td class="text-end">
+                                <button type="button"
+                                        class="btn btn-link p-0 js-open-clin-shipments-popup{% if clin.pod_status == 'partial' %} text-danger{% elif clin.pod_status == 'full' %} text-success{% endif %}"
+                                        data-clin-id="{{ clin.id }}"
+                                        data-popup-url="{% url 'contracts:clin_shipments_popup' clin.id %}"
+                                        title="POD: {% if clin.pod_status == 'full' %}complete{% else %}{{ clin.pod_status }}{% endif %}. Click to manage shipments.">
+                                    {{ clin.pod_date_display }}{% if clin.pod_status == 'full' %} ✓{% endif %}
+                                </button>
+                            </td>
                             <td class="text-end">
                                 <span role="button" tabindex="0" class="text-primary text-decoration-underline"
                                       data-clin="{{ clin.id }}" data-type="quote_value"
@@ -597,6 +607,7 @@
                                             title="CLIN-level cost (no shipment)">
                                         + cost
                                     </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary js-open-clin-shipments-popup" data-clin-id="{{ clin.id }}" data-popup-url="{% url 'contracts:clin_shipments_popup' clin.id %}">Manage shipments</button>
                                     {% with slist=shipments_by_clin|get_item:clin.id %}
                                     {% if slist %}
                                     <button type="button" class="pill pill-partials partials-pill"
@@ -617,7 +628,7 @@
                             </td>
                         </tr>
                         <tr id="accordion-{{ clin.id }}" data-accordion-for="{{ clin.id }}" style="display:none;">
-                            <td colspan="13" style="padding: 0; border-top: none;">
+                            <td colspan="14" style="padding: 0; border-top: none;">
                                 <div style="display: flex; justify-content: flex-end;">
                                     <div style="width: 55%; padding: 8px 12px 8px 0;">
                                 {% with flist=clin.finance_lines_for_audit %}
@@ -685,13 +696,9 @@
                                 <td class="ps-4 small" colspan="2">
                                     <span class="shipment-name-display"
                                           data-shipment-id="{{ shipment.id }}"
-                                          data-counter="{{ forloop.counter }}"
+                                          data-fallback-label="{{ shipment.entry_label }}"
                                           title="Click to rename">
-                                        {% if shipment.name %}
-                                            {{ shipment.name }}
-                                        {% else %}
-                                            Shipment {{ forloop.counter }}
-                                        {% endif %}
+                                        {{ shipment.display_label }}
                                     </span>
                                 </td>
                                 <td class="text-muted small">{{ shipment.uom|default:"—" }}</td>
@@ -699,6 +706,7 @@
                                 <td class="text-end">—</td>
                                 <td class="text-end">{{ shipment.ship_date|date:"m/d/Y"|default:"—" }}</td>
                                 <td class="text-end">{{ shipment.ship_qty|default:"—" }}</td>
+                                <td class="text-end">{{ shipment.pod_date|date:"m/d/Y"|default:"—" }}</td>
                                 <td class="text-end">
                                     <span data-derived-field="quote_value"
                                           data-current-value="{{ shipment.quote_value|floatformat:2|default:'0.00' }}"
@@ -762,7 +770,7 @@
                                 data-clin-id="{{ clin.id }}"
                                 data-shipment-id="{{ shipment.id }}"
                                 style="display:none;">
-                                <td colspan="13" style="padding: 0; border-top: none; background: var(--bs-tertiary-bg);">
+                                <td colspan="14" style="padding: 0; border-top: none; background: var(--bs-tertiary-bg);">
                                     <div style="display: flex; justify-content: flex-end;">
                                         <div style="width: 55%; padding: 8px 12px 8px 0;">
                                             <div class="partial-finance-lines-container px-2 pt-2"
@@ -816,7 +824,7 @@
                             {% endfor %}
                             <tr class="partial-subtotals-row table-secondary small fw-semibold"
                                 data-subtotals-for="{{ clin.id }}">
-                                <td colspan="7" class="ps-4 text-end pe-2">Subtotals</td>
+                                <td colspan="8" class="ps-4 text-end pe-2">Subtotals</td>
                                 {% with sub=shipment_subtotals_by_clin|get_item:clin.id %}
                                 <td class="text-end" data-subtotal-field="quote_value">${{ sub.quote_value|floatformat:2|intcomma }}</td>
                                 <td class="text-end" data-subtotal-field="paid_amount">${{ sub.paid_amount|floatformat:2|intcomma }}</td>
@@ -828,7 +836,7 @@
                             </tr>
                         {% else %}
                             <tr class="partial-empty-hint">
-                                <td colspan="13" class="ps-4 py-2 text-body-secondary small border-0">
+                                <td colspan="14" class="ps-4 py-2 text-body-secondary small border-0">
                                     No shipments yet — use <strong>+ Shipment</strong> on the CLIN row, then log Paid / Customer Pay on the shipment.
                                 </td>
                             </tr>
@@ -851,6 +859,7 @@
                         <td>—</td>
                         <td>—</td>
                         <td>—</td>
+                        <td class="text-end">—</td>
                         <td class="text-end">
                           {% if charge.action_type == 'advance' %}
                             —
@@ -900,7 +909,7 @@
                       </tr>
                       {% endfor %}
                       <tr class="supplier-group-subtotal fw-semibold border-top">
-                        <td colspan="7" class="text-end small text-muted pe-2">
+                        <td colspan="8" class="text-end small text-muted pe-2">
                           {{ group.supplier.name|default:"No Supplier" }} Subtotal
                         </td>
                         <td class="text-end">${{ group.sub_quote|floatformat:2|intcomma }}</td>
@@ -918,7 +927,7 @@
                     {% endfor %}
                     <tfoot>
                       <tr class="grand-total-row fw-bold border-top-2">
-                        <td colspan="7" class="text-end pe-2">Grand Total</td>
+                        <td colspan="8" class="text-end pe-2">Grand Total</td>
                         <td class="text-end" data-totals-field="quote_value">${{ grand_quote|floatformat:2|intcomma }}</td>
                         <td class="text-end" data-totals-field="paid_amount">${{ grand_paid|floatformat:2|intcomma }}</td>
                         <td class="text-end" data-totals-field="item_value">
@@ -1072,8 +1081,12 @@
 <script src="{% static 'contracts/js/add_partial_modal.js' %}?v={% now 'U' %}"></script>
 <script src="{% static 'contracts/js/add_finance_line_modal.js' %}?v={% now 'U' %}"></script>
 <script src="{% static 'contracts/js/finance_audit_splits.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'contracts/js/clin_shipments_popup_opener.js' %}?v={% now 'U' %}"></script>
 <script>
 window.FINANCE_AUDIT_CONTRACT_ID = {{ contract.id }};
+window.onClinShipmentsChanged = function () {
+    window.__clinShipmentsDirty = true;
+};
 
 function openFinanceLinePaymentPopup(financeLineId, lineType, amountBilled) {
     fetch(`/contracts/api/finance-lines/${financeLineId}/payments/`)
@@ -1520,7 +1533,7 @@ function refreshClinRow(clinId) {
             function updateClinPaymentCell(fieldType, amount, hasShipments) {
                 const row = document.querySelector(`.clin-finance-audit-row[data-clin-id="${clinId}"]`);
                 if (!row) return;
-                const colIndex = fieldType === 'paid_amount' ? 8 : 10;
+                const colIndex = fieldType === 'paid_amount' ? 9 : 11;
                 const cell = row.cells[colIndex];
                 if (!cell) return;
                 const formatted = fmt(amount);
@@ -1567,6 +1580,20 @@ function refreshClinRow(clinId) {
                 }
             }
 
+            const podBtn = document.querySelector(
+                `.clin-finance-audit-row[data-clin-id="${clinId}"] .js-open-clin-shipments-popup`
+            );
+            if (podBtn && data.pod_status) {
+                const status = data.pod_status;
+                const label = data.pod_date || '—';
+                const titleStatus = status === 'full' ? 'complete' : status;
+                podBtn.textContent = status === 'full' ? `${label} ✓` : label;
+                podBtn.title = `POD: ${titleStatus}. Click to manage shipments.`;
+                podBtn.classList.remove('text-danger', 'text-success');
+                if (status === 'partial') podBtn.classList.add('text-danger');
+                if (status === 'full') podBtn.classList.add('text-success');
+            }
+
             if (!data.needs_unit_price) {
                 const setBtn = document.querySelector(
                     `.js-set-unit-price[data-clin-id="${clinId}"]`
@@ -1599,7 +1626,7 @@ window.financeShipmentsByClin = {
         {
             id: {{ shipment.id }},
             name: "{{ shipment.name|default:''|escapejs }}",
-            counter: {{ forloop.counter }},
+            label: "{{ shipment.display_label|escapejs }}",
             ship_date: "{{ shipment.ship_date|date:'m/d/Y'|default:'' }}",
         },
         {% endfor %}
@@ -2058,10 +2085,9 @@ window.financeShipmentsByClin = {
         if (!display || display.querySelector('input')) return;
 
         const shipmentId = display.dataset.shipmentId;
-        const counter = display.dataset.counter || '1';
+        const fallback = display.getAttribute('data-fallback-label') || '';
         const currentText = display.textContent.trim();
-        const storedName = currentText.indexOf('Shipment ') === 0 && currentText === ('Shipment ' + counter)
-            ? '' : currentText;
+        const storedName = fallback && currentText === fallback ? '' : currentText;
 
         const input = document.createElement('input');
         input.type = 'text';
@@ -2095,7 +2121,7 @@ window.financeShipmentsByClin = {
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.success) {
-                    display.textContent = data.name || ('Shipment ' + counter);
+                    display.textContent = (data.name && String(data.name).trim()) || fallback;
                 } else {
                     display.innerHTML = originalHtml;
                     if (window.notify) window.notify('error', data.error || 'Failed to rename', 3000);

@@ -928,10 +928,16 @@ class Clin(AuditModel):
         cost = coalesce_decimal(self.paid_amount, self.quote_value)
         gross = income - cost
 
-        finance_costs = (
-            self.finance_lines.aggregate(total=Sum('amount_billed'))['total']
-            or Decimal('0.00')
-        )
+        prefetched = getattr(self, "_prefetched_objects_cache", None)
+        if prefetched is not None and "finance_lines" in prefetched:
+            finance_costs = Decimal("0.00")
+            for line in prefetched["finance_lines"]:
+                finance_costs += line.amount_billed or Decimal("0.00")
+        else:
+            finance_costs = (
+                self.finance_lines.aggregate(total=Sum('amount_billed'))['total']
+                or Decimal('0.00')
+            )
         return gross - finance_costs
 
 class ClinShipment(AuditModel):

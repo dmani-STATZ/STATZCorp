@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -379,91 +380,94 @@ def add_partial_shipment(request):
 
         ship_date_raw = data.get('ship_date')
         ship_date = parse_date(str(ship_date_raw)) if ship_date_raw else None
+        pod_date_raw = data.get('pod_date')
+        pod_date = parse_date(str(pod_date_raw)) if pod_date_raw else None
 
-        shipment = ClinShipment.objects.create(
-            clin=clin,
-            name=data.get('name') or None,
-            ship_qty=ship_qty,
-            uom=data.get('uom') or clin.uom or '',
-            ship_date=ship_date,
-            comments=data.get('comments') or '',
-            quote_value=quote_value,
-            item_value=item_value,
-            paid_amount=Decimal(str(paid_amount_raw)) if paid_amount_raw not in (None, '') else None,
-            wawf_payment=Decimal(str(wawf_payment_raw)) if wawf_payment_raw not in (None, '') else None,
-            created_by=request.user,
-            modified_by=request.user,
-        )
-
-        # Sync clin ship_qty and ship_date rollup fields
-        from ..views.shipment_views import _sync_clin_ship_fields
-        _sync_clin_ship_fields(clin, request.user)
-
-        # Backfill unit prices on CLIN if missing but derivable from totals
-        # (one-time self-healing write for migrated contracts)
-        if (clin.unit_price is None and
-                clin.item_value and
-                clin.order_qty and
-                float(clin.order_qty) != 0):
-            try:
-                clin.unit_price = (
-                    Decimal(str(clin.item_value)) /
-                    Decimal(str(clin.order_qty))
-                )
-                clin.save(update_fields=['unit_price'])
-            except (InvalidOperation, ZeroDivisionError):
-                pass
-
-        if (clin.price_per_unit is None and
-                clin.quote_value and
-                clin.order_qty and
-                float(clin.order_qty) != 0):
-            try:
-                clin.price_per_unit = (
-                    Decimal(str(clin.quote_value)) /
-                    Decimal(str(clin.order_qty))
-                )
-                clin.save(update_fields=['price_per_unit'])
-            except (InvalidOperation, ZeroDivisionError):
-                pass
-
-        # --- PaymentHistory rollup for paid_amount and wawf_payment ---
-        from django.contrib.contenttypes.models import ContentType
-        from ..models import PaymentHistory
-
-        today = shipment.ship_date or __import__('datetime').date.today()
-
-        shipment_content_type = ContentType.objects.get_for_model(ClinShipment)
-
-        ROLLUP_FIELDS = [
-            ('paid_amount', 'partial_paid_amount'),
-            ('wawf_payment', 'partial_wawf_payment'),
-        ]
-
-        had_payment_rollup = False
-        for shipment_field, shipment_payment_type in ROLLUP_FIELDS:
-            value = getattr(shipment, shipment_field)
-            if not value:
-                continue
-
-            had_payment_rollup = True
-            PaymentHistory.objects.create(
-                content_type=shipment_content_type,
-                object_id=shipment.id,
-                payment_type=shipment_payment_type,
-                payment_amount=value,
-                payment_date=today,
-                payment_info='Initial value set on shipment creation',
-                reference_number='',
+        with transaction.atomic():
+            shipment = ClinShipment.objects.create(
+                clin=clin,
+                name=data.get('name') or None,
+                ship_qty=ship_qty,
+                uom=data.get('uom') or clin.uom or '',
+                ship_date=ship_date,
+                pod_date=pod_date,
+                comments=data.get('comments') or '',
+                quote_value=quote_value,
+                item_value=item_value,
+                paid_amount=Decimal(str(paid_amount_raw)) if paid_amount_raw not in (None, '') else None,
+                wawf_payment=Decimal(str(wawf_payment_raw)) if wawf_payment_raw not in (None, '') else None,
                 created_by=request.user,
                 modified_by=request.user,
-                company=clin.company,
             )
 
-        if had_payment_rollup:
-            from .shipment_views import _recompute_clin_payment_rollup
-            _recompute_clin_payment_rollup(clin, request.user)
-        # --- end PaymentHistory rollup ---
+            # Sync clin ship_qty and ship_date rollup fields
+            from ..views.shipment_views import _sync_clin_ship_fields
+            _sync_clin_ship_fields(clin, request.user)
+
+            # Backfill unit prices on CLIN if missing but derivable from totals
+            # (one-time self-healing write for migrated contracts)
+            if (clin.unit_price is None and
+                    clin.item_value and
+                    clin.order_qty and
+                    float(clin.order_qty) != 0):
+                try:
+                    clin.unit_price = (
+                        Decimal(str(clin.item_value)) /
+                        Decimal(str(clin.order_qty))
+                    )
+                    clin.save(update_fields=['unit_price'])
+                except (InvalidOperation, ZeroDivisionError):
+                    pass
+
+            if (clin.price_per_unit is None and
+                    clin.quote_value and
+                    clin.order_qty and
+                    float(clin.order_qty) != 0):
+                try:
+                    clin.price_per_unit = (
+                        Decimal(str(clin.quote_value)) /
+                        Decimal(str(clin.order_qty))
+                    )
+                    clin.save(update_fields=['price_per_unit'])
+                except (InvalidOperation, ZeroDivisionError):
+                    pass
+
+            # --- PaymentHistory rollup for paid_amount and wawf_payment ---
+            from django.contrib.contenttypes.models import ContentType
+            from ..models import PaymentHistory
+
+            today = shipment.ship_date or __import__('datetime').date.today()
+
+            shipment_content_type = ContentType.objects.get_for_model(ClinShipment)
+
+            ROLLUP_FIELDS = [
+                ('paid_amount', 'partial_paid_amount'),
+                ('wawf_payment', 'partial_wawf_payment'),
+            ]
+
+            had_payment_rollup = False
+            for shipment_field, shipment_payment_type in ROLLUP_FIELDS:
+                value = getattr(shipment, shipment_field)
+                if not value:
+                    continue
+
+                had_payment_rollup = True
+                PaymentHistory.objects.create(
+                    content_type=shipment_content_type,
+                    object_id=shipment.id,
+                    payment_type=shipment_payment_type,
+                    payment_amount=value,
+                    payment_date=today,
+                    payment_info='Initial value set on shipment creation',
+                    reference_number='',
+                    created_by=request.user,
+                    modified_by=request.user,
+                )
+
+            if had_payment_rollup:
+                from .shipment_views import _recompute_clin_payment_rollup
+                _recompute_clin_payment_rollup(clin, request.user)
+            # --- end PaymentHistory rollup ---
 
         return JsonResponse({
             'success': True,

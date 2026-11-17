@@ -48,6 +48,9 @@ const ClinShipments = {
 
     updateTotalShipQty() {
         const shipQtys = document.querySelectorAll('input[name$="-qty"]');
+        if (!shipQtys.length) {
+            return;
+        }
         let totalQty = 0;
 
         shipQtys.forEach(input => {
@@ -162,8 +165,14 @@ const ClinShipments = {
     },
 
     async saveShipment(button) {
-        const row = button.closest('tr');
+        const row = button ? button.closest('tr') : null;
+        if (!row) {
+            return;
+        }
         const section = document.querySelector('.section');
+        if (!section) {
+            return;
+        }
         const clinId = section.dataset.clinId;
 
         if (!clinId) {
@@ -171,11 +180,15 @@ const ClinShipments = {
             return;
         }
 
-        const shipmentId = row.querySelector('input[name$="-id"]').value;
+        const idInput = row.querySelector('input[name$="-id"]');
         const dateInput = row.querySelector('input[name$="-date"]');
         const qtyInput = row.querySelector('input[name$="-qty"]');
         const uomInput = row.querySelector('input[name$="-uom"]');
         const commentsInput = row.querySelector('input[name$="-comments"]');
+        if (!idInput || !dateInput || !qtyInput || !uomInput || !commentsInput) {
+            return;
+        }
+        const shipmentId = idInput.value;
 
         if (!qtyInput.value || parseFloat(qtyInput.value) <= 0) {
             this.showMessage('Valid quantity is required', 'error');
@@ -266,10 +279,20 @@ const ClinShipments = {
     },
 
     async removeShipment(button) {
-        const row = button.closest('tr');
+        const row = button ? button.closest('tr') : null;
+        if (!row) {
+            return;
+        }
         const section = document.querySelector('.section');
+        if (!section) {
+            return;
+        }
         const clinId = section.dataset.clinId;
-        const shipmentId = row.querySelector('input[name$="-id"]').value;
+        const idInput = row.querySelector('input[name$="-id"]');
+        if (!idInput) {
+            return;
+        }
+        const shipmentId = idInput.value;
 
         if (!shipmentId) {
             row.remove();
@@ -316,6 +339,12 @@ const ClinShipments = {
     },
 
     completeShipping() {
+        const dateEl = document.getElementById('complete-ship-date');
+        const qtyEl = document.getElementById('complete-ship-qty');
+        const modalEl = document.getElementById('completeShippingModal');
+        if (!dateEl || !qtyEl || !modalEl || typeof bootstrap === 'undefined') {
+            return;
+        }
         // Pre-fill with last shipment's ship_date and total shipped qty
         const rows = document.querySelectorAll(
             '#shipments-table .shipment-row:not(.unsaved-shipment)'
@@ -326,19 +355,21 @@ const ClinShipments = {
             // rendered = most recent; we want the most recent)
             const firstRow = rows[0];
             const dateInput = firstRow.querySelector('input[name$="-date"]');
-            if (dateInput) lastDate = dateInput.value;
+            if (dateInput) {
+                lastDate = dateInput.value;
+            } else if (firstRow.dataset.shipDate) {
+                lastDate = firstRow.dataset.shipDate;
+            }
         }
 
         // Total shipped from the span
         const totalSpan = document.getElementById('totalShipQty');
         const totalQty = totalSpan ? totalSpan.textContent.split('/')[0].trim() : '0';
 
-        document.getElementById('complete-ship-date').value = lastDate;
-        document.getElementById('complete-ship-qty').value = totalQty;
+        dateEl.value = lastDate;
+        qtyEl.value = totalQty;
 
-        const modal = new bootstrap.Modal(
-            document.getElementById('completeShippingModal')
-        );
+        const modal = new bootstrap.Modal(modalEl);
         modal.show();
     },
 
@@ -350,8 +381,14 @@ const ClinShipments = {
             return;
         }
 
-        const shipDate = document.getElementById('complete-ship-date').value;
-        const shipQty = document.getElementById('complete-ship-qty').value;
+        const dateEl = document.getElementById('complete-ship-date');
+        const qtyEl = document.getElementById('complete-ship-qty');
+        const modalEl = document.getElementById('completeShippingModal');
+        if (!dateEl || !qtyEl) {
+            return;
+        }
+        const shipDate = dateEl.value;
+        const shipQty = qtyEl.value;
 
         if (!shipDate) {
             this.showMessage('Ship date is required', 'error');
@@ -379,9 +416,12 @@ const ClinShipments = {
 
             if (data.success) {
                 // Close modal
-                bootstrap.Modal.getInstance(
-                    document.getElementById('completeShippingModal')
-                ).hide();
+                if (modalEl && typeof bootstrap !== 'undefined') {
+                    const instance = bootstrap.Modal.getInstance(modalEl);
+                    if (instance) {
+                        instance.hide();
+                    }
+                }
 
                 // Update the CLIN detail page field displays if they exist
                 // (id pattern matches clin_detail.html onTransactionSaved targets)

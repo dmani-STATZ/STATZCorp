@@ -1,6 +1,7 @@
 """Views for Gov Actions and Log Fields (contract management)."""
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, GovAction, Contract
@@ -77,6 +78,7 @@ def get_clin_details(request, clin_id):
             'is_shipping_complete': is_shipping_complete,
             'item_value': str(clin.item_value) if clin.item_value is not None else '—',
             'unit_price': str(clin.unit_price) if clin.unit_price is not None else '—',
+            'shipments_popup_url': reverse('contracts:clin_shipments_popup', args=[clin.id]),
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

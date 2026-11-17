@@ -173,6 +173,7 @@ from .shipment_views import (
     complete_clin_shipping,
     clin_pod_complete_api,
 )
+from .clin_shipments_popup_views import clin_shipments_popup
 
 from .code_table_views import (
     code_table_admin,

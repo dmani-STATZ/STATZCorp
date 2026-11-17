@@ -16,6 +16,8 @@ from contracts.services.sharepoint_paths import (
     build_explorer_uri,
     resolve_contract_folder_path,
 )
+from contracts.services.pod_status import compute_pod_status
+from contracts.services.shipment_labels import label_shipments
 from contracts.services.split_breakdown import build_split_breakdown_context
 from .mixins import ActiveCompanyQuerysetMixin
 import logging
@@ -23,6 +25,13 @@ from decimal import Decimal
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+def _format_audit_pod_date(value):
+    """Finance Audit POD date display: m/d/Y, or an em dash when empty."""
+    if not value:
+        return "—"
+    return value.strftime("%m/%d/%Y")
 
 PAYMENT_ACTIVITY_PAGE_SIZE = 50
 
@@ -200,6 +209,8 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                     'supplier',
                     'special_payment_terms',
                     'nsn'
+                ).prefetch_related(
+                    'finance_lines'
                 ).order_by('item_number')
 
                 context['clin_split_rollup'] = list(
@@ -254,6 +265,8 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                 shipments_by_clin = {}
                 for shipment in shipments_qs:
                     shipments_by_clin.setdefault(shipment.clin_id, []).append(shipment)
+                for clin_id, shipments in list(shipments_by_clin.items()):
+                    shipments_by_clin[clin_id] = label_shipments(shipments)
 
                 shipment_subtotals_by_clin = {}
                 for clin_id, shipments in shipments_by_clin.items():
@@ -376,6 +389,10 @@ class FinanceAuditView(ActiveCompanyQuerysetMixin, DetailView):
                         not clin.has_shipments
                         or abs(clin.shipment_item_value_delta) <= Decimal('0.01')
                     )
+                    clin_shipments = shipments_by_clin.get(clin.id, [])
+                    clin.pod_status = compute_pod_status(clin, shipments=clin_shipments)
+                    clin.pod_date_display = _format_audit_pod_date(clin.pod_date)
+                    clin.pod_complete = bool(clin.pod_complete)
 
                 grouped = build_finance_audit_supplier_groups(
                     clins_list, level_charges
@@ -505,15 +522,17 @@ def finance_audit_clin_api(request, contract_id, clin_id):
         contract = get_object_or_404(Contract, id=contract_id, company_id=company)
         clin = get_object_or_404(Clin, id=clin_id, contract=contract)
 
-        shipments_qs = ClinShipment.objects.filter(clin=clin).order_by('ship_date', 'created_on')
+        shipment_list = list(
+            ClinShipment.objects.filter(clin=clin).order_by('ship_date', 'created_on')
+        )
         shipment_subtotals = {
-            'quote_value': sum(Decimal(str(s.quote_value or 0)) for s in shipments_qs),
-            'paid_amount': sum(Decimal(str(s.paid_amount or 0)) for s in shipments_qs),
-            'item_value': sum(Decimal(str(s.item_value or 0)) for s in shipments_qs),
-            'wawf_payment': sum(Decimal(str(s.wawf_payment or 0)) for s in shipments_qs),
+            'quote_value': sum(Decimal(str(s.quote_value or 0)) for s in shipment_list),
+            'paid_amount': sum(Decimal(str(s.paid_amount or 0)) for s in shipment_list),
+            'item_value': sum(Decimal(str(s.item_value or 0)) for s in shipment_list),
+            'wawf_payment': sum(Decimal(str(s.wawf_payment or 0)) for s in shipment_list),
         }
 
-        has_shipments = shipments_qs.exists()
+        has_shipments = bool(shipment_list)
         clin_item_val = Decimal(str(clin.item_value or 0))
         shipment_item_value_delta = shipment_subtotals['item_value'] - clin_item_val
         shipment_item_value_balanced = (
@@ -546,6 +565,9 @@ def finance_audit_clin_api(request, contract_id, clin_id):
             'shipment_item_value_delta': str(shipment_item_value_delta),
             'shipment_item_value_balanced': shipment_item_value_balanced,
             'finance_billed_sum': str(finance_billed_sum),
+            'pod_date': _format_audit_pod_date(clin.pod_date),
+            'pod_status': compute_pod_status(clin, shipments=shipment_list),
+            'pod_complete': bool(clin.pod_complete),
         })
     except Exception as e:
         logger.error(f"Error in finance_audit_clin_api: {str(e)}")

@@ -139,6 +139,21 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
         return JsonResponse({"success": False, "error": "Field not supported"}, status=400)
 
     if request.method == "POST":
+        if (
+            model_class.__name__ == "Clin"
+            and field_name == "pod_date"
+            and instance.shipments.exists()
+        ):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": (
+                        "POD Date is derived from the shipments. "
+                        "Edit the shipment's POD Date in the Shipments popup."
+                    ),
+                },
+                status=400,
+            )
         form = EditFieldForm(
             content_type_id=content_type_id,
             field_name=field_name,

@@ -680,7 +680,7 @@
                                 <tr>
                                     <td colspan="2" style="padding-top:8px; border-top:0.5px solid var(--bs-border-color);">
                                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                                            <button type="button" id="cd-shipments-btn" onclick="openShipmentsModal({{ selected_clin.id|default:'null' }})" class="btn btn-outline-secondary btn-sm">Shipments</button>
+                                            <button type="button" id="cd-shipments-btn" class="btn btn-sm btn-outline-secondary js-open-clin-shipments-popup" data-clin-id="{{ selected_clin.id }}" data-popup-url="{% url 'contracts:clin_shipments_popup' selected_clin.id %}">Manage shipments</button>
                                             <span id="view-full-clin-link">
                                                 {% if selected_clin %}
                                                 <a href="{% url 'contracts:clin_detail' selected_clin.id %}" style="font-size:12px;">View Full →</a>
@@ -1231,6 +1231,14 @@
 <script src="{% static 'contracts/js/note_modal.js' %}"></script>
 <script src="{% static 'contracts/js/set_reminders_modal.js' %}?v={{ cache_version }}-set-reminders-1"></script>
 <script src="{% static 'contracts/js/reminder_bell_modal.js' %}?v={{ cache_version }}-reminder-bell-3"></script>
+<script src="{% static 'contracts/js/clin_shipments_popup_opener.js' %}?v={{ cache_version }}"></script>
+<script>
+window.onClinShipmentsChanged = function (clinId) {
+    if (clinId && typeof fetchClinDetails === "function") {
+        fetchClinDetails(clinId);
+    }
+};
+</script>
 <script>
 // Initialize Bootstrap tooltips on this page (for the Fix Legacy CLINs icon
 // button and any other [data-bs-toggle="tooltip"] elements). Safe no-op if
@@ -2279,7 +2287,7 @@ function fetchClinDetails(clinId) {
                             <tr>
                                 <td colspan="2" style="padding-top:8px; border-top:0.5px solid var(--bs-border-color);">
                                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                                        <button type="button" id="cd-shipments-btn" onclick="openShipmentsModal(${d.id})" class="btn btn-outline-secondary btn-sm">Shipments</button>
+                                        <button type="button" id="cd-shipments-btn" class="btn btn-sm btn-outline-secondary js-open-clin-shipments-popup" data-clin-id="${d.id}" data-popup-url="${d.shipments_popup_url}">Manage shipments</button>
                                         <span id="view-full-clin-link"><a href="${viewUrl}" style="font-size:12px;">View Full →</a></span>
                                     </div>
                                 </td>

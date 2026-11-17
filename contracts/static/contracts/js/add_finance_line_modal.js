@@ -120,7 +120,7 @@
         shipments.forEach(function(s) {
             const opt = document.createElement('option');
             opt.value = s.id;
-            const name = s.name || ('Shipment ' + s.counter);
+            const name = s.label || s.name || '';
             const date = s.ship_date ? (' · ' + s.ship_date) : '';
             opt.textContent = name + date;
             if (selectedShipmentId && String(s.id) === String(selectedShipmentId)) {

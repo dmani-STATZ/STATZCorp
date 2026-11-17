@@ -1,0 +1,244 @@
+{% extends "contracts/notes_popup_base.html" %}
+{% load l10n static %}
+
+{% block title %}Shipments — CLIN {{ clin.item_number|default:clin.id }}{% endblock %}
+
+{% block extra_head %}
+<script>
+(function () {
+    var theme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-bs-theme", theme);
+})();
+</script>
+<script src="{% static 'js/theme_toggle.js' %}?v={{ cache_version }}"></script>
+<link rel="stylesheet" href="{% static 'contracts/css/components.css' %}?v={{ cache_version }}">
+{% endblock %}
+
+{% block content %}
+<div id="clin-ship-popup"
+     class="clin-ship-popup"
+     data-clin-id="{{ clin.id }}"
+     data-add-url="{% url 'contracts:partial_shipment_add' %}"
+     data-auto-calc-url="{% url 'contracts:partial_auto_calc' %}"
+     data-name-max="{{ name_max_length }}"
+     data-comments-max="{% if comments_max_length %}{{ comments_max_length }}{% endif %}"
+     data-clin-uom="{{ clin.uom|default:'' }}"
+     data-open-mode="{{ open_mode }}"
+     data-open-shipment-id="{{ open_shipment_id }}">
+    <header class="clin-ship-popup-header">
+        <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+                <h1 class="h5 mb-1">CLIN Shipments</h1>
+                <p class="mb-0 text-body-secondary small">Enter Paid and Customer Pay when adding a shipment. Later money edits stay on Finance Audit.</p>
+            </div>
+            <span class="badge {% if pod_status == 'full' %}text-bg-success{% elif pod_status == 'partial' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+                POD {{ pod_status }}
+            </span>
+        </div>
+        <div class="clin-ship-popup-grid">
+            <div>
+                <span class="clin-ship-popup-label">Contract #</span>
+                <span class="clin-ship-popup-value">{{ clin.contract.contract_number|default:"—" }}</span>
+            </div>
+            <div>
+                <span class="clin-ship-popup-label">CLIN item #</span>
+                <span class="clin-ship-popup-value">{{ clin.item_number|default:"—" }}</span>
+            </div>
+            <div>
+                <span class="clin-ship-popup-label">CLIN Type</span>
+                <span class="clin-ship-popup-value">{{ clin.get_item_type_display|default:"—" }}</span>
+            </div>
+            <div>
+                <span class="clin-ship-popup-label">Sub PO #</span>
+                <span class="clin-ship-popup-value">{{ clin.clin_po_num|default:"—" }}</span>
+            </div>
+            <div>
+                <span class="clin-ship-popup-label">Order Qty</span>
+                <span class="clin-ship-popup-value">{{ clin.order_qty|default:"—" }}{% if clin.uom %} {{ clin.uom }}{% endif %}</span>
+            </div>
+            <div>
+                <span class="clin-ship-popup-label">Shipped</span>
+                {% if clin.order_qty is None %}
+                <span class="clin-ship-popup-value" id="popup-shipped">{{ shipped_qty }}</span>
+                {% else %}
+                <span class="clin-ship-popup-value {{ shipped_class }}" id="popup-shipped">{{ shipped_qty }} of {{ clin.order_qty }}{% if clin.uom %} {{ clin.uom }}{% endif %}{% if is_shipping_complete %} ✓{% endif %}</span>
+                {% endif %}
+            </div>
+            <div>
+                <span class="clin-ship-popup-label">CLIN Due Date</span>
+                <span class="clin-ship-popup-value">{{ clin.due_date|date:"m/d/Y"|default:"—" }}</span>
+            </div>
+            <div>
+                <span class="clin-ship-popup-label">POD Date</span>
+                <span class="clin-ship-popup-value">{{ clin.pod_date|date:"m/d/Y"|default:"—" }}</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="clin-ship-popup-body">
+        <div id="popup-alert" class="alert alert-danger d-none" role="alert"></div>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Shipments</h2>
+            <button type="button" class="btn btn-sm btn-primary" id="open-add-shipment">Add Shipment</button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" id="shipments-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Ship Date</th>
+                        <th class="text-end">Qty</th>
+                        <th>UOM</th>
+                        <th>Comments</th>
+                        <th class="text-end">Quote Value</th>
+                        <th class="text-end">Paid</th>
+                        <th class="text-end">Item Value</th>
+                        <th class="text-end">Customer Pay</th>
+                        <th>POD Date</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for shipment in shipments %}
+                    <tr data-shipment-id="{{ shipment.id }}"
+                        data-update-url="{% url 'contracts:update_shipment' shipment.id %}"
+                        data-delete-url="{% url 'contracts:delete_shipment' shipment.id %}"
+                        data-name="{{ shipment.name|default:'' }}"
+                        data-ship-date="{{ shipment.ship_date|date:'Y-m-d' }}"
+                        data-ship-qty="{% if shipment.ship_qty is not None %}{{ shipment.ship_qty|unlocalize }}{% endif %}"
+                        data-uom="{{ shipment.uom|default:'' }}"
+                        data-comments="{{ shipment.comments|default:'' }}"
+                        data-pod-date="{{ shipment.pod_date|date:'Y-m-d' }}">
+                        <td>{{ shipment.display_label }}</td>
+                        <td>{{ shipment.ship_date|date:"m/d/Y"|default:"—" }}</td>
+                        <td class="text-end">{{ shipment.ship_qty|default:"—" }}</td>
+                        <td>{{ shipment.uom|default:"—" }}</td>
+                        <td>{{ shipment.comments|default:"—" }}</td>
+                        <td class="text-end popup-money" title="Edit on the Finance Audit page.">
+                            {% if shipment.quote_value is None %}—{% else %}${{ shipment.quote_value|floatformat:2 }}{% endif %}
+                        </td>
+                        <td class="text-end popup-money" title="Edit on the Finance Audit page.">
+                            {% if shipment.paid_amount is None %}—{% else %}${{ shipment.paid_amount|floatformat:2 }}{% endif %}
+                        </td>
+                        <td class="text-end popup-money" title="Edit on the Finance Audit page.">
+                            {% if shipment.item_value is None %}—{% else %}${{ shipment.item_value|floatformat:2 }}{% endif %}
+                        </td>
+                        <td class="text-end popup-money" title="Edit on the Finance Audit page.">
+                            {% if shipment.wawf_payment is None %}—{% else %}${{ shipment.wawf_payment|floatformat:2 }}{% endif %}
+                        </td>
+                        <td>{{ shipment.pod_date|date:"m/d/Y"|default:"—" }}</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary js-edit-shipment">Edit</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger js-delete-shipment">Delete</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="text-body-secondary py-3">No shipments yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="shipmentModal" tabindex="-1" aria-labelledby="shipmentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="shipmentModalLabel">Add Shipment</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="shipment-modal-alert" class="alert alert-danger d-none" role="alert"></div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1" for="shipment-name">Name</label>
+                            <input type="text" class="form-control form-control-sm" id="shipment-name" data-field="name" maxlength="{{ name_max_length }}" placeholder="e.g. Shipment 1">
+                            <div class="form-text">Leave blank to use default name (Shipment 1, Shipment 2, etc.)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1" for="shipment-ship-date">Ship Date</label>
+                            <div class="d-flex gap-1">
+                                <input type="date" class="form-control form-control-sm" id="shipment-ship-date" data-field="ship_date">
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-today">Today</button>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1" for="shipment-qty">Qty</label>
+                            <input type="text" class="form-control form-control-sm" id="shipment-qty" data-field="ship_qty" inputmode="decimal">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1" for="shipment-uom">UOM</label>
+                            <input type="text" class="form-control form-control-sm" id="shipment-uom" data-field="uom" maxlength="10">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1" for="shipment-pod-date">POD Date</label>
+                            <div class="d-flex gap-1">
+                                <input type="date" class="form-control form-control-sm" id="shipment-pod-date" data-field="pod_date">
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-today">Today</button>
+                            </div>
+                        </div>
+                        <div class="col-12 js-add-only">
+                            <div class="d-flex gap-2">
+                                <div class="flex-fill">
+                                    <label class="form-label small mb-1" for="popup-preview-quote">Quote Value</label>
+                                    <input type="text" class="form-control form-control-sm bg-body-secondary" id="popup-preview-quote" value="—" readonly tabindex="-1">
+                                </div>
+                                <div class="flex-fill">
+                                    <label class="form-label small mb-1" for="popup-preview-item">Item Value</label>
+                                    <input type="text" class="form-control form-control-sm bg-body-secondary" id="popup-preview-item" value="—" readonly tabindex="-1">
+                                </div>
+                            </div>
+                            <div class="form-text">Derived from Qty x CLIN unit price.</div>
+                        </div>
+                        <div class="col-md-6 js-add-only">
+                            <label class="form-label small mb-1" for="add-paid">Paid</label>
+                            <input type="number" class="form-control form-control-sm" id="add-paid" data-field="paid_amount" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="col-md-6 js-add-only">
+                            <label class="form-label small mb-1" for="add-customer-pay">Customer Pay</label>
+                            <input type="number" class="form-control form-control-sm" id="add-customer-pay" data-field="wawf_payment" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="col-12 js-edit-only d-none">
+                            <p class="form-text mb-0">Money is edited on the Finance Audit page.</p>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small mb-1" for="shipment-comments">Comments</label>
+                            <textarea class="form-control form-control-sm" id="shipment-comments" data-field="comments" rows="2"{% if comments_max_length %} maxlength="{{ comments_max_length }}"{% endif %}></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="shipment-modal-save">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="clin-ship-popup-footer">
+        <div>
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="pod-complete"
+                       data-url="{% url 'contracts:clin_pod_complete_api' clin.id %}"
+                       data-ship-qty="{{ clin.ship_qty|default_if_none:'' }}"
+                       data-order-qty="{{ clin.order_qty|default_if_none:'' }}"
+                       {% if clin.pod_complete %}checked{% endif %}
+                       {% if not clin.pod_complete and not can_complete %}disabled{% endif %}>
+                <label class="form-check-label" for="pod-complete">POD Complete</label>
+            </div>
+            {% if not clin.pod_complete and not can_complete %}
+            <p class="form-text mb-0" id="pod-complete-help">Every shipment needs a POD date before this CLIN can be marked POD complete.</p>
+            {% endif %}
+        </div>
+        <button type="button" class="btn btn-outline-secondary" id="popup-close">Close</button>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'contracts/js/clin_shipments_popup.js' %}?v={{ cache_version }}"></script>
+{% endblock %}

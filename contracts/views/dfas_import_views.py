@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from contracts.models import Clin, Contract, DfasImportBatch, DfasImportRow
+from contracts.services.shipment_labels import label_shipments
 from contracts.services.dfas_import import (
     DfasImportError,
     _resolve_row_contract_clin_shipment,
@@ -137,17 +138,17 @@ def dfas_import_review_view(request, batch_id):
     shipment_options_cache = {}
     def _get_shipment_opts(clin_id):
         if clin_id not in shipment_options_cache:
-            ships = list(
-                ClinShipment.objects.filter(clin_id=clin_id).order_by('id')
-            )
+            ships = label_shipments(list(
+                ClinShipment.objects.filter(clin_id=clin_id)
+            ))
             shipment_options_cache[clin_id] = [
                 {
                     'id': s.id,
-                    'display': s.name or f'Shipment {i + 1}',
+                    'display': s.display_label,
                     'item_value': s.item_value,
                     'wawf_payment': s.wawf_payment,
                 }
-                for i, s in enumerate(ships)
+                for s in ships
             ]
         return shipment_options_cache[clin_id]
 
@@ -612,6 +613,17 @@ def dfas_import_close_batch_view(request, batch_id):
     })
 
 
+def _shipment_display_label(shipment):
+    """Entry-order label for one shipment, using its CLIN's full list."""
+    if shipment is None:
+        return None
+    labeled = label_shipments(list(shipment.clin.shipments.all()))
+    for item in labeled:
+        if item.pk == shipment.pk:
+            return item.display_label
+    return None
+
+
 @login_required
 @require_GET
 def dfas_row_match_preview_api(request, batch_id, row_id):
@@ -674,10 +686,7 @@ def dfas_row_match_preview_api(request, batch_id, row_id):
         'clin_item_number': clin.item_number if clin else None,
         'clin_item_type': clin.get_item_type_display() if clin else None,
         'clin_item_value': _fmt_decimal(clin.item_value) if clin else None,
-        'shipment_name': (
-            (shipment.name or f'Shipment {shipment.pk}')
-            if shipment else None
-        ),
+        'shipment_name': _shipment_display_label(shipment),
         'shipment_item_value': _fmt_decimal(shipment.item_value) if shipment else None,
         'shipment_wawf_payment': _fmt_decimal(shipment.wawf_payment) if shipment else None,
         'dfas_amount': _fmt_decimal(row.raw_check_eft_amount),
@@ -829,11 +838,11 @@ def dfas_shipments_api(request):
             status=400,
         )
 
-    shipments = clin.shipments.all().order_by('id')
+    shipments = label_shipments(list(clin.shipments.all()))
 
     shipment_list = []
-    for i, s in enumerate(shipments):
-        display_name = s.name.strip() if (s.name and s.name.strip()) else f"Shipment {i + 1}"
+    for s in shipments:
+        display_name = s.display_label
 
         item_value = f"{s.item_value:.2f}" if s.item_value is not None else None
         quote_value = f"{s.quote_value:.2f}" if s.quote_value is not None else None
@@ -850,6 +859,6 @@ def dfas_shipments_api(request):
         })
 
     return JsonResponse({
-        "has_shipments": shipments.exists(),
+        "has_shipments": bool(shipment_list),
         "shipments": shipment_list,
     })
