@@ -161,13 +161,6 @@
                             <input type="text" class="form-control form-control-sm" id="shipment-name" data-field="name" maxlength="{{ name_max_length }}" placeholder="e.g. Shipment 1">
                             <div class="form-text">Leave blank to use default name (Shipment 1, Shipment 2, etc.)</div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label small mb-1" for="shipment-ship-date">Ship Date</label>
-                            <div class="d-flex gap-1">
-                                <input type="date" class="form-control form-control-sm" id="shipment-ship-date" data-field="ship_date">
-                                <button type="button" class="btn btn-sm btn-outline-secondary js-today">Today</button>
-                            </div>
-                        </div>
                         <div class="col-md-3">
                             <label class="form-label small mb-1" for="shipment-qty">Qty</label>
                             <input type="text" class="form-control form-control-sm" id="shipment-qty" data-field="ship_qty" inputmode="decimal">
@@ -175,6 +168,13 @@
                         <div class="col-md-3">
                             <label class="form-label small mb-1" for="shipment-uom">UOM</label>
                             <input type="text" class="form-control form-control-sm" id="shipment-uom" data-field="uom" maxlength="10">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1" for="shipment-ship-date">Ship Date</label>
+                            <div class="d-flex gap-1">
+                                <input type="date" class="form-control form-control-sm" id="shipment-ship-date" data-field="ship_date">
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-today">Today</button>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small mb-1" for="shipment-pod-date">POD Date</label>
