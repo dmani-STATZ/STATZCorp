@@ -13,7 +13,8 @@
     var autoCalcToken = 0;
     var mode = "add";
     var editingRow = null;
-    var editPrefill = { paid_amount: "0.00", wawf_payment: "0.00" };
+    var editPrefill = { paid_amount: "0.00", wawf_payment: "0.00", paid_date: "", wawf_payment_date: "" };
+    var PAYMENT_DATE_FIELDS = ["paid_date", "wawf_payment_date"];
     var saveInFlight = false;
     var modalEl = document.getElementById("shipmentModal");
     var modal = modalEl && window.bootstrap ? new window.bootstrap.Modal(modalEl) : null;
@@ -215,7 +216,7 @@
     }
 
     function clearForm() {
-        ["name", "ship_date", "ship_qty", "uom", "pod_date", "comments", "paid_amount", "wawf_payment"].forEach(function (name) {
+        ["name", "ship_date", "ship_qty", "uom", "pod_date", "comments", "paid_amount", "wawf_payment", "paid_date", "wawf_payment_date"].forEach(function (name) {
             setField(modalEl, name, "");
         });
         setPreviews("—", "—");
@@ -275,9 +276,13 @@
         editPrefill = {
             paid_amount: row.getAttribute("data-paid-amount") || "0.00",
             wawf_payment: row.getAttribute("data-wawf-payment") || "0.00",
+            paid_date: row.getAttribute("data-paid-date") || "",
+            wawf_payment_date: row.getAttribute("data-wawf-payment-date") || "",
         };
         setField(modalEl, "paid_amount", editPrefill.paid_amount);
         setField(modalEl, "wawf_payment", editPrefill.wawf_payment);
+        setField(modalEl, "paid_date", editPrefill.paid_date);
+        setField(modalEl, "wawf_payment_date", editPrefill.wawf_payment_date);
         openModal();
     }
 
@@ -344,6 +349,12 @@
             if (!customerPayTotal.skip) {
                 payload.wawf_payment_total = customerPayTotal.value;
             }
+            PAYMENT_DATE_FIELDS.forEach(function (name) {
+                var value = String(fieldValue(modalEl, name) || "").trim();
+                if (value !== editPrefill[name]) {
+                    payload[name] = value;
+                }
+            });
         } else {
             var paid = optionalMoney(fieldValue(modalEl, "paid_amount"));
             if (paid.error) {
@@ -371,6 +382,12 @@
             if (!customerPay.skip) {
                 payload.wawf_payment = customerPay.value;
             }
+            PAYMENT_DATE_FIELDS.forEach(function (name) {
+                var value = blankToNull(fieldValue(modalEl, name));
+                if (value) {
+                    payload[name] = value;
+                }
+            });
         }
         setSaveDisabled(true);
         postJson(url, payload).then(function (result) {

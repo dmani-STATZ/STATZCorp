@@ -47,6 +47,8 @@ TRACKED = [
     (ClinShipment, "quote_value"),
     (ClinShipment, "item_value"),
     (ClinShipment, "pod_date"),
+    (ClinShipment, "paid_date"),
+    (ClinShipment, "wawf_payment_date"),
     (ClinSplit, "split_paid"),
     (ContractLevelCharge, "label"),
     (ContractLevelCharge, "action_type"),
@@ -177,6 +179,7 @@ def store_old_state(sender, instance, **kwargs):
         try:
             row = ClinShipment.objects.filter(pk=instance.pk).values(
                 "ship_qty", "ship_date", "quote_value", "item_value", "pod_date",
+                "paid_date", "wawf_payment_date",
             ).first()
             if row is not None:
                 old_state[key] = {
@@ -185,6 +188,8 @@ def store_old_state(sender, instance, **kwargs):
                     "quote_value": _serialize(row.get("quote_value")),
                     "item_value": _serialize(row.get("item_value")),
                     "pod_date": _serialize(row.get("pod_date")),
+                    "paid_date": _serialize(row.get("paid_date")),
+                    "wawf_payment_date": _serialize(row.get("wawf_payment_date")),
                 }
         except Exception:
             pass

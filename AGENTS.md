@@ -71,6 +71,7 @@
 - Finance Audit POD Date is the column immediately after Ship Qty. Every CLIN-table `<tr>` must still match the header column count, counting `colspan`. The opener sets `window.__clinShipmentsDirty` from `window.onClinShipmentsChanged` and reloads once when `clinShipmentsPopup` closes.
 
 ## Shipment payments (when touching shipment or CLIN Paid / Customer Pay)
+- CLIN `paid_date` / `wawf_recieved` are rollups when the CLIN has shipments; edit dates on shipments (Stage 8, `contracts/AGENTS_contracts.md`).
 - Use `contracts/services/shipment_payments.py`; never write CLIN Paid / Customer Pay on a CLIN with shipments. Full rules: `contracts/AGENTS_contracts.md`. `transaction_edit_field` serves only `EDITABLE_FIELDS` (`transactions/AGENTS_transactions.md`).
 
 ## CSS (when touching `static/css/app-core.css` or any date field)

@@ -9,6 +9,7 @@ from django.db.models import Count, Max, Q, Sum
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_date
 
 from STATZWeb.decorators import conditional_login_required
 from ..models import Clin, ClinShipment, PaymentHistory
@@ -30,12 +31,17 @@ def _sync_clin_ship_fields(clin, user):
     - pod_date = MAX pod_date across shipments with a non-null pod_date, or None if none
     If pod_complete is set and the CLIN now has zero shipments or any shipment
     with a null pod_date, clear pod_complete in the same save.
+    - paid_date = MAX shipment paid_date; wawf_recieved = MAX shipment
+      wawf_payment_date. Only written when some shipment has that date, so an
+      existing CLIN date is never overwritten with NULL.
     Transactions signals fire automatically on save.
     """
     agg = clin.shipments.aggregate(
         total_qty=Sum('ship_qty'),
         latest_date=Max('ship_date'),
         latest_pod_date=Max('pod_date'),
+        latest_paid_date=Max('paid_date'),
+        latest_wawf_payment_date=Max('wawf_payment_date'),
         shipment_count=Count('id'),
         missing_pod=Count('id', filter=Q(pod_date__isnull=True)),
     )
@@ -49,6 +55,14 @@ def _sync_clin_ship_fields(clin, user):
     if clin.pod_complete and (not agg['shipment_count'] or agg['missing_pod']):
         clin.pod_complete = False
         update_fields.append('pod_complete')
+    for clin_field, agg_key in (
+        ('paid_date', 'latest_paid_date'),
+        ('wawf_recieved', 'latest_wawf_payment_date'),
+    ):
+        latest = agg[agg_key]
+        if latest is not None and getattr(clin, clin_field) != latest:
+            setattr(clin, clin_field, latest)
+            update_fields.append(clin_field)
     clin.save(update_fields=update_fields)
 
 
@@ -132,6 +146,32 @@ MONEY_TOTAL_FIELDS = {
     'wawf_payment_total': ('wawf_payment', 'Customer Pay'),
 }
 MAX_MONEY_INTEGER_DIGITS = 13
+
+# Shipment payment date key -> (label, matching money field).
+PAYMENT_DATE_FIELDS = {
+    'paid_date': ('Paid Date', 'paid_amount'),
+    'wawf_payment_date': ('Customer Pay Date', 'wawf_payment'),
+}
+MONEY_FIELD_DATE = {
+    money_field: date_key
+    for date_key, (_label, money_field) in PAYMENT_DATE_FIELDS.items()
+}
+
+
+def parse_optional_date(raw, label):
+    """Return a date, or None for None / blank. Raise ValueError otherwise."""
+    if raw is None or (isinstance(raw, str) and raw.strip() == ''):
+        return None
+    error = ValueError(f'{label} must be a valid date (YYYY-MM-DD).')
+    if not isinstance(raw, str):
+        raise error
+    try:
+        value = parse_date(raw.strip())
+    except ValueError:
+        raise error
+    if value is None:
+        raise error
+    return value
 
 
 def _parse_money_total(raw, label):
@@ -281,6 +321,17 @@ def update_shipment(request, shipment_id):
                         status=400,
                     )
 
+        payment_dates = {}
+        for key, (label, _money_field) in PAYMENT_DATE_FIELDS.items():
+            if key in data:
+                try:
+                    payment_dates[key] = parse_optional_date(data[key], label)
+                except ValueError as exc:
+                    return JsonResponse(
+                        {'success': False, 'error': str(exc), 'field': key},
+                        status=400,
+                    )
+
         # Update shipment fields
         if 'name' in data:
             shipment.name = (data['name'] or '').strip() or None
@@ -311,12 +362,20 @@ def update_shipment(request, shipment_id):
             shipment.item_value = _money(shipment.auto_item_value)
 
         with transaction.atomic():
+            for key, value in payment_dates.items():
+                setattr(shipment, key, value)
             shipment.modified_by = request.user
             shipment.save()
 
             payment_changed = False
             for field, target in money_totals.items():
-                if set_shipment_payment_total(shipment, field, target, request.user):
+                if set_shipment_payment_total(
+                    shipment,
+                    field,
+                    target,
+                    request.user,
+                    payment_date=getattr(shipment, MONEY_FIELD_DATE[field]),
+                ):
                     payment_changed = True
 
             _sync_clin_ship_fields(shipment.clin, request.user)

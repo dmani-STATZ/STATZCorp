@@ -23,7 +23,7 @@ Track field-level edits for a handful of auditable models and surface that histo
 - `urls.py`: Namespaced `transactions` routes under `/transactions/...` for list, detail, edit, and field-info endpoints.
 - `field_types.py`: Computes widget type (`WIDGET_*` constants) plus optional choices (booleans, ForeignKeys, fields with `choices`), limiting FK choice lists to 500 rows for performance.
 - `utils.py`: Provides `get_field_value_display`, `set_field_value` (coercion for dates, FKs, numbers, booleans), and `get_display_value` for rendering updated values.
-- `signals.py`: Defines `TRACKED` `(model_class, field_name)` tuples for `Contract`, `Clin`, `ClinShipment` (`ship_qty`, `ship_date`, `quote_value`, `item_value`, `pod_date`), and `Supplier`; stores pre-save state via `contextvars` and creates `Transaction` rows post-save when the serialized old value differs from the new.
+- `signals.py`: Defines `TRACKED` `(model_class, field_name)` tuples for `Contract`, `Clin`, `ClinShipment` (`ship_qty`, `ship_date`, `quote_value`, `item_value`, `pod_date`, `paid_date`, `wawf_payment_date`), and `Supplier`; stores pre-save state via `contextvars` and creates `Transaction` rows post-save when the serialized old value differs from the new.
 - `middleware.py`: `TransactionUserMiddleware` writes the authenticated user to a contextvar, clears the `old_state` cache each request, and is wired into `MIDDLEWARE` after authentication (`STATZWeb/settings.py:86/98`).
 - `admin.py`: Registers `Transaction` with read-only fields, filters, search, and `date_hierarchy` to support audits.
 - `templates/transactions/transaction_modal.html` plus `templates/transactions/partials/*`: Provide the Bootstrap 5 modal shell, history table, edit form, and detail view HTML. Modal lifecycle and injected-form event binding live in the shell script.
@@ -66,7 +66,7 @@ FK fields on models with more than `FK_AJAX_THRESHOLD` (100) records use `WIDGET
 - `signals.py` contains the core logic. Current `TRACKED` fields are:
   - `Contract`: `contract_number`, `po_number`, `tab_num`, `buyer`, `due_date`, `award_date`, `sales_class`, `solicitation_type`, `plan_gross`, `files_url`
   - `Clin`: `item_type`, `clin_po_num`, `supplier`, `nsn`, `ia`, `fob`, `special_payment_terms`, `supplier_due_date`, `due_date`, `order_qty`, `ship_qty`, `ship_date`, `item_value`, `quote_value`, `unit_price`, `price_per_unit`, `uom`
-  - `ClinShipment`: `ship_qty`, `ship_date`, `quote_value`, `item_value`, `pod_date`
+  - `ClinShipment`: `ship_qty`, `ship_date`, `quote_value`, `item_value`, `pod_date`, `paid_date`, `wawf_payment_date` (Stage 8; `store_old_state` captures both)
   - `ClinSplit`: `split_paid`
   - `ContractLevelCharge`: `label`, `action_type`, `supplier`, `estimated_amount`, `billed_paid_amount`, `payment_date`, `invoice_number`
   - `Supplier`: `name`, `cage_code`, `dodaac`, `allows_gsi`, `probation`, `conditional`, `archived`, `iso`, `ppi`, `special_terms`, `supplier_type`, `prime`, `is_packhouse`, `business_phone`, `primary_phone`, `business_email`, `primary_email`, `website_url`

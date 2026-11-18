@@ -117,6 +117,8 @@ The shipments page (`clin_shipments_popup`) is the only place a shipment is adde
 
 Payment source of truth (Stage 7a): on a CLIN with shipments, Paid / Customer Pay live on the shipments and change only through `contracts/services/shipment_payments.py`; see "Payment source of truth" in `contracts/CONTEXT_contracts.md` and the `EDITABLE_FIELDS` allowlist in `transactions/CONTEXT_transactions.md`.
 
+Shipment payment dates (Stage 8): `ClinShipment.paid_date` / `wawf_payment_date` roll up (MAX, never NULL-over) to `Clin.paid_date` / `wawf_recieved`; see "Shipment payment dates" in `contracts/CONTEXT_contracts.md`.
+
 ---
 
 ## Inventory Dashboard + Public Inventory API (`inventory` app)

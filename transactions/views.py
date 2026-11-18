@@ -43,6 +43,8 @@ EDITABLE_FIELDS = frozenset(
 )
 
 CLIN_SHIPMENT_MONEY_FIELDS = frozenset({"paid_amount", "wawf_payment"})
+# CLIN payment dates are rollups (MAX of the shipments) once a CLIN has shipments.
+CLIN_SHIPMENT_DATE_FIELDS = frozenset({"paid_date", "wawf_recieved"})
 
 
 @login_required
@@ -203,6 +205,18 @@ def transaction_edit_field(request, content_type_id, object_id, field_name):
                 {
                     "success": False,
                     "error": "This CLIN has shipments. Edit Paid / Customer Pay on the shipments.",
+                },
+                status=400,
+            )
+        if (
+            model_class.__name__ == "Clin"
+            and field_name in CLIN_SHIPMENT_DATE_FIELDS
+            and instance.shipments.exists()
+        ):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "This CLIN has shipments. Edit dates on the shipments.",
                 },
                 status=400,
             )

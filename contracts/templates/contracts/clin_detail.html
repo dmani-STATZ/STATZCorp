@@ -556,6 +556,17 @@ function refreshClinShipQty() {
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
+                                {% if clin_has_shipments %}
+                                <span class="clin-field-label d-block">PAID DATE</span>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-paid-date-value">{{ clin.paid_date|date:"m/d/Y"|default:"N/A" }}</span>
+                                    <span class="text-body-secondary ms-1"
+                                          style="font-size:0.7rem;"
+                                          title="Latest shipment Paid Date. Edit in the Shipments popup.">
+                                        ∑
+                                    </span>
+                                </p>
+                                {% else %}
                                 <button type="button"
                                     onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'paid_date')"
                                     class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
@@ -564,6 +575,7 @@ function refreshClinShipQty() {
                                 <p class="font-medium text-sm mt-1">
                                     <span id="clin-paid-date-value">{{ clin.paid_date|date:"m/d/Y"|default:"N/A" }}</span>
                                 </p>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -592,6 +604,17 @@ function refreshClinShipQty() {
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
+                                {% if clin_has_shipments %}
+                                <span class="clin-field-label d-block">CUSTOMER RECEIVED</span>
+                                <p class="font-medium text-sm mt-1">
+                                    <span id="clin-wawf-recieved-value">{{ clin.wawf_recieved|date:"m/d/Y"|default:"N/A" }}</span>
+                                    <span class="text-body-secondary ms-1"
+                                          style="font-size:0.7rem;"
+                                          title="Latest shipment Customer Pay Date. Edit in the Shipments popup.">
+                                        ∑
+                                    </span>
+                                </p>
+                                {% else %}
                                 <button type="button"
                                     onclick="openTransactionsEditModal(window.clinContentTypeId, window.clinId, 'wawf_recieved')"
                                     class="inline-block bg-transparent border-none shadow-none p-0 font-inherit text-gray-600 cursor-pointer hover:text-blue-600 hover:underline focus:outline-none text-left appearance-none text-sm font-medium">
@@ -600,6 +623,7 @@ function refreshClinShipQty() {
                                 <p class="font-medium text-sm mt-1">
                                     <span id="clin-wawf-recieved-value">{{ clin.wawf_recieved|date:"m/d/Y"|default:"N/A" }}</span>
                                 </p>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="col-md-4">

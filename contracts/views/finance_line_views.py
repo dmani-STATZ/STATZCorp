@@ -383,6 +383,17 @@ def add_partial_shipment(request):
         pod_date_raw = data.get('pod_date')
         pod_date = parse_date(str(pod_date_raw)) if pod_date_raw else None
 
+        from .shipment_views import PAYMENT_DATE_FIELDS, parse_optional_date
+        payment_dates = {}
+        for key, (label, _money_field) in PAYMENT_DATE_FIELDS.items():
+            try:
+                payment_dates[key] = parse_optional_date(data.get(key), label)
+            except ValueError as exc:
+                return JsonResponse(
+                    {'success': False, 'error': str(exc), 'field': key},
+                    status=400,
+                )
+
         with transaction.atomic():
             shipment = ClinShipment.objects.create(
                 clin=clin,
@@ -396,6 +407,8 @@ def add_partial_shipment(request):
                 item_value=item_value,
                 paid_amount=Decimal(str(paid_amount_raw)) if paid_amount_raw not in (None, '') else None,
                 wawf_payment=Decimal(str(wawf_payment_raw)) if wawf_payment_raw not in (None, '') else None,
+                paid_date=payment_dates['paid_date'],
+                wawf_payment_date=payment_dates['wawf_payment_date'],
                 created_by=request.user,
                 modified_by=request.user,
             )
@@ -441,12 +454,12 @@ def add_partial_shipment(request):
             shipment_content_type = ContentType.objects.get_for_model(ClinShipment)
 
             ROLLUP_FIELDS = [
-                ('paid_amount', 'partial_paid_amount'),
-                ('wawf_payment', 'partial_wawf_payment'),
+                ('paid_amount', 'partial_paid_amount', 'paid_date'),
+                ('wawf_payment', 'partial_wawf_payment', 'wawf_payment_date'),
             ]
 
             had_payment_rollup = False
-            for shipment_field, shipment_payment_type in ROLLUP_FIELDS:
+            for shipment_field, shipment_payment_type, date_field in ROLLUP_FIELDS:
                 value = getattr(shipment, shipment_field)
                 if not value:
                     continue
@@ -457,7 +470,7 @@ def add_partial_shipment(request):
                     object_id=shipment.id,
                     payment_type=shipment_payment_type,
                     payment_amount=value,
-                    payment_date=today,
+                    payment_date=getattr(shipment, date_field) or today,
                     payment_info='Initial value set on shipment creation',
                     reference_number='',
                     created_by=request.user,

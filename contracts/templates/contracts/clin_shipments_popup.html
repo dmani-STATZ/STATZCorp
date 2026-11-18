@@ -94,8 +94,10 @@
                         <th>Comments</th>
                         <th class="text-end">Quote Value</th>
                         <th class="text-end">Paid</th>
+                        <th>Paid Date</th>
                         <th class="text-end">Item Value</th>
                         <th class="text-end">Customer Pay</th>
+                        <th>Customer Pay Date</th>
                         <th>POD Date</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -111,6 +113,8 @@
                         data-uom="{{ shipment.uom|default:'' }}"
                         data-comments="{{ shipment.comments|default:'' }}"
                         data-pod-date="{{ shipment.pod_date|date:'Y-m-d' }}"
+                        data-paid-date="{{ shipment.paid_date|date:'Y-m-d' }}"
+                        data-wawf-payment-date="{{ shipment.wawf_payment_date|date:'Y-m-d' }}"
                         data-paid-amount="{% if shipment.paid_amount is None %}0.00{% else %}{{ shipment.paid_amount|unlocalize }}{% endif %}"
                         data-wawf-payment="{% if shipment.wawf_payment is None %}0.00{% else %}{{ shipment.wawf_payment|unlocalize }}{% endif %}">
                         <td>{{ shipment.display_label }}</td>
@@ -124,12 +128,14 @@
                         <td class="text-end popup-money" title="Edit with this row's Edit button.">
                             {% if shipment.paid_amount is None %}—{% else %}${{ shipment.paid_amount|floatformat:2 }}{% endif %}
                         </td>
+                        <td>{{ shipment.paid_date|date:"m/d/Y"|default:"—" }}</td>
                         <td class="text-end popup-money" title="Edit on the Finance Audit page.">
                             {% if shipment.item_value is None %}—{% else %}${{ shipment.item_value|floatformat:2 }}{% endif %}
                         </td>
                         <td class="text-end popup-money" title="Edit with this row's Edit button.">
                             {% if shipment.wawf_payment is None %}—{% else %}${{ shipment.wawf_payment|floatformat:2 }}{% endif %}
                         </td>
+                        <td>{{ shipment.wawf_payment_date|date:"m/d/Y"|default:"—" }}</td>
                         <td>{{ shipment.pod_date|date:"m/d/Y"|default:"—" }}</td>
                         <td class="text-end">
                             <button type="button" class="btn btn-sm btn-outline-secondary js-edit-shipment">Edit</button>
@@ -138,7 +144,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="11" class="text-body-secondary py-3">No shipments yet.</td>
+                        <td colspan="13" class="text-body-secondary py-3">No shipments yet.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -199,10 +205,20 @@
                         <div class="col-md-6">
                             <label class="form-label small mb-1" for="add-paid">Paid</label>
                             <input type="number" class="form-control form-control-sm" id="add-paid" data-field="paid_amount" step="0.01" min="0" placeholder="0.00">
+                            <label class="form-label small mb-1 mt-2" for="shipment-paid-date">Paid Date</label>
+                            <div class="d-flex gap-1">
+                                <input type="date" class="form-control form-control-sm" id="shipment-paid-date" data-field="paid_date">
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-today">Today</button>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small mb-1" for="add-customer-pay">Customer Pay</label>
                             <input type="number" class="form-control form-control-sm" id="add-customer-pay" data-field="wawf_payment" step="0.01" min="0" placeholder="0.00">
+                            <label class="form-label small mb-1 mt-2" for="shipment-wawf-payment-date">Customer Pay Date</label>
+                            <div class="d-flex gap-1">
+                                <input type="date" class="form-control form-control-sm" id="shipment-wawf-payment-date" data-field="wawf_payment_date">
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-today">Today</button>
+                            </div>
                         </div>
                         <div class="col-12 js-edit-only d-none">
                             <p class="form-text text-body-secondary mb-0">Changing a total records an adjustment in payment history.</p>

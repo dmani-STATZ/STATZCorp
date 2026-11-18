@@ -307,7 +307,7 @@ class ClinShipmentsPopupTests(TestCase):
         self.assertIn('Shipment 1', html)
         self.assertRegex(
             html,
-            r"\$12\.50\s*</td>\s*<td[^>]*>\s*—\s*</td>\s*<td[^>]*>\s*\$0\.00\s*</td>\s*<td[^>]*>\s*\$1\.20\s*</td>",
+            r"\$12\.50\s*</td>\s*<td[^>]*>\s*—\s*</td>\s*<td>—</td>\s*<td[^>]*>\s*\$0\.00\s*</td>\s*<td[^>]*>\s*\$1\.20\s*</td>\s*<td>—</td>",
         )
         self.assertIn('title="Edit on the Finance Audit page."', html)
 

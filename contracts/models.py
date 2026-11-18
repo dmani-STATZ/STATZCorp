@@ -979,6 +979,8 @@ class ClinShipment(AuditModel):
         null=True, blank=True,
         help_text="Customer pay / WAWF payment received for this partial shipment."
     )
+    paid_date = models.DateField("Paid Date", null=True, blank=True)
+    wawf_payment_date = models.DateField("Customer Pay Date", null=True, blank=True)
 
     @property
     def auto_quote_value(self):
