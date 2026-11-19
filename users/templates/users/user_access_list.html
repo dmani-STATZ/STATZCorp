@@ -1,0 +1,98 @@
+{% extends "base_template.html" %}
+
+{% block title %}User Access — STATZ{% endblock %}
+
+{% block body %}
+<main class="container-fluid py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+        <div>
+            <h1 class="h3 mb-0">User Access</h1>
+            <p class="text-body-secondary small mb-0">Create users, grant apps and training, and disable accounts.</p>
+        </div>
+        <a href="{% url 'users:user_access_create' %}" class="btn btn-primary">New User</a>
+    </div>
+
+    {% if not training_registered %}
+    <div class="alert alert-warning small">
+        <strong>Training isn't in the App Registry</strong>, so every signed-in user can open it and the Training grant has no effect.
+        Registering it switches Training to deny-by-default, so grant it to the right people first.
+    </div>
+    {% endif %}
+
+    <form method="get" class="row g-2 align-items-end mb-3">
+        <div class="col-sm-6 col-md-4">
+            <label for="ua-q" class="form-label small mb-1">Search</label>
+            <input id="ua-q" type="search" name="q" value="{{ q }}" class="form-control" placeholder="Name, username, or email">
+        </div>
+        <div class="col-auto">
+            <label for="ua-status" class="form-label small mb-1">Status</label>
+            <select id="ua-status" name="status" class="form-select">
+                <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
+                <option value="disabled" {% if status == "disabled" %}selected{% endif %}>Disabled</option>
+                <option value="all" {% if status == "all" %}selected{% endif %}>All</option>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-outline-brand">Filter</button>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Role</th>
+                    <th>Apps</th>
+                    <th>CMMC account types</th>
+                    <th>Last login</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in page_obj %}
+                <tr>
+                    <td>
+                        <div class="fw-semibold">{{ u.get_full_name|default:u.username }}</div>
+                        <div class="small text-body-secondary">{{ u.username }}</div>
+                    </td>
+                    <td class="small">{{ u.email|default:"—" }}</td>
+                    <td>
+                        {% if u.is_active %}<span class="badge text-bg-success">Active</span>{% else %}<span class="badge text-bg-secondary">Disabled</span>{% endif %}
+                    </td>
+                    <td class="small">
+                        {% if u.is_superuser %}Superuser{% elif u.is_staff %}Staff{% else %}Standard{% endif %}
+                    </td>
+                    <td class="small">
+                        {% if u.is_superuser %}
+                            <span class="text-body-secondary">All (superuser)</span>
+                        {% else %}
+                            {% for perm in u.granted_apps %}{{ perm.app_name.display_name }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-body-secondary">None</span>{% endfor %}
+                        {% endif %}
+                    </td>
+                    <td class="small">
+                        {% for link in u.account_links.all %}{{ link.account }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-body-secondary">None</span>{% endfor %}
+                    </td>
+                    <td class="small">{{ u.last_login|date:"Y-m-d"|default:"Never" }}</td>
+                    <td class="text-end">
+                        <a href="{% url 'users:user_access_edit' u.pk %}" class="btn btn-sm btn-outline-brand">Edit</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-body-secondary">No users match.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="d-flex justify-content-center align-items-center gap-3 mt-3" aria-label="User pages">
+        {% if page_obj.has_previous %}<a href="?q={{ q|urlencode }}&status={{ status }}&page={{ page_obj.previous_page_number }}">← Previous</a>{% endif %}
+        <span class="small text-body-secondary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?q={{ q|urlencode }}&status={{ status }}&page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+    </nav>
+    {% endif %}
+</main>
+{% endblock %}

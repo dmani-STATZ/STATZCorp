@@ -126,8 +126,8 @@ Current coverage stops short of dashboards, AW flows, audit exports, and user re
 When modifying schema fields, review migrations after `0005` to avoid inconsistencies (especially `Matrix.frequency`, `Tracker.document`, and the new `TrainingDoc` table).
 
 ## 17. Known Gaps / Ambiguities
-- `manage_matrix` lacks a hard `is_staff`/`is_superuser` guard even though the UI exposes it only to superusers; consider adding one to prevent unauthorized access when a non-admin guesses the URL.
-- AW email preview and `.eml` routes require only authentication rather than a staff role, so confirm whether any authenticated user should be able to generate those drafts.
+
+- Arctic Wolf course management and email drafts require superuser access.
 - Document uploads keep binary blobs in the database without any size validation; large uploads may grow the `Tracker.document`/`TrainingDoc.file_blob` blobs unexpectedly.
 - The client-side course filtering in `admin_cmmc_upload` assumes `user_course_map_json` contains entries for every user; if matrix data is stale, the dropdown may disable all options without clarifying which requirement is missing.
 

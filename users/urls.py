@@ -1,6 +1,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
+from . import user_access_views
 from .ms_views import MicrosoftAuthView, MicrosoftCallbackView
 app_name = 'users'
 
@@ -22,6 +23,13 @@ urlpatterns = [
          auth_views.PasswordResetCompleteView.as_view(template_name='users/password_reset_complete.html'), 
          name='password_reset_complete'),
     path('permission-denied/', views.permission_denied, name='permission_denied'),
+
+    # User Access (superuser only)
+    path('access/', user_access_views.user_access_list, name='user_access'),
+    path('access/new/', user_access_views.user_access_create, name='user_access_create'),
+    path('access/<int:user_id>/', user_access_views.user_access_edit, name='user_access_edit'),
+    path('access/<int:user_id>/disable/', user_access_views.user_access_disable, name='user_access_disable'),
+    path('access/<int:user_id>/reactivate/', user_access_views.user_access_reactivate, name='user_access_reactivate'),
     # Company switching (superuser only)
     path('switch-company/', views.switch_company, name='switch_company'),
     

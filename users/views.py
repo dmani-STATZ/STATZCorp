@@ -49,7 +49,9 @@ from django.contrib.auth.decorators import user_passes_test
 import json
 from .user_settings import UserSettings
 from django.contrib.auth import get_user_model
-from django.contrib.auth import authenticate, login as auth_login
+from django.contrib.auth import (
+    SESSION_KEY, authenticate, login as auth_login, update_session_auth_hash,
+)
 from .ms_views import get_microsoft_login_url
 from django.views.generic import ListView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -291,7 +293,6 @@ def login_view(request):
     """Custom login view that redirects to Microsoft authentication"""
     # Clear previous auth errors
     auth_error = None
-    microsoft_auth_success = request.session.get('microsoft_auth_success', False)
     
     # Check for auth errors
     if 'microsoft_auth_error' in request.session:
@@ -306,11 +307,11 @@ def login_view(request):
     # Get the next URL from query parameters
     next_url = request.GET.get('next')
     
-    # Check for Microsoft auth success
-    if microsoft_auth_success:
-        logger.debug(f"Microsoft auth successful, redirecting to: {next_url or 'index'}")
-        return redirect(next_url or 'index')
-    
+    if SESSION_KEY in request.session:
+        request.session.flush()
+    else:
+        request.session.pop('microsoft_auth_success', None)
+
     # Get Microsoft login URL
     microsoft_login_url = get_microsoft_login_url(request)
     if next_url:
@@ -642,14 +643,9 @@ def oauth_migration_view(request):
     else:
         form = EmailLookupForm()
     
-    # Debug: Show all users with emails for testing
-    all_users = User.objects.filter(email__isnull=False).exclude(email='')
-    debug_info = f"Available emails: {', '.join([u.email for u in all_users[:5]])}"  # Show first 5
-    
     context = {
         'title': 'Set Your Password',
         'form': form,
-        'debug_info': debug_info,
     }
     
     return render(request, 'users/oauth_migration.html', context)
@@ -668,18 +664,20 @@ def oauth_password_set_view(request):
     except User.DoesNotExist:
         messages.error(request, 'Invalid user. Please start over.')
         return redirect('users:oauth_migration')
-    
+
+    if not user.is_active or request.user.pk != user.pk:
+        request.session.pop('oauth_migration_user_id', None)
+        messages.error(request, 'Sign in to your account before setting a password.')
+        return redirect('users:login')
+
     if request.method == 'POST':
         form = OAuthPasswordSetForm(user, data=request.POST)
         if form.is_valid():
             new_password = form.cleaned_data['new_password1']
             user.set_password(new_password)
-            user.save()
-            # Clear session
+            user.save(update_fields=['password'])
             del request.session['oauth_migration_user_id']
-            # Log the user in with the first available backend
-            backend = settings.AUTHENTICATION_BACKENDS[0] if settings.AUTHENTICATION_BACKENDS else 'django.contrib.auth.backends.ModelBackend'
-            auth_login(request, user, backend=backend)
+            update_session_auth_hash(request, user)
             messages.success(request, f'Welcome back, {user.first_name or user.username}! Your password has been set successfully.')
             return redirect('index')
         else:

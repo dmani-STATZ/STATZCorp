@@ -53,7 +53,8 @@ class AppPermissionForm(forms.ModelForm):
             existing_permissions = AppPermission.objects.filter(user=user)
             for perm in existing_permissions:
                 field_name = f'app_{perm.app_name.app_name}'
-                self.fields[field_name].initial = perm.has_access
+                if field_name in self.fields:
+                    self.fields[field_name].initial = perm.has_access
 
     class Meta:
         model = AppPermission
@@ -102,11 +103,10 @@ class AppPermissionAdmin(admin.ModelAdmin):
         """Override save_model to handle our custom permission saving"""
         user = form.cleaned_data['user']
         
-        # Delete existing permissions for this user
-        AppPermission.objects.filter(user=user).delete()
-        
-        # Create new permissions for checked boxes
+        # Replace only the grants this form exposes.
         registered_apps = AppRegistry.get_active_apps()
+        AppPermission.objects.filter(user=user, app_name__in=registered_apps).delete()
+
         for app in registered_apps:
             field_name = f'app_{app.app_name}'
             if form.cleaned_data.get(field_name, False):

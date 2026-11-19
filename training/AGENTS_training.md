@@ -41,7 +41,7 @@ This file guides AI coding agents and developers making changes to the `training
 ### Before changing views
 - Read the full `views.py` — business logic is concentrated here across ~700+ lines with no separate services module.
 - Identify which helpers (`get_completion_status`, `latest_completion_by_matrix`, `pick_strictest_frequency`, `eligible_aw_course_ids_for_user`) are shared across multiple views before modifying them.
-- Note that `manage_matrix` only uses `@login_required` — there is **no staff/superuser guard** on the view itself (see Known Footguns).
+- Matrix management and Arctic Wolf course management require superuser access.
 
 ### Before changing forms
 - Read `forms.py` — `CmmcDocumentUploadForm.clean()` enforces user/course validity via `UserAccount` and `Matrix` lookups. Weakening this is a security issue.
@@ -122,9 +122,9 @@ grep -r "training:" --include="*.html" --include="*.py" .
 - **Never remove `@login_required`** from any view — all 20+ views require authentication.
 - `training_audit`, `training_audit_export`, `arctic_wolf_audit`, `arctic_wolf_audit_export` must check `request.user.is_superuser` at entry. These are inline guards, not decorator-based.
 - `admin_cmmc_upload` checks `request.user.is_staff`. Keep this guard.
-- `manage_matrix` has **no staff/superuser guard** despite being admin-only in intent. Do not rely on obscurity; consider adding a guard (noted as a known gap in CONTEXT_training.md).
+- `manage_matrix`, Arctic Wolf course creation and listing, and email preview and download require superuser access.
 - `review_course_link` validates `UserAccount` membership before streaming binary file content. Do not bypass this check or widen the queryset.
-- `view_document` streams `Tracker.document` binary blobs without ownership check beyond authentication — verify this is acceptable for the threat model before exposing to new user roles.
+- `view_document` allows certificate downloads by the owner, staff, or superusers.
 - `CmmcDocumentUploadForm.clean()` prevents staff from uploading documents for invalid user/course pairs. Do not weaken this validation.
 - File uploads use `get_valid_filename` to sanitize names and SHA-256 to hash content. Preserve both.
 
@@ -209,7 +209,7 @@ python manage.py test training
 
 ## 13. Known Footguns
 
-1. **`manage_matrix` missing permission guard.** The view is `@login_required` only. Any authenticated user who guesses `/training/matrix/manage/` can modify the training matrix for any account. This is confirmed in `CONTEXT_training.md` as a known gap.
+
 
 2. **Slug invalidation on AW course rename.** `ArcticWolfCourse.slug` is regenerated on every `save()`. Renaming a course silently breaks all previously distributed completion URLs. There is no redirect or slug history mechanism.
 
@@ -219,7 +219,7 @@ python manage.py test training
 
 5. **Dashboard queries are O(users × matrix entries).** The `dashboard` view iterates `cmmc_users_with_accounts` in Python with a query per user. This degrades with many users — do not add further per-user loops without profiling.
 
-6. **`view_document` has no ownership check.** Any authenticated user who knows a `tracker_id` can download that document. If `tracker_id` values are sequential integers, this is an IDOR risk.
+
 
 7. **Template tag name collision.** Both `matrix_extras` and `training_filters` define a `get_item` filter. If both are loaded in the same template, the last `{% load %}` wins. Avoid adding identically named filters.
 

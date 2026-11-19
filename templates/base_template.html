@@ -380,7 +380,10 @@
                         <p class="settings-label">Admin</p>
                         <p class="settings-help">Launch the console in a new view.</p>
                     </div>
-                    <a href="{% url 'admin:index' %}" class="settings-chip settings-chip-outline">Admin Console</a>
+                    <div class="settings-toggle">
+                        <a href="{% url 'users:user_access' %}" class="settings-chip settings-chip-outline">User Access</a>
+                        <a href="{% url 'admin:index' %}" class="settings-chip settings-chip-outline">Admin Console</a>
+                    </div>
                 </div>
                 {% endif %}
             </div>

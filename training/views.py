@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -236,7 +237,9 @@ def dashboard(request):
 
 
 @login_required
-def manage_matrix(request):
+def manage_matrix(request, account_id=None):
+    if not request.user.is_superuser:
+        raise PermissionDenied
     accounts = Account.objects.all().order_by("type")
     courses = Course.objects.all().order_by("name")
     selected_account = None
@@ -244,9 +247,10 @@ def manage_matrix(request):
     frequency_choices = Matrix.FREQUENCY_CHOICES
 
     # Handle GET request for account selection
-    if request.GET.get("account"):
+    account_id = request.GET.get("account") or account_id
+    if account_id:
         try:
-            account_id = int(request.GET.get("account"))
+            account_id = int(account_id)
             selected_account = get_object_or_404(Account, pk=account_id)
             existing_matrix_entries = Matrix.objects.filter(
                 account=selected_account, is_active=True
@@ -554,20 +558,16 @@ def replace_document(request, matrix_id):
 
 @login_required
 def view_document(request, tracker_id):
-    try:
-        tracker = get_object_or_404(Tracker, pk=tracker_id)
-        if tracker.document:
-            response = HttpResponse(
-                tracker.document, content_type="application/octet-stream"
-            )  # Generic binary type
-            response["Content-Disposition"] = (
-                f'inline; filename="{tracker.document_name}"'
-            )
-            return response
-        else:
-            return HttpResponse("No document uploaded.", status=204)  # No Content
-    except Tracker.DoesNotExist:
-        return HttpResponse("Document not found.", status=404)  # Not Found
+    trackers = Tracker.objects.all()
+    if not (request.user.is_staff or request.user.is_superuser):
+        trackers = trackers.filter(user=request.user)
+    tracker = get_object_or_404(trackers, pk=tracker_id)
+    if not tracker.document:
+        return HttpResponse(status=204)
+    response = HttpResponse(tracker.document, content_type="application/octet-stream")
+    response["Content-Disposition"] = f'inline; filename="{tracker.document_name}"'
+    return response
+
 
 
 @login_required
@@ -816,6 +816,8 @@ def training_audit_export(request):
 
 @login_required
 def add_arctic_wolf_course(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
     if request.method == "POST":
         form = ArcticWolfCourseForm(request.POST)
         if form.is_valid():
@@ -828,7 +830,10 @@ def add_arctic_wolf_course(request):
     return render(request, "training/add_arctic_wolf_course.html", {"form": form})
 
 
+@login_required
 def arctic_wolf_course_list(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
     # Courses list (most recent first)
     courses = ArcticWolfCourse.objects.all().order_by("-created_at", "name")
 
@@ -1255,6 +1260,8 @@ def _absolute_training_url(request, path):
 
 @login_required
 def arctic_wolf_email_preview(request, slug):
+    if not request.user.is_superuser:
+        raise PermissionDenied
     """Render a preview of the email to send to users for a given course.
     This mimics the Arctic Wolf email, but uses our completion link and
     replaces the Start CTA with a Sign CTA.
@@ -1279,6 +1286,8 @@ def arctic_wolf_email_preview(request, slug):
 
 @login_required
 def arctic_wolf_email_eml(request, slug):
+    if not request.user.is_superuser:
+        raise PermissionDenied
     """Generate a downloadable .eml file for the given course using the HTML body template.
     The EML is a simple message with Subject and HTML body, leaving To/From blank
     so Outlook can fill as appropriate when opened.

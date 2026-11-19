@@ -2,6 +2,7 @@ import msal
 from django.conf import settings
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth import get_user_model
+from django.db import transaction
 import logging
 import uuid
 import requests
@@ -136,25 +137,34 @@ class MicrosoftAuthBackend(ModelBackend):
             except Exception as e:
                 logger.exception(f"Error getting user info from Microsoft Graph: {str(e)}")
         
+        email = (email or '').strip()
         if not email:
             logger.error("No email found in claims or Microsoft Graph response")
             return None
             
         logger.info(f"Microsoft authentication for email: {email}")
         
-        # Get or create user and save token
-        user = None
+        return self._save_authenticated_user(request, email, name, oid, token_result)
+
+    @transaction.atomic
+    def _save_authenticated_user(self, request, email, name, oid, token_result):
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.select_for_update().get(email__iexact=email)
+            if not self.user_can_authenticate(user):
+                logger.warning("Microsoft sign-in refused for disabled user %s", user.pk)
+                return None
             logger.info(f"Found existing user: {user.username}")
             
             # Update user information if needed
             if name and (not user.first_name or not user.last_name):
                 user.first_name = name.split(' ')[0] if ' ' in name else name
                 user.last_name = name.split(' ')[1] if ' ' in name else ''
-                user.save()
+                user.save(update_fields=['first_name', 'last_name'])
                 logger.info(f"Updated user info for {user.username}")
 
+        except User.MultipleObjectsReturned:
+            logger.error("Microsoft sign-in refused because multiple users match the email claim")
+            return None
         except User.DoesNotExist:
             if settings.AZURE_AD_CONFIG.get('auto_create_user', True):
                 logger.info(f"Creating new user with email: {email}")
@@ -225,10 +235,13 @@ class MicrosoftAuthBackend(ModelBackend):
         return None
 
     def get_user(self, user_id):
+        # Restoring a session: drop disabled users so an existing Microsoft
+        # session ends on the next request after the account is disabled.
         try:
-            return User.objects.get(pk=user_id)
+            user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
             return None
+        return user if self.user_can_authenticate(user) else None
 
 # --- Token Refresh Utility Functions ---
 

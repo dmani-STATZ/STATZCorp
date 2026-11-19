@@ -253,6 +253,10 @@ This app is **core infrastructure**. Changes here can break authentication, acce
 
 20. **Do not reassign `organizer` for portal-origin events during a pull.** `sync_sharepoint_calendar()` only rewrites `organizer` / `source_identifier` when `existing.source_system == "sharepoint"`. A portal event that we pushed up is mirrored in SharePoint, not owned by it — reassigning its organizer to `SHAREPOINT_SYNC_USER_EMAIL` strips the creator's edit and delete rights, since `portal_event_update` / `portal_event_delete` both gate on `organizer_id`.
 
+21. **User Access page (`/users/access/`, `users:user_access*`).** Logic lives in `users/user_access.py` and views in `users/user_access_views.py`. The `users` namespace is exempt from the AppPermission check, so every view must keep `superuser_required`. Disable = `is_active=False` + delete `UserOAuthToken` only; never delete `AppPermission`, `UserAccount`, or `Tracker` rows on disable. Keep the self-disable and last-active-superuser guards. The page never sets `is_superuser`. Created users get an unusable password and are matched at Microsoft sign-in by email; keep email unique (case-insensitive) because `MicrosoftAuthBackend` refuses ambiguous matches.
+
+22. **Disabled users must stay out.** `MicrosoftAuthBackend.authenticate()` refuses inactive users before storing a token, and `get_user()` returns `None` for them so existing sessions end. Any new path that calls `login()` directly must check `is_active` first (`oauth_password_set_view` does).
+
 ---
 
 ## 14. Safe Change Workflow

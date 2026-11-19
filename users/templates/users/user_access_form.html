@@ -1,0 +1,149 @@
+{% extends "base_template.html" %}
+
+{% block title %}{% if target %}{{ target.username }}{% else %}New User{% endif %} — User Access — STATZ{% endblock %}
+
+{% block body %}
+<main class="container py-4">
+    <a href="{% url 'users:user_access' %}" class="btn btn-outline-brand btn-sm mb-2">← All users</a>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+        <h1 class="h3 mb-0">
+            {% if target %}{{ target.get_full_name|default:target.username }}{% else %}New User{% endif %}
+            {% if target %}
+                {% if target.is_active %}<span class="badge text-bg-success fs-6 align-middle">Active</span>{% else %}<span class="badge text-bg-secondary fs-6 align-middle">Disabled</span>{% endif %}
+                {% if target.is_superuser %}<span class="badge text-bg-dark fs-6 align-middle">Superuser</span>{% endif %}
+            {% endif %}
+        </h1>
+        {% if target and target.pk != request.user.pk %}
+            {% if target.is_active %}
+            <form method="post" action="{% url 'users:user_access_disable' target.pk %}"
+                  onsubmit="return confirm('Disable {{ target.username|escapejs }}? They lose all access on their next request. Grants and training history are kept.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger">Disable user</button>
+            </form>
+            {% else %}
+            <form method="post" action="{% url 'users:user_access_reactivate' target.pk %}"
+                  onsubmit="return confirm('Reactivate {{ target.username|escapejs }}? Their saved app grants come back immediately.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">Reactivate user</button>
+            </form>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if target and not target.is_active %}
+    <div class="alert alert-secondary small">
+        This account is disabled: it can't sign in and any open session ends on its next request. The grants below are kept and come back on reactivate.
+    </div>
+    {% endif %}
+    {% if target.is_superuser %}
+    <div class="alert alert-info small">
+        Superusers bypass app permissions, so the app checkboxes below have no effect while this account is a superuser. Superuser status is managed in the Admin Console.
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Account</div>
+            <div class="card-body row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="ua-email">Microsoft sign-in email</label>
+                    <input id="ua-email" type="email" name="email" value="{{ data.email }}" class="form-control" required maxlength="254">
+                    <div class="form-text">Must match the address they sign in to Microsoft with. That's how sign-in finds this account.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="ua-username">Username</label>
+                    {% if target %}
+                    <input id="ua-username" type="text" value="{{ data.username }}" class="form-control" disabled>
+                    {% else %}
+                    <input id="ua-username" type="text" name="username" value="{{ data.username }}" class="form-control" maxlength="150" placeholder="Leave blank to use the part before @">
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="ua-first">First name</label>
+                    <input id="ua-first" type="text" name="first_name" value="{{ data.first_name }}" class="form-control" maxlength="150">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="ua-last">Last name</label>
+                    <input id="ua-last" type="text" name="last_name" value="{{ data.last_name }}" class="form-control" maxlength="150">
+                </div>
+                {% if target %}
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_staff" id="ua-staff" {% if data.is_staff %}checked{% endif %}>
+                        <label class="form-check-label" for="ua-staff">Staff</label>
+                    </div>
+                    <div class="form-text">
+                        Puts them on Arctic Wolf tracking. Also unlocks staff-only actions across the app (reports, reminders, CMMC uploads for other users, portal editing) and lets them open the Admin Console (no models unless granted there).
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">App access</div>
+            <div class="card-body">
+                {% if not app_permissions_enforced %}<div class="alert alert-warning small">App grants are saved here. This environment has REQUIRE_LOGIN disabled, so it does not enforce app grants.</div>{% endif %}
+                <p class="small text-body-secondary">With app permission checks enabled, checked apps are granted. Unchecked apps are denied. Apps not listed here aren't in the App Registry and are open to every signed-in user.</p>
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-2">
+                    {% for app in registry_apps %}
+                    <div class="col">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="apps" value="{{ app.pk }}" id="ua-app-{{ app.pk }}" {% if app.pk in data.app_ids %}checked{% endif %}>
+                            <label class="form-check-label" for="ua-app-{{ app.pk }}">
+                                {{ app.display_name }}
+                                {% if not app.is_active %}<span class="badge text-bg-light border" title="Hidden from the old admin editor but still enforced by the permission check">inactive in registry</span>{% endif %}
+                            </label>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-body-secondary">No apps are registered.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Training</div>
+            <div class="card-body">
+                {% if training_registered %}
+                <p class="small text-body-secondary">When app permission checks are enabled, opening Training requires the <strong>Training</strong> grant above.</p>
+                {% else %}
+                <div class="alert alert-warning small">Training isn't in the App Registry, so every signed-in user can open it no matter what's set here.</div>
+                {% endif %}
+
+                <label class="form-label fw-semibold">CMMC account types</label>
+                <p class="small text-body-secondary mb-2">These decide which CMMC courses they have to complete (from the training matrix). Removing a type keeps their completion history.</p>
+                <div class="row row-cols-1 row-cols-sm-2 g-2 mb-3">
+                    {% for account in training_accounts %}
+                    <div class="col">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="training_accounts" value="{{ account.pk }}" id="ua-acct-{{ account.pk }}" {% if account.pk in data.training_account_ids %}checked{% endif %}>
+                            <label class="form-check-label" for="ua-acct-{{ account.pk }}">{{ account }}</label>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-body-secondary small">No CMMC account types exist yet.</p>
+                    {% endfor %}
+                </div>
+
+                <label class="form-label fw-semibold">Arctic Wolf</label>
+                {% if arctic_wolf %}
+                <p class="small mb-0">
+                    {% if arctic_wolf.tracked %}Tracked{% else %}Not tracked (only active Staff are tracked){% endif %}.
+                    Courses eligible by join date: {{ arctic_wolf.eligible_count }} of {{ arctic_wolf.total_count }} (courses created before they joined don't count).
+                </p>
+                {% else %}
+                <p class="small text-body-secondary mb-0">New users start as Standard. After creating the account, you can edit its Staff status.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">{% if target %}Save changes{% else %}Create user{% endif %}</button>
+            <a href="{% url 'users:user_access' %}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</main>
+{% endblock %}
