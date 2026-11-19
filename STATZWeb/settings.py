@@ -559,6 +559,8 @@ if IS_PRODUCTION:
     }
 else:
     # Development logging (more verbose)
+    # FileHandler opens its file at dictConfig time; a clean checkout has no logs/.
+    (BASE_DIR / "logs").mkdir(exist_ok=True)
     LOGGING = {
         "version": 1,
         "disable_existing_loggers": False,
