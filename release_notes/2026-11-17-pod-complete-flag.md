@@ -1,7 +1,7 @@
 ---
 id: 2026-11-17-pod-complete-flag
 title: A CLIN can be marked POD complete
-published: false
+published: true
 publish_date: 2026-11-17
 tags: [improved, contracts]
 critical: false

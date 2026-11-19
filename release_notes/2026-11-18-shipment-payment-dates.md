@@ -1,7 +1,7 @@
 ---
 id: 2026-11-18-shipment-payment-dates
 title: Paid Date and Customer Pay Date on shipments
-published: false
+published: true
 publish_date: 2026-11-18
 tags: [improved, contracts]
 critical: false
