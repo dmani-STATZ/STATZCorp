@@ -740,6 +740,18 @@ The `tags` array will fail validation if it does not contain exactly two items:
 - **Audit Exclusion for Planning Metadata**: The fields of the `ShipmentPaymentPlan` model store planning intentions, not financial state. They must never be added to `transactions.signals.TRACKED`.
 - **No `queryset.update()` on Audited Fields**: For any audited data mutations (such as changing the payment term `<select>`), perform instance-level `.save(update_fields=[...])` so that the `transactions` signals capture and record the history change.
 
+## 18. POD vs Customer Pay Report Rules
+
+Full description: `CONTEXT_contracts.md` §22.
+
+- Read-only and GET-only. Never write `Clin`, `ClinShipment`, `pod_complete`, or payment fields from `contracts/services/pod_vs_customer_pay.py` or its views.
+- Eligibility and section rules live only in `pod_vs_customer_pay.py` (`classify`, `clin_queryset`, `shipment_queryset`). Do not compute them in the template or view.
+- Do not use `compute_pod_status` / `pod_status` here: the report's CLIN rule (shipments + `pod_complete`, or no shipments + `pod_date`) is business-fixed and differs from the `partial` status. Shipment view ignores `Clin.pod_complete`.
+- Round Item Value to cents in Python (`ROUND_HALF_UP`) before comparing. Never move the underpaid comparison into SQL; SQLite compares decimals as floats. The SQL prefilter must stay a superset of qualifying rows.
+- Shipment labels only via `label_shipments` on each CLIN's full shipment list. Never label from the filtered eligible list.
+- Keep query count fixed: shipment count is a correlated subquery with `.order_by()` (ClinShipment `Meta.ordering` would leak into GROUP BY), sibling shipments use `clin_id__in=<queryset>`, never a Python id list. No ORDER BY on `ContractStatus.description` / `Buyer.description`.
+- CSV keeps `section` as the first column and both sections in one file; CLIN and Shipment column lists are `CLIN_CSV_COLUMNS` / `SHIPMENT_CSV_COLUMNS`.
+
 
 ```
 

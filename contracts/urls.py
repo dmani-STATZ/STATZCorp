@@ -4,6 +4,7 @@ from .views import partner_reconciliation_views
 from .views.payment_forecast_views import PaymentForecastView, upsert_payment_plan
 from .views.finance_views import FinanceAuditView, finance_audit_summary_api, finance_audit_clin_api
 from .views.on_time_delivery_views import on_time_delivery_report, on_time_delivery_export
+from .views.pod_vs_customer_pay_views import pod_vs_customer_pay_report, pod_vs_customer_pay_export
 from .views.finance_line_views import (
     add_contract_level_charge,
     add_finance_line,
@@ -787,6 +788,9 @@ urlpatterns = [
     # On-Time Delivery Report URLs
     path("reports/on-time-delivery/", on_time_delivery_report, name="on_time_delivery_report"),
     path("reports/on-time-delivery/export/", on_time_delivery_export, name="on_time_delivery_export"),
+    # POD vs Customer Pay Report URLs
+    path("reports/pod-vs-customer-pay/", pod_vs_customer_pay_report, name="pod_vs_customer_pay_report"),
+    path("reports/pod-vs-customer-pay/export/", pod_vs_customer_pay_export, name="pod_vs_customer_pay_export"),
     path(
         "api/contract/<int:contract_pk>/level-charges/add/",
         add_contract_level_charge,

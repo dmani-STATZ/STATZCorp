@@ -615,3 +615,27 @@ The page renders those fields as checkboxes, not `<select multiple>`. Buyer is a
 **Reliance on `due_status.py`.** The service materializes the queryset (with `late_status_shipment_prefetch()`) and calls `clin_completion_ship_date()`, `clin_shipped_qty()`, and `is_late()` per CLIN. No completion logic lives in this module and nothing is stored. The as-of comparison for not-shipped CLINs is report-specific and lives in `on_time_delivery.py`; `Clin.is_late` never marks an incomplete CLIN late.
 
 **Export.** `on_time_delivery_{start}_{end}.xlsx`. `Summary`: parameter block (Report, Company, **Contract Due Date Range**, Buyers, CLIN Types, IA, As Of, Generated), a blank row, header, data rows, bold Total and Percent rows (`0.00%`, real fractions), fills on header / total / percent only (Not Shipped `FFE699`, Late `F8CBAD`, On-Time `C6E0B4`), frozen below the header, auto-filter, and the same footnotes as the page. `Detail`: one row per CLIN, columns in order `Contract #`, `CLIN`, `Buyer`, `CLIN Type`, `IA`, `Contract Due Date`, `Supplier Due Date`, `Completion Date` (as `m/d/yyyy`, blank when not shipped), `Status` (`Shipped` / `Not Shipped`), `Shipped Qty / Order Qty` (e.g. `40 / 100`), `Late vs Due Date` (`Yes` / `No` / `Not Yet Due`), `Late vs QDD` (`Yes` / `No` / `Not Yet Due` / `N/A`, `N/A` only when `supplier_due_date` is null), `Early Ship Flag` (`Check` when completion is more than 180 days before the supplier due date; blank when `supplier_due_date` is null). The flag is informational only. Sorted by buyer, contract #, CLIN; frozen header, auto-filter. An invalid export query returns HTTP 400 with the form errors as plain text.
+
+## 22. POD vs Customer Pay Report
+
+Finance's payment-chasing list: deliveries with proof of delivery where the customer has not paid in full. Read-only; no models or migrations. Linked in the Contract Menu directly below On-Time Delivery Report.
+
+**URLs.** `GET /contracts/reports/pod-vs-customer-pay/` (`pod_vs_customer_pay_report`) and `GET /contracts/reports/pod-vs-customer-pay/export/` (`pod_vs_customer_pay_export`). GET only (POST → 405). Same gate as On-Time Delivery: `@login_required`, `ActiveCompanyQuerysetMixin.get_active_company()`, scoped by `contract__company`.
+
+**Files.** `contracts/services/pod_vs_customer_pay.py` (`PodPayFilters`, `classify`, `clin_queryset`, `shipment_queryset`, `compute_pod_pay_report`, `build_pod_pay_csv`), `contracts/forms.py` (`PodVsCustomerPayFilterForm`), `contracts/views/pod_vs_customer_pay_views.py`, `contracts/templates/contracts/pod_vs_customer_pay_report.html`, `contracts/tests/test_pod_vs_customer_pay.py`.
+
+**Parameters.** `view` = `clin` (default) or `shipment`; `status` = blank for All (includes contracts with no status) or a `ContractStatus` pk; `np_page` / `up_page` page the two sections independently (100 rows each). Unknown `view`/`status` is a form error on the page and HTTP 400 on the export. The page runs on first load with the defaults.
+
+**Rules (business-fixed).**
+- Customer Pay = `wawf_payment`; NULL money counts as 0.00.
+- CLIN view: POD complete = (has shipments and `pod_complete`) or (no shipments and `pod_date` set). Money and POD date are the CLIN's own columns (rollups when it has shipments). Shipment count is a correlated `Count` subquery, never a join + GROUP BY.
+- Shipment view: POD complete = the shipment's own `pod_date` is set, regardless of `Clin.pod_complete`. Money is the shipment's own columns. Labels come from `label_shipments` over each CLIN's complete shipment list (fetched with one `clin_id__in=<subquery>` query), so they match the popup and Finance Audit.
+- Sections: **Not paid ($0.00)** = pay == 0.00. **Underpaid** = pay > 0, Item Value (2 dp) > 0, and Item Value (2 dp) − pay ≥ 0.01. Item Value is rounded in Python with `Decimal.quantize(0.01, ROUND_HALF_UP)`; 1000.0049 vs 1000.00 is not underpaid, 1000.0050 is. NULL Item Value is excluded from both sections. A stored zero or negative Item Value still qualifies for Not paid when pay is zero. Negative pay lands in neither.
+- Balance = Item Value (2 dp) − pay. Days since POD = `timezone.localdate()` − POD date. Sort: oldest POD first, ties by pk, undated rows last.
+- The SQL prefilter (`pay IS NULL OR pay = 0 OR pay < item_value`) only narrows the fetch; it can never drop a qualifying row. Classification is always in Python so SQLite and MSSQL agree.
+
+**Performance.** CLIN view = 1 query, Shipment view = 2 queries, independent of row count. No ORDER BY / GROUP BY on TextFields (statuses are sorted in Python for the filter dropdown). No unbounded `__in` lists.
+
+**Display.** Money `$` + `floatformat:2|intcomma`, dates `m/d/Y`, empty values `—` (NULL Customer Pay shows `—`; the math still uses 0.00). Contract # links to `finance_audit_detail`.
+
+**Export.** `pod_vs_customer_pay_{view}_{YYYY-MM-DD}.csv`: current view and status, both sections, all rows (no paging), leading `section` column (`not_paid` / `underpaid`). Raw numbers (`1234.50`), ISO dates, blank for missing values. CLIN columns: section, Contract #, PO #, Buyer, Status, CLIN #, Supplier, POD Date, Days since POD, Item Value, Customer Pay, Balance, Shipments. Shipment view inserts Shipment and Ship Qty after CLIN # and drops Shipments.

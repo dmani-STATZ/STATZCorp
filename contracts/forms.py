@@ -38,6 +38,7 @@ from .models import (
 from .services.contract_create import duplicate_idiq_message, find_duplicate_idiq
 from .services.due_status import today
 from .services.on_time_delivery import OtdFilters
+from .services.pod_vs_customer_pay import VIEW_CHOICES, VIEW_CLIN, PodPayFilters, sorted_statuses
 
 User = get_user_model()
 
@@ -922,6 +923,49 @@ class OnTimeDeliveryFilterForm(forms.Form):
             buyer_ids=tuple(b.pk for b in cd['buyer']),
             item_types=tuple(cd['item_type']),
             ia_codes=ia_codes,
+        )
+
+
+class PodVsCustomerPayFilterForm(forms.Form):
+    """GET filters for the POD vs Customer Pay report.
+
+    ``view`` blank → CLIN. ``status`` blank → All (includes contracts with no
+    status). Unknown values are validation errors. Statuses are sorted in
+    Python because ``ContractStatus.description`` is a TextField.
+    """
+
+    view = forms.ChoiceField(
+        choices=VIEW_CHOICES,
+        required=False,
+        label='View',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    status = forms.ChoiceField(
+        choices=(),
+        required=False,
+        label='Status',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['status'].choices = [('', 'All')] + [
+            (str(s.pk), (s.description or '').strip() or f'(Status {s.pk})') for s in sorted_statuses()
+        ]
+
+    def full_clean(self):
+        super().full_clean()
+        for name in self.errors:
+            if name in self.fields:
+                widget = self.fields[name].widget
+                widget.attrs['class'] = f"{widget.attrs.get('class', '')} is-invalid".strip()
+
+    def to_filters(self):
+        cd = self.cleaned_data
+        status = cd.get('status')
+        return PodPayFilters(
+            view=cd.get('view') or VIEW_CLIN,
+            status_id=int(status) if status else None,
         )
 
 

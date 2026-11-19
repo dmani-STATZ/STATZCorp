@@ -88,3 +88,6 @@
  uses `INVENTORY_API_KEY` / `INVENTORY_API_HMAC_SECRET`. Do not import from `suppliers.*`.
 - No CORS headers. Every API response sends `Cache-Control: no-store`.
 - The `LoginRequiredMiddleware` bypass is the exact prefix `/api/inventory/v1/`. Do not widen it.
+
+## POD vs Customer Pay report (when touching `contracts/services/pod_vs_customer_pay.py`)
+- Read-only, cent-rounded classification in Python, fixed query count; full rules in `contracts/AGENTS_contracts.md` §18.

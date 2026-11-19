@@ -1,0 +1,132 @@
+{% extends "contracts/contract_base.html" %}
+{% load humanize contract_tags %}
+
+{% block title %}POD vs Customer Pay{% endblock %}
+
+{% block body_class %}metric-detail-page{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+    <h1 class="h3 mb-3">POD vs Customer Pay</h1>
+
+    <form method="get" action="{% url 'contracts:pod_vs_customer_pay_report' %}" class="card mb-4" novalidate>
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-auto">
+                    <div class="form-label">{{ form.view.label }}</div>
+                    <div class="btn-group" role="group" aria-label="View">
+                        {% for opt in form.view %}
+                            <input type="radio" class="btn-check" name="view" value="{{ opt.data.value }}" id="pvc-view-{{ opt.data.value }}" autocomplete="off"{% if opt.data.value == form.view.value or not form.view.value and forloop.first %} checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="pvc-view-{{ opt.data.value }}">{{ opt.choice_label }}</label>
+                        {% endfor %}
+                    </div>
+                    {% for error in form.view.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-12 col-sm-4 col-lg-3">
+                    <label for="{{ form.status.id_for_label }}" class="form-label">{{ form.status.label }}</label>
+                    {{ form.status }}
+                    {% for error in form.status.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Apply</button>
+                </div>
+                {% if report %}
+                    <div class="col-auto ms-auto">
+                        <a href="{% url 'contracts:pod_vs_customer_pay_export' %}{% if export_query %}?{{ export_query }}{% endif %}" class="btn btn-success">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Export CSV
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    {% if report %}
+        <p class="small text-body-secondary mb-3">
+            {% if shipment_view %}Shipments with a POD date{% else %}POD-complete CLINs{% endif %}
+            whose customer has not paid in full. Days since POD as of {{ report.as_of|date:"m/d/Y" }}. Oldest POD first.
+        </p>
+
+        {% for section in sections %}
+            <div class="card mb-4" id="pvc-section-{{ section.key }}">
+                <div class="card-header d-flex align-items-center gap-2">
+                    <h2 class="h5 mb-0">{{ section.label }}</h2>
+                    <span class="badge text-bg-secondary">{{ section.total }}</span>
+                </div>
+                {% if not section.total %}
+                    <div class="card-body text-body-secondary">No rows.</div>
+                {% else %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Contract #</th>
+                                    <th>PO #</th>
+                                    <th>Buyer</th>
+                                    <th>Status</th>
+                                    <th>CLIN #</th>
+                                    {% if shipment_view %}
+                                        <th>Shipment</th>
+                                        <th class="text-end">Ship Qty</th>
+                                    {% endif %}
+                                    <th>Supplier</th>
+                                    <th class="text-end">POD Date</th>
+                                    <th class="text-end">Days since POD</th>
+                                    <th class="text-end">Item Value</th>
+                                    <th class="text-end">Customer Pay</th>
+                                    <th class="text-end">Balance</th>
+                                    {% if not shipment_view %}
+                                        <th class="text-end">Shipments</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in section.page.object_list %}
+                                    <tr>
+                                        <td><a href="{% url 'contracts:finance_audit_detail' row.contract_id %}">{{ row.contract_number|default:"—" }}</a></td>
+                                        <td>{{ row.po_number|default:"—" }}</td>
+                                        <td>{{ row.buyer|default:"—" }}</td>
+                                        <td>{{ row.status|default:"—" }}</td>
+                                        <td>{{ row.clin_number|default:"—" }}</td>
+                                        {% if shipment_view %}
+                                            <td>{{ row.shipment_label|default:"—" }}</td>
+                                            <td class="text-end">{{ row.ship_qty_display|intcomma|default:"—" }}</td>
+                                        {% endif %}
+                                        <td>{{ row.supplier|default:"—" }}</td>
+                                        <td class="text-end">{{ row.pod_date|date:"m/d/Y"|default:"—" }}</td>
+                                        <td class="text-end">{% if row.days_since_pod is None %}—{% else %}{{ row.days_since_pod }}{% endif %}</td>
+                                        <td class="text-end">{% if row.item_value < 0 %}-{% endif %}${{ row.item_value|abs_value|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">{% if row.customer_pay is None %}—{% else %}${{ row.customer_pay|floatformat:2|intcomma }}{% endif %}</td>
+                                        <td class="text-end fw-semibold">{% if row.balance < 0 %}-{% endif %}${{ row.balance|abs_value|floatformat:2|intcomma }}</td>
+                                        {% if not shipment_view %}
+                                            <td class="text-end">{{ row.shipment_count }}</td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if section.page.paginator.num_pages > 1 %}
+                        <div class="card-footer d-flex align-items-center gap-2">
+                            {% if section.prev_query %}
+                                <a class="btn btn-sm btn-outline-secondary" href="?{{ section.prev_query }}#pvc-section-{{ section.key }}">Previous</a>
+                            {% else %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                            {% endif %}
+                            <span class="small text-body-secondary">
+                                Page {{ section.page.number }} of {{ section.page.paginator.num_pages }}
+                                ({{ section.page.start_index }}–{{ section.page.end_index }} of {{ section.total }})
+                            </span>
+                            {% if section.next_query %}
+                                <a class="btn btn-sm btn-outline-secondary" href="?{{ section.next_query }}#pvc-section-{{ section.key }}">Next</a>
+                            {% else %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

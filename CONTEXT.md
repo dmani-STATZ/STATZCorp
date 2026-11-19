@@ -126,3 +126,9 @@ Shipment payment dates (Stage 8): `ClinShipment.paid_date` / `wawf_payment_date`
 **Dashboard.** `/inventory/` is server-side: search (`q`), visibility (`vis` = `all|public|private`), whitelisted sort (`sort`, `dir`), pagination (`page`, `per_page` in 25/50/100). Query logic lives in `inventory/selectors.py` (`build_item_queryset`, `inventory_kpis`). KPI cards come from one `aggregate()` over the whole table. JS is `inventory/static/inventory/js/inventory_dashboard.js`; no inline scripts.
 
 **Public API.** `GET /api/inventory/v1/items/` and `/items/<pk>/` (`inventory/api/`, namespace `inventory_api`) serve `statzcorp-com` server-to-server. Same HMAC scheme as the supplier portal API, separate secrets `INVENTORY_API_KEY` / `INVENTORY_API_HMAC_SECRET`; unset secrets fail closed (401). Only `InventoryItem.is_public=True` rows, and only `id, nsn, description, part_number, manufacturer, quantity`. `/api/inventory/v1/` is in the `LoginRequiredMiddleware` public URL list (`STATZWeb/middleware.py`). Consumer contract: `inventory/INVENTORY_API.md`.
+
+---
+
+## POD vs Customer Pay Report (`contracts` app)
+
+Read-only, GET-only Finance report of POD-complete CLINs / shipments not paid in full (Contract Menu, below On-Time Delivery); full spec in `contracts/CONTEXT_contracts.md` §22.
