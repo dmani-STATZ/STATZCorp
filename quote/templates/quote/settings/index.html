@@ -1,0 +1,119 @@
+{% extends "quote/base.html" %}
+
+{% block content %}
+<div class="mb-3">
+  <h1 class="h4 mb-0">Settings</h1>
+  <div class="text-body-secondary small">Quotes app settings. Superusers only.</div>
+</div>
+
+<div class="card card-padded mb-3">
+  <h2 class="h6">Email scanning</h2>
+  {% if fields.email_scan_enabled.error %}
+  <div class="alert alert-danger py-2">{{ fields.email_scan_enabled.error }}</div>
+  {% endif %}
+  <div class="form-check form-switch">
+    <input class="form-check-input" type="checkbox" role="switch" id="email_scan_enabled" disabled>
+    <label class="form-check-label text-body-secondary" for="email_scan_enabled">{{ fields.email_scan_enabled.label }}</label>
+  </div>
+  <div class="form-text">Not built yet</div>
+  <div class="small text-body-secondary mt-1">{{ fields.email_scan_enabled.help }}</div>
+</div>
+
+<div class="card card-padded mb-3">
+  <h2 class="h6">RFQs</h2>
+  {% if form_error %}<div class="alert alert-danger py-2">{{ form_error }}</div>{% endif %}
+  <form method="post" action="{% url 'quote:settings_save' %}" class="mb-3">
+    {% csrf_token %}
+    <input type="hidden" name="section" value="rfqs">
+    <div class="form-check form-switch mb-1">
+      <input class="form-check-input" type="checkbox" role="switch" id="rfq_test_mode" name="rfq_test_mode"
+             {% if fields.rfq_test_mode.value %}checked{% endif %}>
+      <label class="form-check-label" for="rfq_test_mode">{{ fields.rfq_test_mode.label }}</label>
+    </div>
+    <div class="form-text mb-3">{{ fields.rfq_test_mode.help }}</div>
+
+    <label class="label" for="rfq_test_recipient">{{ fields.rfq_test_recipient.label }}</label>
+    <input type="email" class="form-control {% if fields.rfq_test_recipient.error %}is-invalid{% endif %}"
+           id="rfq_test_recipient" name="rfq_test_recipient" maxlength="254"
+           value="{{ fields.rfq_test_recipient.value }}">
+    {% if fields.rfq_test_recipient.error %}
+      <div class="invalid-feedback">{{ fields.rfq_test_recipient.error }}</div>
+    {% endif %}
+    <div class="form-text mb-3">
+      Exactly one address. No commas, semicolons or spaces, and it cannot match any supplier or
+      contact email. Test Mode cannot be saved on unless this passes.
+    </div>
+    <button class="btn btn-primary btn-sm" type="submit">Save</button>
+  </form>
+
+  <h3 class="h6 mb-2">Recent test sends</h3>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr><th>When</th><th>Kind</th><th>SOLs</th><th>Test address</th><th>Result</th><th>Would have gone to</th></tr>
+      </thead>
+      <tbody>
+      {% for row in test_sends %}
+        <tr>
+          <td class="small">{{ row.created_at|date:"M j, g:i A" }}</td>
+          <td>{{ row.get_kind_display }}</td>
+          <td class="font-monospace small">{{ row.sol_numbers|default:"—" }}</td>
+          <td class="small">{{ row.test_recipient|default:"—" }}</td>
+          <td>
+            {% if row.ok %}OK{% else %}<span class="text-danger">Failed</span>{% endif %}
+            {% if row.error_text %}<div class="small text-body-secondary">{{ row.error_text }}</div>{% endif %}
+          </td>
+          <td class="small text-body-secondary">
+            To: {{ row.intended_to|default:"—" }}{% if row.intended_cc %} · Cc: {{ row.intended_cc }}{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="text-body-secondary">No test sends yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card card-padded quote-status-card">
+  <h2 class="h6">System status</h2>
+  <dl class="mb-0">
+    <dt>TypeSafe</dt>
+    <dd>
+      {% if status.typesafe.ok %}
+        TypeSafe is {{ status.typesafe.enabled|yesno:"on,off" }}.
+        API key present: {{ status.typesafe.key_present|yesno:"yes,no" }}.
+      {% else %}unavailable{% endif %}
+    </dd>
+    <dt>Anthropic budget</dt>
+    <dd>
+      {% if status.budget.ok %}
+        {% if status.budget.balance is not None %}${{ status.budget.balance }}{% else %}no budget on file{% endif %}
+      {% else %}unavailable{% endif %}
+    </dd>
+    <dt>Background worker</dt>
+    <dd>
+      {% if status.worker.ok %}
+        {% if status.worker.last_run_at %}last ran {{ status.worker.last_run_at|timesince }} ago{% else %}has not run{% endif %}
+      {% else %}unavailable{% endif %}
+    </dd>
+    <dt>Quote tasks</dt>
+    <dd>
+      {% if status.quote_tasks.ok %}
+        {% for task in status.quote_tasks.tasks %}
+          <div>
+            <span class="font-monospace">{{ task.name }}</span>:
+            {% if task.missing %}not registered
+            {% else %}
+              enabled {{ task.is_enabled|yesno:"yes,no" }},
+              running {{ task.is_running|yesno:"yes,no" }},
+              freezes {{ task.freeze_count }},
+              last run {% if task.last_run_at %}{{ task.last_run_at|timesince }} ago{% else %}never{% endif %}
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}unavailable{% endif %}
+    </dd>
+  </dl>
+</div>
+{% endblock content %}

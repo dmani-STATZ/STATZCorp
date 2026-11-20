@@ -1,4 +1,5 @@
 {% extends "base_template.html" %}
+{% load quote_tags %}
 {% comment %}
   Quotes app shell.
 
@@ -67,8 +68,19 @@
         </div>
         <span class="quote-phase-label">Phase 4</span>
       </div>
+      {% if request.user.is_superuser %}
+      <span class="quote-phase-sep" aria-hidden="true">|</span>
+      <div class="quote-phase">
+        <div class="quote-phase-links">
+          <a href="{% url 'quote:settings' %}"
+             class="app-subnav-link {% if section == 'settings' %}active{% endif %}">Settings</a>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </nav>
+
+  {% quote_test_mode_banner %}
 
   {% block content %}{% endblock content %}
 

@@ -162,7 +162,7 @@ class RFQTests(Phase1Base):
         contact.categories.add(sales)
         self.assertEqual(resolve_recipients(self.supplier), ['pat@vortex.example'])
 
-    @patch('quote.services.rfq.send_mail_via_graph', return_value=True)
+    @patch('quote.services.outbound.send_mail_via_graph', return_value=True)
     def test_send_marks_sent_and_moves_solicitation(self, send):
         self._queue()
         self.client.post(reverse('quote:rfq_send', args=[self.supplier.pk]))
@@ -172,7 +172,7 @@ class RFQTests(Phase1Base):
         self.assertEqual(self._status(self.sol), 'RFQ_SENT')
         self.assertEqual(send.call_args.kwargs['to_address'], 'sales@vortex.example')
 
-    @patch('quote.services.rfq.send_mail_via_graph', return_value=False)
+    @patch('quote.services.outbound.send_mail_via_graph', return_value=False)
     def test_failed_send_changes_nothing_but_the_error(self, send):
         self._queue()
         self.client.post(reverse('quote:rfq_send', args=[self.supplier.pk]))

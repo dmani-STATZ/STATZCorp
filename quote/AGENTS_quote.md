@@ -251,6 +251,21 @@ permission gating silently stops applying.
   (`quote-drawer.js`) together.
 - Feature flag `QUOTE_EMAIL_SCAN_ENABLED` hides the button and 404s both endpoints. Keep it that way.
 
+### Outbound mail and settings
+- **Every supplier-facing send goes through `services/outbound.send_supplier_mail`.** The only
+  module that may import the mail transport or call `send_mail_via_graph` is `services/outbound.py`.
+  A guard test (`test_outbound.TransportGuardTests`) fails the build otherwise.
+- **Test Mode fails closed and writes no business state.** To is the one test recipient, Cc and
+  Bcc are empty, and nothing is sent when that recipient is missing or is a supplier or contact
+  address. A test send does not touch `QuoteRFQ`, `QuoteSolicitation` or `QuotePackhouseRFQ`;
+  the only write is one `QuoteTestSend` row (also on a failed attempt, `ok=False`).
+- **`send_requests` reads Test Mode once** and passes that decision into `send_supplier_mail`, so
+  the duplicate-check skip and the redirect cannot disagree.
+- **Settings are read from the database on every use.** No cache, no module-level value. Adding a
+  setting is a `REGISTRY` entry in `services/app_settings.py` only: no migration, no template edit.
+  An unknown key raises `KeyError`. `email_scan_enabled` stays `available=False` until background
+  scanning is built; the server refuses to change it. It is not the mailbox Scan quote flag.
+
 ## 5. Files That Commonly Need to Change Together
 
 ### Changing the packhouse request flow

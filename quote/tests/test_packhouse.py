@@ -16,7 +16,7 @@ from quote.services import mailbox, packhouse
 from quote.services.matching import seed_solicitation_states
 from suppliers.models import Contact, Supplier
 
-SEND = 'quote.services.packhouse.send_mail_via_graph'
+SEND = 'quote.services.outbound.send_mail_via_graph'
 DIMS = {'weight': '2.5', 'length': '6', 'width': '4', 'height': '3', 'source_notes': 'spec sheet'}
 
 

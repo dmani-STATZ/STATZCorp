@@ -4619,6 +4619,40 @@ main {
   border-top: 1px solid var(--bs-border-color);
 }
 
+/* Quotes — RFQ Test Mode warning, shown on every Quotes page while it is on. */
+.quote-test-banner {
+  margin: 0.75rem 1rem 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #78350f;
+  background-color: #fef3c7;
+  border: 1px solid #b45309;
+  border-radius: var(--bs-border-radius);
+}
+
+.quote-test-banner a {
+  margin-left: 0.5rem;
+  color: inherit;
+  font-weight: 600;
+}
+
+[data-bs-theme="dark"] .quote-test-banner {
+  color: #fde68a;
+  background-color: #451a03;
+  border-color: #d97706;
+}
+
+.quote-status-card dt {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color);
+}
+
+.quote-status-card dd { margin-bottom: 0; }
+
 /* Quotes — sub-nav grouped by phase: pipes between groups, a quiet serif
    caption under each ("Phase 1", "Phase 2", ...). */
 .app-subnav.quote-phase-nav { height: auto; }

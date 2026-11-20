@@ -7,8 +7,9 @@ automatically (Phase 2 mailbox). Solicitation PDFs already stored in
 ``dibbs.Solicitation.pdf_blob`` ride along as attachments, within Graph's
 inline-attachment budget.
 
-Sending goes through ``mailer.services.graph_mail.send_mail_via_graph``, which
-returns False (never raises) on any failure, including GRAPH_MAIL_ENABLED=False.
+Sending goes through ``quote.services.outbound.send_supplier_mail`` (the Graph
+transport returns False, never raises, on any failure including GRAPH_MAIL_ENABLED=False).
+In RFQ Test Mode the email goes to the test recipient and no RFQ or solicitation state changes.
 """
 import logging
 from collections import OrderedDict
@@ -17,14 +18,14 @@ from django.db import transaction
 from django.utils import timezone
 
 from dibbs.models import CompanyCAGE
-from mailer.services.graph_mail import send_mail_via_graph
-from quote.models import QuoteRFQ, QuoteSolicitation
+from quote.models import QuoteRFQ, QuoteSolicitation, QuoteTestSend
+from quote.services import outbound
 
 logger = logging.getLogger(__name__)
 
 PENDING_STATUSES = (QuoteRFQ.STATUS_QUEUED, QuoteRFQ.STATUS_READY_TO_SEND)
 
-#: Graph sendMail rejects request bodies over ~4 MB; base64 inflates by ~4/3.
+#: Graph rejects send request bodies over ~4 MB; base64 inflates by ~4/3.
 ATTACHMENT_BUDGET_BYTES = 2_800_000
 
 SUBJECT_SOL_LIMIT = 4
@@ -190,7 +191,8 @@ def pending_groups():
 def send_supplier_rfqs(supplier, user):
     """
     Send one consolidated email for every pending RFQ to ``supplier``.
-    Returns a result dict; never raises for a send failure.
+    Returns a result dict; never raises for a send failure. A Test Mode send returns
+    ``test=True`` and ``test_recipient`` and leaves every RFQ queued.
     """
     rfqs = list(pending_rfqs().filter(supplier=supplier))
     if not rfqs:
@@ -198,11 +200,15 @@ def send_supplier_rfqs(supplier, user):
 
     recipients = resolve_recipients(supplier)
     if not recipients:
-        _record_failure(rfqs, 'No recipient: no Sales contact, rfq_email, business or primary email.')
+        if not outbound.test_mode_state()['on']:
+            _record_failure(rfqs, 'No recipient: no Sales contact, rfq_email, business or primary email.')
         return {'ok': False, 'error': 'No email address on file for this supplier.', 'sent': 0}
 
     subject, body = compose_message(supplier, rfqs, user)
-    ok = send_mail_via_graph(
+    outcome = outbound.send_supplier_mail(
+        kind=QuoteTestSend.KIND_RFQ,
+        sol_numbers=_sol_numbers(rfqs),
+        user=user,
         to_address=recipients[0],
         cc_addresses=recipients[1:] or None,
         subject=subject,
@@ -210,7 +216,13 @@ def send_supplier_rfqs(supplier, user):
         reply_to=default_reply_to(),
         attachments=_attachments(rfqs) or None,
     )
-    if not ok:
+    if outcome.test_mode:
+        return {
+            'ok': outcome.ok, 'test': True, 'test_recipient': outcome.test_recipient,
+            'error': outcome.error, 'sent': len(rfqs) if outcome.ok else 0,
+            'recipients': recipients, 'subject': subject,
+        }
+    if not outcome.ok:
         _record_failure(rfqs, 'Graph send failed (see server log; GRAPH_MAIL_ENABLED may be off).')
         return {'ok': False, 'error': 'Email send failed. Nothing was marked sent.', 'sent': 0}
 

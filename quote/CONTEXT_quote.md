@@ -76,12 +76,17 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `services/cage_names.py` | Read-only CAGE → name resolver: SAM cache, supplier directory, our CAGEs. Never calls SAM. |
 | `views/cages.py` | `cage_names` — cache-only JSON for the workspace refresh. |
 | `static/quote/js/cage-names.js` | Refreshes unnamed CAGE cells when the workspace tab regains focus. |
-| `services/rfq.py` | `queue_rfqs`, `resolve_recipients`, `compose_message`, `pending_groups`, `send_supplier_rfqs`. |
+| `services/rfq.py` | `queue_rfqs`, `resolve_recipients`, `compose_message`, `pending_groups`, `send_supplier_rfqs`. Sends through `services/outbound.py`. |
 | `services/archival.py` + `tasks/archive_stale_solicitations.py` | 7-day / past-due archival (daily `ScheduledTask`, seeded by `0005`). |
 | `views/solicitations.py`, `views/rfq.py` | Phase 1 screens (orchestration only). |
 | `services/graph_inbox.py` | Graph reader for the `GRAPH_MAIL_SENDER_RFQ` mailbox (moved from the retired `sales` app). |
 | `management/commands/seed_quote_demo.py` | Dev-only demo data (§14a). |
-| `templates/quote/base.html` | App shell (`.app-shell` / `.app-subnav`, shared with `dibbs`). |
+| `models/settings.py` | `QuoteSetting` (`quote_setting`), `QuoteSettingChange` (`quote_setting_change`, append-only), `QuoteTestSend` (`quote_test_send`). |
+| `services/app_settings.py` | The settings registry and store: `get` / `get_many` / `set_value` / `save_section` / `validate_test_recipient` / `page_context` / `status_snapshot`. Read from the database on every use. |
+| `services/outbound.py` | The only supplier-mail choke point: `send_supplier_mail`. RFQ Test Mode redirects here. |
+| `views/settings.py`, `templates/quote/settings/` | The Settings page (superuser only). |
+| `templatetags/quote_tags.py`, `templates/quote/includes/test_mode_banner.html` | The Test Mode banner on every Quotes page. Renders nothing when off, and never raises. |
+| `templates/quote/base.html` | App shell (`.app-shell` / `.app-subnav`, shared with `dibbs`). Settings link for superusers; the banner sits above `{% block content %}`. |
 
 ## 5. Data Model Notes
 - Every table has an explicit `quote_` `db_table`. Money: unit prices `Decimal(13,5)`,
@@ -408,6 +413,22 @@ Winner names come from our CAGEs, the supplier directory, then cached SAM names
 (`entity_names`, which delegates to `cage_names.resolve_cages` with that same
 precedence); reconciliation never calls the SAM API.
 
+**Settings and RFQ Test Mode (built) — `/quote/settings/`, superusers only:**
+1. The page has three cards. **Email scanning** is a disabled switch ("Not built yet");
+   `email_scan_enabled` is registered with `available=False` and the server refuses to change it.
+   This is not the mailbox Scan quote button, which stays behind `QUOTE_EMAIL_SCAN_ENABLED`.
+2. **RFQs** is Test Mode plus one test recipient. Saved all-or-nothing. Test Mode cannot be
+   saved on unless the recipient is one valid address that matches no supplier email
+   (`business_email`, `primary_email`, `rfq_email`) and no `Contact.email`.
+3. While Test Mode is on, every supplier-facing send (`send_supplier_rfqs`, `send_requests`)
+   goes to that one address: To = the test recipient, Cc and Bcc empty, subject prefixed
+   `[TEST] `, and a banner naming the real recipients. **A test send changes no business
+   state** — RFQ rows, solicitation status and `QuotePackhouseRFQ` are untouched, and the
+   packhouse duplicate check does not block it. It fails closed: a missing or disallowed
+   recipient sends nothing. The only write is one `QuoteTestSend` row.
+4. **System status** is read-only (TypeSafe on/off and whether its key is set, the Anthropic
+   budget balance, the background worker and the two quote tasks). Each line fails on its own.
+
 ## 7. Templates and UI
 - Bootstrap 5.3.3 (Spacelab) from the global base. New classes go in
   `static/css/app-core.css`. No new CSS files, no Tailwind, no CDN tags.
@@ -479,6 +500,8 @@ precedence); reconciliation never calls the SAM API.
 | `quote:capability_import_undo` | `/quote/capabilities/import/<id>/undo/` | POST, JSON (409 when already undone) |
 | `quote:capability_export` | `/quote/capabilities/export/[?supplier=<id>]` | CSV, streamed |
 | `quote:rfq_queue` / `rfq_send` / `rfq_send_all` / `rfq_remove` | `/quote/rfq/...` | POST except the queue page |
+| `quote:settings` | `/quote/settings/` | GET. Superuser only; anyone else 403 |
+| `quote:settings_save` | `/quote/settings/save/` | POST `section` (`rfqs` or `email_scan`) plus that section's fields. Superuser only |
 | `quote:mailbox` | `/quote/mailbox/?email=<id>` | inbox page |
 | `quote:mailbox_sync` | `/quote/mailbox/sync/` | POST, JSON |
 | `quote:email_detail` | `/quote/mailbox/<id>/` | XHR fragment (non-XHR redirects to the inbox) |
@@ -626,7 +649,12 @@ resolution, column detection, dry-run plan + impact, commit / remove / undo and 
 effect on matching, every capability endpoint, supplier-page / workspace / dashboard
 integration, `user_can_use_quote`),
 `test_phase1.py` (queue dataset/estimate, claims + poll, manual match learning,
-RFQ queue/compose/send success + failure, recipients, archival), `test_matching.py` (import signal →
+RFQ queue/compose/send success + failure, recipients, archival),
+`test_settings.py` (registry and store, the test-recipient rule, Settings access, the banner
+and Send TEST labels, the status card),
+`test_outbound.py` (Test Mode on / off / fail-closed for RFQ and packhouse, and the guard that
+only `services/outbound.py` may call the mail transport),
+`test_matching.py` (import signal →
 state seeding, additive matching, idempotency, no rewind, receiver isolation,
 batch-delete protection), `test_permission_seed.py`, `test_seed_quote_demo.py`.
 Run `python manage.py test quote dibbs`.
@@ -649,6 +677,8 @@ Run `python manage.py test quote dibbs`.
 - `0011_quote_source_channel` — `QuoteSupplierQuote.source_channel` (default EMAIL), `received_on`,
   `contact_name`. Additive only; existing rows read as email quotes with no date.
 - `0012_email_scan` — `QuoteEmailScan` (`quote_email_scan`). Additive only.
+- `0013_settings_and_test_mode` — `QuoteSetting`, `QuoteSettingChange`, `QuoteTestSend`. Additive
+  only; no seed. A missing settings row means the registry default.
 - `products/migrations/0005` added the NSN dimension provenance fields.
 
 ## 17. Known Gaps
@@ -728,6 +758,11 @@ Run `python manage.py test quote dibbs`.
    vision. The scan is synchronous (up to 100 s holding a worker) and is not exercised on SQL Server
    yet. Values are read, not computed: a lead time in weeks is converted, anything else (stock, ranges,
    business days) leaves Days ARO blank with a flag. Freight is never filled.
+26. RFQ Test Mode covers every supplier-facing send: `services/rfq.send_supplier_rfqs` and
+   `services/packhouse.send_requests`. A test send does not exercise the reply / `RESPONDED` flow,
+   because no RFQ row is marked sent. **Send all** in Test Mode sends one email per supplier, all
+   of them to the test inbox. The Email scanning switch is a placeholder until background scanning
+   is built; the mailbox Scan quote button is a separate feature.
 
 ## 20. CSS
 Three files repo-wide: `theme-vars.css`, `app-core.css` (shared `.app-shell` /

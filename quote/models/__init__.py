@@ -25,6 +25,7 @@ from .outcomes import BidOutcome
 from .packhouse import QuotePackhouseRFQ
 from .quotes import QuoteSupplierQuote
 from .rfq import QuoteRFQ
+from .settings import QuoteSetting, QuoteSettingChange, QuoteTestSend
 from .solicitation import QuoteSolicitation
 
 __all__ = [
@@ -39,9 +40,12 @@ __all__ = [
     'QuoteEmailSolLink',
     'QuotePackhouseRFQ',
     'QuoteRFQ',
+    'QuoteSetting',
+    'QuoteSettingChange',
     'QuoteSolicitation',
     'QuoteSolicitationMatch',
     'QuoteSupplierFSC',
     'QuoteSupplierNSN',
     'QuoteSupplierQuote',
+    'QuoteTestSend',
 ]

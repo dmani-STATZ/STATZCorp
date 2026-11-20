@@ -9,7 +9,8 @@ they answered so the rep can drop it into the quote's packaging section.
 
 * ``preview_request`` -- dry run: recipients, warnings and the exact message.
 * ``send_requests``   -- sends one email per packhouse, records a QuotePackhouseRFQ per
-  success. Never raises for a send failure; a failed send records nothing.
+  success. Never raises for a send failure; a failed send records nothing. In RFQ Test
+  Mode it skips the duplicate check, records nothing and saves no dimensions.
 * ``record_reply``    -- the rep types in the price from the packhouse's reply.
 * ``requests_payload`` / ``reply_candidates`` / ``history`` -- data for the screens.
 
@@ -24,9 +25,8 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from django.utils import timezone
 
-from mailer.services.graph_mail import send_mail_via_graph
-from quote.models import QuotePackhouseRFQ, QuoteSupplierQuote
-from quote.services import cost
+from quote.models import QuotePackhouseRFQ, QuoteSupplierQuote, QuoteTestSend
+from quote.services import cost, outbound
 from quote.services.matching import normalize_nsn
 from quote.services.quotes import save_dimensions
 from quote.services.rfq import default_reply_to, resolve_recipients, solicitation_attachments
@@ -235,6 +235,7 @@ def preview_request(solicitation, packhouse_ids, dims, note='', line_id=None, us
     """Dry run of ``send_requests``: never sends, never writes."""
     lines, line = resolve_scope(solicitation, line_id)
     packhouses = _load_packhouses(packhouse_ids)
+    test_mode = outbound.test_mode_state()
     parsed = parse_dims(dims)
     quantity = sum(item.quantity or 0 for item in lines)
     requirements = packaging_requirements(solicitation)
@@ -249,7 +250,7 @@ def preview_request(solicitation, packhouse_ids, dims, note='', line_id=None, us
     rows = []
     for packhouse in packhouses:
         recipients = resolve_recipients(packhouse)
-        earlier = _open_request(solicitation, line, packhouse)
+        earlier = None if test_mode['on'] else _open_request(solicitation, line, packhouse)
         rows.append({
             'id': packhouse.pk,
             'name': packhouse.name or '(no name)',
@@ -260,19 +261,24 @@ def preview_request(solicitation, packhouse_ids, dims, note='', line_id=None, us
                 else ''
             ),
         })
-    return {
+    out = {
         'subject': subject,
         'body': body,
         'packhouses': rows,
         'warnings': warnings,
         'attachments': [a['name'] for a in solicitation_attachments([solicitation])],
+        'test_mode': test_mode,
     }
+    if test_mode['on']:
+        out['effective_to'] = test_mode['recipient']
+    return out
 
 
 def send_requests(solicitation, packhouse_ids, dims, user, note='', line_id=None, save_dims=False):
     """
     Email each packhouse and record a QuotePackhouseRFQ for every one that went out.
-    Returns {'results': [{'id', 'name', 'ok', 'error'}], 'sent': n, 'dims_saved': [...]}.
+    Returns {'results': [{'id', 'name', 'ok', 'error', 'test'}], 'sent': n, 'dims_saved': [...],
+    'test_sent': n, 'test_recipient': str}. ``sent`` counts real sends only.
     """
     lines, line = resolve_scope(solicitation, line_id)
     packhouses = _load_packhouses(packhouse_ids)
@@ -282,12 +288,14 @@ def send_requests(solicitation, packhouse_ids, dims, user, note='', line_id=None
     note = _clean_note(note)
     attachments = solicitation_attachments([solicitation]) or None
     reply_to = default_reply_to()
+    # Read once and pass it down: the duplicate check and the send must agree.
+    test_state = outbound.test_mode_state()
 
-    results, sent = [], 0
+    results, sent, test_sent, test_recipient = [], 0, 0, ''
     for packhouse in packhouses:
-        result = {'id': packhouse.pk, 'name': packhouse.name or '(no name)', 'ok': False, 'error': ''}
+        result = {'id': packhouse.pk, 'name': packhouse.name or '(no name)', 'ok': False, 'error': '', 'test': False}
         results.append(result)
-        earlier = _open_request(solicitation, line, packhouse)
+        earlier = None if test_state['on'] else _open_request(solicitation, line, packhouse)
         if earlier:
             result['error'] = f'Already asked on {earlier.sent_at:%b %d}; still waiting for a reply.'
             continue
@@ -298,7 +306,11 @@ def send_requests(solicitation, packhouse_ids, dims, user, note='', line_id=None
         subject, body = compose_message(
             packhouse, solicitation, lines, quantity, parsed, requirements, note, user,
         )
-        ok = send_mail_via_graph(
+        outcome = outbound.send_supplier_mail(
+            kind=QuoteTestSend.KIND_PACKHOUSE,
+            sol_numbers=[solicitation.solicitation_number],
+            user=user,
+            test_state=test_state,
             to_address=recipients[0],
             cc_addresses=recipients[1:] or None,
             subject=subject,
@@ -306,7 +318,12 @@ def send_requests(solicitation, packhouse_ids, dims, user, note='', line_id=None
             reply_to=reply_to,
             attachments=attachments,
         )
-        if not ok:
+        if outcome.test_mode:
+            result.update(ok=outcome.ok, error=outcome.error, test=True)
+            test_sent += int(outcome.ok)
+            test_recipient = outcome.test_recipient
+            continue
+        if not outcome.ok:
             result['error'] = 'The email did not send (see the server log).'
             continue
         QuotePackhouseRFQ.objects.create(
@@ -322,7 +339,8 @@ def send_requests(solicitation, packhouse_ids, dims, user, note='', line_id=None
         sent += 1
 
     dims_saved = save_dimensions(lines, dims, user) if (save_dims and sent) else []
-    return {'results': results, 'sent': sent, 'dims_saved': dims_saved}
+    return {'results': results, 'sent': sent, 'dims_saved': dims_saved,
+            'test_sent': test_sent, 'test_recipient': test_recipient}
 
 
 # ── The reply ────────────────────────────────────────────────────────────────

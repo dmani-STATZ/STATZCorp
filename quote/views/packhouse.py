@@ -67,7 +67,13 @@ def packhouse_send(request, sol_number):
 
     sent = [r['name'] for r in result['results'] if r['ok']]
     failed = [f"{r['name']}: {r['error']}" for r in result['results'] if not r['ok']]
-    message = f"Packaging quote requested from {', '.join(sent)}." if sent else 'Nothing was sent.'
+    if result['test_sent']:
+        message = (f"TEST sent to {result['test_recipient']}. Nothing went to the supplier; "
+                   'no packhouse request was recorded.')
+    elif sent:
+        message = f"Packaging quote requested from {', '.join(sent)}."
+    else:
+        message = 'Nothing was sent.'
     if failed:
         message += ' ' + ' '.join(failed)
     if result['dims_saved']:
@@ -77,6 +83,7 @@ def packhouse_send(request, sol_number):
         'partial': bool(sent and failed),
         'message': message,
         'results': result['results'],
+        'test_mode': bool(result['test_sent'] or any(r['test'] for r in result['results'])),
         'requests': packhouse.requests_payload([solicitation.pk]).get(solicitation.pk, []),
     })
 

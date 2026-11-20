@@ -123,21 +123,27 @@
 
     function renderPreview(p) {
       previewing = true;
+      const testing = !!(p.test_mode && p.test_mode.on);
       const blocked = p.packhouses.every(h => h.problem);
+      function who(h) {
+        if (h.problem) return '<span class="text-danger">' + esc(h.problem) + '</span>';
+        if (!testing) return esc(h.recipients.join(', '));
+        return esc(p.effective_to || '') +
+          ' <span class="text-body-secondary">(real: ' + esc(h.recipients.join(', ')) + ')</span>';
+      }
       $('#qPhPreview').innerHTML =
         (p.warnings.length ? '<div class="alert alert-warning py-1 px-2 small mb-2"><ul class="mb-0 ps-3">' +
           p.warnings.map(w => '<li>' + esc(w) + '</li>').join('') + '</ul></div>' : '') +
         '<ul class="list-unstyled small mb-2">' + p.packhouses.map(h =>
-          '<li><strong>' + esc(h.name) + '</strong> &rarr; ' +
-          (h.problem ? '<span class="text-danger">' + esc(h.problem) + '</span>'
-            : esc(h.recipients.join(', '))) + '</li>').join('') + '</ul>' +
+          '<li><strong>' + esc(h.name) + '</strong> &rarr; ' + who(h) + '</li>').join('') + '</ul>' +
         '<details class="mb-2"><summary class="small">Message (' + esc(p.subject) + ')</summary>' +
         '<pre class="quote-ph-body small mb-1"></pre>' +
         '<div class="small text-body-secondary">Each packhouse gets its own name in the greeting.' +
         (p.attachments.length ? ' Attached: ' + esc(p.attachments.join(', ')) + '.' : ' No PDF stored for this solicitation; the DIBBS link is in the message.') +
+        (testing ? ' Test Mode sends this to the test address only, with [TEST] on the subject.' : '') +
         '</div></details>' +
         '<button type="button" class="btn btn-primary btn-sm" id="qPhSend"' + (blocked ? ' disabled' : '') + '>' +
-        '<i class="bi bi-send"></i> Send request</button>';
+        '<i class="bi bi-send"></i> ' + (testing ? 'Send TEST' : 'Send request') + '</button>';
       $('#qPhPreview').querySelector('.quote-ph-body').textContent = p.body;
       $('#qPhPreview').classList.remove('d-none');
     }

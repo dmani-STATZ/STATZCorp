@@ -1,0 +1,6 @@
+{% if show %}
+<div class="quote-test-banner" role="status">
+  TEST MODE ON — RFQs and packhouse requests go to {{ recipient|default:"(not set)" }}, not to suppliers.
+  {% if is_superuser %}<a href="{% url 'quote:settings' %}">Settings</a>{% endif %}
+</div>
+{% endif %}

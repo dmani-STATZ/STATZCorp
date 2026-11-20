@@ -8,9 +8,10 @@
   </div>
   {% if groups %}
   <form method="post" action="{% url 'quote:rfq_send_all' %}" class="m-0"
-        onsubmit="return confirm('Send {{ groups|length }} supplier email(s) now?');">
+        onsubmit="return confirm('{% if test_mode.on %}Send {{ groups|length }} TEST email(s) to the test address? Nothing goes to suppliers.{% else %}Send {{ groups|length }} supplier email(s) now?{% endif %}');">
     {% csrf_token %}
-    <button class="btn btn-primary btn-sm"><i class="bi bi-send"></i> Send all ({{ groups|length }})</button>
+    <button class="btn btn-primary btn-sm"><i class="bi bi-send"></i>
+      {% if test_mode.on %}Send all TEST{% else %}Send all{% endif %} ({{ groups|length }})</button>
   </form>
   {% endif %}
 </div>
@@ -22,10 +23,13 @@
       <span class="fw-semibold">{{ group.supplier.name|default:"(no name)" }}</span>
       <span class="font-monospace small text-body-secondary">{{ group.supplier.cage_code|default:"" }}</span>
       <div class="small">
-        {% if group.recipients %}
-          To: {{ group.recipients|join:", " }}
-        {% else %}
+        {% if not group.recipients %}
           <span class="text-danger">No email on file &mdash; add a Sales contact to this supplier.</span>
+        {% elif test_mode.on %}
+          To: {{ test_mode.recipient }}
+          <div class="text-body-secondary">Real recipients: {{ group.recipients|join:", " }}</div>
+        {% else %}
+          To: {{ group.recipients|join:", " }}
         {% endif %}
       </div>
       <div class="small text-body-secondary">
@@ -41,7 +45,7 @@
               data-bs-target="#preview-{{ group.supplier.pk }}" aria-expanded="false">Preview</button>
       <form method="post" action="{% url 'quote:rfq_send' group.supplier.pk %}" class="m-0">
         {% csrf_token %}
-        <button class="btn btn-primary btn-sm" {% if not group.recipients %}disabled{% endif %}>Send</button>
+        <button class="btn btn-primary btn-sm" {% if not group.recipients %}disabled{% endif %}>{% if test_mode.on %}Send TEST{% else %}Send{% endif %}</button>
       </form>
     </div>
   </div>

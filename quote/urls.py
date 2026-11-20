@@ -80,6 +80,9 @@ urlpatterns = [
     path('rfq/send-all/', views.rfq_send_all, name='rfq_send_all'),
     path('rfq/send/<int:supplier_id>/', views.rfq_send, name='rfq_send'),
     path('rfq/<int:rfq_id>/remove/', views.rfq_remove, name='rfq_remove'),
+    # Settings (superuser only; the views enforce it)
+    path('settings/', views.settings_page, name='settings'),
+    path('settings/save/', views.settings_save, name='settings_save'),
     path('research/', research_views.supplier_research, name='supplier_research'),
     path(
         'research/<str:cage>/export/',

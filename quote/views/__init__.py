@@ -43,6 +43,7 @@ from .quotes import (
     rfq_close,
 )
 from .rfq import rfq_queue, rfq_remove, rfq_send, rfq_send_all
+from .settings import settings_page, settings_save
 from .solicitations import (
     add_match,
     claim,
@@ -112,6 +113,8 @@ __all__ = [
     'rfq_send',
     'rfq_send_all',
     'set_status',
+    'settings_page',
+    'settings_save',
     'solicitation_queue',
     'solicitation_workspace',
     'supplier_search',

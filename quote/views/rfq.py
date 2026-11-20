@@ -6,6 +6,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from quote.models import QuoteRFQ
+from quote.services.outbound import test_mode_state
 from quote.services.rfq import (
     compose_message,
     pending_groups,
@@ -13,6 +14,12 @@ from quote.services.rfq import (
     send_supplier_rfqs,
 )
 from suppliers.models import Supplier
+
+
+def _test_sent_message(recipient, count=1):
+    if count == 1:
+        return f'TEST sent to {recipient}. Nothing went to the supplier; the RFQ is still queued.'
+    return f'{count} TEST emails sent to {recipient}. Nothing went to the suppliers; the RFQs are still queued.'
 
 
 @login_required
@@ -36,6 +43,7 @@ def rfq_queue(request):
         'section': 'rfq',
         'groups': groups,
         'recent': recent,
+        'test_mode': test_mode_state(),
     })
 
 
@@ -45,7 +53,9 @@ def rfq_send(request, supplier_id):
     """POST -- send one supplier's consolidated RFQ email."""
     supplier = get_object_or_404(Supplier, pk=supplier_id)
     result = send_supplier_rfqs(supplier, request.user)
-    if result['ok']:
+    if result.get('test') and result['ok']:
+        messages.warning(request, _test_sent_message(result['test_recipient']))
+    elif result['ok']:
         messages.success(
             request,
             f"RFQ sent to {supplier.name} ({', '.join(result['recipients'])}) "
@@ -60,13 +70,18 @@ def rfq_send(request, supplier_id):
 @require_POST
 def rfq_send_all(request):
     """POST -- send every supplier group in the queue."""
-    sent, failed = 0, []
+    sent, test_sent, test_recipient, failed = 0, 0, '', []
     for group in pending_groups():
         result = send_supplier_rfqs(group['supplier'], request.user)
-        if result['ok']:
+        if result.get('test') and result['ok']:
+            test_sent += 1
+            test_recipient = result['test_recipient']
+        elif result['ok']:
             sent += 1
         else:
             failed.append(f"{group['supplier'].name}: {result['error']}")
+    if test_sent:
+        messages.warning(request, _test_sent_message(test_recipient, test_sent))
     if sent:
         messages.success(request, f'{sent} supplier email(s) sent.')
     for failure in failed:

@@ -259,7 +259,7 @@ Path construction is **not** duplicated — derivation uses the same drive-relat
 ### `quote` — DIBBS Quoting Workflow
 **Purpose:** Owns the whole quoting workflow and all its data: solicitation pipeline state, supplier NSN/FSC capabilities + additive matching, RFQ dispatch, `quotes@` mailbox, supplier quotes with landed-cost buildup, bid staging, BQ export, post-award "Our Bids" analytics. Phase 1–4 screens are not built yet (placeholder dashboard).
 
-**Owns:** `QuoteSolicitation`, `QuoteSupplierNSN`, `QuoteSupplierFSC`, `QuoteCapabilityImport`, `QuoteSolicitationMatch`, `QuoteRFQ`, `QuoteSupplierQuote`, `QuoteBid`, `QuoteEmail`, `QuoteEmailAttachment`, `QuoteEmailSolLink`, `BidOutcome` (all `quote_*` tables)
+**Owns:** `QuoteSolicitation`, `QuoteSupplierNSN`, `QuoteSupplierFSC`, `QuoteCapabilityImport`, `QuoteSolicitationMatch`, `QuoteRFQ`, `QuoteSupplierQuote`, `QuotePackhouseRFQ`, `QuoteBid`, `QuoteEmail`, `QuoteEmailAttachment`, `QuoteEmailSolLink`, `QuoteEmailScan`, `BidOutcome`, and its own settings store `QuoteSetting` / `QuoteSettingChange` / `QuoteTestSend` (registry in `quote/services/app_settings.py`; not `users.UserSettings`) (all `quote_*` tables)
 
 **Supplier capabilities (NSN / FSC lists):** owned and written only by `quote` (`quote/services/capabilities.py`), surfaced from both sides: `/quote/capabilities/` (page + drawer editor + paste / CSV / Excel import with a dry-run review and undo) and inline on the supplier detail page (`suppliers` `#section-capabilities`, gated on Quotes access). Every add re-matches open solicitations; every remove / undo prunes the links it justified.
 
