@@ -12,14 +12,16 @@ the app runs on several workers, so a value kept in memory would show a stale Te
 """
 import logging
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Callable, Optional
 
 from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from quote.models import QuoteSetting, QuoteSettingChange, QuoteTestSend
 
@@ -27,8 +29,11 @@ logger = logging.getLogger(__name__)
 
 TRUE_VALUES = {'true', 'on', '1', 'yes'}
 RECENT_TEST_SENDS = 20
-QUOTE_TASKS = ('archive_stale_solicitations', 'reconcile_bid_outcomes')
+QUOTE_TASKS = ('archive_stale_solicitations', 'reconcile_bid_outcomes', 'process_quote_email_pipeline')
 UNAVAILABLE_MESSAGE = "That setting isn't available yet."
+NOT_EDITABLE_MESSAGE = "That setting is set automatically and can't be changed here."
+CONFIRM_SCAN_FIELD = 'confirm_scan_on'
+CONFIRM_SCAN_MESSAGE = 'Tick the confirmation box to turn email scanning on.'
 
 
 class SettingUnavailable(Exception):
@@ -69,24 +74,70 @@ def _optional_test_recipient(address):
     return validate_test_recipient(address) if address else None
 
 
+def _probability(value):
+    try:
+        number = Decimal(value)
+    except (InvalidOperation, TypeError):
+        return 'Enter a number between 0 and 1.'
+    if not number.is_finite() or not Decimal('0') <= number <= Decimal('1'):
+        return 'Enter a number between 0 and 1.'
+    if -number.as_tuple().exponent > 4:
+        return 'Use at most 4 decimal places.'
+    return None
+
+
+def _daily_cap(value):
+    if not value.isdigit() or not 0 <= int(value) <= 1000:
+        return 'Enter a whole number from 0 to 1000.'
+    return None
+
+
 @dataclass(frozen=True)
 class Setting:
     key: str
     label: str
     help: str
-    kind: str                 # 'bool' | 'email'
+    kind: str                 # 'bool' | 'email' | 'decimal' | 'int' | 'datetime'
     default: object
     section: str              # 'email_scan' | 'rfqs'
     available: bool = True
     validator: Optional[Callable[[str], Optional[str]]] = None
+    editable: bool = True     # False = written by code only, never by the Settings form
 
 
 REGISTRY = {s.key: s for s in (
     Setting(
         key='email_scan_enabled',
         label='Scan incoming supplier emails in the background',
-        help='Reads new supplier emails automatically and prepares their quotes for review.',
-        kind='bool', default=False, section='email_scan', available=False,
+        help='Reads new supplier emails automatically and prepares their quotes for review. Only mail '
+             'received after the switch is turned on is scanned; turning it off and on again starts over '
+             'from that moment.',
+        kind='bool', default=False, section='email_scan',
+    ),
+    Setting(
+        key='email_scan_enabled_at',
+        label='Scanning on since',
+        help='Set when the switch is turned on. Mail received before this is never scanned automatically.',
+        kind='datetime', default=None, section='email_scan', editable=False,
+    ),
+    Setting(
+        key='jev_min_quote_probability',
+        label='Minimum quote probability',
+        help='Emails TypeSafe rates below this are treated as "not a quote" (0 to 1).',
+        kind='decimal', default=Decimal('0.20'), section='email_scan', validator=_probability,
+    ),
+    Setting(
+        key='jev_block_hold_probability',
+        label='Possible blocked company: hold at',
+        help='Hold an email for a rep when TypeSafe rates the chance it involves a blocked company at or '
+             'above this (0 to 1).',
+        kind='decimal', default=Decimal('0.50'), section='email_scan', validator=_probability,
+    ),
+    Setting(
+        key='sonnet_daily_cap',
+        label='Automatic Claude extractions per day',
+        help='Automatic scans stop for the day at this count. Manual scans are never capped.',
+        kind='int', default=150, section='email_scan', validator=_daily_cap,
     ),
     Setting(
         key='rfq_test_mode',
@@ -111,12 +162,25 @@ SECTIONS = {'email_scan': 'Email scanning', 'rfqs': 'RFQs'}
 def _encode(spec, value):
     if spec.kind == 'bool':
         return 'true' if value else 'false'
-    return str(value or '')
+    if spec.kind == 'datetime':
+        return value.isoformat() if value else ''
+    if value is None:
+        return ''
+    return str(value)
 
 
 def _decode(spec, text):
     if spec.kind == 'bool':
         return text == 'true'
+    try:
+        if spec.kind == 'decimal':
+            return Decimal(text)
+        if spec.kind == 'int':
+            return int(text)
+    except (InvalidOperation, ValueError, TypeError):
+        return spec.default
+    if spec.kind == 'datetime':
+        return parse_datetime(text) if text else None
     return text
 
 
@@ -126,10 +190,14 @@ def _clean(spec, raw):
         if isinstance(raw, bool):
             return _encode(spec, raw)
         return _encode(spec, str(raw or '').strip().lower() in TRUE_VALUES)
-    value = str(raw or '').strip().lower()
+    value = '' if raw is None else str(raw).strip().lower()
     error = spec.validator(value) if spec.validator else None
     if error:
         raise SettingInvalid(error)
+    if spec.kind == 'decimal':
+        return str(Decimal(value))
+    if spec.kind == 'int':
+        return str(int(value))
     return value
 
 
@@ -167,32 +235,48 @@ def _section_keys(section):
     return [s.key for s in REGISTRY.values() if s.section == section]
 
 
+def _write(key, new, actor, now):
+    """Store one canonical value inside the caller's transaction. True when it changed (and was audited)."""
+    spec = REGISTRY[key]
+    row = QuoteSetting.objects.select_for_update().filter(key=key).first()
+    old = row.value if row is not None else _encode(spec, spec.default)
+    if old == new:
+        return False
+    if row is None:
+        QuoteSetting.objects.create(key=key, value=new, updated_by=actor, updated_at=now)
+    else:
+        row.value, row.updated_by, row.updated_at = new, actor, now
+        row.save(update_fields=['value', 'updated_by', 'updated_at'])
+    QuoteSettingChange.objects.create(key=key, old_value=old, new_value=new, changed_by=actor, changed_at=now)
+    if key == 'email_scan_enabled' and new == 'true':
+        # Every OFF -> ON moves the cutoff: mail received while scanning was off is never auto-processed.
+        _write('email_scan_enabled_at', _encode(REGISTRY['email_scan_enabled_at'], now), actor, now)
+    return True
+
+
+def _actor(user):
+    return user if user is not None and getattr(user, 'is_authenticated', False) else None
+
+
 def set_value(key, raw, user):
     """Validate and store one setting. Returns True when the value changed (and was audited)."""
     spec = REGISTRY[key]
     if not spec.available:
         raise SettingUnavailable(key)
+    if not spec.editable:
+        raise SettingInvalid(NOT_EDITABLE_MESSAGE)
     new = _clean(spec, raw)
     merged = dict(_current_text(_section_keys(spec.section)), **{key: new})
     errors = _cross_errors(spec.section, merged)
     if errors:
         raise SettingInvalid(next(iter(errors.values())))
 
-    actor = user if user is not None and getattr(user, 'is_authenticated', False) else None
+    actor = _actor(user)
     with transaction.atomic():
-        row = QuoteSetting.objects.select_for_update().filter(key=key).first()
-        old = row.value if row is not None else _encode(spec, spec.default)
-        if old == new:
-            return False
-        now = timezone.now()
-        if row is None:
-            QuoteSetting.objects.create(key=key, value=new, updated_by=actor, updated_at=now)
-        else:
-            row.value, row.updated_by, row.updated_at = new, actor, now
-            row.save(update_fields=['value', 'updated_by', 'updated_at'])
-        QuoteSettingChange.objects.create(key=key, old_value=old, new_value=new, changed_by=actor, changed_at=now)
-    logger.info('quote setting changed key=%s user=%s', key, getattr(actor, 'pk', None))
-    return True
+        changed = _write(key, new, actor, timezone.now())
+    if changed:
+        logger.info('quote setting changed key=%s user=%s', key, getattr(actor, 'pk', None))
+    return changed
 
 
 @dataclass
@@ -214,9 +298,9 @@ def save_section(section, post_data, user):
     current = _current_text([s.key for s in specs])
     values, errors = dict(current), {}
     for spec in specs:
-        if not spec.available:
+        if not spec.available or not spec.editable:
             if spec.key in post_data:
-                errors[spec.key] = UNAVAILABLE_MESSAGE
+                errors[spec.key] = UNAVAILABLE_MESSAGE if not spec.available else NOT_EDITABLE_MESSAGE
             continue
         if spec.kind != 'bool' and spec.key not in post_data:
             continue
@@ -227,20 +311,21 @@ def save_section(section, post_data, user):
             values[spec.key] = str(post_data.get(spec.key) or '')
     if not errors:
         errors = _cross_errors(section, values)
+    if (not errors and section == 'email_scan' and current.get('email_scan_enabled') != 'true'
+            and values.get('email_scan_enabled') == 'true' and post_data.get(CONFIRM_SCAN_FIELD) != '1'):
+        errors = {CONFIRM_SCAN_FIELD: CONFIRM_SCAN_MESSAGE}
     if errors:
         return SaveResult(False, errors, values, [])
 
-    # Switches turning off are written first and switches turning on last, so each set_value
-    # passes its own cross-check and Test Mode is never stored on without a checked recipient.
-    def order(spec):
-        if spec.kind != 'bool':
-            return 1
-        return 2 if values[spec.key] == 'true' else 0
-
+    actor = _actor(user)
     changed = []
-    for spec in sorted((s for s in specs if s.available), key=order):
-        if set_value(spec.key, _decode(spec, values[spec.key]), user):
-            changed.append(spec.key)
+    with transaction.atomic():
+        now = timezone.now()
+        for spec in specs:
+            if spec.available and spec.editable and _write(spec.key, values[spec.key], actor, now):
+                changed.append(spec.key)
+    for key in changed:
+        logger.info('quote setting changed key=%s user=%s', key, getattr(actor, 'pk', None))
     return SaveResult(True, {}, values, changed)
 
 
@@ -257,15 +342,18 @@ def page_context(values=None, errors=None):
     for spec in REGISTRY.values():
         value = typed[spec.key]
         if values and spec.key in values:
-            value = _decode(spec, values[spec.key])
+            value = values[spec.key] if spec.key in errors else _decode(spec, values[spec.key])
         fields[spec.key] = {
             'key': spec.key, 'label': spec.label, 'help': spec.help, 'kind': spec.kind,
-            'section': spec.section, 'available': spec.available, 'value': value,
-            'error': errors.get(spec.key, ''),
+            'section': spec.section, 'available': spec.available, 'editable': spec.editable,
+            'value': value, 'error': errors.get(spec.key, ''),
         }
     return {
         'fields': fields,
+        'email_scan_numbers': [f for f in fields.values()
+                               if f['section'] == 'email_scan' and f['kind'] in ('decimal', 'int')],
         'form_error': errors.get('__all__', ''),
+        'confirm_scan_error': errors.get(CONFIRM_SCAN_FIELD, ''),
         'test_sends': list(QuoteTestSend.objects.select_related('sent_by').order_by('-id')[:RECENT_TEST_SENDS]),
         'status': status_snapshot(),
     }
@@ -304,11 +392,35 @@ def _quote_tasks_status():
     return {'tasks': [rows.get(name, {'name': name, 'missing': True}) for name in QUOTE_TASKS]}
 
 
+def _typesafe_client_status():
+    from quote.services.email_triage import client_available
+    return {'available': client_available(), 'scan_on': get('email_scan_enabled')}
+
+
+def _triage_status():
+    from quote.models import QuoteEmailTriage
+    since = get('email_scan_enabled_at')
+    if since is None:
+        return {'since': None, 'counts': []}
+    rows = (QuoteEmailTriage.objects.filter(created_at__gte=since).values('state')
+            .annotate(n=Count('id')).order_by('state'))
+    labels = dict(QuoteEmailTriage.STATE_CHOICES)
+    return {'since': since, 'counts': [{'state': labels.get(r['state'], r['state']), 'n': r['n']} for r in rows]}
+
+
+def _sonnet_status():
+    from quote.services.email_scan import auto_calls_today
+    return {'today': auto_calls_today(), 'cap': get('sonnet_daily_cap')}
+
+
 def status_snapshot():
     """Read-only facts for the System status card. Each line fails on its own ({'ok': False})."""
     return {
         'typesafe': _line('typesafe', _typesafe_status),
+        'typesafe_client': _line('typesafe_client', _typesafe_client_status),
         'budget': _line('budget', _budget_status),
         'worker': _line('worker', _worker_status),
         'quote_tasks': _line('quote_tasks', _quote_tasks_status),
+        'triage': _line('triage', _triage_status),
+        'sonnet': _line('sonnet', _sonnet_status),
     }

@@ -101,13 +101,25 @@ def fetch_inbox_messages() -> tuple[list[GraphEmailMessage], Optional[str]]:
 
     Returns (messages, error_message). Messages are ordered newest-first.
     """
+    messages, _next_url, error = fetch_inbox_page()
+    return messages, error
+
+
+def fetch_inbox_page(next_url: Optional[str] = None) -> tuple[list[GraphEmailMessage], Optional[str], Optional[str]]:
+    """
+    One page of the inbox, newest first: the first page, or the page at a previous call's
+    ``@odata.nextLink``. Returns (messages, next_url or None, error_message). Read-only.
+    """
     sender = settings.GRAPH_MAIL_SENDER_RFQ
     if not sender:
-        return [], 'GRAPH_MAIL_SENDER_RFQ is not configured.'
+        return [], None, 'GRAPH_MAIL_SENDER_RFQ is not configured.'
+    if next_url is not None and not next_url.startswith(f'{GRAPH_BASE}/'):
+        # The bearer token must never go to a host other than Graph.
+        return [], None, 'Unexpected next-page link from Graph.'
 
     token = _get_graph_token()
     if not token:
-        return [], (
+        return [], None, (
             'Could not acquire Graph token. Check GRAPH_MAIL_* environment variables '
             'and Azure App Registration permissions.'
         )
@@ -118,7 +130,7 @@ def fetch_inbox_messages() -> tuple[list[GraphEmailMessage], Optional[str]]:
     }
 
     user_seg = quote(sender, safe='')
-    url = (
+    url = next_url or (
         f'{GRAPH_BASE}/users/{user_seg}/mailFolders/inbox/messages'
         f'?$top={INBOX_FETCH_LIMIT}'
         f'&$orderby=receivedDateTime desc'
@@ -130,7 +142,7 @@ def fetch_inbox_messages() -> tuple[list[GraphEmailMessage], Optional[str]]:
         resp.raise_for_status()
     except requests.RequestException as exc:
         logger.error('graph_inbox: fetch_inbox_messages failed: %s', exc)
-        return [], f'Graph API request failed: {exc}'
+        return [], None, f'Graph API request failed: {exc}'
 
     data = resp.json()
     messages: list[GraphEmailMessage] = []
@@ -148,7 +160,7 @@ def fetch_inbox_messages() -> tuple[list[GraphEmailMessage], Optional[str]]:
             )
         )
 
-    return messages, None
+    return messages, data.get('@odata.nextLink') or None, None
 
 
 def fetch_message_body(graph_message_id: str) -> tuple[str, Optional[str]]:

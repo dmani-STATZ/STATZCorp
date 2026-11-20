@@ -218,10 +218,16 @@ class QuoteEmailScan(models.Model):
     LEVEL_DEEP = 'deep'
     LEVEL_CHOICES = [(LEVEL_NORMAL, 'Normal'), (LEVEL_DEEP, 'Deep')]
 
+    TRIGGER_AUTO = 'auto'
+    TRIGGER_MANUAL = 'manual'
+    TRIGGER_CHOICES = [(TRIGGER_AUTO, 'Automatic'), (TRIGGER_MANUAL, 'Manual')]
+
+    STATUS_QUEUED = 'queued'
     STATUS_RUNNING = 'running'
     STATUS_COMPLETED = 'completed'
     STATUS_FAILED = 'failed'
     STATUS_CHOICES = [
+        (STATUS_QUEUED, 'Queued'),
         (STATUS_RUNNING, 'Running'),
         (STATUS_COMPLETED, 'Completed'),
         (STATUS_FAILED, 'Failed'),
@@ -229,7 +235,13 @@ class QuoteEmailScan(models.Model):
 
     email = models.ForeignKey(QuoteEmail, on_delete=models.CASCADE, related_name='scans')
     level = models.CharField(max_length=8, choices=LEVEL_CHOICES)
+    #: Queued rows (auto or manual) are run by the background worker; the mailbox button's
+    #: synchronous run_scan rows are manual and never queued.
+    trigger = models.CharField(max_length=8, choices=TRIGGER_CHOICES, default=TRIGGER_MANUAL)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_RUNNING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
     model_name = models.CharField(max_length=100, blank=True, default='')
     content_hash = models.CharField(
         max_length=64, blank=True, default='', db_index=True,

@@ -1,4 +1,6 @@
 """Quotes Settings: the registry / store, the test-recipient rule, the page, the banner and the status card."""
+from dataclasses import replace
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -50,10 +52,17 @@ class StoreTests(TestCase):
         self.assertFalse(QuoteSetting.objects.filter(key='rfq_test_mode').exists())
 
     def test_unavailable_setting_cannot_change(self):
-        with self.assertRaises(app_settings.SettingUnavailable):
-            app_settings.set_value('email_scan_enabled', True, self.user)
+        spec = app_settings.REGISTRY['rfq_test_mode']
+        with patch.dict(app_settings.REGISTRY, {spec.key: replace(spec, available=False)}):
+            with self.assertRaises(app_settings.SettingUnavailable):
+                app_settings.set_value('rfq_test_mode', True, self.user)
         self.assertFalse(QuoteSetting.objects.exists())
         self.assertFalse(QuoteSettingChange.objects.exists())
+
+    def test_code_only_setting_cannot_be_set_through_set_value(self):
+        with self.assertRaises(app_settings.SettingInvalid):
+            app_settings.set_value('email_scan_enabled_at', '2026-01-01T00:00:00+00:00', self.user)
+        self.assertFalse(QuoteSetting.objects.exists())
 
     def test_bool_coercion(self):
         spec = app_settings.REGISTRY['rfq_test_mode']
@@ -93,10 +102,12 @@ class StoreTests(TestCase):
         self.assertEqual(app_settings.get_many(['rfq_test_mode', 'rfq_test_recipient']),
                          {'rfq_test_mode': False, 'rfq_test_recipient': ''})
 
-    def test_forged_post_for_an_unavailable_setting_changes_nothing(self):
-        result = app_settings.save_section('email_scan', {'email_scan_enabled': 'on'}, self.user)
+    def test_forged_post_for_a_code_only_setting_changes_nothing(self):
+        result = app_settings.save_section('email_scan', {
+            'email_scan_enabled_at': '2020-01-01T00:00:00+00:00', 'sonnet_daily_cap': '10',
+        }, self.user)
         self.assertFalse(result.ok)
-        self.assertEqual(result.errors['email_scan_enabled'], "That setting isn't available yet.")
+        self.assertEqual(result.errors['email_scan_enabled_at'], app_settings.NOT_EDITABLE_MESSAGE)
         self.assertFalse(QuoteSetting.objects.exists())
 
     def test_unknown_section(self):
@@ -106,8 +117,10 @@ class StoreTests(TestCase):
         app_settings.set_value('rfq_test_recipient', TEST_ADDRESS, self.user)
         with self.assertNumQueries(1):
             values = app_settings.get_many(list(app_settings.REGISTRY))
-        self.assertEqual(values, {'email_scan_enabled': False, 'rfq_test_mode': False,
-                                  'rfq_test_recipient': TEST_ADDRESS})
+        self.assertEqual(values, {'email_scan_enabled': False, 'email_scan_enabled_at': None,
+                                  'jev_min_quote_probability': Decimal('0.20'),
+                                  'jev_block_hold_probability': Decimal('0.50'), 'sonnet_daily_cap': 150,
+                                  'rfq_test_mode': False, 'rfq_test_recipient': TEST_ADDRESS})
 
 
 class TestRecipientTests(TestCase):
@@ -162,21 +175,23 @@ class SettingsAccessTests(TestCase):
         self.assertNotContains(page, reverse('quote:settings'))
         self.assertFalse(QuoteSetting.objects.exists())
 
-    def test_superuser_sees_the_page_the_link_and_the_disabled_switch(self):
+    def test_superuser_sees_the_page_the_link_and_the_live_switch(self):
         self.client.force_login(self.superuser)
         page = self.client.get(reverse('quote:settings'))
         self.assertEqual(page.status_code, 200)
-        self.assertContains(page, 'Not built yet')
-        self.assertContains(page, 'disabled')
+        self.assertContains(page, 'name="email_scan_enabled"')
+        self.assertContains(page, 'name="confirm_scan_on"')
+        self.assertContains(page, 'name="jev_min_quote_probability"')
+        self.assertNotContains(page, 'name="email_scan_enabled_at"')
         self.assertContains(self.client.get(reverse('quote:dashboard')), reverse('quote:settings'))
 
-    def test_a_forged_post_for_email_scanning_changes_nothing(self):
+    def test_turning_scanning_on_without_the_confirmation_changes_nothing(self):
         self.client.force_login(self.superuser)
         resp = self.client.post(reverse('quote:settings_save'), {
             'section': 'email_scan', 'email_scan_enabled': 'on',
         })
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "That setting isn&#x27;t available yet.")
+        self.assertContains(resp, app_settings.CONFIRM_SCAN_MESSAGE)
         self.assertFalse(QuoteSetting.objects.exists())
 
     def test_a_bad_recipient_is_rejected_and_nothing_is_saved(self):

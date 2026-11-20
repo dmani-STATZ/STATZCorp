@@ -15,9 +15,10 @@ the sender's domain against those same addresses.
 import html
 import logging
 import re
+import time
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -223,67 +224,106 @@ def ingest_message(payload, attachments=()):
     if (body.get('contentType') or '').lower() == 'text':
         body_html = f'<pre style="white-space:pre-wrap;font-family:inherit">{html.escape(body_html)}</pre>'
     received = parse_datetime(payload.get('receivedDateTime') or '') or timezone.now()
+    supplier = resolve_supplier(sender.get('address'))
 
-    with transaction.atomic():
-        email = QuoteEmail.objects.create(
-            graph_message_id=graph_id,
-            sender_email=(sender.get('address') or '')[:254],
-            sender_name=(sender.get('name') or '')[:255],
-            subject=(payload.get('subject') or '')[:998],
-            received_at=received,
-            body_preview=payload.get('bodyPreview') or '',
-            body_html=body_html,
-            headers_json=payload.get('internetMessageHeaders'),
-            raw_payload={k: v for k, v in payload.items() if k != 'body'},
-            is_read=bool(payload.get('isRead')),
-            is_orphan=True,
-            supplier=resolve_supplier(sender.get('address')),
-        )
-        for att in attachments:
-            QuoteEmailAttachment.objects.create(
-                email=email,
-                graph_attachment_id=att['graph_attachment_id'][:512],
-                original_name=att['name'][:255],
-                content_type=(att['content_type'] or '')[:127],
-                file_size=att['size'],
-                content=att['content'],
-                downloaded_at=timezone.now() if att['content'] is not None else None,
+    try:
+        with transaction.atomic():
+            email = QuoteEmail.objects.create(
+                graph_message_id=graph_id,
+                sender_email=(sender.get('address') or '')[:254],
+                sender_name=(sender.get('name') or '')[:255],
+                subject=(payload.get('subject') or '')[:998],
+                received_at=received,
+                body_preview=payload.get('bodyPreview') or '',
+                body_html=body_html,
+                headers_json=payload.get('internetMessageHeaders'),
+                raw_payload={k: v for k, v in payload.items() if k != 'body'},
+                is_read=bool(payload.get('isRead')),
+                is_orphan=True,
+                supplier=supplier,
             )
+            for att in attachments:
+                QuoteEmailAttachment.objects.create(
+                    email=email,
+                    graph_attachment_id=att['graph_attachment_id'][:512],
+                    original_name=att['name'][:255],
+                    content_type=(att['content_type'] or '')[:127],
+                    file_size=att['size'],
+                    content=att['content'],
+                    downloaded_at=timezone.now() if att['content'] is not None else None,
+                )
+    except IntegrityError:
+        # Another sync (the button and the background task) stored it first.
+        existing = QuoteEmail.objects.filter(graph_message_id=graph_id).first()
+        if existing is None:
+            raise
+        return existing, False
     auto_link(email)
     return email, True
 
 
-def sync_mailbox():
+def _inbox_pages(max_pages):
+    """(messages, error) per page, newest first. One page uses the original single fetch."""
+    if max_pages <= 1:
+        yield graph_inbox.fetch_inbox_messages()
+        return
+    url = None
+    for _ in range(max_pages):
+        messages, url, error = graph_inbox.fetch_inbox_page(url)
+        yield messages, error
+        if error or not url:
+            return
+
+
+def sync_mailbox(max_pages=1, stop_before=None, deadline=None):
     """
     Pull the newest messages from the quotes@ inbox and store any we have not
     seen. Returns {'fetched', 'new', 'linked', 'errors': [...]}.
+
+    The defaults (one page of 50) are the mailbox button. The background pipeline passes
+    ``max_pages`` to follow Graph's next-page links, ``stop_before`` (stop at the first message
+    received earlier) and ``deadline`` (a ``time.monotonic()`` value: no new message is fetched
+    after it). Paging also stops after a page whose messages are all stored already.
     """
-    messages, error = graph_inbox.fetch_inbox_messages()
-    if error:
-        return {'fetched': 0, 'new': 0, 'linked': 0, 'errors': [error]}
-    known = set(
-        QuoteEmail.objects.filter(graph_message_id__in=[m.graph_id for m in messages])
-        .values_list('graph_message_id', flat=True)
-    )
-    new = linked = 0
+    fetched = new = linked = 0
     errors = []
-    for message in messages:
-        if message.graph_id in known:
-            continue
-        payload, err = graph_inbox.fetch_message_full(message.graph_id)
-        if err:
-            errors.append(err)
-            continue
-        attachments = []
-        if payload.get('hasAttachments'):
-            attachments, err = graph_inbox.fetch_attachments(message.graph_id)
+    for messages, error in _inbox_pages(max_pages):
+        if error:
+            errors.append(error)
+            break
+        fetched += len(messages)
+        known = set(
+            QuoteEmail.objects.filter(graph_message_id__in=[m.graph_id for m in messages])
+            .values_list('graph_message_id', flat=True)
+        )
+        stop = bool(messages) and len(known) == len(messages)
+        for message in messages:
+            if stop_before is not None and message.received_at < stop_before:
+                stop = True
+                break
+            if deadline is not None and time.monotonic() >= deadline:
+                stop = True
+                break
+            if message.graph_id in known:
+                continue
+            payload, err = graph_inbox.fetch_message_full(message.graph_id)
             if err:
                 errors.append(err)
-        email, created = ingest_message(payload, attachments)
-        if created:
-            new += 1
-            linked += int(not email.is_orphan)
-    return {'fetched': len(messages), 'new': new, 'linked': linked, 'errors': errors[:5]}
+                continue
+            attachments = []
+            if payload.get('hasAttachments'):
+                attachments, err = graph_inbox.fetch_attachments(message.graph_id)
+                if err:
+                    errors.append(err)
+            email, created = ingest_message(payload, attachments)
+            if created:
+                new += 1
+                linked += int(not email.is_orphan)
+        if stop:
+            break
+    if fetched == 0 and errors:
+        return {'fetched': 0, 'new': 0, 'linked': 0, 'errors': errors[:1]}
+    return {'fetched': fetched, 'new': new, 'linked': linked, 'errors': errors[:5]}
 
 
 def open_solicitation_search(q, limit=20):

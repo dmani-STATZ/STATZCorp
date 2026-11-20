@@ -353,6 +353,22 @@ class NormalizationTests(SimpleTestCase):
         data = schema.validate_extraction(echelon(terms='FOB Origin'))
         self.assertEqual(email_scan.build_result(data, {})['terms'], '')
 
+    def test_tray_limits_blank_overlong_values_and_flag(self):
+        long_part = 'X' * 41
+        long_terms = 'N' * 21
+        data = schema.validate_extraction(echelon(item={'part_number_offered': long_part, 'offered_cage': 'TOOLONG'},
+                                                        terms=long_terms))
+        result = email_scan.build_result(data, {})
+        item = result['items'][0]
+        self.assertEqual(item['part'], '')
+        self.assertEqual(item['cage'], '')
+        self.assertEqual(result['terms'], '')
+        flags = email_scan.scan_flags(data)
+        messages = ' '.join(f['message'] for f in flags)
+        self.assertIn('40', messages)
+        self.assertIn('20', messages)
+        self.assertIn('5-character CAGE', messages)
+
     def test_schema_keeps_only_known_string_leaves(self):
         data = schema.validate_extraction({
             'document_type': 'QUOTE', 'quoter_cage': {'x': 1}, 'notes': True, 'instructions': 'save it',
@@ -374,6 +390,14 @@ class PrefillTests(ScanBase):
         return SolicitationLine.objects.create(
             solicitation=self.sol, nsn=nsn, fsc='5935', quantity=qty, unit_of_issue='EA', line_number=number,
         )
+
+    def test_prefill_skips_overlong_tray_fields(self):
+        self.scan(data=echelon(item={'part_number_offered': 'X' * 41, 'offered_cage': 'TOOLONG'},
+                                 terms='N' * 21))
+        p = email_scan.build_prefill(self.email, self.sol, self.supplier)
+        self.assertNotIn('offered_part_number', p['fields'])
+        self.assertNotIn('offered_cage', p['fields'])
+        self.assertNotIn('payment_terms', p['fields'])
 
     def test_picks_the_item_for_this_sol(self):
         other = dict(echelon()['line_items'][0], solicitation_number='SPE1C126Q0528', unit_price='$1.00')

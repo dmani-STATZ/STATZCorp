@@ -3,12 +3,15 @@ Mailbox "Scan quote": Claude reads one supplier email (body text + PDF / PNG / J
 pulls out what a rep would type into the Log quote tray.
 
   scan_state(email)                  -> what the Scan button should offer, from the scan rows
-  run_scan(email, level, user)       -> QuoteEmailScan (normal = Haiku, deep = Sonnet)
+  run_scan(email, level, user)       -> QuoteEmailScan (normal = Haiku, deep = Sonnet), in the request
+  queue_scan / process_scan_queue    -> background extraction (Sonnet) run by the email pipeline task
+  execute_scan(scan)                 -> the one Claude call path, shared by both
   build_prefill(email, sol, supplier)-> tray values for one SOL (empty when a quote is already on file)
 
-A scan never saves a quote: the only table it writes is ``quote_email_scan``. The rep reviews the
-prefilled tray and saves as usual. The Claude call runs inside the request (no transaction is open
-across it) and goes through ``core.anthropic_client``, imported lazily.
+A scan never saves a quote: it writes only ``quote_email_scan`` (and moves the email's
+``quote_email_triage`` row to extracted / failed). The rep reviews the prefilled tray and saves as
+usual. No transaction is open across the Claude call, which goes through ``core.anthropic_client``,
+imported lazily inside ``execute_scan``.
 """
 import base64
 import hashlib
@@ -22,10 +25,11 @@ from html.parser import HTMLParser
 
 import requests
 from django.conf import settings
+from django.db.models import F
 from django.utils import timezone
 
 from products.nsn_utils import nsn_query_variants
-from quote.models import QuoteEmailAttachment, QuoteEmailScan
+from quote.models import QuoteEmailAttachment, QuoteEmailScan, QuoteEmailTriage
 from quote.services import email_scan_schema as schema
 from quote.services.mailbox import sniff_preview_type
 
@@ -34,6 +38,9 @@ logger = logging.getLogger(__name__)
 CALL_SITE = 'quote_email_scan'
 SCAN_TIMEOUT_SECONDS = 100          # Azure's front end cuts a request off at 230 s
 IN_FLIGHT_WINDOW = timedelta(minutes=3)
+WORKER_STALE_AFTER = timedelta(minutes=10)
+WORKER_TASK = 'process_quote_email_pipeline'
+MAX_EXTRACTS_PER_RUN = 5
 BODY_MAX_CHARS = 30_000
 MAX_ATTACHMENTS = 5
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -44,6 +51,8 @@ MAX_TOKENS = {QuoteEmailScan.LEVEL_NORMAL: 4096, QuoteEmailScan.LEVEL_DEEP: 8192
 UNIT_PRICE_Q = Decimal('0.00001')
 MATH_TOLERANCE = Decimal('0.01')
 CAGE_RE = re.compile(r'^[A-Z0-9]{5}$')
+PART_MAX_LEN = 40
+TERMS_MAX_LEN = 20
 
 NOTHING_TO_SCAN = 'Nothing to scan: no body text or supported attachment.'
 BUDGET_MESSAGE = 'The AI budget is used up, so the scan did not run. Ask an admin to top it up.'
@@ -66,7 +75,11 @@ class ScanDisabled(Exception):
 
 
 class ScanNotAllowed(Exception):
-    """The requested level is not the next one for this message."""
+    """This message can't be scanned now (wrong level, or the sender is blocked)."""
+
+
+class ScanWorkerUnavailable(Exception):
+    """The background task that runs queued scans is missing or disabled."""
 
 
 def enabled():
@@ -282,7 +295,11 @@ def _plain(number):
 
 def _terms(extraction):
     terms = (extraction.get('terms') or '').strip()
-    return '' if 'fob' in terms.lower() else terms
+    if 'fob' in terms.lower():
+        return ''
+    if len(terms) > TERMS_MAX_LEN:
+        return ''
+    return terms
 
 
 def normalize_item(item):
@@ -290,9 +307,11 @@ def normalize_item(item):
     price = parse_decimal(item.get('unit_price'))
     quantity = parse_decimal(item.get('quantity'))
     moq, _ = parse_moq(item.get('moq'))
+    part = (item.get('part_number_offered') or '').strip()
+    cage = normalize_cage(item.get('offered_cage')) or normalize_cage(item.get('mfr_cage'))
     return {
-        'part': (item.get('part_number_offered') or '').strip(),
-        'cage': normalize_cage(item.get('offered_cage')) or normalize_cage(item.get('mfr_cage')),
+        'part': part if len(part) <= PART_MAX_LEN else '',
+        'cage': cage if cage and CAGE_RE.match(cage) else '',
         'cost': str(price.quantize(UNIT_PRICE_Q)) if price is not None else '',
         'lead': parse_lead_days(item.get('lead_time')),
         'moq': moq,
@@ -349,7 +368,15 @@ def scan_flags(extraction, supplier_cage='', today=None):
     doc_type = extraction.get('document_type') or 'other'
     if doc_type != 'quote':
         flags.append(_flag('header', f'This looks like {DOC_TYPE_TEXT.get(doc_type, doc_type)}, not a quote.'))
+    raw_terms = (extraction.get('terms') or '').strip()
+    if raw_terms and 'fob' not in raw_terms.lower() and len(raw_terms) > TERMS_MAX_LEN:
+        flags.append(_flag('terms', f'Payment terms are {len(raw_terms)} characters; the tray allows '
+                                   f'{TERMS_MAX_LEN}.'))
     for index, item in enumerate(extraction.get('line_items') or []):
+        part = (item.get('part_number_offered') or '').strip()
+        if part and len(part) > PART_MAX_LEN:
+            flags.append(_flag('part', f'Part number is {len(part)} characters; the tray allows {PART_MAX_LEN}.',
+                               index))
         price = parse_decimal(item.get('unit_price'))
         quantity = parse_decimal(item.get('quantity'))
         amount = parse_decimal(item.get('line_amount'))
@@ -403,7 +430,12 @@ def _loads(text, default):
 
 
 def _stale(row):
-    return row['status'] == QuoteEmailScan.STATUS_RUNNING and row['created_at'] < timezone.now() - IN_FLIGHT_WINDOW
+    """A running row past its window: 3 minutes for the button's in-request scan, 10 for the worker's."""
+    if row['status'] != QuoteEmailScan.STATUS_RUNNING:
+        return False
+    if row.get('started_at'):
+        return row['started_at'] < timezone.now() - WORKER_STALE_AFTER
+    return row['created_at'] < timezone.now() - IN_FLIGHT_WINDOW
 
 
 def summarize(row):
@@ -428,11 +460,36 @@ def summarize(row):
     }
 
 
-_STATE_FIELDS = ('id', 'level', 'status', 'result_json', 'flags_json', 'error_text', 'from_cache', 'created_at')
+_STATE_FIELDS = ('id', 'level', 'trigger', 'status', 'result_json', 'flags_json', 'error_text', 'from_cache',
+                 'created_at', 'started_at')
+
+
+def _triage_summary(email):
+    row = (QuoteEmailTriage.objects.filter(email=email)
+           .values('state', 'reason', 'jev_quote_probability', 'jev_block_label').first())
+    if row is None:
+        return None
+    probability = row['jev_quote_probability']
+    return {'state': row['state'], 'reason': row['reason'],
+            'jev_quote_probability': str(probability) if probability is not None else None,
+            'block_label': row['jev_block_label']}
+
+
+def _active_summary(rows):
+    active = next((r for r in rows if r['status'] in (QuoteEmailScan.STATUS_QUEUED, QuoteEmailScan.STATUS_RUNNING)),
+                  None)
+    if active is None:
+        return None
+    age = (timezone.now() - (active['started_at'] or active['created_at'])).total_seconds()
+    return {'id': active['id'], 'trigger': active['trigger'], 'status': active['status'],
+            'age_seconds': int(age), 'stuck': age > WORKER_STALE_AFTER.total_seconds()}
 
 
 def scan_state(email):
-    """{'next_level': 'normal' | 'deep' | None, 'latest': summary | None}, from the database."""
+    """
+    {'next_level': 'normal' | 'deep' | None, 'latest': summary | None, 'triage': … | None,
+    'active': queued / running scan | None}, from the database.
+    """
     rows = list(email.scans.order_by('-id').values(*_STATE_FIELDS)[:20])
     completed = {r['level'] for r in rows if r['status'] == QuoteEmailScan.STATUS_COMPLETED}
     if QuoteEmailScan.LEVEL_DEEP in completed:
@@ -441,7 +498,12 @@ def scan_state(email):
         next_level = QuoteEmailScan.LEVEL_DEEP
     else:
         next_level = QuoteEmailScan.LEVEL_NORMAL
-    return {'next_level': next_level, 'latest': summarize(rows[0]) if rows else None}
+    return {
+        'next_level': next_level,
+        'latest': summarize(rows[0]) if rows else None,
+        'triage': _triage_summary(email),
+        'active': _active_summary(rows),
+    }
 
 
 def scan_response(scan):
@@ -467,7 +529,7 @@ def _budget_available():
 def _create(email, level, user, **fields):
     return QuoteEmailScan.objects.create(
         email=email, level=level,
-        created_by=user if user is not None and user.is_authenticated else None,
+        created_by=user if user is not None and getattr(user, 'is_authenticated', False) else None,
         **fields,
     )
 
@@ -501,16 +563,25 @@ def build_result(extraction, listing):
     )
 
 
+def _refuse_blocked(email):
+    from quote.services.blocklist import find_code_block
+
+    state = QuoteEmailTriage.objects.filter(email=email).values_list('state', flat=True).first()
+    if state == QuoteEmailTriage.STATE_BLOCKED or find_code_block(email) is not None:
+        raise ScanNotAllowed('This sender is blocked, so the email cannot be scanned.')
+
+
 def run_scan(email, level, user):
     if not enabled():
         raise ScanDisabled()
     if level not in (QuoteEmailScan.LEVEL_NORMAL, QuoteEmailScan.LEVEL_DEEP):
         raise ScanNotAllowed('Unknown scan level.')
+    _refuse_blocked(email)
 
     now = timezone.now()
-    email.scans.filter(status=QuoteEmailScan.STATUS_RUNNING, created_at__lt=now - IN_FLIGHT_WINDOW).update(
-        status=QuoteEmailScan.STATUS_FAILED, error_text=STALE_MESSAGE,
-    )
+    email.scans.filter(
+        status=QuoteEmailScan.STATUS_RUNNING, started_at__isnull=True, created_at__lt=now - IN_FLIGHT_WINDOW,
+    ).update(status=QuoteEmailScan.STATUS_FAILED, error_text=STALE_MESSAGE)
     completed = set(email.scans.filter(status=QuoteEmailScan.STATUS_COMPLETED).values_list('level', flat=True))
     if level == QuoteEmailScan.LEVEL_NORMAL and QuoteEmailScan.LEVEL_NORMAL in completed:
         raise ScanNotAllowed('This message already has a normal scan. Run a deep scan instead.')
@@ -522,38 +593,65 @@ def run_scan(email, level, user):
     running = email.scans.filter(level=level, status=QuoteEmailScan.STATUS_RUNNING).order_by('-id').first()
     if running:
         return running
+    scan = _create(email, level, user, status=QuoteEmailScan.STATUS_RUNNING)
+    return execute_scan(scan)
 
+
+_FINISH_FIELDS = ['status', 'error_text', 'result_json', 'flags_json', 'input_tokens', 'output_tokens',
+                  'content_hash', 'model_name', 'from_cache', 'finished_at']
+
+
+def _mark_triage(email_id, status, error_text=''):
+    """The email's triage row follows its scan (never out of ``blocked``)."""
+    rows = QuoteEmailTriage.objects.filter(email_id=email_id).exclude(state=QuoteEmailTriage.STATE_BLOCKED)
+    if status == QuoteEmailScan.STATUS_COMPLETED:
+        rows.update(state=QuoteEmailTriage.STATE_EXTRACTED, state_changed_at=timezone.now(), error_text='')
+    elif status == QuoteEmailScan.STATUS_FAILED:
+        rows.update(state=QuoteEmailTriage.STATE_FAILED, state_changed_at=timezone.now(), error_text=error_text)
+
+
+def _finish(scan, status, error_text=''):
+    scan.status, scan.error_text, scan.finished_at = status, error_text, timezone.now()
+    scan.save(update_fields=_FINISH_FIELDS)
+    _mark_triage(scan.email_id, status, error_text)
+    return scan
+
+
+def execute_scan(scan):
+    """
+    Run one scan row that is already ``running`` and update it in place: inputs, cache, budget, the
+    Claude call, validation. Never raises for a model / network failure (the row is marked failed).
+    """
+    email = scan.email
+    level = scan.level
     started = time.monotonic()
     body, attachments, skipped = _gather(email)
     listing = {'attachments': [a['name'] for a in attachments], 'skipped_attachments': skipped}
+    scan.result_json = json.dumps(listing)
     if not body and not attachments:
-        return _create(email, level, user, status=QuoteEmailScan.STATUS_FAILED,
-                       error_text=NOTHING_TO_SCAN, result_json=json.dumps(listing))
-    digest = content_hash(body, attachments)
+        return _finish(scan, QuoteEmailScan.STATUS_FAILED, NOTHING_TO_SCAN)
+    scan.content_hash = content_hash(body, attachments)
     supplier_cage = _supplier_cage(email)
 
-    cached = (QuoteEmailScan.objects.filter(content_hash=digest, level=level, status=QuoteEmailScan.STATUS_COMPLETED)
-              .order_by('-id').values('result_json', 'model_name').first())
+    cached = (QuoteEmailScan.objects.filter(content_hash=scan.content_hash, level=level,
+                                            status=QuoteEmailScan.STATUS_COMPLETED)
+              .exclude(pk=scan.pk).order_by('-id').values('result_json', 'model_name').first())
     if cached:
         result = _loads(cached['result_json'], {})
         result.update(listing)
-        scan = _create(
-            email, level, user, status=QuoteEmailScan.STATUS_COMPLETED, content_hash=digest,
-            model_name=cached['model_name'], from_cache=True, result_json=json.dumps(result),
-            flags_json=json.dumps(scan_flags(result.get('extraction') or {}, supplier_cage)),
-        )
+        scan.model_name, scan.from_cache = cached['model_name'], True
+        scan.result_json = json.dumps(result)
+        scan.flags_json = json.dumps(scan_flags(result.get('extraction') or {}, supplier_cage))
         logger.info('email_scan email=%s level=%s status=completed cached=1', email.pk, level)
-        return scan
+        return _finish(scan, QuoteEmailScan.STATUS_COMPLETED)
 
     if not _budget_available():
-        return _create(email, level, user, status=QuoteEmailScan.STATUS_FAILED, content_hash=digest,
-                       error_text=BUDGET_MESSAGE, result_json=json.dumps(listing))
+        return _finish(scan, QuoteEmailScan.STATUS_FAILED, BUDGET_MESSAGE)
 
-    model = _model_for(level)
+    scan.model_name = _model_for(level)
     focus = _focus_labels(email) if level == QuoteEmailScan.LEVEL_DEEP else None
-    payload = build_payload(model, body, attachments, focus, MAX_TOKENS[level])
-    scan = _create(email, level, user, status=QuoteEmailScan.STATUS_RUNNING, model_name=model, content_hash=digest)
-    usage = {}
+    payload = build_payload(scan.model_name, body, attachments, focus, MAX_TOKENS[level])
+    usage, status, error = {}, QuoteEmailScan.STATUS_COMPLETED, ''
     try:
         from core.anthropic_client import call_anthropic, extract_text
         response = call_anthropic(payload, CALL_SITE, timeout=SCAN_TIMEOUT_SECONDS)
@@ -561,18 +659,99 @@ def run_scan(email, level, user):
         extraction = parse_reply(extract_text(response))
         scan.result_json = json.dumps(build_result(extraction, listing))
         scan.flags_json = json.dumps(scan_flags(extraction, supplier_cage))
-        scan.status = QuoteEmailScan.STATUS_COMPLETED
     except Exception as exc:
-        scan.status = QuoteEmailScan.STATUS_FAILED
-        scan.error_text = _friendly(exc)
-        scan.result_json = json.dumps(listing)
+        status, error = QuoteEmailScan.STATUS_FAILED, _friendly(exc)
         logger.warning('email_scan failed email=%s level=%s error=%s', email.pk, level, type(exc).__name__)
     scan.input_tokens = int(usage.get('input_tokens') or 0)
     scan.output_tokens = int(usage.get('output_tokens') or 0)
-    scan.save(update_fields=['status', 'error_text', 'result_json', 'flags_json', 'input_tokens', 'output_tokens'])
+    _finish(scan, status, error)
     logger.info('email_scan email=%s level=%s status=%s in=%s out=%s ms=%d', email.pk, level, scan.status,
                 scan.input_tokens, scan.output_tokens, (time.monotonic() - started) * 1000)
     return scan
+
+
+# ── Background queue (run by quote/tasks/process_quote_email_pipeline.py) ────
+
+def queue_scan(email, trigger, user=None):
+    """A queued Sonnet scan for the worker."""
+    return _create(email, QuoteEmailScan.LEVEL_DEEP, user, trigger=trigger, status=QuoteEmailScan.STATUS_QUEUED)
+
+
+def auto_calls_today():
+    """Automatic scans that started today (local day) and were not cache hits: the daily cap's count."""
+    start = timezone.make_aware(datetime.combine(timezone.localdate(), datetime.min.time()))
+    return QuoteEmailScan.objects.filter(
+        trigger=QuoteEmailScan.TRIGGER_AUTO, from_cache=False,
+        started_at__gte=start, started_at__lt=start + timedelta(days=1),
+    ).count()
+
+
+def recover_stale_scans():
+    """Worker scans left running for 10 minutes (a deploy or crash mid-call) are failed."""
+    cutoff = timezone.now() - WORKER_STALE_AFTER
+    rows = list(QuoteEmailScan.objects.filter(status=QuoteEmailScan.STATUS_RUNNING, started_at__lt=cutoff)
+                .values_list('pk', 'email_id'))
+    for pk, email_id in rows:
+        if QuoteEmailScan.objects.filter(pk=pk, status=QuoteEmailScan.STATUS_RUNNING).update(
+            status=QuoteEmailScan.STATUS_FAILED, error_text=STALE_MESSAGE, finished_at=timezone.now(),
+        ):
+            _mark_triage(email_id, QuoteEmailScan.STATUS_FAILED, STALE_MESSAGE)
+    return len(rows)
+
+
+def process_scan_queue(seconds_left, manual_only=False):
+    """
+    Run queued scans, oldest first, until MAX_EXTRACTS_PER_RUN or ``seconds_left`` is spent. Automatic
+    scans stop at the daily cap (left queued); manual ones never do. Returns counts.
+    """
+    from quote.services import app_settings
+
+    deadline = time.monotonic() + seconds_left
+    counts = {'processed': 0, 'completed': 0, 'failed': 0, 'cached': 0}
+    recover_stale_scans()
+    queued = QuoteEmailScan.objects.filter(status=QuoteEmailScan.STATUS_QUEUED)
+    if manual_only:
+        queued = queued.filter(trigger=QuoteEmailScan.TRIGGER_MANUAL)
+    rows = list(queued.order_by('id').values_list('id', 'trigger')[:MAX_EXTRACTS_PER_RUN + 20])
+    if not rows:
+        return counts
+    cap = app_settings.get('sonnet_daily_cap')
+    used = auto_calls_today()
+    capped_logged = False
+    started = time.monotonic()
+    for scan_id, trigger in rows:
+        if counts['processed'] >= MAX_EXTRACTS_PER_RUN or time.monotonic() >= deadline:
+            break
+        if trigger == QuoteEmailScan.TRIGGER_AUTO and used >= cap:
+            if not capped_logged:
+                logger.info('quote_email_scan daily cap reached cap=%s', cap)
+                capped_logged = True
+            continue
+        claimed = QuoteEmailScan.objects.filter(pk=scan_id, status=QuoteEmailScan.STATUS_QUEUED).update(
+            status=QuoteEmailScan.STATUS_RUNNING, started_at=timezone.now(), attempts=F('attempts') + 1,
+        )
+        if not claimed:
+            continue
+        counts['processed'] += 1
+        try:
+            scan = execute_scan(QuoteEmailScan.objects.select_related('email', 'email__supplier').get(pk=scan_id))
+        except Exception:
+            logger.exception('quote_email_scan failed scan=%s', scan_id)
+            QuoteEmailScan.objects.filter(pk=scan_id, status=QuoteEmailScan.STATUS_RUNNING).update(
+                status=QuoteEmailScan.STATUS_FAILED, error_text=STALE_MESSAGE, finished_at=timezone.now(),
+            )
+            email_id = QuoteEmailScan.objects.filter(pk=scan_id).values_list('email_id', flat=True).first()
+            _mark_triage(email_id, QuoteEmailScan.STATUS_FAILED, STALE_MESSAGE)
+            counts['failed'] += 1
+            continue
+        if trigger == QuoteEmailScan.TRIGGER_AUTO and not scan.from_cache:
+            used += 1
+        counts['cached'] += int(scan.from_cache)
+        counts['completed' if scan.status == QuoteEmailScan.STATUS_COMPLETED else 'failed'] += 1
+    if counts['processed']:
+        logger.info('quote_email_scan processed=%s completed=%s failed=%s cached=%s ms=%d', counts['processed'],
+                    counts['completed'], counts['failed'], counts['cached'], (time.monotonic() - started) * 1000)
+    return counts
 
 
 # ── Prefill for the tray ─────────────────────────────────────────────────────

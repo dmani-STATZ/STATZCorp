@@ -11,12 +11,43 @@
   {% if fields.email_scan_enabled.error %}
   <div class="alert alert-danger py-2">{{ fields.email_scan_enabled.error }}</div>
   {% endif %}
-  <div class="form-check form-switch">
-    <input class="form-check-input" type="checkbox" role="switch" id="email_scan_enabled" disabled>
-    <label class="form-check-label text-body-secondary" for="email_scan_enabled">{{ fields.email_scan_enabled.label }}</label>
-  </div>
-  <div class="form-text">Not built yet</div>
-  <div class="small text-body-secondary mt-1">{{ fields.email_scan_enabled.help }}</div>
+  {% if status.typesafe_client.ok and status.typesafe_client.scan_on and not status.typesafe_client.available %}
+  <div class="alert alert-warning py-2">Scanning is on but TypeSafe is disabled; emails will wait.</div>
+  {% endif %}
+  <form method="post" action="{% url 'quote:settings_save' %}">
+    {% csrf_token %}
+    <input type="hidden" name="section" value="email_scan">
+    <div class="form-check form-switch mb-1">
+      <input class="form-check-input" type="checkbox" role="switch" id="email_scan_enabled" name="email_scan_enabled"
+             {% if fields.email_scan_enabled.value %}checked{% endif %}>
+      <label class="form-check-label" for="email_scan_enabled">{{ fields.email_scan_enabled.label }}</label>
+    </div>
+    <div class="form-text mb-2">{{ fields.email_scan_enabled.help }}</div>
+    {% if fields.email_scan_enabled_at.value %}
+    <div class="small mb-2">Scanning on since {{ fields.email_scan_enabled_at.value|date:"M j, Y g:i A" }}</div>
+    {% endif %}
+    <div class="form-check mb-3">
+      <input class="form-check-input {% if confirm_scan_error %}is-invalid{% endif %}" type="checkbox"
+             id="confirm_scan_on" name="confirm_scan_on" value="1">
+      <label class="form-check-label small" for="confirm_scan_on">
+        I understand this sends the text and attachments of incoming supplier emails to TypeSafe and Anthropic.
+      </label>
+      {% if confirm_scan_error %}<div class="invalid-feedback">{{ confirm_scan_error }}</div>{% endif %}
+    </div>
+
+    <div class="row g-3 mb-3">
+      {% for field in email_scan_numbers %}
+      <div class="col-md-4">
+        <label class="label" for="{{ field.key }}">{{ field.label }}</label>
+        <input type="text" inputmode="decimal" class="form-control {% if field.error %}is-invalid{% endif %}"
+               id="{{ field.key }}" name="{{ field.key }}" value="{{ field.value }}">
+        {% if field.error %}<div class="invalid-feedback">{{ field.error }}</div>{% endif %}
+        <div class="form-text">{{ field.help }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <button class="btn btn-primary btn-sm" type="submit">Save</button>
+  </form>
 </div>
 
 <div class="card card-padded mb-3">
@@ -85,6 +116,12 @@
         API key present: {{ status.typesafe.key_present|yesno:"yes,no" }}.
       {% else %}unavailable{% endif %}
     </dd>
+    <dt>TypeSafe client</dt>
+    <dd>
+      {% if status.typesafe_client.ok %}
+        TypeSafe client available: {{ status.typesafe_client.available|yesno:"yes,no" }}.
+      {% else %}unavailable{% endif %}
+    </dd>
     <dt>Anthropic budget</dt>
     <dd>
       {% if status.budget.ok %}
@@ -113,6 +150,18 @@
           </div>
         {% endfor %}
       {% else %}unavailable{% endif %}
+    </dd>
+    <dt>Email pipeline</dt>
+    <dd>
+      {% if status.triage.ok %}
+        {% if status.triage.since %}
+          {% for row in status.triage.counts %}<div>{{ row.state }}: {{ row.n }}</div>{% empty %}No emails triaged yet.{% endfor %}
+        {% else %}Scanning has never been turned on.{% endif %}
+      {% else %}unavailable{% endif %}
+    </dd>
+    <dt>Automatic Claude extractions today</dt>
+    <dd>
+      {% if status.sonnet.ok %}{{ status.sonnet.today }} of {{ status.sonnet.cap }}{% else %}unavailable{% endif %}
     </dd>
   </dl>
 </div>

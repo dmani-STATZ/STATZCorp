@@ -23,6 +23,7 @@ from .email import (
 )
 from .outcomes import BidOutcome
 from .packhouse import QuotePackhouseRFQ
+from .pipeline import QuoteEmailTriage, QuoteSenderBlock
 from .quotes import QuoteSupplierQuote
 from .rfq import QuoteRFQ
 from .settings import QuoteSetting, QuoteSettingChange, QuoteTestSend
@@ -38,8 +39,10 @@ __all__ = [
     'QuoteEmailAttachment',
     'QuoteEmailScan',
     'QuoteEmailSolLink',
+    'QuoteEmailTriage',
     'QuotePackhouseRFQ',
     'QuoteRFQ',
+    'QuoteSenderBlock',
     'QuoteSetting',
     'QuoteSettingChange',
     'QuoteSolicitation',
