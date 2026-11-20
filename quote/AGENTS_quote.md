@@ -229,9 +229,13 @@ permission gating silently stops applying.
 - **The scan never saves a quote.** It writes only `QuoteEmailScan`. Never call `save_supplier_quote` /
   `update_supplier_quote` or touch `QuoteSupplierQuote.objects` in the `email_scan*` files or
   `views/email_scan.py`. The rep reviews the prefilled tray and presses Save.
-- **Claude only through `core.anthropic_client`**, imported lazily inside functions; models from
-  `CLAUDE_HAIKU_MODEL` (Normal) / `CLAUDE_SONNET_MODEL` (Deep); call site `quote_email_scan`;
-  `timeout=SCAN_TIMEOUT_SECONDS`. No `import anthropic` anywhere in `quote`.
+- **Manual scan POST only queues** (`request_manual_scan` → `queued` row). The HTTP request must make
+  **zero** Claude calls. `email-scan.js` polls GET until the worker's `execute_scan` finishes.
+- **Claude only through `core.anthropic_client`**, imported lazily inside functions; Sonnet model for
+  new scans; call site `quote_email_scan`; `timeout=SCAN_TIMEOUT_SECONDS`. No `import anthropic`
+  anywhere in `quote`. Do not reintroduce Haiku or a two-level Normal → Deep mailbox flow.
+- **`execute_scan` re-checks `blocklist.find_code_block`** after claim and **before** cache, budget,
+  and Claude. Blocked → `failed` + triage `blocked`, no model call.
 - **Structured output is text JSON, not tools.** Forced `tool_choice`, `temperature`, prefill etc. 400 on
   the 5.5 models. Read with `extract_text`, parse with `json.loads(parse_float=Decimal)`, then
   `validate_extraction` (drops unknown keys, non-string leaves, oversize lists). Never use a raw model
@@ -249,7 +253,18 @@ permission gating silently stops applying.
   saved card, a draft (unless the rep pressed Scan), or a field the rep typed in.
 - Adding a tray target means changing `SCAN_TARGET_FIELDS` + `TRAY_INPUTS` (schema) and `SCAN_INPUTS`
   (`quote-drawer.js`) together.
-- Feature flag `QUOTE_EMAIL_SCAN_ENABLED` hides the button and 404s both endpoints. Keep it that way.
+- Worker gate: `email_scan.enabled()` reads `ScheduledTask` `process_quote_email_pipeline` `is_enabled`
+  only (not the Settings switch). Manual scans still require that row; GET/POST 404/503 when off.
+
+### Email pipeline (manual scan, block sender, mailbox UI)
+- **Block values are derived server-side** in `email_triage.block_sender` / `blocklist.add_block`. Never
+  trust a client-posted `value` (Settings or mailbox block modal).
+- **Polling** in `email-scan.js` uses `setTimeout` only (no `setInterval`), cancels on message switch,
+  stops after 15 minutes with a plain status line.
+- **Inbox triage** is one `QuoteEmailTriage` query per page (`email_id__in`); do not add per-row queries
+  in `mailbox_page` or the list template.
+- **Settings blocklist** endpoints are superuser-only; mailbox **Block sender** is any logged-in Quotes
+  user with a required reason.
 
 ### Outbound mail and settings
 - **Every supplier-facing send goes through `services/outbound.send_supplier_mail`.** The only

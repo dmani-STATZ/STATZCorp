@@ -236,7 +236,7 @@ class QuoteEmailScan(models.Model):
     email = models.ForeignKey(QuoteEmail, on_delete=models.CASCADE, related_name='scans')
     level = models.CharField(max_length=8, choices=LEVEL_CHOICES)
     #: Queued rows (auto or manual) are run by the background worker; the mailbox button's
-    #: synchronous run_scan rows are manual and never queued.
+    #: manual mailbox scans are queued; legacy rows may show level normal.
     trigger = models.CharField(max_length=8, choices=TRIGGER_CHOICES, default=TRIGGER_MANUAL)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_RUNNING)
     attempts = models.PositiveSmallIntegerField(default=0)

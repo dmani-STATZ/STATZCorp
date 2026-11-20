@@ -47,13 +47,13 @@ Functional spec and the two approved UI mockups live in `quote/docs/`:
 | `models/packhouse.py` | `QuotePackhouseRFQ` (`quote_packhouse_rfq`) — one row per packhouse per request. `SENT → RESPONDED`. `line` null = every line on the SOL (Combined). Snapshot of what was sent (qty, weight / L / W / H, subject, note, recipients) + what came back (`quoted_unit`, `quoted_total`, `quoted_lead_days`, `response_email`). Deliberately **not** `QuoteRFQ`: it never moves the solicitation status. |
 | `models/bids.py` | `QuoteBid` (`quote_bid`) — OneToOne on `dibbs.SolicitationLine`; the solicitation is reached via `line.solicitation` (no duplicate FK). Every BQ overlay column + `clin_group`. |
 | `models/email.py` | `QuoteEmail` (raw payload, headers, claim), `QuoteEmailAttachment` (bytes), `QuoteEmailSolLink` (many-to-many email ↔ line), `QuoteEmailScan` (`quote_email_scan`: one row per Scan quote run: level, status, content hash, validated result / flags JSON, tokens; the feature's only write). |
-| `services/email_scan.py`, `services/email_scan_schema.py` | Mailbox **Scan quote**: `scan_state`, `run_scan` (Normal = Haiku, Deep = Sonnet, through `core.anthropic_client`), `build_prefill` (scan → tray values + flags). The schema file holds the JSON shape, prompts, `validate_extraction` and the tray field map. |
+| `services/email_scan.py`, `services/email_scan_schema.py` | Mailbox **Scan quote**: `scan_state`, `queue_scan` / `execute_scan` (Sonnet only, through `core.anthropic_client`), `build_prefill` (scan → tray values + flags). Manual **Scan quote** POST only queues; Claude runs in the worker. The schema file holds the JSON shape, prompts, `validate_extraction` and the tray field map. |
 | `models/pipeline.py` | `QuoteSenderBlock` (`quote_sender_block`: block by cage / email / domain / supplier, unique per type + value, soft-deactivated) and `QuoteEmailTriage` (`quote_email_triage`: one row per email the automatic pipeline looked at; state, reason, Jev probabilities, threshold used, attempts). |
 | `services/email_pipeline.py`, `tasks/process_quote_email_pipeline.py` | The automatic email pipeline (`run_once`: sync → maintenance → triage → extraction, bounded by `RUN_BUDGET_SECONDS`) and its 5-minute task. Switch off = `run_manual_only`. |
 | `services/email_triage.py` | Jev (TypeSafe) triage: `build_state`, `classify` (one `system_one` call per email), the decision flow, conditional-update claims, `release_hold`, `request_manual_scan`. The only `quote` module that calls TypeSafe besides `mailbox_ai.py`. |
 | `services/blocklist.py` | `add_block` / `deactivate_block` / `find_code_block` (email → supplier → cage → domain, subdomains match) / `jev_block_choices`. |
 | `management/commands/backtest_quote_classifier.py`, `quote_pipeline_report.py` | Read-only: Jev recall per threshold against logged quotes; triage + scan rows for recent mail or one email. |
-| `views/email_scan.py`, `static/quote/js/email-scan.js` | `scan_email` (GET state / POST run) and `scan_prefill`; the message-header button + status line. The tray side lives in `quote-drawer.js` (`loadScanPrefill` / `applyScanPrefill`). |
+| `views/email_scan.py`, `static/quote/js/email-scan.js` | `scan_email` (GET JSON state / POST queue), `email_block`, `email_release`, and `scan_prefill`; the message-header button, status line, polling. The tray side lives in `quote-drawer.js` (`loadScanPrefill` / `applyScanPrefill`). |
 | `models/outcomes.py` | `BidOutcome` — OneToOne on `QuoteBid`, nullable FK to `dibbs.DibbsAward`, derived deltas, frozen bid snapshot. |
 | `services/matching.py` | `seed_solicitation_states`, `match_solicitations`, `process_import_batch`, `add_manual_match` (+ capability learning and sibling re-match), `remove_manual_match`, `rematch_open_solicitations`. Also `preview_matches` (dry run: what would these capability pairs link?) and `prune_derived_matches` (drop NSN/FSC links no capability supports any more). `_index_lines` / `_wanted_matches` are shared by the real run and the dry run, so a preview can never disagree with the commit. |
 | `services/capabilities.py` | Everything a rep can do to capability lists: `find_items` (NSN/FSC extraction), `read_text` / `read_upload` (paste, CSV, TXT, XLSX -> `Table`), `SupplierResolver` (CAGE / name / alias -> supplier), `detect_mapping`, `build_plan` (dry run, never writes), `plan_to_preview`, `commit_plan`, `remove_capabilities`, `undo_import`, `capability_overview`, `export_rows`. |
@@ -210,16 +210,23 @@ modal). They are now first-class, reachable from both directions:
    for. Sender → supplier via contact email, supplier emails, then domain
    (public mail domains ignored). A reply from an RFQ'd supplier flips its
    RFQs to `RESPONDED`. Unlinked mail is an orphan ("No SOL").
-3. Inbox (left) filters client-side: All / No SOL / Needs quote / Unread +
-   search; ↑/↓ move between messages. Selecting one swaps in a detail fragment
+3. Inbox (left) filters client-side: All / No SOL / Needs quote / Unread / **Quote ready** /
+   **Held** + search; ↑/↓ move between messages. Each row shows a triage badge when the
+   automatic pipeline has classified that message (for example **Quote ready**, **Scanning**,
+   **Quote · set supplier**, **Possible blocked**, **Blocked**, **Scan failed**). Badges refresh
+   on page load and after **Check for new mail**, not live. Selecting one swaps in a detail fragment
    (`email_detail`, XHR) — no page reload — and takes the email's 20-minute claim.
    Read state is app-only: the real mailbox is never marked read (reps watch
    its unread count in Outlook). The sync is read-only against Graph.
 4. Message pane: supplier (or **Set supplier**), linked SOL chips (unlink ×,
    **+ Link SOL** search by SOL/NSN/part #), attachments, body, quotes already
-   logged from it. Body renders only in `<iframe sandbox="allow-popups
-   allow-popups-to-escape-sandbox" srcdoc>` with a CSP meta blocking scripts and
-   every remote load (tracking pixels, external CSS).
+   logged from it. A **triage panel** under the header explains automatic-pipeline state
+   (scanning, quote ready, held for supplier / possible block, blocked sender, not a quote, scan
+   failed). **More → Block sender…** opens a modal: any Quotes user may block (reason required);
+   domain blocks are disabled for public mail domains (block the address instead). **Scan anyway**
+   appears on a possible-block hold and queues a manual Sonnet scan via **release**. Body renders
+   only in `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc>` with a CSP meta
+   blocking scripts and every remote load (tracking pixels, external CSS).
 4a. **Attachments** list with a **View** button on PDFs and images. It opens the file in a panel
    *beside* the message body (`attachment-viewer.js`), not a new tab: drag the divider (or use ←/→ on
    it) to resize, tabs flip between files, ⧉ pops it out to its own tab, ✕ closes. Width and "was
@@ -330,22 +337,19 @@ modal). They are now first-class, reachable from both directions:
 9. Back in the part supplier's drawer, a recorded price gets a **Use** button: it selects the
    packhouse and fills the per-unit packaging price (total follows from the normal
    unit ⇄ total wiring). Saving the quote is unchanged (`packaging_vendor`, `packaging_adder_unit`).
-10. **Scan quote** (behind `QUOTE_EMAIL_SCAN_ENABLED`, off by default). A button in the message header
-   sends *this* message's body text plus up to 5 PDF / PNG / JPEG attachments (type sniffed from the
-   bytes; ≤ 10 MB each, 25 MB total) to Claude through `core.anthropic_client` (call site
-   `quote_email_scan`, 100 s timeout, synchronous). First press = **Normal** (Haiku), second = **Deep**
-   (Sonnet, told which tray fields Normal missed), then the button reads "Scanned (Deep)". A failed scan
-   does not advance the level. The reply is JSON text (no tools: forced `tool_choice` is banned on the
-   5.5 models), parsed with `Decimal` and validated against the schema before anything is used.
-   Byte-identical content reuses an earlier completed result at that level (no call). No budget row or a
-   balance ≤ 0 refuses the call. Every run writes one `QuoteEmailScan` row; nothing else is written —
-   **the scan never saves a quote**. When the tray opens on a SOL with no saved quote from that supplier and
-   no draft, `scan_prefill` fills Part #, CAGE, Unit cost (5 dp), Days ARO, MOQ and Terms from the best
-   line item (deep beats normal; the item naming this SOL, else the only item, else on a multi-line SOL
-   the one NSN match) and adds a `Scan: …` line to Notes (validity, FOB, condition, BAA, Mfr / Dealer).
-   Scan-filled fields get a blue ring (amber + tooltip when flagged: line maths, odd CAGE, lead time not
-   plain days, quoted qty ≠ SOL qty, other SOL, NSN mismatch); typing in one clears its marker, and a
-   later scan only fills fields that are empty or still hold the scan value. FOB Origin always warns.
+10. **Scan quote** (when the `process_quote_email_pipeline` worker row exists and is enabled). The
+   message-header **Scan quote** button only **queues** a Sonnet (`deep`) run: POST returns **202** and
+   the browser polls GET until the worker finishes. No Claude call happens in the request thread. While
+   queued or running the button reads **Scanning…**; a blocked sender shows **Blocked sender** (disabled).
+   After worker hours (about 5 AM–5 PM Central) a queued manual scan waits until morning; the status line
+   says so. The worker sends this message's body text plus up to 5 PDF / PNG / JPEG attachments (type
+   sniffed; ≤ 10 MB each, 25 MB total) through `core.anthropic_client` (call site `quote_email_scan`).
+   JSON text output (no tools), `Decimal` + schema validation, content-hash cache, budget check, and a
+   blocklist re-check before any model call. Every run writes one `QuoteEmailScan` row — **the scan never
+   saves a quote**. `scan_prefill` and the tray blue-ring behaviour are unchanged (completed `deep` scans
+   win; legacy `normal` rows on old mail still count for prefill). Superusers manage the sender blocklist
+   on **Settings → Blocked senders** (add / deactivate); deactivating unblocks future mail but an email
+   left in triage `blocked` stays that way until someone scans it again.
 
 Pricing is **markup on cost**: `price = landed × (1 + pct)`, rounded to cents
 (the approved mockup's formula). In Combined mode packaging/freight totals are
@@ -507,12 +511,16 @@ precedence); reconciliation never calls the SAM API.
 | `quote:rfq_queue` / `rfq_send` / `rfq_send_all` / `rfq_remove` | `/quote/rfq/...` | POST except the queue page |
 | `quote:settings` | `/quote/settings/` | GET. Superuser only; anyone else 403 |
 | `quote:settings_save` | `/quote/settings/save/` | POST `section` (`rfqs` or `email_scan`) plus that section's fields. Superuser only |
+| `quote:settings_block_add` | `/quote/settings/blocks/add/` | POST block fields. Superuser only |
+| `quote:settings_block_deactivate` | `/quote/settings/blocks/<id>/deactivate/` | POST. Superuser only |
 | `quote:mailbox` | `/quote/mailbox/?email=<id>` | inbox page |
 | `quote:mailbox_sync` | `/quote/mailbox/sync/` | POST, JSON |
 | `quote:email_detail` | `/quote/mailbox/<id>/` | XHR fragment (non-XHR redirects to the inbox) |
 | `quote:email_link` / `email_unlink` / `email_set_supplier` / `save_quote` | `/quote/mailbox/<id>/...` | POST, JSON. `save_quote` with `entry=<key>` updates that logged quote (404 if it is not this message's, 409 `{locked: true}` once sent to DIBBS); without `entry` it creates one |
 | `quote:mailbox_sol_search` | `/quote/mailbox/solicitations/?q=` | JSON |
-| `quote:email_scan` | `/quote/mailbox/<id>/scan/` | GET JSON state `{next_level, latest}`; POST `{level: normal\|deep}` → 200 completed, 202 already running, 409 level not allowed, 502 failed `{ok: false, error}`. 404 while `QUOTE_EMAIL_SCAN_ENABLED` is off |
+| `quote:email_scan` | `/quote/mailbox/<id>/scan/` | GET JSON scan + triage state; POST queues manual Sonnet scan → 202 `{ok, created, state}`; 409 blocked / in-flight rules; 503 worker off. GET 404 when worker off |
+| `quote:email_block` | `/quote/mailbox/<id>/block/` | POST `block_type`, `reason`, optional `label`. Value derived server-side. 200 ok / 400 invalid |
+| `quote:email_release` | `/quote/mailbox/<id>/release/` | POST release hold → 202 + queue scan; 409 when blocked |
 | `quote:email_scan_prefill` | `/quote/mailbox/<id>/scan/prefill/?sol=&supplier=` | GET JSON tray values; 404 if the SOL is not linked to the message or the flag is off; empty `fields` + `saved_quote: true` when the supplier already quoted that SOL |
 | `quote:bid_board` | `/quote/bids/?tab=needs\|ready\|submitted` | |
 | `quote:compare_quotes` | `/quote/bids/<sol>/compare/` | XHR fragment |
@@ -631,7 +639,8 @@ remove, enter-a-quote picker, login required),
 rows, in-place update over the quote's own lines, rejected edits change nothing, the lock, bid follow /
 demote rules, re-pick, `save_quote` update path 404 / 409 / 400, Edit buttons, no template syntax
 leaking to the page),
-`test_email_scan.py` (Normal → Deep state machine, failed / in-flight / stale runs, content-hash cache,
+`test_email_scan_ui.py` (queued POST, block / release, detail triage panel, inbox badges / query count),
+`test_email_scan.py` (execute_scan, queue, cache, budget, prefill, endpoints; no synchronous two-step flow),
 budget refusal, attachment sniffing + skip reasons, the Echelon quote end to end, normalization, flags,
 prefill line picking, prompt-injection framing, endpoints + permission gate, button markup; the wrapper
 is mocked — tests must never call Anthropic),
@@ -760,14 +769,19 @@ Run `python manage.py test quote dibbs`.
    re-derived; a changed part number / CAGE is flagged in the save message instead.
 25. Scan quote: the request is base64, so attachments near the 25 MB total exceed Anthropic's ~32 MB
    request limit and that scan fails ("try again"). Scanned / image-only PDFs depend on the model's
-   vision. The scan is synchronous (up to 100 s holding a worker) and is not exercised on SQL Server
-   yet. Values are read, not computed: a lead time in weeks is converted, anything else (stock, ranges,
-   business days) leaves Days ARO blank with a flag. Freight is never filled.
-26. RFQ Test Mode covers every supplier-facing send: `services/rfq.send_supplier_rfqs` and
+   vision. Manual scans are **queued** (not synchronous in the browser); they wait outside worker hours
+   (~5 AM–5 PM Central). `QuoteEmailScan.level` is legacy storage: new manual and automatic rows are
+   `deep`; old `normal` completed rows still affect prefill. Values are read, not computed: a lead time in
+   weeks is converted, anything else (stock, ranges, business days) leaves Days ARO blank with a flag.
+   Freight is never filled.
+26. Inbox triage badges update on page load / sync, not live. Unblocking in Settings does not rewrite
+   older triage rows: a message already marked **blocked** stays that way until a rep scans it again.
+27. RFQ Test Mode covers every supplier-facing send: `services/rfq.send_supplier_rfqs` and
    `services/packhouse.send_requests`. A test send does not exercise the reply / `RESPONDED` flow,
    because no RFQ row is marked sent. **Send all** in Test Mode sends one email per supplier, all
-   of them to the test inbox. The Email scanning switch is a placeholder until background scanning
-   is built; the mailbox Scan quote button is a separate feature.
+   of them to the test inbox. Background email scanning is gated by the Settings **Email scanning**
+   switch (superuser); the mailbox Scan quote button uses the worker row only and does not depend on
+   that switch.
 
 ## 20. CSS
 Three files repo-wide: `theme-vars.css`, `app-core.css` (shared `.app-shell` /
