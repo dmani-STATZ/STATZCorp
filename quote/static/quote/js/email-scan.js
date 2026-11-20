@@ -12,13 +12,23 @@
   const POLL_SLOW_MS = 10000;
   const POLL_FAST_CAP_MS = 120000;
   const POLL_GIVE_UP_MS = 900000;
-  const ACTIVE_AGE_MAX_S = 600;
 
   let activeEmail = null;
   let pollTimer = null;
   let pollStartedAt = null;
   let scanCtx = null;
   let lastState = null;
+
+  function isLive(ctx) {
+    return !!ctx && ctx === scanCtx && ctx.current();
+  }
+
+  function showError(ctx, text) {
+    const row = document.createElement('div');
+    row.className = 'text-danger';
+    row.textContent = text;
+    ctx.status.appendChild(row);
+  }
 
   function readJson(r) {
     if (r.redirected) return Promise.reject(new Error('redirected'));
@@ -35,6 +45,17 @@
       init.body = body != null ? body : '';
     }
     return init;
+  }
+
+  function formatFlag(f) {
+    if (f && typeof f === 'object') return f.message || '';
+    return String(f || '');
+  }
+
+  function formatSkipped(a) {
+    if (typeof a === 'string') return a;
+    if (a && typeof a === 'object') return a.name + ' (' + a.reason + ')';
+    return '';
   }
 
   function render(state) {
@@ -64,15 +85,15 @@
 
     if (triage && triage.state === 'blocked') {
       setBtn('Blocked sender', false, false);
-    } else if (active && active.status === 'queued' && active.age_seconds <= ACTIVE_AGE_MAX_S) {
-      setBtn('Scanning…', false, true);
-      statusLine('Queued — waiting for the background worker…');
-    } else if (active && active.status === 'running' && active.age_seconds <= ACTIVE_AGE_MAX_S) {
-      setBtn('Scanning…', false, true);
-      statusLine('Scanning…');
     } else if (active && active.stuck) {
       setBtn('Scanning…', false, true);
       statusLine('Still waiting for the background worker. It runs about 5 AM–5 PM Central; after hours the scan waits until morning.');
+    } else if (active && active.status === 'queued') {
+      setBtn('Scanning…', false, true);
+      statusLine('Queued — waiting for the background worker…');
+    } else if (active && active.status === 'running') {
+      setBtn('Scanning…', false, true);
+      statusLine('Scanning…');
     } else if (latest && latest.status === 'completed') {
       setBtn('Scan again', true, false);
       let text = 'Scan: found ' + latest.found_count + ' of ' + latest.total_count + ' fields.';
@@ -89,11 +110,11 @@
       }
       status.appendChild(row);
       if (latest.flags && latest.flags.length) {
-        statusLine('Check: ' + latest.flags.join(' · '), 'quote-scan-flags');
+        statusLine('Check: ' + latest.flags.map(formatFlag).join(' · '), 'quote-scan-flags');
       }
       if (latest.skipped_attachments && latest.skipped_attachments.length) {
         statusLine(
-          'Not read: ' + latest.skipped_attachments.map(a => a.name + ' (' + a.reason + ')').join(', '),
+          'Not read: ' + latest.skipped_attachments.map(formatSkipped).join(', '),
           'text-body-secondary',
         );
       }
@@ -125,32 +146,36 @@
     const delay = elapsed < POLL_FAST_CAP_MS ? POLL_FAST_MS : POLL_SLOW_MS;
     pollTimer = setTimeout(() => {
       pollTimer = null;
-      if (!scanCtx || !scanCtx.current()) return;
-      fetch(scanCtx.url, fetchOpts(scanCtx.csrf, 'GET'))
+      const ctx = scanCtx;
+      if (!isLive(ctx)) return;
+      fetch(ctx.url, fetchOpts(ctx.csrf, 'GET'))
         .then(readJson)
         .then(res => {
-          if (!scanCtx.current() || !res.ok) return;
+          if (!isLive(ctx) || !res.ok) return;
           const state = res.body;
           render(state);
           if (!state.active) {
             if (state.latest && state.latest.status === 'completed'
-                && scanCtx.opts.drawer && scanCtx.opts.drawer.applyScan) {
-              scanCtx.opts.drawer.applyScan();
+                && ctx.opts.drawer && ctx.opts.drawer.applyScan) {
+              ctx.opts.drawer.applyScan();
             }
             return;
           }
           schedulePoll();
         })
-        .catch(() => {});
+        .catch(() => {
+          if (isLive(ctx)) schedulePoll();
+        });
     }, delay);
   }
 
   function loadState() {
     if (!scanCtx || !scanCtx.current()) return Promise.resolve();
-    return fetch(scanCtx.url, fetchOpts(scanCtx.csrf, 'GET'))
+    const ctx = scanCtx;
+    return fetch(ctx.url, fetchOpts(ctx.csrf, 'GET'))
       .then(readJson)
       .then(res => {
-        if (!scanCtx.current() || !res.ok) return;
+        if (!isLive(ctx) || !res.ok) return;
         render(res.body);
         if (res.body.active) schedulePoll();
         else if (pollTimer) {
@@ -160,23 +185,23 @@
         }
       })
       .catch(() => {
-        if (scanCtx.current()) {
-          scanCtx.status.textContent = '';
-          const row = document.createElement('div');
-          row.className = 'text-danger';
-          row.textContent = 'Could not load the scan status.';
-          scanCtx.status.appendChild(row);
-        }
+        if (!isLive(ctx)) return;
+        ctx.status.textContent = '';
+        const row = document.createElement('div');
+        row.className = 'text-danger';
+        row.textContent = 'Could not load the scan status.';
+        ctx.status.appendChild(row);
       });
   }
 
   function onClick() {
     if (!scanCtx || !scanCtx.current() || scanCtx.btn.disabled) return;
-    scanCtx.btn.disabled = true;
-    fetch(scanCtx.url, fetchOpts(scanCtx.csrf, 'POST'))
+    const ctx = scanCtx;
+    ctx.btn.disabled = true;
+    fetch(ctx.url, fetchOpts(ctx.csrf, 'POST'))
       .then(readJson)
       .then(res => {
-        if (!scanCtx.current()) return;
+        if (!isLive(ctx)) return;
         const body = res.body || {};
         if (res.status === 202) {
           pollStartedAt = Date.now();
@@ -185,24 +210,16 @@
           return;
         }
         if (res.status === 409 || res.status === 503) {
-          scanCtx.status.textContent = '';
-          const row = document.createElement('div');
-          row.className = 'text-danger';
-          row.textContent = body.error || 'That scan is not available.';
-          scanCtx.status.appendChild(row);
           render(lastState);
+          showError(ctx, body.error || 'That scan is not available.');
           return;
         }
         render(lastState);
       })
       .catch(() => {
-        if (!scanCtx.current()) return;
-        scanCtx.status.textContent = '';
-        const row = document.createElement('div');
-        row.className = 'text-danger';
-        row.textContent = 'The scan failed. Check your connection and try again.';
-        scanCtx.status.appendChild(row);
+        if (!isLive(ctx)) return;
         render(lastState);
+        showError(ctx, 'The scan failed. Check your connection and try again.');
       });
   }
 
