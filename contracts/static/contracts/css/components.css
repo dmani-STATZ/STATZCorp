@@ -48,6 +48,50 @@
     border-bottom: 1px solid rgba(255, 138, 128, 0.20);
 }
 
+/* Finance Audit header — metadata wraps instead of truncating, so closed date/user stay visible. */
+.finance-audit-header-bar .finance-audit-header-identity {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Finance Audit header actions — one size, one icon treatment. */
+.finance-audit-header-bar .finance-audit-header-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.finance-audit-header-bar .finance-audit-docs-group {
+    flex-wrap: nowrap;
+}
+
+.finance-audit-header-bar .finance-audit-explorer-btn {
+    padding-inline: 0.5rem;
+}
+
+/* Unavailable Explorer: the tooltip wrapper sits between the button and the
+ * btn-group, so Bootstrap's joined-edge rules don't reach the inner button. */
+.finance-audit-header-bar .finance-audit-explorer-wrap {
+    display: flex;
+    position: relative;
+    margin-left: calc(-1 * var(--bs-border-width));
+    border-top-right-radius: var(--statz-radius-sm);
+    border-bottom-right-radius: var(--statz-radius-sm);
+    cursor: not-allowed;
+}
+
+.finance-audit-header-bar .finance-audit-explorer-wrap > .btn {
+    pointer-events: none;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+.finance-audit-header-bar .finance-audit-explorer-wrap:focus-visible {
+    z-index: 1;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem var(--statz-focus-ring);
+}
+
 .finance-audit-stat-card {
     width: 220px;
     flex: 0 0 220px;

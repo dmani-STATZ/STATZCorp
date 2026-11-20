@@ -1,7 +1,7 @@
 ---
 id: 2026-11-19-user-access-page
 title: User Access page for superusers
-published: false
+published: true
 publish_date: 2026-11-19
 tags: [new, system]
 critical: false

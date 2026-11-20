@@ -16,13 +16,6 @@
     border-left: 3px solid #fd7e14;
     border-right: 3px solid #fd7e14;
 }
-.btn-folder-explorer {
-    border-color: #F8D775 !important;
-}
-.btn-folder-explorer:hover {
-    border-color: #F8D775 !important;
-    background-color: rgba(248, 215, 117, 0.15) !important;
-}
 </style>
 {% endblock %}
 
@@ -61,9 +54,14 @@
     {# Section A — Contract header bar #}
     <div class="finance-audit-header-bar finance-audit-header-bar--{% if contract.status.description == 'Closed' %}closed{% elif contract.status.description == 'Canceled' %}canceled{% else %}open{% endif %} rounded-top px-3 py-3 mb-3">
         <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between gap-3">
-            <div class="flex-grow-1 min-w-0">
-                <div class="fs-4 fw-bold text-body">{{ contract.contract_number }}</div>
-                <div class="small text-body-secondary text-truncate">
+            <div class="finance-audit-header-identity flex-grow-1">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="fs-4 fw-bold text-body">{{ contract.contract_number }}</span>
+                    <span class="status-pill status-pill--{{ contract.status.description|lower|default:'unknown' }}">
+                        {{ contract.status.description|default:"Unknown" }}
+                    </span>
+                </div>
+                <div class="small text-body-secondary">
                     PO {{ contract.po_number|default:"—" }}
                     <span class="text-body-secondary">·</span>
                     {{ contract.buyer|default:"—" }}
@@ -82,47 +80,58 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 flex-shrink-0 align-items-center">
-                <span class="status-pill status-pill--{{ contract.status.description|lower|default:'unknown' }}">
-                    {{ contract.status.description|default:"Unknown" }}
-                </span>
-                {% if contract.status.description == "Open" %}
-                <a href="{% url 'contracts:contract_close' contract.pk %}?next={{ request.path|urlencode }}" class="btn btn-sm btn-outline-danger">Close Contract</a>
-                {% endif %}
-                <div class="btn-group" role="group" aria-label="Documents actions">
+                <div class="btn-group finance-audit-docs-group" role="group" aria-label="Contract documents">
                     <button type="button" onclick="openDocumentsBrowser({{ contract.id }})"
-                        class="d-inline-flex align-items-center justify-content-center gap-1 small fw-medium btn btn-outline-brand">
-                        <svg xmlns="http://www.w3.org/2000/svg" style="width: 22px; height: 22px; flex-shrink: 0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                            <rect x="6" y="5" width="11" height="14" rx="1"/>
-                            <rect x="4" y="3" width="11" height="14" rx="1" fill="white" stroke="currentColor"/>
-                            <line x1="7" y1="8" x2="12" y2="8" stroke-linecap="round"/>
-                            <line x1="7" y1="11" x2="12" y2="11" stroke-linecap="round"/>
-                            <line x1="7" y1="14" x2="10" y2="14" stroke-linecap="round"/>
+                        class="btn btn-sm btn-secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="finance-audit-header-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                            <rect x="4" y="3" width="11" height="14" rx="1"/>
+                            <path d="M15 5h1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-1"/>
+                            <line x1="7" y1="7.5" x2="12" y2="7.5"/>
+                            <line x1="7" y1="10.5" x2="12" y2="10.5"/>
+                            <line x1="7" y1="13.5" x2="10" y2="13.5"/>
                         </svg>
                         Documents
                     </button>
                     {% if explorer_uri %}
                     <button type="button"
-                            class="btn btn-sm btn-outline-secondary btn-folder-explorer"
-                            style="border-color: #F8D775;"
+                            class="btn btn-sm btn-secondary finance-audit-explorer-btn"
                             onclick="window.location.href='{{ explorer_uri }}'; return false;"
+                            aria-label="Open contract folder in Windows Explorer"
                             title="Open contract folder in Windows Explorer">
-                        📁
+                        <svg xmlns="http://www.w3.org/2000/svg" class="finance-audit-header-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        </svg>
                     </button>
                     {% else %}
-                    <span tabindex="0"
+                    {% with explorer_hint="File path needs updating — open Documents and click Save Path to Contract" %}
+                    <span class="finance-audit-explorer-wrap"
+                          id="finance-audit-explorer-unavailable"
+                          tabindex="0"
+                          role="button"
+                          aria-disabled="true"
+                          aria-label="Open contract folder in Windows Explorer"
+                          aria-describedby="finance-audit-explorer-hint"
                           data-bs-toggle="tooltip"
                           data-bs-placement="top"
-                          title="File path needs updating — open Documents and click Save Path to Contract">
+                          data-bs-title="{{ explorer_hint }}">
                         <button type="button"
-                                class="btn btn-sm btn-outline-secondary btn-folder-explorer"
+                                class="btn btn-sm btn-secondary finance-audit-explorer-btn"
                                 disabled
-                                style="pointer-events: none; border-color: #F8D775;">
-                            📁
+                                tabindex="-1"
+                                aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="finance-audit-header-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            </svg>
                         </button>
                     </span>
+                    <span id="finance-audit-explorer-hint" hidden>{{ explorer_hint }}</span>
+                    {% endwith %}
                     {% endif %}
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-open-notes">Notes</button>
+                <button type="button" class="btn btn-sm btn-secondary" id="btn-open-notes">Notes</button>
+                {% if contract.status.description == "Open" %}
+                <a href="{% url 'contracts:contract_close' contract.pk %}?next={{ request.path|urlencode }}" class="btn btn-sm btn-outline-danger">Close Contract</a>
+                {% endif %}
                 <a href="{% url 'contracts:contract_management' contract.pk %}" class="btn btn-sm btn-primary">Back to Contract</a>
             </div>
         </div>
@@ -1194,6 +1203,14 @@ function openDocumentsBrowser(contractId) {
 // On page load, update localStorage and follow-me the documents window
 // if it is already open from a previous contract.
 document.addEventListener('DOMContentLoaded', function() {
+    const unavailableExplorer = document.getElementById('finance-audit-explorer-unavailable');
+    if (unavailableExplorer) {
+        const hintId = unavailableExplorer.getAttribute('aria-describedby');
+        // Bootstrap uses the visible tooltip as the description until it closes.
+        unavailableExplorer.addEventListener('hidden.bs.tooltip', function () {
+            unavailableExplorer.setAttribute('aria-describedby', hintId);
+        });
+    }
     if (window.bootstrap && bootstrap.Tooltip) {
         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
             try { bootstrap.Tooltip.getOrCreateInstance(el); } catch (e) { /* noop */ }
