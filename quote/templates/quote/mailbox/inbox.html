@@ -23,6 +23,8 @@
         <button type="button" class="quote-pill" data-filter="orphan">No SOL</button>
         <button type="button" class="quote-pill" data-filter="unquoted">Needs quote</button>
         <button type="button" class="quote-pill" data-filter="unread">Unread</button>
+        <button type="button" class="quote-pill" data-filter="ready">Quote ready</button>
+        <button type="button" class="quote-pill" data-filter="held">Held</button>
       </div>
     </div>
     <div class="quote-inbox-list" id="inboxList">
@@ -32,6 +34,7 @@
               data-orphan="{{ email.is_orphan|yesno:'1,0' }}"
               data-quoted="{{ email.quote_count|add:email.packhouse_count }}"
               data-read="{{ email.is_read|yesno:'1,0' }}"
+              data-triage="{{ email.triage_state }}"
               data-search="{{ email.sender_name|lower }} {{ email.sender_email|lower }} {{ email.subject|lower }} {{ email.body_preview|lower|truncatechars:400 }} {{ email.sol_numbers|join:' '|lower }} {{ email.supplier.name|default:''|lower }}">
         <span class="row-between">
           <span class="quote-inbox-sender">{{ email.supplier.name|default:email.sender_name|default:email.sender_email }}</span>
@@ -49,6 +52,13 @@
           {% endif %}
           {% if email.quote_count %}<span class="badge text-bg-success">{{ email.quote_count }} quote{{ email.quote_count|pluralize }} logged</span>{% endif %}
           {% if email.claimed_by_other %}<span class="badge text-bg-warning"><i class="bi bi-eye"></i> {{ email.claimed_by.first_name|default:email.claimed_by.username }}</span>{% endif %}
+          {% if email.triage_state == 'extracted' %}<span class="badge text-bg-info">Quote ready</span>
+          {% elif email.triage_state == 'extract_queued' %}<span class="badge text-bg-light border">Scanning</span>
+          {% elif email.triage_state == 'held_unknown_sender' %}<span class="badge text-bg-warning">Quote · set supplier</span>
+          {% elif email.triage_state == 'held_possible_block' %}<span class="badge text-bg-warning">Possible blocked</span>
+          {% elif email.triage_state == 'blocked' %}<span class="badge text-bg-secondary">Blocked</span>
+          {% elif email.triage_state == 'failed' %}<span class="badge text-bg-danger">Scan failed</span>
+          {% endif %}
         </span>
       </button>
       {% empty %}
@@ -121,6 +131,10 @@
       if (filter === 'orphan') show = el.dataset.orphan === '1';
       if (filter === 'unquoted') show = el.dataset.orphan === '0' && el.dataset.quoted === '0';
       if (filter === 'unread') show = el.dataset.read === '0';
+      if (filter === 'ready') show = el.dataset.triage === 'extracted';
+      if (filter === 'held') {
+        show = el.dataset.triage === 'held_unknown_sender' || el.dataset.triage === 'held_possible_block';
+      }
       if (show && q) {
         const hay = el.dataset.search;
         show = hay.includes(q) || (qDigits.length > 3 && hay.replace(/[^0-9a-z]/g, '').includes(qDigits));
@@ -207,6 +221,41 @@
   </div>
 </div>
 
+<div class="modal fade" id="quoteBlockModal" tabindex="-1" aria-labelledby="quoteBlockModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="quoteBlockModalLabel">Block sender</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="block_type" id="blockTypeEmail" value="email" checked>
+          <label class="form-check-label" for="blockTypeEmail">This address (<span id="blockLabelEmail"></span>)</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="block_type" id="blockTypeDomain" value="domain">
+          <label class="form-check-label" for="blockTypeDomain">Everyone at <span id="blockLabelDomain"></span></label>
+          <div class="form-text text-body-secondary" id="blockPublicDomainNote">Public mail domain: block the address instead.</div>
+        </div>
+        <div class="form-check" id="blockSupplierRow">
+          <input class="form-check-input" type="radio" name="block_type" id="blockTypeSupplier" value="supplier">
+          <label class="form-check-label" for="blockTypeSupplier">This supplier (<span id="blockLabelSupplier"></span>)</label>
+        </div>
+        <label class="form-label mt-2" for="blockReason">Reason</label>
+        <textarea class="form-control" id="blockReason" name="reason" rows="3" maxlength="500" required
+                  placeholder="Why are we blocking them? (required)"></textarea>
+        <div class="invalid-feedback" id="blockReasonError"></div>
+        <p class="form-text text-body-secondary mb-0 mt-2">Blocked senders&rsquo; emails are never sent to Jev or Sonnet. A superuser can unblock them in Quotes &rarr; Settings.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="quoteBlockConfirm">Block</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   const CSRF = '{{ csrf_token }}';
@@ -245,6 +294,75 @@
   // Modals are page-level; they act on whichever message is loaded.
   const linkModalEl = document.getElementById('linkSolModal');
   const supplierModalEl = document.getElementById('supplierModal');
+  const blockModalEl = document.getElementById('quoteBlockModal');
+
+  function detailDrawerOpen() {
+  const pane = document.getElementById('mailDetail');
+    return !!(pane && pane.querySelector('#quoteDrawer.show'));
+  }
+
+  function refreshDetailAfterAction(toastMsg, drawerToast) {
+    if (detailDrawerOpen()) {
+      window.showToast('info', drawerToast || 'Reopen the message to refresh.');
+      return;
+    }
+    if (toastMsg) window.showToast('success', toastMsg);
+    window.quoteMailbox.reload();
+  }
+
+  document.addEventListener('click', e => {
+    const blockBtn = e.target.closest('[data-action="block-sender"]');
+    if (blockBtn && current) {
+      const ds = current.root.dataset;
+      const fromHtml = (current.root.querySelector('.quote-msg-heading .text-body-secondary') || {}).innerHTML || '';
+      const fromMatch = /&lt;([^&]+)&gt;/.exec(fromHtml);
+      document.getElementById('blockLabelEmail').textContent = fromMatch ? fromMatch[1] : '';
+      document.getElementById('blockLabelDomain').textContent = ds.senderDomain || '';
+      const pub = ds.publicDomain === '1';
+      const domainRadio = document.getElementById('blockTypeDomain');
+      domainRadio.disabled = pub;
+      document.getElementById('blockPublicDomainNote').classList.toggle('d-none', !pub);
+      const supplierRow = document.getElementById('blockSupplierRow');
+      const hasSupplier = !!ds.supplierName;
+      supplierRow.classList.toggle('d-none', !hasSupplier);
+      document.getElementById('blockLabelSupplier').textContent = ds.supplierName || '';
+      document.getElementById('blockReason').value = '';
+      document.getElementById('blockReason').classList.remove('is-invalid');
+      document.getElementById('blockReasonError').textContent = '';
+      document.getElementById('blockTypeEmail').checked = true;
+      bootstrap.Modal.getOrCreateInstance(blockModalEl).show();
+    }
+  });
+  document.getElementById('quoteBlockConfirm').addEventListener('click', () => {
+    if (!current) return;
+    const reasonEl = document.getElementById('blockReason');
+    const reason = reasonEl.value.trim();
+    if (!reason) {
+      reasonEl.classList.add('is-invalid');
+      return;
+    }
+    reasonEl.classList.remove('is-invalid');
+    const blockType = document.querySelector('#quoteBlockModal input[name="block_type"]:checked');
+    if (!blockType || blockType.disabled) {
+      reasonEl.classList.add('is-invalid');
+      document.getElementById('blockReasonError').textContent = 'Pick a block type.';
+      return;
+    }
+    post(current.root.dataset.blockUrl, { block_type: blockType.value, reason: reason }).then(res => {
+      if (res.ok) {
+        bootstrap.Modal.getOrCreateInstance(blockModalEl).hide();
+        if (detailDrawerOpen()) {
+          window.showToast('info', 'Sender blocked. Reopen the message to refresh.');
+        } else {
+          window.showToast('success', res.body.message);
+          window.quoteMailbox.reload();
+        }
+      } else if (res.body && res.body.error) {
+        document.getElementById('blockReasonError').textContent = res.body.error;
+        reasonEl.classList.add('is-invalid');
+      }
+    });
+  });
 
   document.getElementById('linkSolSearch').addEventListener('input', debounce(e => {
     const q = e.target.value.trim();
@@ -337,6 +455,14 @@
         post(root.dataset.linkUrl, { sol: btn.dataset.sol }).then(res => {
           if (res.ok) { window.showToast('success', btn.dataset.sol + ' linked.'); window.quoteMailbox.reload(); }
           else { window.showToast('error', 'Could not link that solicitation.'); }
+        });
+      } else if (action === 'release-hold') {
+        post(root.dataset.releaseUrl, {}).then(res => {
+          if (res.ok) {
+            refreshDetailAfterAction('Scan queued.', 'Scan queued. Reopen the message to refresh.');
+          } else if (res.body && res.body.error) {
+            window.showToast('error', res.body.error);
+          }
         });
       } else if (action === 'open-drawer') {
         const needs = btn.dataset.needs;

@@ -22,6 +22,7 @@ from dibbs.models import Solicitation
 from quote.models import (
     QuoteEmail,
     QuoteEmailAttachment,
+    QuoteEmailTriage,
     QuoteSupplierQuote,
 )
 from quote.services import cost, email_scan, graph_inbox, mailbox, mailbox_ai, packhouse
@@ -84,9 +85,14 @@ def mailbox_page(request):
         .distinct()
     ):
         sol_numbers.setdefault(email_id, []).append(number)
+    ids = [e.pk for e in emails]
+    triage_states = dict(
+        QuoteEmailTriage.objects.filter(email_id__in=ids).values_list('email_id', 'state')
+    ) if ids else {}
     for email in emails:
         email.sol_numbers = sorted(sol_numbers.get(email.pk, []))
         email.claimed_by_other = email.is_claimed_by_other(request.user)
+        email.triage_state = triage_states.get(email.pk, '')
     selected = request.GET.get('email')
     return render(request, 'quote/mailbox/inbox.html', {
         'section': 'mailbox',
@@ -163,6 +169,9 @@ def email_detail(request, email_id):
         q.card = card_of_row.get(q.pk)
         # Say so when a quote did not come from this very message (an earlier email, a phone call, ...).
         q.source_note = via_text(q) if q.source_email_id != email.pk else ''
+    scan_enabled = email_scan.enabled()
+    sender = (email.sender_email or '').strip().lower()
+    sender_domain = sender.rsplit('@', 1)[1] if '@' in sender else ''
     return render(request, 'quote/mailbox/_detail.html', {
         'email': email,
         'logged_sols': logged_sols,
@@ -175,7 +184,10 @@ def email_detail(request, email_id):
         ),
         'linked': grouped,
         'suggestion': suggestion,
-        'scan_enabled': email_scan.enabled(),
+        'scan_enabled': scan_enabled,
+        'scan_ui': email_scan.scan_state(email) if scan_enabled else None,
+        'sender_domain': sender_domain,
+        'sender_is_public': sender_domain in mailbox.PUBLIC_MAIL_DOMAINS,
         'drawer_json': drawer_payload(grouped, cards),
         'quotes': quotes,
         'packhouse_replies': [

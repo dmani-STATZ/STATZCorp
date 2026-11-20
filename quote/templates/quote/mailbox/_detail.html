@@ -14,6 +14,11 @@
      data-packhouse-preview-url="{% url 'quote:packhouse_preview' '_SOL_' %}"
      data-packhouse-send-url="{% url 'quote:packhouse_send' '_SOL_' %}"
      data-packhouse-reply-url="{% url 'quote:packhouse_record_reply' 0 %}"
+     data-block-url="{% url 'quote:email_block' email.pk %}"
+     data-release-url="{% url 'quote:email_release' email.pk %}"
+     data-sender-domain="{{ sender_domain }}"
+     data-supplier-name="{{ email.supplier.name|default:'' }}"
+     data-public-domain="{{ sender_is_public|yesno:'1,0' }}"
      {% if scan_enabled %}data-scan-prefill-url="{% url 'quote:email_scan_prefill' email.pk %}"{% endif %}>
 
   {% if claimed_by_other %}
@@ -46,7 +51,7 @@
         {% if scan_enabled %}
         {# Label and state come from quote:email_scan (static/quote/js/email-scan.js). A scan never saves a quote. #}
         <button type="button" class="btn btn-outline-primary btn-sm" data-scan-button disabled
-                title="Read this message and its attachments, then fill the quote tray">
+                title="Read this message and its attachments in the background, then fill the quote tray">
           <span class="spinner-border spinner-border-sm d-none" data-scan-spinner aria-hidden="true"></span>
           <i class="bi bi-stars" data-scan-icon></i> <span data-scan-label>Scan quote</span>
         </button>
@@ -57,10 +62,36 @@
                 title="Log this supplier's quote">
           <i class="bi bi-lightning-charge-fill"></i> Log supplier quote
         </button>
+        <div class="btn-group">
+          <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">More</button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><button type="button" class="dropdown-item" data-action="block-sender">Block sender&hellip;</button></li>
+          </ul>
+        </div>
       </div>
       {% if scan_enabled %}<div class="quote-scan-status" data-scan-status aria-live="polite"></div>{% endif %}
     </div>
   </header>
+
+  {% if scan_ui and scan_ui.triage %}
+    {% with triage=scan_ui.triage %}
+      {% if triage.state == 'extracted' %}
+        <div class="alert alert-info alert-sm py-2 px-3 mb-2">Quote data extracted. Open Log supplier quote to use it.</div>
+      {% elif triage.state == 'extract_queued' %}
+        <div class="alert alert-light border alert-sm py-2 px-3 mb-2">Scanning in the background&hellip;</div>
+      {% elif triage.state == 'held_unknown_sender' %}
+        <div class="alert alert-warning alert-sm py-2 px-3 mb-2">Looks like a quote, but the sender isn&rsquo;t a known supplier. Set the supplier to scan it automatically, or click Scan quote.</div>
+      {% elif triage.state == 'held_possible_block' %}
+        <div class="alert alert-warning alert-sm py-2 px-3 mb-2">Looks like a quote that may involve a blocked company: {{ triage.block_label }}. <button type="button" class="btn btn-sm btn-outline-dark ms-2" data-action="release-hold">Scan anyway</button></div>
+      {% elif triage.state == 'blocked' %}
+        <div class="alert alert-secondary alert-sm py-2 px-3 mb-2">Sender is blocked. This message is not sent for scanning.</div>
+      {% elif triage.state == 'not_quote' %}
+        <div class="alert alert-light border alert-sm py-2 px-3 mb-2">Jev: probably not a quote.</div>
+      {% elif triage.state == 'failed' %}
+        <div class="alert alert-danger alert-sm py-2 px-3 mb-2">The automatic scan failed. Click Scan quote to try again.</div>
+      {% endif %}
+    {% endwith %}
+  {% endif %}
 
   <div class="quote-msg-sols">
     {% for number, entry in linked.items %}

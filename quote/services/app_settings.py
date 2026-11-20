@@ -348,6 +348,7 @@ def page_context(values=None, errors=None):
             'section': spec.section, 'available': spec.available, 'editable': spec.editable,
             'value': value, 'error': errors.get(spec.key, ''),
         }
+    from quote.models import QuoteSenderBlock
     return {
         'fields': fields,
         'email_scan_numbers': [f for f in fields.values()
@@ -356,6 +357,10 @@ def page_context(values=None, errors=None):
         'confirm_scan_error': errors.get(CONFIRM_SCAN_FIELD, ''),
         'test_sends': list(QuoteTestSend.objects.select_related('sent_by').order_by('-id')[:RECENT_TEST_SENDS]),
         'status': status_snapshot(),
+        'blocks': list(
+            QuoteSenderBlock.objects.select_related('created_by', 'supplier')
+            .order_by('-is_active', '-id')[:100]
+        ),
     }
 
 

@@ -2,10 +2,11 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from quote.services import app_settings
+from quote.models import QuoteSenderBlock
+from quote.services import app_settings, blocklist
 
 
 def _superuser(request):
@@ -37,3 +38,36 @@ def settings_save(request):
         'section': 'settings',
         **app_settings.page_context(values=result.values, errors=result.errors),
     })
+
+
+@login_required
+@require_POST
+def settings_block_add(request):
+    _superuser(request)
+    try:
+        blocklist.add_block(
+            request.POST.get('block_type', ''),
+            request.POST.get('value', ''),
+            request.POST.get('label', ''),
+            request.POST.get('reason', ''),
+            supplier=None,
+            user=request.user,
+        )
+    except blocklist.BlockInvalid as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, 'Blocked.')
+    return redirect('quote:settings')
+
+
+@login_required
+@require_POST
+def settings_block_deactivate(request, block_id):
+    _superuser(request)
+    block = get_object_or_404(QuoteSenderBlock, pk=block_id)
+    blocklist.deactivate_block(block, request.user)
+    messages.success(
+        request,
+        'Unblocked. Their new emails will be scanned again; use Scan quote on older ones.',
+    )
+    return redirect('quote:settings')

@@ -7,8 +7,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from quote.models import QuoteSetting, QuoteSettingChange, QuoteSolicitation
-from quote.services import app_settings
+from quote.models import QuoteSenderBlock, QuoteSetting, QuoteSettingChange, QuoteSolicitation
+from quote.services import app_settings, blocklist
 from quote.services.rfq import queue_rfqs
 from quote.tests.test_outbound import TEST_ADDRESS, turn_on
 from quote.tests.test_phase1 import Phase1Base
@@ -170,6 +170,17 @@ class SettingsAccessTests(TestCase):
             self.client.post(reverse('quote:settings_save'), {'section': 'rfqs', 'rfq_test_mode': 'on'}).status_code,
             403,
         )
+        self.assertEqual(
+            self.client.post(reverse('quote:settings_block_add'), {
+                'block_type': 'email', 'value': 'x@y.com', 'reason': 'nope',
+            }).status_code,
+            403,
+        )
+        block = blocklist.add_block('email', 'block-me@test.example', reason='setup', user=self.superuser)
+        self.assertEqual(
+            self.client.post(reverse('quote:settings_block_deactivate', args=[block.pk])).status_code,
+            403,
+        )
         page = self.client.get(reverse('quote:dashboard'))
         self.assertEqual(page.status_code, 200)
         self.assertNotContains(page, reverse('quote:settings'))
@@ -179,6 +190,8 @@ class SettingsAccessTests(TestCase):
         self.client.force_login(self.superuser)
         page = self.client.get(reverse('quote:settings'))
         self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'Blocked senders')
+        self.assertContains(page, reverse('quote:settings_block_add'))
         self.assertContains(page, 'name="email_scan_enabled"')
         self.assertContains(page, 'name="confirm_scan_on"')
         self.assertContains(page, 'name="jev_min_quote_probability"')
@@ -274,3 +287,46 @@ class StatusCardTests(TestCase):
         resp = self._page_survives('quote.services.app_settings._quote_tasks_status')
         self.assertContains(resp, 'API key present:')
         self.assertNotContains(resp, 'archive_stale_solicitations')
+
+
+class SettingsBlockTests(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser('boss', 'boss@example.com', 'x')
+        self.client.force_login(self.superuser)
+
+    def test_add_creates_block(self):
+        count_before = QuoteSenderBlock.objects.count()
+        resp = self.client.post(reverse('quote:settings_block_add'), {
+            'block_type': 'email', 'value': 'spam@evil.example', 'label': 'Evil', 'reason': 'Spam',
+        })
+        self.assertRedirects(resp, reverse('quote:settings'))
+        self.assertEqual(QuoteSenderBlock.objects.count(), count_before + 1)
+        self.assertTrue(QuoteSenderBlock.objects.filter(value='spam@evil.example', is_active=True).exists())
+
+    def test_public_domain_add_shows_error_and_creates_nothing(self):
+        count_before = QuoteSenderBlock.objects.count()
+        resp = self.client.post(reverse('quote:settings_block_add'), {
+            'block_type': 'domain', 'value': 'gmail.com', 'reason': 'nope',
+        }, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.request['PATH_INFO'], reverse('quote:settings'))
+        self.assertEqual(QuoteSenderBlock.objects.count(), count_before)
+        self.assertContains(resp, 'public mail domain')
+
+    def test_deactivate_and_re_add_reactivates(self):
+        block = blocklist.add_block('domain', 'evil.example', reason='first', user=self.superuser)
+        self.client.post(reverse('quote:settings_block_deactivate', args=[block.pk]))
+        block.refresh_from_db()
+        self.assertFalse(block.is_active)
+        self.client.post(reverse('quote:settings_block_add'), {
+            'block_type': 'domain', 'value': 'evil.example', 'reason': 'again',
+        })
+        block.refresh_from_db()
+        self.assertTrue(block.is_active)
+        self.assertEqual(QuoteSenderBlock.objects.filter(block_type='domain', value='evil.example').count(), 1)
+
+    def test_deactivate_unknown_block_is_404(self):
+        self.assertEqual(
+            self.client.post(reverse('quote:settings_block_deactivate', args=[99999])).status_code,
+            404,
+        )

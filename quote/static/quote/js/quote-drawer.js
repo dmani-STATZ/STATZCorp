@@ -241,7 +241,7 @@
       renderLines();
       applyingScan = false;
       const bits = [];
-      if (filled) bits.push('Filled from the ' + (p.level === 'deep' ? 'deep' : 'normal') + ' scan; check every value before saving.');
+      if (filled) bits.push('Filled from the scan; check every value before saving.');
       (p.flags || []).forEach(msg => bits.push(msg));
       const note = $('#qScanNote');
       if (!note) return;

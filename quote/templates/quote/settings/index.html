@@ -51,6 +51,68 @@
 </div>
 
 <div class="card card-padded mb-3">
+  <h2 class="h6">Blocked senders</h2>
+  <form method="post" action="{% url 'quote:settings_block_add' %}" class="mb-3">
+    {% csrf_token %}
+    <div class="row g-2">
+      <div class="col-md-2">
+        <label class="label" for="block_type">Type</label>
+        <select class="form-select form-select-sm" id="block_type" name="block_type" required>
+          <option value="cage">CAGE</option>
+          <option value="email">Email</option>
+          <option value="domain">Domain</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="label" for="block_value">Value</label>
+        <input type="text" class="form-control form-control-sm" id="block_value" name="value" maxlength="254" required>
+      </div>
+      <div class="col-md-3">
+        <label class="label" for="block_label">Label</label>
+        <input type="text" class="form-control form-control-sm" id="block_label" name="label" maxlength="200">
+      </div>
+      <div class="col-md-4">
+        <label class="label" for="block_reason">Reason</label>
+        <input type="text" class="form-control form-control-sm" id="block_reason" name="reason" maxlength="500" required>
+      </div>
+    </div>
+    <button class="btn btn-outline-danger btn-sm mt-2" type="submit">Add block</button>
+  </form>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Type</th><th>Value</th><th>Label</th><th>Reason</th><th>Added by</th><th>Added</th><th>Status</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for block in blocks %}
+        <tr>
+          <td>{{ block.get_block_type_display }}</td>
+          <td class="font-monospace small">{{ block.value }}</td>
+          <td>{{ block.label|default:"—" }}</td>
+          <td class="small">{{ block.reason|truncatechars:80 }}</td>
+          <td class="small">{{ block.created_by|default:"—" }}</td>
+          <td class="small">{{ block.created_at|date:"M j, Y" }}</td>
+          <td>{% if block.is_active %}Active{% else %}Inactive{% endif %}</td>
+          <td>
+            {% if block.is_active %}
+            <form method="post" action="{% url 'quote:settings_block_deactivate' block.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-secondary">Unblock</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="text-body-secondary">No blocked senders yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card card-padded mb-3">
   <h2 class="h6">RFQs</h2>
   {% if form_error %}<div class="alert alert-danger py-2">{{ form_error }}</div>{% endif %}
   <form method="post" action="{% url 'quote:settings_save' %}" class="mb-3">

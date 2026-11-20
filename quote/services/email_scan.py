@@ -3,7 +3,6 @@ Mailbox "Scan quote": Claude reads one supplier email (body text + PDF / PNG / J
 pulls out what a rep would type into the Log quote tray.
 
   scan_state(email)                  -> what the Scan button should offer, from the scan rows
-  run_scan(email, level, user)       -> QuoteEmailScan (normal = Haiku, deep = Sonnet), in the request
   queue_scan / process_scan_queue    -> background extraction (Sonnet) run by the email pipeline task
   execute_scan(scan)                 -> the one Claude call path, shared by both
   build_prefill(email, sol, supplier)-> tray values for one SOL (empty when a quote is already on file)
@@ -24,7 +23,6 @@ from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 
 import requests
-from django.conf import settings
 from django.db.models import F
 from django.utils import timezone
 
@@ -71,7 +69,7 @@ DOC_TYPE_TEXT = {
 
 
 class ScanDisabled(Exception):
-    """QUOTE_EMAIL_SCAN_ENABLED is off."""
+    """The background scan worker is not available."""
 
 
 class ScanNotAllowed(Exception):
@@ -83,7 +81,9 @@ class ScanWorkerUnavailable(Exception):
 
 
 def enabled():
-    return bool(getattr(settings, 'QUOTE_EMAIL_SCAN_ENABLED', False))
+    """True when the ``process_quote_email_pipeline`` worker row exists and is enabled."""
+    from core.models import ScheduledTask
+    return ScheduledTask.objects.filter(name=WORKER_TASK, is_enabled=True).exists()
 
 
 # ── Reading the message ──────────────────────────────────────────────────────
@@ -487,36 +487,21 @@ def _active_summary(rows):
 
 def scan_state(email):
     """
-    {'next_level': 'normal' | 'deep' | None, 'latest': summary | None, 'triage': … | None,
-    'active': queued / running scan | None}, from the database.
+    {'latest': summary | None, 'triage': … | None, 'active': queued / running scan | None}, from the DB.
     """
     rows = list(email.scans.order_by('-id').values(*_STATE_FIELDS)[:20])
-    completed = {r['level'] for r in rows if r['status'] == QuoteEmailScan.STATUS_COMPLETED}
-    if QuoteEmailScan.LEVEL_DEEP in completed:
-        next_level = None
-    elif QuoteEmailScan.LEVEL_NORMAL in completed:
-        next_level = QuoteEmailScan.LEVEL_DEEP
-    else:
-        next_level = QuoteEmailScan.LEVEL_NORMAL
     return {
-        'next_level': next_level,
         'latest': summarize(rows[0]) if rows else None,
         'triage': _triage_summary(email),
         'active': _active_summary(rows),
     }
 
 
-def scan_response(scan):
-    """The POST answer: the scan's summary plus what the button offers next."""
-    row = QuoteEmailScan.objects.filter(pk=scan.pk).values(*_STATE_FIELDS).first()
-    return dict(summarize(row), next_level=scan_state(scan.email)['next_level'])
-
-
 # ── Running a scan ───────────────────────────────────────────────────────────
 
 def _model_for(level):
-    from core.anthropic_client import CLAUDE_HAIKU_MODEL, CLAUDE_SONNET_MODEL
-    return CLAUDE_SONNET_MODEL if level == QuoteEmailScan.LEVEL_DEEP else CLAUDE_HAIKU_MODEL
+    from core.anthropic_client import CLAUDE_SONNET_MODEL
+    return CLAUDE_SONNET_MODEL
 
 
 def _budget_available():
@@ -563,40 +548,6 @@ def build_result(extraction, listing):
     )
 
 
-def _refuse_blocked(email):
-    from quote.services.blocklist import find_code_block
-
-    state = QuoteEmailTriage.objects.filter(email=email).values_list('state', flat=True).first()
-    if state == QuoteEmailTriage.STATE_BLOCKED or find_code_block(email) is not None:
-        raise ScanNotAllowed('This sender is blocked, so the email cannot be scanned.')
-
-
-def run_scan(email, level, user):
-    if not enabled():
-        raise ScanDisabled()
-    if level not in (QuoteEmailScan.LEVEL_NORMAL, QuoteEmailScan.LEVEL_DEEP):
-        raise ScanNotAllowed('Unknown scan level.')
-    _refuse_blocked(email)
-
-    now = timezone.now()
-    email.scans.filter(
-        status=QuoteEmailScan.STATUS_RUNNING, started_at__isnull=True, created_at__lt=now - IN_FLIGHT_WINDOW,
-    ).update(status=QuoteEmailScan.STATUS_FAILED, error_text=STALE_MESSAGE)
-    completed = set(email.scans.filter(status=QuoteEmailScan.STATUS_COMPLETED).values_list('level', flat=True))
-    if level == QuoteEmailScan.LEVEL_NORMAL and QuoteEmailScan.LEVEL_NORMAL in completed:
-        raise ScanNotAllowed('This message already has a normal scan. Run a deep scan instead.')
-    if level == QuoteEmailScan.LEVEL_DEEP:
-        if QuoteEmailScan.LEVEL_NORMAL not in completed:
-            raise ScanNotAllowed('Run a normal scan first.')
-        if QuoteEmailScan.LEVEL_DEEP in completed:
-            raise ScanNotAllowed('This message already has a deep scan.')
-    running = email.scans.filter(level=level, status=QuoteEmailScan.STATUS_RUNNING).order_by('-id').first()
-    if running:
-        return running
-    scan = _create(email, level, user, status=QuoteEmailScan.STATUS_RUNNING)
-    return execute_scan(scan)
-
-
 _FINISH_FIELDS = ['status', 'error_text', 'result_json', 'flags_json', 'input_tokens', 'output_tokens',
                   'content_hash', 'model_name', 'from_cache', 'finished_at']
 
@@ -624,6 +575,22 @@ def execute_scan(scan):
     """
     email = scan.email
     level = scan.level
+    from quote.services import blocklist
+    block = blocklist.find_code_block(email)
+    if block:
+        now = timezone.now()
+        scan.status = QuoteEmailScan.STATUS_FAILED
+        scan.error_text = 'Sender is blocked.'
+        scan.finished_at = now
+        scan.save(update_fields=['status', 'error_text', 'finished_at'])
+        triage = QuoteEmailTriage.objects.filter(email=email).first()
+        if triage is not None:
+            triage.state = QuoteEmailTriage.STATE_BLOCKED
+            triage.reason = f'code_block:{block.block_type}'
+            triage.block_entry = block
+            triage.state_changed_at = now
+            triage.save(update_fields=['state', 'reason', 'block_entry', 'state_changed_at'])
+        return scan
     started = time.monotonic()
     body, attachments, skipped = _gather(email)
     listing = {'attachments': [a['name'] for a in attachments], 'skipped_attachments': skipped}

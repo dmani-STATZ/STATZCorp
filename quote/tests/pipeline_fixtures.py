@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from core.models import APIBudget
+from core.models import APIBudget, ScheduledTask
 from quote.models import QuoteEmail, QuoteEmailAttachment
 from quote.services import app_settings
 from suppliers.models import Contact, Supplier
@@ -88,6 +88,7 @@ class PipelineBase(TestCase):
         self.supplier = Supplier.objects.create(name='Echelon Supply', cage_code='61125')
         Contact.objects.create(name='Sam', email='sam@echelon.example', supplier=self.supplier)
         app_settings.save_section('email_scan', {'email_scan_enabled': 'on', 'confirm_scan_on': '1'}, self.user)
+        ScheduledTask.objects.filter(name='process_quote_email_pipeline').update(is_enabled=True)
         self.cutoff = app_settings.get('email_scan_enabled_at')
         self.count = 0
 

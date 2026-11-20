@@ -4,10 +4,9 @@ from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.test import override_settings
 from django.utils import timezone
 
-from core.models import APIBudget
+from core.models import APIBudget, ScheduledTask
 from dibbs.models import ImportBatch, Solicitation, SolicitationLine
 from quote.models import QuoteEmailScan, QuoteEmailTriage
 from quote.services import blocklist, email_scan
@@ -19,6 +18,10 @@ from quote.tests.test_email_scan import echelon, reply
 
 
 class QueueBase(PipelineBase):
+    def setUp(self):
+        super().setUp()
+        ScheduledTask.objects.filter(name='process_quote_email_pipeline').update(is_enabled=True)
+
     def queued(self, trigger='auto', email=None, triage_state='extract_queued', body=None):
         email = email or self.make_email(body=body or f'<p>Quote {self.count + 1}</p>')
         if triage_state:
@@ -180,7 +183,6 @@ class DailyCapTests(QueueBase):
             self.assertEqual(email_scan.auto_calls_today(), 0)
 
 
-@override_settings(QUOTE_EMAIL_SCAN_ENABLED=True)
 class RealQuoteTests(QueueBase):
     def setUp(self):
         super().setUp()
@@ -228,13 +230,6 @@ class RealQuoteTests(QueueBase):
 
 
 class ManualButtonTests(QueueBase):
-    @override_settings(QUOTE_EMAIL_SCAN_ENABLED=True)
-    def test_run_scan_refuses_a_blocked_sender(self):
-        blocklist.add_block('domain', 'echelon.example')
-        with patch(CALL) as call, self.assertRaises(email_scan.ScanNotAllowed):
-            email_scan.run_scan(self.make_email(), 'normal', self.user)
-        call.assert_not_called()
-
     def test_scan_state_reports_triage_and_the_active_scan(self):
         scan = self.queued()
         state = email_scan.scan_state(scan.email)

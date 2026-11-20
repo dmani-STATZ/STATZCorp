@@ -19,7 +19,7 @@ from .capabilities import (
     capability_supplier,
 )
 from .dashboard import dashboard
-from .email_scan import scan_email, scan_prefill
+from .email_scan import email_block, email_release, scan_email, scan_prefill
 from .our_bids import our_bids, outcome_detail, reconcile_now
 from .mailbox import (
     attachment_download,
@@ -43,7 +43,7 @@ from .quotes import (
     rfq_close,
 )
 from .rfq import rfq_queue, rfq_remove, rfq_send, rfq_send_all
-from .settings import settings_page, settings_save
+from .settings import settings_block_add, settings_block_deactivate, settings_page, settings_save
 from .solicitations import (
     add_match,
     claim,
@@ -96,6 +96,8 @@ __all__ = [
     'mailbox_page',
     'mailbox_sync',
     'save_quote',
+    'email_block',
+    'email_release',
     'scan_email',
     'scan_prefill',
     'solicitation_search',
@@ -113,6 +115,8 @@ __all__ = [
     'rfq_send',
     'rfq_send_all',
     'set_status',
+    'settings_block_add',
+    'settings_block_deactivate',
     'settings_page',
     'settings_save',
     'solicitation_queue',

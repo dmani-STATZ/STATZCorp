@@ -373,8 +373,7 @@ def _refuse_blocked(email):
 
 
 def _require_worker():
-    from core.models import ScheduledTask
-    if not ScheduledTask.objects.filter(name=email_scan.WORKER_TASK, is_enabled=True).exists():
+    if not email_scan.enabled():
         raise ScanWorkerUnavailable("Background scanning isn't running right now.")
 
 
@@ -395,10 +394,58 @@ def request_manual_scan(email, user):
     (scan, created). Queues one manual scan for the worker, or returns the one already queued /
     running. Works with or without a triage row and with the switch on or off. No Claude call here.
     """
-    _refuse_blocked(email)
     _require_worker()
+    triage = QuoteEmailTriage.objects.filter(email=email).first()
+    if triage is not None and triage.state == QuoteEmailTriage.STATE_BLOCKED and blocklist.find_code_block(email) is None:
+        triage.state = QuoteEmailTriage.STATE_EXTRACT_QUEUED
+        triage.reason = 'unblocked'
+        triage.state_changed_at = timezone.now()
+        triage.save(update_fields=['state', 'reason', 'state_changed_at'])
+    _refuse_blocked(email)
     active = (email.scans.filter(status__in=[QuoteEmailScan.STATUS_QUEUED, QuoteEmailScan.STATUS_RUNNING])
               .order_by('-id').first())
     if active is not None:
         return active, False
     return email_scan.queue_scan(email, QuoteEmailScan.TRIGGER_MANUAL, user), True
+
+
+def block_sender(email, block_type, reason, user, label=''):
+    if block_type not in ('email', 'domain', 'supplier'):
+        raise ValueError('Unknown block type.')
+    reason = (reason or '').strip()
+    if not reason:
+        raise ValueError('A reason is required.')
+    reason = reason[:500]
+    sender = (email.sender_email or '').strip().lower()
+    if block_type == 'email':
+        value = sender
+    elif block_type == 'domain':
+        if '@' not in sender:
+            raise ValueError('Enter a valid email address.')
+        value = sender.rsplit('@', 1)[1]
+    else:
+        if email.supplier_id is None:
+            raise ValueError('This message has no supplier.')
+        value = str(email.supplier_id)
+    if not (label or '').strip():
+        label = (email.supplier.name if email.supplier_id else
+                 (sender.rsplit('@', 1)[1] if '@' in sender else ''))
+    try:
+        block = blocklist.add_block(
+            block_type, value, label, reason,
+            supplier=email.supplier if block_type == 'supplier' else None,
+            user=user,
+        )
+    except blocklist.BlockInvalid as exc:
+        raise ValueError(str(exc)) from None
+    now = timezone.now()
+    triage, _ = QuoteEmailTriage.objects.get_or_create(
+        email=email,
+        defaults={'state': QuoteEmailTriage.STATE_BLOCKED},
+    )
+    triage.state = QuoteEmailTriage.STATE_BLOCKED
+    triage.reason = f'code_block:{block_type}'
+    triage.block_entry = block
+    triage.state_changed_at = now
+    triage.save(update_fields=['state', 'reason', 'block_entry', 'state_changed_at'])
+    return block

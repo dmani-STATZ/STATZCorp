@@ -50,6 +50,8 @@ urlpatterns = [
     path('mailbox/<int:email_id>/quote/', views.save_quote, name='save_quote'),
     path('mailbox/<int:email_id>/scan/', views.scan_email, name='email_scan'),
     path('mailbox/<int:email_id>/scan/prefill/', views.scan_prefill, name='email_scan_prefill'),
+    path('mailbox/<int:email_id>/block/', views.email_block, name='email_block'),
+    path('mailbox/<int:email_id>/release/', views.email_release, name='email_release'),
     path('mailbox/attachments/<int:attachment_id>/', views.attachment_download, name='attachment_download'),
     path('mailbox/attachments/<int:attachment_id>/view/', views.attachment_view, name='attachment_view'),
     # Phase 2 -- packhouse packaging-quote requests (drawer packaging section + message pane)
@@ -83,6 +85,8 @@ urlpatterns = [
     # Settings (superuser only; the views enforce it)
     path('settings/', views.settings_page, name='settings'),
     path('settings/save/', views.settings_save, name='settings_save'),
+    path('settings/blocks/add/', views.settings_block_add, name='settings_block_add'),
+    path('settings/blocks/<int:block_id>/deactivate/', views.settings_block_deactivate, name='settings_block_deactivate'),
     path('research/', research_views.supplier_research, name='supplier_research'),
     path(
         'research/<str:cage>/export/',

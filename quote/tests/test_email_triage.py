@@ -193,6 +193,7 @@ class ReleaseTests(TriageBase):
 
     def test_release_hold_and_manual_scan_refuse_blocked(self):
         email = self.make_email()
+        blocklist.add_block('email', email.sender_email)
         QuoteEmailTriage.objects.create(email=email, state='blocked')
         with self.assertRaises(email_scan.ScanNotAllowed):
             email_triage.release_hold(email, self.user)
